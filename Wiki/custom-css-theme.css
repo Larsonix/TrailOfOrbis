@@ -1,0 +1,473 @@
+/* ================================================================
+   TRAIL OF ORBIS — Custom Wiki Theme
+   Subtle gold accents on warm dark background
+   "High-end leather-bound book with gold leaf details"
+   ================================================================ */
+
+
+/* ----------------------------------------------------------------
+   1. FOUNDATION — CSS Variables
+   These cascade to every component automatically.
+   ---------------------------------------------------------------- */
+
+html.dark {
+  /* Page background — barely warm black */
+  --background: oklch(0.15 0.008 55);
+  --foreground: oklch(0.90 0.008 75);
+
+  /* Cards & containers */
+  --card: oklch(0.18 0.007 55);
+  --card-foreground: oklch(0.90 0.008 75);
+
+  /* Gold accent — links, active states, buttons */
+  --primary: oklch(0.72 0.11 75);
+  --primary-foreground: oklch(0.15 0.01 55);
+
+  /* Secondary elements */
+  --secondary: oklch(0.22 0.008 55);
+  --secondary-foreground: oklch(0.85 0.008 70);
+
+  /* Muted text — dates, descriptions, sidebar items */
+  --muted: oklch(0.20 0.006 55);
+  --muted-foreground: oklch(0.55 0.02 65);
+
+  /* Hover backgrounds, active sidebar item */
+  --accent: oklch(0.22 0.012 60);
+  --accent-foreground: oklch(0.90 0.008 75);
+
+  /* Borders — warm dark, not cold gray */
+  --border: oklch(0.28 0.012 55);
+
+  /* Danger/error */
+  --destructive: oklch(0.55 0.2 25);
+
+  /* Focus ring — gold instead of blue */
+  --ring: oklch(0.72 0.11 75);
+}
+
+
+/* ----------------------------------------------------------------
+   2. HEADINGS — Solid gold, clean and sharp
+   ---------------------------------------------------------------- */
+
+.prose h1 {
+  color: oklch(0.82 0.09 78) !important;
+  letter-spacing: 0.02em;
+}
+
+.prose h2 {
+  color: oklch(0.78 0.08 76) !important;
+  letter-spacing: 0.01em;
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid oklch(0.35 0.04 70) !important;
+}
+
+.prose h3 {
+  color: oklch(0.72 0.06 74) !important;
+}
+
+.prose h4 {
+  color: oklch(0.68 0.05 72) !important;
+}
+
+/* Copy-link button on headings — subtle until hovered */
+.copy-heading-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.heading-with-link:hover .copy-heading-btn {
+  opacity: 0.5;
+}
+.copy-heading-btn:hover {
+  opacity: 1 !important;
+  color: oklch(0.72 0.11 75);
+}
+
+
+/* ----------------------------------------------------------------
+   3. LINKS — Gold, underline on hover
+   ---------------------------------------------------------------- */
+
+.prose a {
+  color: oklch(0.72 0.11 75) !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.prose a:hover {
+  color: oklch(0.82 0.13 80) !important;
+  border-bottom-color: oklch(0.60 0.09 75);
+}
+
+
+/* ----------------------------------------------------------------
+   4. TABLES — Dark header, gold text, row hover
+   Our wiki is data-heavy so tables matter a lot.
+   ---------------------------------------------------------------- */
+
+.prose table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+.prose thead {
+  background: oklch(0.20 0.012 58) !important;
+}
+
+.prose th {
+  color: oklch(0.78 0.08 76) !important;
+  font-weight: 600;
+  border-bottom: 2px solid oklch(0.38 0.04 70) !important;
+  padding: 0.6em 0.8em !important;
+}
+
+.prose td {
+  border-color: oklch(0.25 0.01 55) !important;
+  padding: 0.5em 0.8em !important;
+  transition: background-color 0.15s ease;
+}
+
+/* First column of table body — white text for labels (unless a keyword link overrides) */
+.prose tbody td:first-child {
+  color: oklch(0.92 0.005 70) !important;
+  font-weight: 600;
+}
+
+/* Alternating rows — barely visible warm tint */
+.prose tbody tr:nth-child(even) {
+  background: oklch(0.17 0.006 55);
+}
+
+/* Row hover — subtle gold warmth */
+.prose tbody tr:hover {
+  background: oklch(0.22 0.015 65) !important;
+}
+
+
+/* ----------------------------------------------------------------
+   5. CODE — Dark warm background, gold left accent
+   ---------------------------------------------------------------- */
+
+.prose pre {
+  background: oklch(0.13 0.008 50) !important;
+  border: 1px solid oklch(0.25 0.01 55) !important;
+  border-left: 3px solid oklch(0.45 0.06 72) !important;
+}
+
+/* Inline code */
+.prose code,
+.inline-code {
+  background: oklch(0.20 0.01 55) !important;
+  border: 1px solid oklch(0.28 0.012 55) !important;
+  color: oklch(0.82 0.06 75) !important;
+  padding: 0.15em 0.35em !important;
+  border-radius: 4px !important;
+}
+
+/* Don't double-style code inside pre */
+.prose pre code {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit !important;
+}
+
+
+/* ----------------------------------------------------------------
+   6. CARDS — Thin gold top border, subtle shadow
+   ---------------------------------------------------------------- */
+
+[data-slot="card"] {
+  border-top: 2px solid oklch(0.40 0.05 72) !important;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3),
+              0 0 12px oklch(0.72 0.11 75 / 0.04) !important;
+}
+
+
+/* ----------------------------------------------------------------
+   7. SIDEBAR — Gold active indicator + scroll fix
+   ---------------------------------------------------------------- */
+
+/* Sidebar scroll fix — own scrollable container, anchored to top */
+aside .sticky {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+aside .sticky::-webkit-scrollbar {
+  display: none;
+}
+
+/* Active page — gold left border */
+aside a.border-primary\/25,
+aside a[class*="bg-accent"][class*="font-medium"] {
+  border-left: 3px solid oklch(0.65 0.10 75) !important;
+  background: oklch(0.22 0.015 65) !important;
+}
+
+/* Sidebar tree indent lines — muted gold instead of gray */
+aside .border-l {
+  border-color: oklch(0.30 0.025 65) !important;
+}
+
+/* Sidebar links hover */
+aside a.group:hover {
+  background: oklch(0.21 0.01 58) !important;
+}
+
+
+/* ----------------------------------------------------------------
+   8. ALERTS — Element-themed left borders
+   GitHub-flavored markdown alerts rendered as blockquotes.
+   Exact selectors may need adjustment after testing.
+   ---------------------------------------------------------------- */
+
+/* Base alert style */
+.prose blockquote {
+  border-left: 4px solid oklch(0.40 0.05 72) !important;
+  background: oklch(0.18 0.008 55) !important;
+  padding: 1em 1.2em !important;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Alert type colors — if the platform uses .markdown-alert classes */
+.markdown-alert-tip,
+[class*="alert-tip"] {
+  border-left-color: oklch(0.72 0.11 75) !important;     /* Gold */
+}
+
+.markdown-alert-note,
+[class*="alert-note"] {
+  border-left-color: oklch(0.65 0.12 240) !important;    /* Water blue */
+}
+
+.markdown-alert-important,
+[class*="alert-important"] {
+  border-left-color: oklch(0.70 0.15 45) !important;     /* Fire orange */
+}
+
+.markdown-alert-warning,
+[class*="alert-warning"] {
+  border-left-color: oklch(0.78 0.14 90) !important;     /* Lightning yellow */
+}
+
+.markdown-alert-caution,
+[class*="alert-caution"] {
+  border-left-color: oklch(0.60 0.15 310) !important;    /* Void purple */
+}
+
+
+/* ----------------------------------------------------------------
+   9. PREV/NEXT NAVIGATION — Subtle gold hover
+   ---------------------------------------------------------------- */
+
+a[data-slot="button"] {
+  transition: transform 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.2s ease !important;
+}
+
+a[data-slot="button"]:hover {
+  border-color: oklch(0.45 0.06 72) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px oklch(0.72 0.11 75 / 0.08) !important;
+}
+
+
+/* ----------------------------------------------------------------
+   10. POLISH — Details that signal quality
+   ---------------------------------------------------------------- */
+
+/* Text selection — gold highlight */
+::selection {
+  background: oklch(0.40 0.08 72) !important;
+  color: oklch(0.95 0.01 80) !important;
+}
+
+/* Custom scrollbar (WebKit browsers) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(0.14 0.006 50);
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.30 0.02 60);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.38 0.04 68);
+}
+
+/* Horizontal rules — warm gold line */
+.prose hr {
+  border-color: oklch(0.32 0.03 68) !important;
+}
+
+/* Strong/bold — slightly warm */
+.prose strong {
+  color: oklch(0.92 0.01 78) !important;
+}
+
+/* Bold inside keyword links inherits the link color, not the strong color */
+.prose a strong {
+  color: inherit !important;
+}
+
+
+/* ----------------------------------------------------------------
+   12. LOGO — Replace navbar text with logo image
+   ---------------------------------------------------------------- */
+
+/* Hide the book icon in top navbar ONLY (not sidebar) */
+nav.sticky a[href^="/mod/"] > svg {
+  display: none !important;
+}
+
+/* Replace mod name text with logo in top navbar ONLY */
+nav.sticky a[href^="/mod/"] > span {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  display: inline-block !important;
+  width: 180px;
+  height: 40px;
+  background: url('https://wiki.hytalemodding.dev/storage/mods/icons/e6d65dd0-3f80-47aa-ba66-1ff41af30e19.png') no-repeat center / contain;
+}
+
+/* Welcome page logo — centered, constrained */
+.prose > p:first-child > img[alt="Trail of Orbis"] {
+  display: block;
+  margin: 0 auto 1.5rem auto;
+  max-width: 400px;
+  height: auto;
+}
+
+/* ----------------------------------------------------------------
+   13. LANDING PAGE — Replace generic content with logo
+   The auto-generated page at /mod/trail-of-orbis
+   ---------------------------------------------------------------- */
+
+/* Replace the generic book icon with the logo */
+main > div > [data-slot="card"]:first-child .lucide-book-open,
+main .lucide-book-open {
+  display: none !important;
+}
+
+/* Style the "Explore the Documentation" heading area */
+main > div > [data-slot="card"]:first-child [data-slot="card-content"] {
+  text-align: center;
+}
+
+/* Add logo above the landing page content */
+main > div > [data-slot="card"]:first-child [data-slot="card-content"]::before {
+  content: "";
+  display: block;
+  width: 350px;
+  height: 120px;
+  margin: 0 auto 1rem auto;
+  background: url('https://wiki.hytalemodding.dev/storage/mods/icons/e6d65dd0-3f80-47aa-ba66-1ff41af30e19.png') no-repeat center / contain;
+}
+
+/* Style the "Featured Pages" heading */
+main > div > [data-slot="card"]:first-child h2 {
+  color: oklch(0.80 0.09 78) !important;
+}
+
+/* Featured page cards — gold border accent */
+main > div > [data-slot="card"]:first-child a[data-slot="card"] {
+  border-left: 3px solid oklch(0.45 0.06 72) !important;
+  transition: border-color 0.2s ease, transform 0.2s ease !important;
+}
+
+main > div > [data-slot="card"]:first-child a[data-slot="card"]:hover {
+  border-left-color: oklch(0.72 0.11 75) !important;
+  transform: translateX(4px) !important;
+}
+
+/* Smooth transitions on interactive elements */
+aside a,
+[data-slot="card"],
+.copy-heading-btn {
+  transition: all 0.2s ease;
+}
+
+/* Navbar mod name — inherits gold from --primary automatically */
+.bg-clip-text {
+  color: var(--primary) !important;
+}
+
+
+/* ================================================================
+   11. GAME KEYWORD COLORS
+   Usage in markdown: <span class="fire">Fire</span>
+   All keywords are bold + colored to match in-game values.
+   Colors are exact hex from AttributeType.java & GearRarity.java.
+   ================================================================ */
+
+/* --- Element + rarity + mob links: bold, no underline --- */
+.prose a[href*="fire"], .prose a[href*="water"],
+.prose a[href*="lightning"], .prose a[href*="earth"],
+.prose a[href*="wind"], .prose a[href*="void"],
+.prose a[href*="gear-rarities#"], .prose a[href*="elites-bosses"] {
+  font-weight: 700 !important;
+  border-bottom: none !important;
+}
+
+/* --- Ailment links: italic, not bold --- */
+.prose a[href*="burn-fire-dot"], .prose a[href*="freeze-water-slow"],
+.prose a[href*="shock-lightning-damage-amp"], .prose a[href*="poison-void-stacking-dot"] {
+  font-style: italic !important;
+  font-weight: normal !important;
+  border-bottom: none !important;
+}
+
+/* --- Elements (colors from AttributeType.java) ---
+   Usage: [Fire](fire) */
+.prose a[href*="fire"]      { color: #FF7755 !important; }
+.prose a[href*="water"]      { color: #55CCEE !important; }
+.prose a[href*="lightning"]   { color: #FFEE55 !important; }
+.prose a[href*="earth"]    { color: #DDAA55 !important; }
+.prose a[href*="wind"]      { color: #77DD77 !important; }
+.prose a[href*="void"]     { color: #BB77DD !important; }
+
+/* --- Ailments (same color as parent element) ---
+   Usage: [Burn](burn-fire-dot) */
+.prose a[href*="burn-fire-dot"]                { color: #FF7755 !important; }
+.prose a[href*="freeze-water-slow"]            { color: #55CCEE !important; }
+.prose a[href*="shock-lightning-damage-amp"]    { color: #FFEE55 !important; }
+.prose a[href*="poison-void-stacking-dot"]     { color: #BB77DD !important; }
+
+/* Element/ailment hover — brighten */
+.prose a[href*="fire"]:hover, .prose a[href*="burn-fire-dot"]:hover             { color: #FF9977 !important; }
+.prose a[href*="water"]:hover, .prose a[href*="freeze-water-slow"]:hover         { color: #77DDFF !important; }
+.prose a[href*="lightning"]:hover, .prose a[href*="shock-lightning-damage-amp"]:hover { color: #FFFF88 !important; }
+.prose a[href*="earth"]:hover    { color: #EEBB66 !important; }
+.prose a[href*="wind"]:hover      { color: #99EE99 !important; }
+.prose a[href*="void"]:hover, .prose a[href*="poison-void-stacking-dot"]:hover { color: #CC99EE !important; }
+
+/* --- Rarities (colors from GearRarity.java) ---
+   Usage: [Legendary](gear-rarities#legendary) or [Legendary](#legendary) on the rarities page */
+.prose a[href*="gear-rarities#common"],  .prose a[href="#common"]    { color: #C9D2DD !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#uncommon"],.prose a[href="#uncommon"]  { color: #3E9049 !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#rare"],    .prose a[href="#rare"]      { color: #2770B7 !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#epic"],    .prose a[href="#epic"]      { color: #8B339E !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#legendary"],.prose a[href="#legendary"]{ color: #BB8A2C !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#mythic"],  .prose a[href="#mythic"]    { color: #FF4500 !important; font-weight: 700 !important; }
+.prose a[href*="gear-rarities#unique"],  .prose a[href="#unique"]    { color: #AF6025 !important; font-weight: 700 !important; }
+
+/* Rarity hover — brighten */
+.prose a[href*="gear-rarities#common"]:hover,  .prose a[href="#common"]:hover    { color: #DDE5EE !important; }
+.prose a[href*="gear-rarities#uncommon"]:hover,.prose a[href="#uncommon"]:hover  { color: #50B05C !important; }
+.prose a[href*="gear-rarities#rare"]:hover,    .prose a[href="#rare"]:hover      { color: #3388CC !important; }
+.prose a[href*="gear-rarities#epic"]:hover,    .prose a[href="#epic"]:hover      { color: #A050B8 !important; }
+.prose a[href*="gear-rarities#legendary"]:hover,.prose a[href="#legendary"]:hover{ color: #DDA840 !important; }
+.prose a[href*="gear-rarities#mythic"]:hover,  .prose a[href="#mythic"]:hover    { color: #FF6633 !important; }
+.prose a[href*="gear-rarities#unique"]:hover,  .prose a[href="#unique"]:hover    { color: #CC7735 !important; }
+
+/* --- Mob Classes --- */
+.prose a[href*="elites-bosses"] { color: #FFEE55 !important; font-weight: 700 !important; }

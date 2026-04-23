@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Allow wiki content
+!Wiki/
+!Wiki/content/
+!Wiki/content/**
+!Wiki/custom-css-theme.css
+
+# Allow gitignore itself
+!.gitignore
