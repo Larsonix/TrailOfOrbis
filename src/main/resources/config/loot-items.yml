@@ -1,0 +1,123 @@
+# =============================================================================
+# LOOT ITEMS CONFIGURATION
+# =============================================================================
+# Defines base items that can drop as loot and their slot weights.
+#
+# base_items:
+#   Each slot type contains a list of item IDs that can drop for that slot.
+#   Item IDs use Hytale's PascalCase format (e.g., Weapon_Sword_Iron).
+#
+# slot_weights:
+#   Controls how often each slot type drops. Higher weight = more frequent.
+#   Total weights are summed to calculate probability percentages.
+#
+# Material tiers (low to high):
+#   Crude -> Copper -> Bronze -> Iron -> Steel -> Cobalt -> Mithril ->
+#   Thorium -> Adamantite -> Onyxium
+# =============================================================================
+
+# Base items that can drop for each equipment slot
+base_items:
+  # Weapons - swords, axes, maces, bows, staffs, daggers
+  weapon:
+    # Swords (tier progression)
+    - "Weapon_Sword_Crude"
+    - "Weapon_Sword_Copper"
+    - "Weapon_Sword_Bronze"
+    - "Weapon_Sword_Iron"
+    - "Weapon_Sword_Steel"
+    - "Weapon_Sword_Bone"
+    # Axes
+    - "Weapon_Axe_Crude"
+    - "Weapon_Axe_Copper"
+    - "Weapon_Axe_Iron"
+    - "Weapon_Axe_Bone"
+    # Maces
+    - "Weapon_Mace_Crude"
+    - "Weapon_Mace_Copper"
+    - "Weapon_Mace_Iron"
+    # Bows
+    - "Weapon_Shortbow_Crude"
+    - "Weapon_Shortbow_Copper"
+    - "Weapon_Shortbow_Iron"
+    # Crossbows
+    - "Weapon_Crossbow_Iron"
+    # Staffs
+    - "Weapon_Staff_Wood"
+    - "Weapon_Staff_Bone"
+    - "Weapon_Staff_Iron"
+    # Daggers
+    - "Weapon_Daggers_Crude"
+    - "Weapon_Daggers_Copper"
+    - "Weapon_Daggers_Iron"
+    - "Weapon_Daggers_Bone"
+
+  # Head armor - helmets and caps
+  head:
+    # Metal helmets
+    - "Armor_Copper_Head"
+    - "Armor_Bronze_Head"
+    - "Armor_Iron_Head"
+    - "Armor_Steel_Head"
+    # Leather/cloth
+    - "Armor_Leather_Light_Head"
+    - "Armor_Leather_Medium_Head"
+    - "Armor_Cloth_Cotton_Head"
+    - "Armor_Cloth_Wool_Head"
+
+  # Chest armor - chestplates and tunics
+  chest:
+    # Metal
+    - "Armor_Copper_Chest"
+    - "Armor_Bronze_Chest"
+    - "Armor_Iron_Chest"
+    - "Armor_Steel_Chest"
+    # Leather/cloth
+    - "Armor_Leather_Light_Chest"
+    - "Armor_Leather_Medium_Chest"
+    - "Armor_Cloth_Cotton_Chest"
+    - "Armor_Cloth_Wool_Chest"
+
+  # Leg armor - leggings and pants
+  legs:
+    # Metal
+    - "Armor_Copper_Legs"
+    - "Armor_Bronze_Legs"
+    - "Armor_Iron_Legs"
+    - "Armor_Steel_Legs"
+    # Leather/cloth
+    - "Armor_Leather_Light_Legs"
+    - "Armor_Leather_Medium_Legs"
+    - "Armor_Cloth_Cotton_Legs"
+    - "Armor_Cloth_Wool_Legs"
+
+  # Hand armor - gloves and gauntlets
+  hands:
+    # Metal
+    - "Armor_Copper_Hands"
+    - "Armor_Bronze_Hands"
+    - "Armor_Iron_Hands"
+    - "Armor_Steel_Hands"
+    # Leather/cloth
+    - "Armor_Leather_Light_Hands"
+    - "Armor_Leather_Medium_Hands"
+    - "Armor_Cloth_Cotton_Hands"
+    - "Armor_Cloth_Wool_Hands"
+
+  # Shields and off-hand items
+  off_hand:
+    - "Weapon_Shield_Wood"
+    - "Weapon_Shield_Copper"
+    - "Weapon_Shield_Iron"
+    - "Weapon_Shield_Rusty"
+    - "Weapon_Shield_Scrap"
+
+# Drop weight for each slot type
+# Higher weight = more likely to drop
+slot_weights:
+  weapon: 30    # 30% - Weapons are most common
+  head: 10      # 10% - Head armor less common
+  chest: 20     # 20% - Chest armor moderately common
+  legs: 15      # 15% - Leg armor moderate
+  hands: 15     # 15% - Hand armor moderate
+  off_hand: 10  # 10% - Shields less common

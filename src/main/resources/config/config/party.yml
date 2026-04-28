@@ -1,0 +1,88 @@
+# =============================================================================
+# Party Integration Configuration
+# =============================================================================
+# Controls integration with PartyPro (or compatible party mods).
+# All features gracefully degrade when no party mod is detected.
+# =============================================================================
+
+# Master switch for all party integration features
+enabled: true
+
+# Detection: which party mod API class to look for
+api_class: "me.tsumori.partypro.api.PartyProAPI"
+
+# Detection retry settings (party mod may load after us)
+detection:
+  max_retries: 5
+  retry_delay_ms: 2000
+
+# -----------------------------------------------------------------------------
+# XP SHARING
+# -----------------------------------------------------------------------------
+# When a party member kills a mob, XP is distributed among the party.
+#
+# Modes:
+#   "equal"        — Total XP pool split equally among all online members
+#   "killer_bonus"  — Killer gets full XP, others get a bonus share
+#
+# Party size multipliers encourage grouping:
+#   2 players: 1.2x pool = each gets 60% of solo XP (1.2 total vs 1.0 solo)
+#   3 players: 1.35x pool = each gets 45% of solo XP (1.35 total vs 1.0 solo)
+
+xp_sharing:
+  enabled: true
+  mode: equal
+  party_size_multipliers:
+    2: 1.2
+    3: 1.35
+    4: 1.45
+    5: 1.5
+  # Maximum distance (blocks) for XP sharing. -1 = unlimited.
+  # In realms, all members are in the same instance, so distance rarely matters.
+  max_distance: -1
+  source_name: "PARTY_SHARE"
+
+# -----------------------------------------------------------------------------
+# ANTI-BOOSTING
+# -----------------------------------------------------------------------------
+# Prevents high-level players from boosting low-level alts by sharing XP
+# from trivial content. The level-gap penalty uses the HIGHEST party member
+# level instead of just the killer's level.
+
+anti_boosting:
+  enabled: true
+  use_party_max_level: true
+
+# -----------------------------------------------------------------------------
+# PVP PROTECTION
+# -----------------------------------------------------------------------------
+# Prevents friendly fire between party members (unless the party has PvP enabled).
+
+pvp_protection:
+  enabled: true
+  block_friendly_fire: true
+
+# -----------------------------------------------------------------------------
+# REALM CO-OP
+# -----------------------------------------------------------------------------
+# When a player activates a realm map, online party members are automatically
+# teleported into the realm instance.
+
+realm_coop:
+  enabled: true
+  auto_enter_party: true
+  # Maximum distance (blocks) for auto-entry. -1 = unlimited.
+  entry_radius: -1
+  entry_message: "Entering realm with your party..."
+
+# -----------------------------------------------------------------------------
+# HUD INTEGRATION
+# -----------------------------------------------------------------------------
+# Displays player level in PartyPro's custom text fields on the party HUD.
+
+hud:
+  enabled: true
+  # Format for level display. {level} is replaced with the player's current level.
+  level_format: "Lv.{level}"
+  # Which PartyPro custom text slot to use (1 or 2)
+  level_slot: 1

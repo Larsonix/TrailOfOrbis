@@ -1,0 +1,364 @@
+# Trail of Orbis Main Configuration
+# Version: 1.0.0-SNAPSHOT
+
+# General Settings
+debugMode: false
+language: "en_US"
+
+# Creative mode players bypass all gear requirements (level + attributes)
+creativeModeBypassRequirements: true
+
+# Suppress vanilla weapon/armor drops from combat mobs (HOSTILE/ELITE/BOSS).
+# Only RPG-generated loot drops. Materials and resources still drop normally.
+# PASSIVE mobs are unaffected.
+suppressVanillaGearDrops: true
+
+# Database Configuration
+database:
+  # Database type: H2 (embedded), MySQL, or PostgreSQL
+  type: "H2"
+
+  # Connection settings (used for MySQL/PostgreSQL)
+  host: "localhost"
+  port: 3306
+  database: "trailoforbis"
+  username: "root"
+  password: ""
+
+  # Connection pool settings
+  # Minimum recommended: 20 for small servers, 30+ for 50+ concurrent players.
+  # Each player join/disconnect requires a DB connection briefly.
+  poolSize: 30
+
+# Elemental Attribute System Configuration
+# Each element represents a distinct playstyle archetype (zero overlap — 30 unique stats):
+# - FIRE:      Glass cannon - physical, charged attack, crit, burn, ignite
+# - WATER:     Arcane mage - spell damage, mana, barrier, mana regen, freeze
+# - LIGHTNING: Storm blitz - attack speed, move speed, crit chance, stamina, shock
+# - EARTH:     Iron fortress - max HP%, armor, HP regen, block, KB resist
+# - WIND:      Ghost ranger - evasion, accuracy, projectile damage, jump, proj speed
+# - VOID:      Life devourer - life steal, % hit as true damage, DoT, mana on kill, effect duration
+attributes:
+  # Points granted at character creation
+  startingPoints: 1
+
+  # Points granted per level
+  pointsPerLevel: 1
+
+  # Stats granted per point of FIRE (Glass Cannon)
+  fireGrants:
+    # +% physical damage per point
+    physicalDamagePercent: 0.4
+
+    # +% charged attack damage per point
+    chargedAttackDamagePercent: 0.3
+
+    # +% crit damage per point
+    criticalMultiplier: 0.6
+
+    # +% burn damage per point
+    burnDamagePercent: 0.4
+
+    # +% ignite chance per point
+    igniteChance: 0.1
+
+  # Stats granted per point of WATER (Arcane Mage)
+  waterGrants:
+    # +% spell damage per point
+    spellDamagePercent: 0.5
+
+    # +flat mana per point
+    maxMana: 1.5
+
+    # +flat barrier (energy shield) per point
+    energyShield: 2.0
+
+    # +mana/s regen per point
+    manaRegen: 0.15
+
+    # +% freeze chance per point
+    freezeChance: 0.1
+
+  # Stats granted per point of LIGHTNING (Storm Blitz)
+  lightningGrants:
+    # +% attack speed per point
+    attackSpeedPercent: 0.3
+
+    # +% move speed per point
+    moveSpeedPercent: 0.15
+
+    # +% crit chance per point
+    critChance: 0.1
+
+    # +stamina/s regen per point
+    staminaRegen: 0.1
+
+    # +% shock chance per point
+    shockChance: 0.1
+
+  # Stats granted per point of EARTH (Iron Fortress)
+  earthGrants:
+    # +% max HP per point
+    maxHealthPercent: 0.5
+
+    # +flat armor per point
+    armor: 5.0
+
+    # +HP/s regen per point
+    healthRegen: 0.2
+
+    # +% passive block chance per point
+    passiveBlockChance: 0.2
+
+    # +% knockback resistance per point
+    knockbackResistance: 0.3
+
+  # Stats granted per point of WIND (Ghost Ranger)
+  windGrants:
+    # +flat evasion rating per point
+    evasion: 5.0
+
+    # +flat accuracy rating per point
+    accuracy: 3.0
+
+    # +% projectile damage per point
+    projectileDamagePercent: 0.5
+
+    # +% jump height per point
+    jumpForcePercent: 0.15
+
+    # +% projectile speed per point
+    projectileSpeedPercent: 0.3
+
+  # Stats granted per point of VOID (Life Devourer)
+  voidGrants:
+    # +% life steal per point
+    lifeSteal: 0.1
+
+    # +% of hit dealt as true damage per point
+    percentHitAsTrueDamage: 0.05
+
+    # +% damage over time per point
+    dotDamagePercent: 0.3
+
+    # +flat mana gained per kill
+    manaOnKill: 0.5
+
+    # +% status effect duration per point
+    statusEffectDuration: 0.3
+
+# Combat System Configuration
+combat:
+  # Critical hit damage multiplier (2.0 = 200% damage)
+  critMultiplier: 2.0
+
+  # Base damage for unarmed attacks (no RPG weapon equipped)
+  # This completely replaces vanilla weapon damage
+  unarmedBaseDamage: 5.0
+
+  # Final multiplier applied to unarmed player attacks (no weapon equipped)
+  # 1.0 = full damage, 0.45 = 45% damage. Only affects players, not mobs.
+  unarmedDamageMultiplier: 0.45
+
+  # Minimum damage threshold (as % of max HP) to trigger the red screen flash
+  # and health alert. Hits below this threshold won't send the DamageInfo packet.
+  # Default: 3.0 (3% of max HP)
+  healthAlertMinThreshold: 3.0
+
+
+  # Evasion/Accuracy System (PoE-inspired formula)
+  # Formula: ChanceToHit = hitChanceConstant × Accuracy / (Accuracy + (Evasion × evasionScalingFactor)^evasionExponent)
+  evasion:
+    # Minimum hit chance (0.0 to 1.0) - attacks never miss more than this
+    minHitChance: 0.05
+
+    # Maximum hit chance (0.0 to 1.0) - attacks never hit more than this
+    maxHitChance: 1.0
+
+    # Scaling factor applied to evasion (lower = evasion less effective)
+    evasionScalingFactor: 0.2
+
+    # Exponent for diminishing returns (< 1.0 = diminishing returns at high evasion)
+    evasionExponent: 0.9
+
+    # Constant in formula numerator (higher = favors attacker)
+    hitChanceConstant: 1.25
+
+  # Parry Mechanics
+  parry:
+    # Portion of damage reflected back to attacker (0.0 to 1.0)
+    reflectAmount: 0.5
+
+    # Damage multiplier for defender after parry (0.5 = take 50% damage)
+    damageReduction: 0.5
+
+    # Minimum HP attacker is left with after reflected damage (prevents parry kills)
+    reflectMinAttackerHp: 1.0
+
+  # Environmental Damage (HP-based)
+  # Converts fixed environmental damage to max HP percentage.
+  # This scales naturally with player progression - early game lava is deadly,
+  # late game lava is still dangerous (not trivial like with fixed damage).
+  # Set to 0 to disable HP-based damage for that type (use vanilla fixed).
+  environmentalDamage:
+    # Fire/Lava damage per tick as % of max HP
+    fire: 5.0
+
+    # Drowning damage per tick as % of max HP
+    drowning: 3.0
+
+    # Suffocation damage (stuck in blocks) as % of max HP
+    suffocation: 8.0
+
+    # Poison damage per tick as % of max HP
+    poison: 2.0
+
+    # Void/out-of-world damage as % of max HP (usually instant kill)
+    outOfWorld: 100.0
+
+    # Generic environment damage (cactus, etc.) as % of max HP
+    environment: 2.0
+
+  # Attack Speed System
+  # Tier 1: InteractionTimeShiftSystem shifts server-side damage windows
+  # Tier 2: AnimationSpeedSyncManager syncs visual swing speed per player
+  attackSpeed:
+    # Enable/disable the attack speed system
+    enabled: true
+
+    # Animation speed sync (visual swing speed matching attack speed stat)
+    # Dampening: 0.5 means +100% stat → 1.5x animation speed
+    animationSpeedScale: 0.5
+    # Never slower than 0.5x (even with negative attack speed)
+    animationMinSpeed: 0.5
+    # Never faster than 3x (prevents visually broken animations)
+    animationMaxSpeed: 3.0
+
+    # Tier 1: Server-side interaction timing shift (damage lands faster)
+    # Uses same animationSpeedScale dampening as visual sync
+    # Disable independently if causing gameplay issues while keeping visual sync
+    interactionTimeShiftEnabled: true
+
+# Armor System Configuration
+# Uses Path of Exile formula: reduction = armor / (armor + formulaDivisor * damage)
+# Total armor = Equipment armor + element bonuses (EARTH)
+armor:
+  # Whether to include vanilla equipment armor in total armor calculation
+  # If false, only elemental armor bonuses are used
+  includeEquipmentArmor: true
+
+  # Multiplier applied to equipment armor values for balance
+  # 1.0 = no scaling, 0.5 = half armor, 2.0 = double armor
+  equipmentArmorMultiplier: 1.0
+
+  # Maximum damage reduction from armor (0.0 to 1.0)
+  # 0.90 = 90% cap (matches PoE), prevents armor from trivializing damage
+  maxReduction: 0.90
+
+  # Divisor in armor formula: armor / (armor + divisor * damage)
+  # Lower = armor more effective, Higher = armor less effective vs big hits
+  # Default 10.0 matches Path of Exile
+  formulaDivisor: 10.0
+
+  # Minimum armor effectiveness after penetration (0.0 to 1.0)
+  # This is a FLOOR - armor penetration cannot reduce effective armor below this fraction.
+  # With 0.5 (50% floor), even 100% armor pen only reduces armor to half its value.
+  # This ensures armor investment remains meaningful against high-pen enemies (Ravagers, etc.)
+  #
+  # Examples with 1000 armor and 50% floor:
+  #   0% pen  → 1000 effective armor
+  #   25% pen → 750 effective armor
+  #   50% pen → 500 effective armor (floor reached)
+  #   75% pen → 500 effective armor (capped at floor)
+  #
+  # Set to 0.0 to disable the floor (allow armor to be fully penetrated)
+  # Set to 1.0 to make armor penetration have no effect
+  armorPenetrationFloor: 0.5
+
+# Physical Resistance Configuration
+# Physical resistance is a separate damage reduction layer from armor.
+# It only applies to physical damage (not elemental, fall, or environmental).
+physicalResistance:
+  # Maximum physical resistance cap (0-100)
+  # Prevents trivializing physical damage; 75% is a good balance
+  maxResistance: 75.0
+
+  # Whether physical resistance applies to projectile damage
+  # Set to false if you want projectiles to bypass physical resistance
+  appliesToProjectiles: true
+
+# Skill Tree System Configuration
+skillTree:
+  # Enable/disable the skill tree system
+  enabled: true
+
+  # Skill points granted per level up
+  pointsPerLevel: 1
+
+  # Starting skill points at character creation
+  startingPoints: 1
+
+  # Cost per tier for individual node refund (gold)
+  respecCostPerTier: 0
+
+  # Base cost for full respec (multiplied by respec count)
+  fullRespecBaseCost: 0
+
+  # Number of free full respecs per character (subsequent ones cost 50% of total node costs in refund points)
+  freeRespecs: 1
+
+# Projectile Stats System Configuration
+# Modifies arrow/thrown weapon physics based on player stats.
+# Uses projectileSpeedPercent and projectileGravityPercent from ComputedStats.
+projectile:
+  # Enable/disable the projectile stats system
+  enabled: true
+
+  # Speed bonus caps (%)
+  # Maximum speed bonus percentage (e.g., 200 = +200% = 3x speed cap)
+  maxSpeedBonus: 200.0
+
+  # Minimum speed bonus percentage (e.g., -50 = 0.5x speed floor)
+  # Cannot go below -100 (would reverse projectile direction)
+  minSpeedBonus: -50.0
+
+  # Gravity bonus caps (%)
+  # Maximum gravity bonus percentage (e.g., 100 = +100% = 2x gravity, falls faster)
+  maxGravityBonus: 100.0
+
+  # Minimum gravity bonus percentage (e.g., -90 = 0.1x gravity, floats longer)
+  # Negative values make projectiles float/arc higher
+  minGravityBonus: -90.0
+
+# Level Scaling Configuration (shared by gear + mobs + realm modifiers)
+# Controls the exponential scaling curve used by ALL RPG systems.
+# Below transitionLevel: normal power-of-log growth (~50% bonus at level 100).
+# Above transitionLevel: asymptotic diminishing returns — each level gives less
+# and less, approaching a ceiling that can never be exceeded.
+#
+# The decayDivisor controls how slowly the curve approaches ceiling post-transition.
+# Higher = slower approach = more meaningful progression at high levels.
+#
+# Example with defaults (transition=100, ratio=2.0, decayDivisor=5):
+#   Level 100  -> ~1.50x (transition point)
+#   Level 200  -> ~1.80x (steady gains)
+#   Level 500  -> ~2.32x (still progressing)
+#   Level 1000 -> ~2.76x (slowing)
+#   Level 2000 -> ~2.96x (near ceiling of 3.0x)
+scaling:
+  # Level where diminishing returns begin
+  transitionLevel: 100
+
+  # How much stronger the ceiling is vs the transition value.
+  # ceiling = transitionMultiplier x maxMultiplierRatio
+  # With 1.5x at transition and ratio 2.0 -> ceiling = 3.0x
+  maxMultiplierRatio: 2.0
+
+  # Divisor for post-transition decay rate: k = 1 / (transitionLevel x decayDivisor)
+  # Higher values stretch the curve so progression stays meaningful longer.
+  # 1.0 = legacy (done by ~500), 5.0 = meaningful through ~2000
+  decayDivisor: 5.0
+
+# NOTE: Mob scaling settings are in mob-scaling.yml
+# NOTE: Mob classification (boss/elite detection) is in mob-classification.yml
+# NOTE: Leveling settings are in leveling.yml

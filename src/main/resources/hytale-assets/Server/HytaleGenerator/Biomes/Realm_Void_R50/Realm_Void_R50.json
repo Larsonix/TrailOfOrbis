@@ -1,0 +1,645 @@
+{
+  "$Title": "[ROOT] Biome - Realm Void Arena (R50)",
+  "Name": "Realm_Void_R50",
+  "Terrain": {
+    "Type": "DAOTerrain",
+    "Density": {
+      "Type": "Sum",
+      "Skip": false,
+      "Inputs": [
+        {
+          "Type": "CurveMapper",
+          "Skip": false,
+          "Curve": {
+            "Type": "Manual",
+            "Points": [
+              {
+                "In": 25,
+                "Out": -7
+              },
+              {
+                "In": 15,
+                "Out": -5
+              },
+              {
+                "In": 0,
+                "Out": -1
+              },
+              {
+                "In": -1,
+                "Out": 0
+              },
+              {
+                "In": -10,
+                "Out": 0.5
+              },
+              {
+                "In": -20,
+                "Out": 1
+              }
+            ]
+          },
+          "Inputs": [
+            {
+              "Type": "Sum",
+              "Skip": false,
+              "Inputs": [
+                {
+                  "Type": "BaseHeight",
+                  "Skip": false,
+                  "BaseHeightName": "Base",
+                  "Distance": true
+                },
+                {
+                  "Type": "Normalizer",
+                  "Skip": false,
+                  "FromMin": -1,
+                  "FromMax": 1,
+                  "ToMin": -5.25,
+                  "ToMax": 5.25,
+                  "Inputs": [
+                    {
+                      "Type": "SimplexNoise2D",
+                      "Skip": false,
+                      "Lacunarity": 2,
+                      "Persistence": 0.4,
+                      "Octaves": 3,
+                      "Scale": 20,
+                      "Seed": "terrain"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Type": "Axis",
+          "Skip": false,
+          "Axis": {
+            "X": 0,
+            "Y": 1,
+            "Z": 0
+          },
+          "Curve": {
+            "Type": "Manual",
+            "Points": [
+              {
+                "In": 0,
+                "Out": 0
+              },
+              {
+                "In": 50,
+                "Out": 0
+              },
+              {
+                "In": 55,
+                "Out": -5
+              },
+              {
+                "In": 65,
+                "Out": -5
+              },
+              {
+                "In": 66,
+                "Out": -2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "MaterialProvider": {
+    "Type": "Solidity",
+    "Solid": {
+      "Type": "Queue",
+      "Queue": [
+        {
+          "Type": "SpaceAndDepth",
+          "LayerContext": "DEPTH_INTO_FLOOR",
+          "MaxExpectedDepth": 3,
+          "Layers": [
+            {
+              "Type": "ConstantThickness",
+              "Thickness": 1,
+              "Material": {
+                "Type": "Constant",
+                "Material": {
+                  "Solid": "Rock_Stone"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "Type": "Constant",
+          "Material": {
+            "Solid": "Rock_Stone"
+          }
+        }
+      ]
+    },
+    "Empty": {
+      "Type": "Queue",
+      "Queue": [
+        {
+          "Type": "Constant",
+          "Material": {
+            "Solid": "Empty"
+          }
+        }
+      ]
+    }
+  },
+  "Props": [
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "crystal_clusters_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.24499999999999997,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 24,
+              "Seed": "crystal_clusters_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 12,
+            "ScaleY": 12,
+            "ScaleZ": 12,
+            "Jitter": 0.4,
+            "Seed": "crystal_clusters_r50"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/Purple",
+              "Weight": 4
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/Blue",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/Cyan",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/White",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "crystal_clusters_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "void_pillars_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.175,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 32,
+              "Seed": "void_pillars_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 16,
+            "ScaleY": 16,
+            "ScaleZ": 16,
+            "Jitter": 0.4,
+            "Seed": "void_pillars_r50"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Hexagon",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Large",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Quartzite/Large",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "void_pillars_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "void_spikes_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.21,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 28,
+              "Seed": "void_spikes_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 14,
+            "ScaleY": 14,
+            "ScaleZ": 14,
+            "Jitter": 0.4,
+            "Seed": "void_spikes_r50"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Slate/Spikes/Small",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Slate/Spikes/Large",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Slate/Small",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "void_spikes_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "void_detail_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.175,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 20,
+              "Seed": "void_detail_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 10,
+            "ScaleY": 10,
+            "ScaleZ": 10,
+            "Jitter": 0.4,
+            "Seed": "void_detail_r50"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/Pink",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Geodes/Green",
+              "Weight": 1
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Calcite/Small",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "void_detail_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    }
+  ],
+  "EnvironmentProvider": {
+    "Type": "Constant",
+    "Environment": "Realm_Void_Env"
+  },
+  "TintProvider": {
+    "Type": "DensityDelimited",
+    "Density": {
+      "Type": "SimplexNoise2D",
+      "Skip": false,
+      "Lacunarity": 5,
+      "Persistence": 0.2,
+      "Octaves": 2,
+      "Scale": 100,
+      "Seed": "tints"
+    },
+    "Delimiters": [
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#1A0A2E"
+        },
+        "Range": {
+          "MinInclusive": -1.0,
+          "MaxExclusive": -0.3333
+        }
+      },
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#0F0520"
+        },
+        "Range": {
+          "MinInclusive": -0.3333,
+          "MaxExclusive": 0.3333
+        }
+      },
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#25103C"
+        },
+        "Range": {
+          "MinInclusive": 0.3333,
+          "MaxExclusive": 1.0
+        }
+      }
+    ]
+  }
+}

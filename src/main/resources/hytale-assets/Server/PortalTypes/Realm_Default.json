@@ -1,0 +1,12 @@
+{
+  "InstanceId": "realm_basic_test",
+  "Description": {
+    "DisplayName": "server.rpg.realm.portal.title",
+    "FlavorText": "server.rpg.realm.portal.description",
+    "ThemeColor": "#AA00AAFF",
+    "SplashImage": "DefaultArtwork.png",
+    "Tips": []
+  },
+  "VoidInvasionEnabled": false,
+  "GameplayConfig": "Portal"
+}

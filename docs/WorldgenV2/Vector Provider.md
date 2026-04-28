@@ -1,0 +1,53 @@
+World Generation
+Technical Hytale Generator
+Vector Provider
+Defines a 3D decimal vector {x, y, z}.
+
+Official Hytale Documentation
+All content on this section is provided by Hypixel Studios Canada Inc. and is presented without any substantial changes, aside from visual design adjustments by the HytaleModding Team.
+Constant
+Generates the provided vector.
+
+Parameters:
+Name	Description
+Vector	3D decimal vector.
+DensityGradient
+Generates the gradient of the provided Density field. The resulting gradient vector shows in which direction the Density field is increasing and how fast the field is changing.;
+
+For more information about gradient vectors you can read: https://en.wikipedia.org/wiki/Gradient
+
+Parameters:
+Name	Description
+SampleDistance	positive decimal value. How far apart the Density field value samples are taken. The optimal value for performance is 1.0. Greater values could be useful for smoothing out results for specific applications.
+Density	Density slot.
+Cache
+Caches the input vector for each position.;
+
+This should only be used if the downstream (child) VectorProvider is expensive and the same coordinate is queried more than once.
+
+Parameters:
+Name	Description
+SampleDistance	positive decimal value. How far apart the Density field value samples are taken. The optimal value for performance is 1.0. Greater values could be useful for smoothing out results for specific applications.
+Density	Density slot.
+Exported
+Allows exporting a VectorProvider as a single instance. Enabling the SingleInstance on this node ensures all importers share the same logic.;
+
+By default a completely different instance is create for every Imported node. When there are multiple Imported nodes that import the same exported key, a new instance of that exported VectorProvider tree will be created for each one of the Imported nodes. SingleInstance ensures all importers share the same underlying instance of the node tree.
+
+This node can be used to optimize caching when an exported VectorProvider is imported multiple times in the same context and contains caches. The caches would be shared between the different imported instances.
+
+Important: This is still an experimental feature and could cause unexpected behaviors if misused.
+
+Expected Inputs: 1
+
+Parameters:
+Name	Description
+SingleInstance	boolean. Enable to share the exported for all Imported nodes referencing this key.
+VectorProvider	VectorProvider slot.
+Imported
+Imports an exported VectorProvider.
+
+Parameters:
+Name	Description
+Name	string. The exported VectorProvider.
+Written by Hypixel Studios Canada Inc.

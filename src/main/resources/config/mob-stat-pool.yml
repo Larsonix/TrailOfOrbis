@@ -1,0 +1,1625 @@
+# =============================================================================
+# Mob Stat Pool Configuration
+# =============================================================================
+# Controls how stat points are generated and distributed for scaled mobs.
+#
+# OVERVIEW:
+# ---------
+# When a mob spawns, it receives a "stat pool" based on:
+#   1. Mob level (from nearby player levels)
+#   2. Distance bonus (from spawn location distance to origin)
+#
+# This pool is then distributed across 30 different stats using a Dirichlet
+# distribution, creating natural variation where each mob specializes in
+# different areas (tanky, fast, hard-hitting, etc.)
+#
+# FORMULA:
+#   total_pool = (mob_level * points_per_level) + distance_bonus
+#   stat_value = base_value + (pool_share * conversion_factor)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PROGRESSIVE SCALING (Early-Game Balance)
+# -----------------------------------------------------------------------------
+# Makes low-level mobs weaker, gradually ramping up to full power.
+# This prevents new players from being overwhelmed at the start.
+#
+# FORMULA:
+#   scaling_factor = min_scaling_factor + (1 - min_scaling_factor) * (level / soft_cap_level)
+#   effective_pool = level * points_per_level * scaling_factor
+#
+# EXAMPLE (with min_scaling_factor=0.15, soft_cap_level=30):
+#   Level 1:  0.15 + 0.85 * (1/30)  = 0.178 (17.8% power)
+#   Level 5:  0.15 + 0.85 * (5/30)  = 0.292 (29.2% power)
+#   Level 10: 0.15 + 0.85 * (10/30) = 0.433 (43.3% power)
+#   Level 20: 0.15 + 0.85 * (20/30) = 0.717 (71.7% power)
+#   Level 30+: 1.0 (100% power - full scaling)
+#
+# This creates a smooth difficulty curve where:
+#   - Level 1 mobs deal ~1/6 of their potential damage (easier early game)
+#   - Difficulty ramps up gradually as players level
+#   - By level 30, mobs are at full power
+
+progressive_scaling:
+  # Enable/disable progressive scaling
+  # Set to false to use flat scaling (mobs at full power from level 1)
+  # Default: true
+  enabled: true
+
+  # Level at which mobs reach 100% of their calculated power
+  # Lower values = faster ramp to full difficulty
+  # Higher values = longer "easy" period for new players
+  # Default: 30 (extended from 20 for smoother early-game curve)
+  soft_cap_level: 50
+
+  # Minimum scaling factor at level 1
+  # 0.1 = level 1 mobs have 10% of their calculated power (~13 HP, 4-5 shot)
+  # 0.15 = level 1 mobs have 15% of their calculated power (easier early game)
+  # 0.3 = level 1 mobs have 30% of their calculated power
+  # 0.5 = level 1 mobs have 50% of their calculated power
+  # Default: 0.1
+  min_scaling_factor: 0.1
+
+# -----------------------------------------------------------------------------
+# POOL GENERATION
+# -----------------------------------------------------------------------------
+# These settings control how many stat points mobs receive.
+
+# Points added to the stat pool per mob level
+# Higher = stronger mobs at all levels
+# Default: 15.0 (a level 10 mob gets 150 base pool points)
+points_per_level: 20.0
+
+# Bonus pool points per block of distance from world origin (0,0)
+# This makes mobs progressively stronger as players explore further
+# Default: 0.3 (at 1000 blocks = 300 bonus points)
+distance_bonus_per_block: 0.5
+
+# Pool multipliers for special mob types (applied after base calculation)
+# These stack with classification multipliers from mob-classification.yml
+boss_pool_multiplier: 1.5
+elite_pool_multiplier: 1.25
+
+# -----------------------------------------------------------------------------
+# DIRICHLET DISTRIBUTION
+# -----------------------------------------------------------------------------
+# Controls how the stat pool is distributed across different stats.
+#
+# NOTE: dirichlet_precision is NOT YET WIRED into DirichletDistributor.
+# The value loads and validates but has no effect on stat generation.
+# The actual distribution variance is controlled solely by per-stat
+# alpha_weight values below. This field is retained for future use:
+# when wired, it would multiply all alpha weights, controlling global
+# variance (lower = more extreme specialization, higher = more uniform).
+#
+# Per-stat alpha_weight meanings (these ARE active):
+# - Lower alpha (e.g., 0.1): Stat rarely gets pool share, but can spike
+# - alpha = 1.0: Normal allocation weight
+# - Higher alpha (e.g., 2.0): Stat consistently gets more pool share
+
+dirichlet_precision: 0.5  # NOT ACTIVE — see note above
+
+# -----------------------------------------------------------------------------
+# STAT CONFIGURATIONS
+# -----------------------------------------------------------------------------
+# Each stat has the following properties:
+#
+#   factor:       Conversion factor (pool_share * factor = stat bonus)
+#   base_value:   Starting value before pool distribution
+#   min_value:    Minimum allowed value (floor)
+#   max_value:    Maximum allowed value (cap)
+#   alpha_weight: Relative weight in Dirichlet distribution (higher = more pool)
+#
+# STAT CATEGORIES:
+#   - Combat: Health, damage, armor
+#   - Movement: Speed, attack timing, range
+#   - Critical: Crit chance and multiplier
+#   - Defense: Dodge, block, parry
+#   - Sustain: Life steal, health regen
+#   - Elemental Damage: Fire, cold, lightning, chaos
+#   - Elemental Resistance: Resistances to elemental damage
+#   - AI: Aggro range, reaction times
+#   - Special: Armor penetration, true damage
+
+stats:
+  # === COMBAT STATS ===
+  max_health:
+    factor: 0.88
+    base_value: 100.0
+    min_value: 1.0
+    max_value: 100000.0
+    alpha_weight: 1.0
+
+  physical_damage:
+    factor: 0.15           # Increased from 0.067 for better mob damage scaling
+    base_value: 10.0       # Base damage at level 1
+    min_value: 1.0
+    max_value: 10000.0
+    alpha_weight: 1.0
+
+  armor:
+    factor: 0.282
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 10000.0
+    alpha_weight: 0.5
+
+  # === MOVEMENT STATS ===
+  move_speed:
+    factor: 0.0022
+    base_value: 1.0
+    min_value: 0.3
+    max_value: 3.0
+    alpha_weight: 1.0
+
+  attack_speed:
+    factor: 0.001
+    base_value: 1.0
+    min_value: 0.5
+    max_value: 2.5
+    alpha_weight: 1.0
+
+  attack_range:
+    factor: 0.1
+    base_value: 2.0
+    min_value: 1.0
+    max_value: 20.0
+    alpha_weight: 1.0
+
+  attack_cooldown:
+    factor: -0.05          # Negative = higher pool reduces cooldown
+    base_value: 1.0
+    min_value: 0.1
+    max_value: 3.0
+    alpha_weight: 1.0
+
+  # === CRITICAL STATS ===
+  critical_chance:
+    factor: 0.11
+    base_value: 5.0        # 5% base crit chance
+    min_value: 0.0
+    max_value: 75.0        # Cap at 75%
+    alpha_weight: 1.0
+
+  critical_multiplier:
+    factor: 0.44
+    base_value: 150.0      # 150% base crit damage (1.5x)
+    min_value: 100.0
+    max_value: 500.0       # Cap at 500% (5x)
+    alpha_weight: 1.0
+
+  # === DEFENSE STATS ===
+  dodge_chance:
+    factor: 0.11
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 50.0        # Cap at 50%
+    alpha_weight: 1.0
+
+  block_chance:
+    factor: 0.08
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 40.0        # Cap at 40%
+    alpha_weight: 1.0
+
+  parry_chance:
+    factor: 0.06
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 30.0        # Cap at 30%
+    alpha_weight: 1.0
+
+  # === SUSTAIN STATS ===
+  life_steal:
+    factor: 0.066
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 30.0        # Cap at 30%
+    alpha_weight: 1.0
+
+  health_regen:
+    factor: 0.044
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 50.0
+    alpha_weight: 0.1      # Low weight - regen is powerful
+
+  # === ELEMENTAL DAMAGE ===
+  # All elemental damage reduced by factor of 5 for balance
+  fire_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  water_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  lightning_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  earth_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  wind_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  void_damage:
+    factor: 0.2
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 5000.0
+    alpha_weight: 1.0
+
+  # === ELEMENTAL RESISTANCE ===
+  fire_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0        # Cap at 90% (never immune)
+    alpha_weight: 1.0
+
+  water_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0
+    alpha_weight: 1.0
+
+  lightning_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0
+    alpha_weight: 1.0
+
+  earth_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0
+    alpha_weight: 1.0
+
+  wind_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0
+    alpha_weight: 1.0
+
+  void_resistance:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 90.0
+    alpha_weight: 1.0
+
+  # === ELEMENTAL PENETRATION ===
+  # Penetration reduces the target's effective resistance
+  # (PoE-style: 20 penetration vs 50% resistance = 30% effective resistance)
+  fire_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0        # Cap at 75%
+    alpha_weight: 1.0
+
+  water_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0
+    alpha_weight: 1.0
+
+  lightning_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0
+    alpha_weight: 1.0
+
+  earth_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0
+    alpha_weight: 1.0
+
+  wind_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0
+    alpha_weight: 1.0
+
+  void_penetration:
+    factor: 0.3
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0
+    alpha_weight: 1.0
+
+  # === ELEMENTAL INCREASED DAMAGE ===
+  # PoE-style "increased" damage - additive % bonus
+  # Example: 50 increased + 30 increased = 80% total bonus
+  fire_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  water_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  lightning_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  earth_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  wind_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  void_increased_damage:
+    factor: 0.5
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 200.0
+    alpha_weight: 1.0
+
+  # === ELEMENTAL MORE DAMAGE ===
+  # PoE-style "more" damage - multiplicative % bonus
+  # Example: 20 more × 30 more = (1.20 × 1.30) = 1.56× multiplier
+  fire_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  water_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  lightning_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  earth_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  wind_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  void_more_damage:
+    factor: 0.25
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0
+    alpha_weight: 1.0
+
+  # === AI STATS ===
+  aggro_range:
+    factor: 0.1
+    base_value: 16.0
+    min_value: 8.0
+    max_value: 64.0
+    alpha_weight: 1.0
+
+  reaction_delay:
+    factor: -0.1           # Negative = higher pool reduces delay
+    base_value: 1.0
+    min_value: 0.1
+    max_value: 2.0
+    alpha_weight: 1.0
+
+  charge_time:
+    factor: -0.1           # Negative = higher pool reduces charge time
+    base_value: 1.0
+    min_value: 0.2
+    max_value: 3.0
+    alpha_weight: 1.0
+
+  charge_distance:
+    factor: 0.1
+    base_value: 5.0
+    min_value: 2.0
+    max_value: 20.0
+    alpha_weight: 1.0
+
+  # === SPECIAL STATS ===
+  armor_penetration:
+    factor: 0.176
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 75.0        # Cap at 75%
+    alpha_weight: 1.0
+
+  true_damage:
+    factor: 0.1            # Reduced from 0.5 (divided by 5) for balance
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 1000.0
+    alpha_weight: 1.0
+
+  # === ACCURACY & KNOCKBACK ===
+  accuracy:
+    factor: 0.5            # Accuracy counters player dodge/evasion
+    base_value: 100.0      # 100 base accuracy (PoE-style formula)
+    min_value: 50.0
+    max_value: 300.0
+    alpha_weight: 1.0
+
+  knockback_resistance:
+    factor: 0.25           # Percentage resistance to knockback
+    base_value: 0.0
+    min_value: 0.0
+    max_value: 100.0       # 100% = immune to knockback
+    alpha_weight: 1.0
+
+# -----------------------------------------------------------------------------
+# MOB ARCHETYPES
+# -----------------------------------------------------------------------------
+# Predefined weight profiles for different mob combat styles.
+# Each archetype adjusts the alpha weights for all 52 stats.
+#
+# Format: archetype_name: [weight for each stat in order]
+# Stats order: max_health, physical_damage, armor, move_speed, attack_speed,
+#              attack_range, attack_cooldown, critical_chance, critical_multiplier,
+#              dodge_chance, block_chance, parry_chance, life_steal, health_regen,
+#              fire_damage, water_damage, lightning_damage, earth_damage, wind_damage, void_damage,
+#              fire_resistance, water_resistance, lightning_resistance, earth_resistance, wind_resistance, void_resistance,
+#              fire_penetration, water_penetration, lightning_penetration, earth_penetration, wind_penetration, void_penetration,
+#              fire_increased_damage, water_increased_damage, lightning_increased_damage, earth_increased_damage, wind_increased_damage, void_increased_damage,
+#              fire_more_damage, water_more_damage, lightning_more_damage, earth_more_damage, wind_more_damage, void_more_damage,
+#              aggro_range, reaction_delay, charge_time, charge_distance,
+#              armor_penetration, true_damage, accuracy, knockback_resistance
+#
+# Weight meanings:
+#   0.5 = Half normal allocation
+#   1.0 = Normal allocation
+#   2.0 = Double allocation
+#   2.5 = Heavy focus on this stat
+
+archetypes:
+  # Balanced melee fighter - good at everything combat-related
+  warrior:
+    - 2.5   # max_health        - HIGH: can take hits
+    - 2.5   # physical_damage   - HIGH: primary damage dealer
+    - 2.0   # armor             - HIGH: damage reduction
+    - 0.8   # move_speed        - LOW: not fast
+    - 0.8   # attack_speed      - LOW: heavy swings
+    - 0.8   # attack_range      - LOW: melee
+    - 1.5   # attack_cooldown   - MEDIUM: steady attacks
+    - 1.5   # critical_chance   - MEDIUM: some crits
+    - 1.0   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 1.0   # block_chance
+    - 1.0   # parry_chance
+    - 1.0   # life_steal
+    - 1.0   # health_regen
+    - 0.5   # fire_damage       - LOW: physical focus
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.5   # earth_damage
+    - 0.5   # wind_damage
+    - 0.5   # void_damage
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 0.5   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 0.5   # wind_resistance
+    - 0.5   # void_resistance
+    - 0.3   # fire_penetration   - LOW: physical focus
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.3   # void_penetration
+    - 0.3   # fire_increased_damage   - LOW: physical focus
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.3   # fire_more_damage   - LOW: physical focus
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 0.5   # aggro_range
+    - 0.8   # reaction_delay
+    - 1.0   # charge_time
+    - 1.0   # charge_distance
+    - 1.0   # armor_penetration
+    - 1.0   # true_damage
+    - 1.5   # accuracy          - MEDIUM-HIGH: hits reliably
+    - 2.0   # knockback_resistance - HIGH: hard to push around
+
+  # Ranged attacker - fast, mobile, high damage at range
+  ranger:
+    - 1.0   # max_health
+    - 1.5   # physical_damage
+    - 0.8   # armor
+    - 2.5   # move_speed        - HIGH: mobile
+    - 2.0   # attack_speed      - HIGH: rapid fire
+    - 1.0   # attack_range
+    - 1.0   # attack_cooldown
+    - 1.0   # critical_chance
+    - 1.0   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 1.0   # block_chance
+    - 1.0   # parry_chance
+    - 1.0   # life_steal
+    - 1.0   # health_regen
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.5   # earth_damage
+    - 1.0   # wind_damage       - MEDIUM: ranger has wind affinity
+    - 0.5   # void_damage
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 0.5   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 0.8   # wind_resistance
+    - 0.5   # void_resistance
+    - 0.3   # fire_penetration   - LOW: physical focus
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.5   # wind_penetration   - MEDIUM: wind affinity
+    - 0.3   # void_penetration
+    - 0.3   # fire_increased_damage   - LOW: physical focus
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.5   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.3   # fire_more_damage   - LOW: physical focus
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.5   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 1.5   # aggro_range       - HIGH: spots from far
+    - 1.5   # reaction_delay    - HIGH: quick reactions
+    - 0.8   # charge_time
+    - 1.0   # charge_distance
+    - 1.0   # armor_penetration
+    - 1.0   # true_damage
+    - 2.0   # accuracy          - HIGH: precise shots
+    - 0.5   # knockback_resistance - LOW: light and mobile
+
+  # Magic user - elemental damage focus
+  mage:
+    - 1.0   # max_health
+    - 1.0   # physical_damage
+    - 0.5   # armor             - LOW: fragile
+    - 0.8   # move_speed
+    - 1.0   # attack_speed
+    - 1.0   # attack_range
+    - 1.0   # attack_cooldown
+    - 1.0   # critical_chance
+    - 1.0   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 0.5   # block_chance
+    - 0.5   # parry_chance
+    - 0.5   # life_steal
+    - 1.0   # health_regen
+    - 2.5   # fire_damage       - HIGH: elemental focus
+    - 2.5   # water_damage
+    - 2.5   # lightning_damage
+    - 2.5   # earth_damage
+    - 2.5   # wind_damage
+    - 2.5   # void_damage
+    - 1.0   # fire_resistance
+    - 1.0   # water_resistance
+    - 1.0   # lightning_resistance
+    - 1.0   # earth_resistance
+    - 1.0   # wind_resistance
+    - 1.0   # void_resistance
+    - 2.0   # fire_penetration   - HIGH: elemental focus
+    - 2.0   # water_penetration
+    - 2.0   # lightning_penetration
+    - 2.0   # earth_penetration
+    - 2.0   # wind_penetration
+    - 2.0   # void_penetration
+    - 2.5   # fire_increased_damage   - VERY HIGH: elemental focus
+    - 2.5   # water_increased_damage
+    - 2.5   # lightning_increased_damage
+    - 2.5   # earth_increased_damage
+    - 2.5   # wind_increased_damage
+    - 2.5   # void_increased_damage
+    - 1.5   # fire_more_damage   - HIGH: elemental focus
+    - 1.5   # water_more_damage
+    - 1.5   # lightning_more_damage
+    - 1.5   # earth_more_damage
+    - 1.5   # wind_more_damage
+    - 1.5   # void_more_damage
+    - 0.5   # aggro_range
+    - 0.8   # reaction_delay
+    - 1.0   # charge_time
+    - 0.5   # charge_distance
+    - 1.0   # armor_penetration
+    - 1.0   # true_damage
+    - 1.0   # accuracy          - NORMAL: average aim
+    - 0.3   # knockback_resistance - LOW: fragile
+
+  # Defensive specialist - high survivability
+  tank:
+    - 3.0   # max_health        - VERY HIGH: meat shield
+    - 1.5   # physical_damage
+    - 3.0   # armor             - VERY HIGH: damage reduction
+    - 0.5   # move_speed        - LOW: slow
+    - 0.5   # attack_speed      - LOW: heavy attacks
+    - 1.0   # attack_range
+    - 2.0   # attack_cooldown
+    - 2.0   # critical_chance
+    - 1.0   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 2.0   # block_chance      - HIGH: blocks attacks
+    - 2.0   # parry_chance      - HIGH: parries attacks
+    - 2.0   # life_steal
+    - 1.5   # health_regen      - HIGH: sustain
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.5   # earth_damage
+    - 0.5   # wind_damage
+    - 0.5   # void_damage
+    - 2.0   # fire_resistance   - HIGH: resists elements
+    - 2.0   # water_resistance
+    - 2.0   # lightning_resistance
+    - 2.0   # earth_resistance
+    - 2.0   # wind_resistance
+    - 2.0   # void_resistance
+    - 0.3   # fire_penetration   - LOW: defensive focus
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.3   # void_penetration
+    - 0.3   # fire_increased_damage   - LOW: defensive focus
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.3   # fire_more_damage   - LOW: defensive focus
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 0.5   # aggro_range
+    - 0.5   # reaction_delay
+    - 1.5   # charge_time
+    - 0.5   # charge_distance
+    - 1.0   # armor_penetration
+    - 1.0   # true_damage
+    - 1.0   # accuracy          - NORMAL: average aim
+    - 3.0   # knockback_resistance - VERY HIGH: immovable
+
+  # Fast damage dealer - glass cannon with crits
+  assassin:
+    - 0.8   # max_health        - LOW: fragile
+    - 2.5   # physical_damage   - HIGH: burst damage
+    - 0.5   # armor             - LOW: no armor
+    - 2.0   # move_speed        - HIGH: fast
+    - 1.5   # attack_speed      - HIGH: quick strikes
+    - 1.0   # attack_range
+    - 1.0   # attack_cooldown
+    - 1.0   # critical_chance
+    - 2.5   # critical_multiplier - VERY HIGH: big crits
+    - 2.0   # dodge_chance      - HIGH: evasive
+    - 2.0   # block_chance
+    - 1.0   # parry_chance
+    - 1.0   # life_steal
+    - 1.5   # health_regen
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.5   # earth_damage
+    - 0.8   # wind_damage       - SOME: wind affinity for speed
+    - 0.5   # void_damage
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 0.5   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 0.5   # wind_resistance
+    - 0.5   # void_resistance
+    - 0.5   # fire_penetration   - MEDIUM: balanced
+    - 0.5   # water_penetration
+    - 0.5   # lightning_penetration
+    - 0.5   # earth_penetration
+    - 0.5   # wind_penetration
+    - 0.5   # void_penetration
+    - 0.5   # fire_increased_damage   - MEDIUM: balanced
+    - 0.5   # water_increased_damage
+    - 0.5   # lightning_increased_damage
+    - 0.5   # earth_increased_damage
+    - 0.5   # wind_increased_damage
+    - 0.5   # void_increased_damage
+    - 0.5   # fire_more_damage   - MEDIUM: balanced
+    - 0.5   # water_more_damage
+    - 0.5   # lightning_more_damage
+    - 0.5   # earth_more_damage
+    - 0.5   # wind_more_damage
+    - 0.5   # void_more_damage
+    - 1.0   # aggro_range
+    - 1.0   # reaction_delay
+    - 0.5   # charge_time       - LOW: quick charge
+    - 2.0   # charge_distance   - HIGH: long charge
+    - 1.0   # armor_penetration
+    - 1.0   # true_damage
+    - 2.5   # accuracy          - VERY HIGH: precise strikes
+    - 0.3   # knockback_resistance - LOW: nimble but light
+
+  # =============================================================================
+  # ELEMENTAL SPECIALISTS
+  # =============================================================================
+
+  # Pyromancer - Burns everything. Master of fire with explosive damage.
+  # "The air ignites before they even attack."
+  pyromancer:
+    - 0.8   # max_health        - LOW: glass cannon
+    - 0.3   # physical_damage   - MINIMAL: pure fire
+    - 0.3   # armor             - MINIMAL: robes
+    - 1.0   # move_speed
+    - 1.2   # attack_speed      - MEDIUM: casting
+    - 1.5   # attack_range      - MEDIUM: ranged spells
+    - 1.0   # attack_cooldown
+    - 1.5   # critical_chance   - MEDIUM: spell crits
+    - 2.0   # critical_multiplier - HIGH: explosive crits
+    - 0.8   # dodge_chance
+    - 0.3   # block_chance      - MINIMAL: no shield
+    - 0.3   # parry_chance
+    - 0.5   # life_steal
+    - 0.8   # health_regen
+    - 3.5   # fire_damage       - EXTREME: fire specialist
+    - 0.0   # water_damage       - NONE: fire opposes cold
+    - 0.5   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 0.5   # void_damage
+    - 3.0   # fire_resistance   - VERY HIGH: immune to own element
+    - 0.0   # water_resistance   - NONE: weak to cold
+    - 0.5   # lightning_resistance
+    - 0.3   # earth_resistance
+    - 0.3   # wind_resistance
+    - 0.5   # void_resistance
+    - 3.0   # fire_penetration   - VERY HIGH: burns through resist
+    - 0.0   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.3   # void_penetration
+    - 3.0   # fire_increased_damage   - VERY HIGH: amplified flames
+    - 0.0   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 2.5   # fire_more_damage   - VERY HIGH: multiplicative fire
+    - 0.0   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 1.0   # aggro_range
+    - 1.0   # reaction_delay
+    - 1.5   # charge_time       - MEDIUM: spell windup
+    - 0.5   # charge_distance
+    - 0.5   # armor_penetration
+    - 0.5   # true_damage
+    - 1.5   # accuracy
+    - 0.3   # knockback_resistance - LOW: fragile caster
+
+  # Frost Warden - Icy tank that slows and freezes. Cold and sturdy.
+  # "Where they walk, winter follows."
+  frost_warden:
+    - 2.5   # max_health        - HIGH: sturdy ice
+    - 1.0   # physical_damage   - NORMAL
+    - 2.5   # armor             - HIGH: ice armor
+    - 0.6   # move_speed        - LOW: slow and deliberate
+    - 0.7   # attack_speed      - LOW: heavy frozen strikes
+    - 1.0   # attack_range
+    - 1.5   # attack_cooldown
+    - 0.8   # critical_chance
+    - 1.0   # critical_multiplier
+    - 0.5   # dodge_chance      - LOW: doesn't dodge
+    - 2.0   # block_chance      - HIGH: ice shield
+    - 1.5   # parry_chance
+    - 0.5   # life_steal
+    - 1.5   # health_regen      - HIGH: regenerates
+    - 0.0   # fire_damage       - NONE: cold opposes fire
+    - 3.0   # water_damage       - VERY HIGH: cold specialist
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 0.3   # void_damage
+    - 0.0   # fire_resistance   - NONE: weak to fire
+    - 3.0   # water_resistance   - VERY HIGH: immune to cold
+    - 1.0   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 0.5   # wind_resistance
+    - 1.0   # void_resistance
+    - 0.0   # fire_penetration
+    - 2.5   # water_penetration   - HIGH: freezes through resist
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.3   # void_penetration
+    - 0.0   # fire_increased_damage
+    - 2.5   # water_increased_damage   - HIGH: amplified cold
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.0   # fire_more_damage
+    - 2.0   # water_more_damage   - HIGH: multiplicative cold
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 0.8   # aggro_range
+    - 0.5   # reaction_delay    - LOW: slow reactions
+    - 2.0   # charge_time       - HIGH: slow windup
+    - 0.5   # charge_distance
+    - 0.8   # armor_penetration
+    - 0.5   # true_damage
+    - 1.0   # accuracy
+    - 2.5   # knockback_resistance - HIGH: immovable glacier
+
+  # Storm Caller - Lightning-fast attacks, chain lightning specialist.
+  # "Thunder follows in their wake."
+  storm_caller:
+    - 1.0   # max_health
+    - 0.5   # physical_damage   - LOW: pure lightning
+    - 0.5   # armor             - LOW: light armor
+    - 2.0   # move_speed        - HIGH: fast as lightning
+    - 3.0   # attack_speed      - EXTREME: rapid strikes
+    - 2.0   # attack_range      - HIGH: chain lightning
+    - 0.5   # attack_cooldown   - LOW: rapid attacks
+    - 2.0   # critical_chance   - HIGH: shocking crits
+    - 1.5   # critical_multiplier
+    - 1.5   # dodge_chance      - HIGH: quick dodges
+    - 0.5   # block_chance
+    - 0.5   # parry_chance
+    - 0.5   # life_steal
+    - 0.8   # health_regen
+    - 0.3   # fire_damage
+    - 0.3   # water_damage
+    - 3.5   # lightning_damage   - EXTREME: lightning specialist
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 2.0   # wind_damage        - HIGH: storm brings wind
+    - 0.3   # void_damage
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 3.0   # lightning_resistance - VERY HIGH: conducts safely
+    - 0.3   # earth_resistance
+    - 1.5   # wind_resistance    - MEDIUM: wind affinity
+    - 0.5   # void_resistance
+    - 0.3   # fire_penetration
+    - 0.3   # water_penetration
+    - 3.0   # lightning_penetration - VERY HIGH: shocks through
+    - 0.3   # earth_penetration
+    - 1.5   # wind_penetration   - MEDIUM: wind affinity
+    - 0.3   # void_penetration
+    - 0.3   # fire_increased_damage
+    - 0.3   # water_increased_damage
+    - 3.0   # lightning_increased_damage - VERY HIGH: amplified
+    - 0.3   # earth_increased_damage
+    - 1.5   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.3   # fire_more_damage
+    - 0.3   # water_more_damage
+    - 2.5   # lightning_more_damage - VERY HIGH: multiplicative
+    - 0.3   # earth_more_damage
+    - 1.2   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 2.0   # aggro_range       - HIGH: senses electrical
+    - 2.5   # reaction_delay    - EXTREME: instant reactions
+    - 0.3   # charge_time       - LOW: instant strikes
+    - 1.5   # charge_distance
+    - 0.5   # armor_penetration
+    - 0.5   # true_damage
+    - 2.0   # accuracy          - HIGH: lightning precision
+    - 0.5   # knockback_resistance - LOW: light and mobile
+
+  # Void Weaver - Chaos specialist. Reality bends around them.
+  # "They don't fight you - they unmake you."
+  void_weaver:
+    - 1.2   # max_health
+    - 0.3   # physical_damage   - MINIMAL: pure chaos
+    - 0.5   # armor
+    - 1.0   # move_speed
+    - 1.0   # attack_speed
+    - 2.0   # attack_range      - HIGH: reaches through void
+    - 1.0   # attack_cooldown
+    - 1.5   # critical_chance
+    - 2.0   # critical_multiplier - HIGH: reality-warping crits
+    - 1.5   # dodge_chance      - HIGH: phases through
+    - 0.3   # block_chance
+    - 0.3   # parry_chance
+    - 1.5   # life_steal        - HIGH: drains essence
+    - 0.5   # health_regen
+    - 0.3   # fire_damage
+    - 0.3   # water_damage
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 3.5   # void_damage      - EXTREME: chaos specialist
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 0.5   # lightning_resistance
+    - 0.3   # earth_resistance
+    - 0.3   # wind_resistance
+    - 3.0   # void_resistance   - VERY HIGH: embraces chaos
+    - 0.3   # fire_penetration
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 3.0   # void_penetration   - VERY HIGH: ignores resist
+    - 0.3   # fire_increased_damage
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 3.0   # void_increased_damage - VERY HIGH: amplified chaos
+    - 0.3   # fire_more_damage
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 2.5   # void_more_damage   - VERY HIGH: multiplicative
+    - 1.5   # aggro_range
+    - 1.0   # reaction_delay
+    - 1.0   # charge_time
+    - 1.0   # charge_distance
+    - 0.5   # armor_penetration
+    - 2.5   # true_damage        - VERY HIGH: bypasses all
+    - 1.2   # accuracy
+    - 1.0   # knockback_resistance
+
+  # =============================================================================
+  # COMBAT SPECIALISTS
+  # =============================================================================
+
+  # Berserker - Rage incarnate. Massive damage, no defense, sustains through carnage.
+  # "Pain only makes them angrier."
+  berserker:
+    - 1.5   # max_health        - MEDIUM: rage sustains
+    - 3.5   # physical_damage   - EXTREME: rage damage
+    - 0.3   # armor             - MINIMAL: no defense
+    - 2.0   # move_speed        - HIGH: charges in
+    - 2.5   # attack_speed      - VERY HIGH: frenzied
+    - 0.8   # attack_range      - LOW: gets close
+    - 0.5   # attack_cooldown   - LOW: relentless
+    - 2.0   # critical_chance   - HIGH: wild swings
+    - 2.0   # critical_multiplier - HIGH: devastating crits
+    - 0.3   # dodge_chance      - MINIMAL: doesn't care
+    - 0.3   # block_chance      - MINIMAL: offense only
+    - 0.3   # parry_chance
+    - 3.0   # life_steal        - VERY HIGH: heals through violence
+    - 0.5   # health_regen
+    - 0.8   # fire_damage       - SOME: burning rage
+    - 0.3   # water_damage
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 0.8   # void_damage      - SOME: chaotic fury
+    - 0.3   # fire_resistance   - LOW: doesn't care
+    - 0.3   # water_resistance
+    - 0.3   # lightning_resistance
+    - 0.3   # earth_resistance
+    - 0.3   # wind_resistance
+    - 0.3   # void_resistance
+    - 0.5   # fire_penetration
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.5   # void_penetration
+    - 0.5   # fire_increased_damage
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.5   # void_increased_damage
+    - 0.5   # fire_more_damage
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.5   # void_more_damage
+    - 2.0   # aggro_range       - HIGH: seeks combat
+    - 0.3   # reaction_delay    - MINIMAL: instant rage
+    - 0.3   # charge_time       - MINIMAL: immediate
+    - 2.5   # charge_distance   - VERY HIGH: leaps into combat
+    - 2.0   # armor_penetration  - HIGH: cleaves through armor
+    - 1.0   # true_damage
+    - 1.5   # accuracy
+    - 0.5   # knockback_resistance - LOW: doesn't try to resist
+
+  # Juggernaut - Unstoppable force. Charges through everything.
+  # "Nothing stops them. Nothing."
+  juggernaut:
+    - 3.0   # max_health        - VERY HIGH: massive
+    - 2.0   # physical_damage   - HIGH: impact damage
+    - 2.5   # armor             - VERY HIGH: armored
+    - 1.5   # move_speed        - MEDIUM: building momentum
+    - 0.5   # attack_speed      - LOW: heavy impacts
+    - 1.0   # attack_range
+    - 2.0   # attack_cooldown   - HIGH: recovery time
+    - 0.5   # critical_chance   - LOW: brute force
+    - 1.0   # critical_multiplier
+    - 0.3   # dodge_chance      - MINIMAL: too big
+    - 1.5   # block_chance      - MEDIUM: uses mass
+    - 0.5   # parry_chance
+    - 0.5   # life_steal
+    - 1.0   # health_regen
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.8   # earth_damage       - SOME: earth affinity for tanking
+    - 0.3   # wind_damage        - LOW: not fast
+    - 0.5   # void_damage
+    - 1.5   # fire_resistance   - HIGH: thick hide
+    - 1.5   # water_resistance
+    - 1.5   # lightning_resistance
+    - 2.0   # earth_resistance   - VERY HIGH: earth affinity
+    - 0.8   # wind_resistance
+    - 1.5   # void_resistance
+    - 0.5   # fire_penetration
+    - 0.5   # water_penetration
+    - 0.5   # lightning_penetration
+    - 0.5   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.5   # void_penetration
+    - 0.5   # fire_increased_damage
+    - 0.5   # water_increased_damage
+    - 0.5   # lightning_increased_damage
+    - 0.5   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.5   # void_increased_damage
+    - 0.5   # fire_more_damage
+    - 0.5   # water_more_damage
+    - 0.5   # lightning_more_damage
+    - 0.5   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.5   # void_more_damage
+    - 1.5   # aggro_range
+    - 0.5   # reaction_delay    - LOW: slow start
+    - 0.3   # charge_time       - LOW: once moving...
+    - 3.5   # charge_distance   - EXTREME: unstoppable charge
+    - 2.5   # armor_penetration  - VERY HIGH: smashes through
+    - 1.5   # true_damage        - HIGH: impact bypasses armor
+    - 0.8   # accuracy          - LOW: doesn't aim, just hits
+    - 3.5   # knockback_resistance - EXTREME: immovable object
+
+  # Duelist - Technical fighter. Perfect parries, precise strikes.
+  # "Every move calculated. Every strike lethal."
+  duelist:
+    - 1.0   # max_health
+    - 1.5   # physical_damage   - MEDIUM: skill over power
+    - 1.0   # armor             - MEDIUM: light armor
+    - 1.5   # move_speed        - HIGH: footwork
+    - 1.8   # attack_speed      - HIGH: rapid thrusts
+    - 1.2   # attack_range      - MEDIUM: rapier reach
+    - 0.8   # attack_cooldown
+    - 2.5   # critical_chance   - VERY HIGH: finds weaknesses
+    - 2.0   # critical_multiplier - HIGH: precise strikes
+    - 2.5   # dodge_chance      - VERY HIGH: graceful evasion
+    - 1.5   # block_chance      - HIGH: defensive posture
+    - 3.0   # parry_chance      - EXTREME: master parrier
+    - 0.5   # life_steal
+    - 0.8   # health_regen
+    - 0.3   # fire_damage
+    - 0.3   # water_damage
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage
+    - 0.8   # wind_damage        - SOME: wind affinity for speed
+    - 0.3   # void_damage
+    - 0.8   # fire_resistance
+    - 0.8   # water_resistance
+    - 0.8   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 1.0   # wind_resistance    - MEDIUM: wind affinity
+    - 0.8   # void_resistance
+    - 0.5   # fire_penetration
+    - 0.5   # water_penetration
+    - 0.5   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.8   # wind_penetration   - SOME: wind affinity
+    - 0.5   # void_penetration
+    - 0.5   # fire_increased_damage
+    - 0.5   # water_increased_damage
+    - 0.5   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.8   # wind_increased_damage
+    - 0.5   # void_increased_damage
+    - 0.5   # fire_more_damage
+    - 0.5   # water_more_damage
+    - 0.5   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.8   # wind_more_damage
+    - 0.5   # void_more_damage
+    - 1.2   # aggro_range
+    - 2.0   # reaction_delay    - HIGH: quick reflexes
+    - 0.5   # charge_time       - LOW: quick lunges
+    - 1.5   # charge_distance   - HIGH: fencing lunges
+    - 1.5   # armor_penetration  - HIGH: finds gaps
+    - 0.5   # true_damage
+    - 3.0   # accuracy          - EXTREME: perfect precision
+    - 1.0   # knockback_resistance
+
+  # Ravager - Defense shredder. Destroys armor, deals true damage.
+  # "Armor is just an obstacle to overcome."
+  ravager:
+    - 1.5   # max_health
+    - 2.0   # physical_damage   - HIGH: shredding attacks
+    - 0.8   # armor
+    - 1.8   # move_speed        - HIGH: aggressive
+    - 2.0   # attack_speed      - HIGH: rapid slashes
+    - 1.0   # attack_range
+    - 0.8   # attack_cooldown
+    - 1.5   # critical_chance
+    - 1.5   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 0.5   # block_chance
+    - 0.5   # parry_chance
+    - 1.5   # life_steal        - HIGH: feeds on wounds
+    - 0.5   # health_regen
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.5   # earth_damage
+    - 0.5   # wind_damage
+    - 1.0   # void_damage      - SOME: corrupting strikes
+    - 0.5   # fire_resistance
+    - 0.5   # water_resistance
+    - 0.5   # lightning_resistance
+    - 0.5   # earth_resistance
+    - 0.5   # wind_resistance
+    - 1.0   # void_resistance
+    - 1.0   # fire_penetration   - MEDIUM: elemental shred
+    - 1.0   # water_penetration
+    - 1.0   # lightning_penetration
+    - 0.8   # earth_penetration
+    - 0.8   # wind_penetration
+    - 1.5   # void_penetration   - HIGH: chaos shred
+    - 0.8   # fire_increased_damage
+    - 0.8   # water_increased_damage
+    - 0.8   # lightning_increased_damage
+    - 0.5   # earth_increased_damage
+    - 0.5   # wind_increased_damage
+    - 1.0   # void_increased_damage
+    - 0.8   # fire_more_damage
+    - 0.8   # water_more_damage
+    - 0.8   # lightning_more_damage
+    - 0.5   # earth_more_damage
+    - 0.5   # wind_more_damage
+    - 1.0   # void_more_damage
+    - 1.5   # aggro_range
+    - 1.5   # reaction_delay
+    - 0.5   # charge_time
+    - 1.5   # charge_distance
+    - 3.5   # armor_penetration  - EXTREME: shreds armor
+    - 3.0   # true_damage        - VERY HIGH: bypasses defenses
+    - 1.8   # accuracy
+    - 0.8   # knockback_resistance
+
+  # =============================================================================
+  # HYBRID / SPECIAL ARCHETYPES
+  # =============================================================================
+
+  # Spellblade - Hybrid warrior-mage. Physical and elemental mastery.
+  # "The blade channels the arcane."
+  spellblade:
+    - 1.5   # max_health        - MEDIUM: balanced
+    - 2.0   # physical_damage   - HIGH: melee focus
+    - 1.5   # armor             - MEDIUM: battle mage armor
+    - 1.2   # move_speed
+    - 1.5   # attack_speed      - HIGH: fluid combos
+    - 1.0   # attack_range
+    - 1.0   # attack_cooldown
+    - 1.5   # critical_chance   - HIGH: enchanted strikes
+    - 1.5   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 1.0   # block_chance
+    - 1.0   # parry_chance
+    - 0.8   # life_steal
+    - 0.8   # health_regen
+    - 1.5   # fire_damage       - HIGH: elemental infusion
+    - 1.5   # water_damage
+    - 1.5   # lightning_damage
+    - 1.2   # earth_damage       - MEDIUM: all elements balanced
+    - 1.2   # wind_damage
+    - 1.0   # void_damage
+    - 1.0   # fire_resistance   - MEDIUM: magical protection
+    - 1.0   # water_resistance
+    - 1.0   # lightning_resistance
+    - 1.0   # earth_resistance
+    - 1.0   # wind_resistance
+    - 0.8   # void_resistance
+    - 1.2   # fire_penetration   - MEDIUM: elemental edge
+    - 1.2   # water_penetration
+    - 1.2   # lightning_penetration
+    - 1.0   # earth_penetration
+    - 1.0   # wind_penetration
+    - 0.8   # void_penetration
+    - 1.5   # fire_increased_damage   - HIGH: balanced elemental
+    - 1.5   # water_increased_damage
+    - 1.5   # lightning_increased_damage
+    - 1.2   # earth_increased_damage
+    - 1.2   # wind_increased_damage
+    - 0.8   # void_increased_damage
+    - 1.2   # fire_more_damage   - MEDIUM: multiplicative
+    - 1.2   # water_more_damage
+    - 1.2   # lightning_more_damage
+    - 1.0   # earth_more_damage
+    - 1.0   # wind_more_damage
+    - 0.8   # void_more_damage
+    - 1.0   # aggro_range
+    - 1.2   # reaction_delay
+    - 0.8   # charge_time
+    - 1.2   # charge_distance
+    - 1.5   # armor_penetration  - HIGH: enchanted strikes
+    - 0.8   # true_damage
+    - 1.5   # accuracy
+    - 1.2   # knockback_resistance
+
+  # Necromancer - Life drainer. Cold and chaos, sustains through stolen life.
+  # "Death is merely a resource to exploit."
+  necromancer:
+    - 1.0   # max_health        - NORMAL: relies on drain
+    - 0.5   # physical_damage   - LOW: magic focus
+    - 0.5   # armor             - LOW: robes
+    - 0.8   # move_speed        - LOW: deliberate
+    - 0.8   # attack_speed      - LOW: channeled spells
+    - 2.0   # attack_range      - HIGH: drains from distance
+    - 1.5   # attack_cooldown
+    - 1.0   # critical_chance
+    - 1.5   # critical_multiplier
+    - 1.0   # dodge_chance
+    - 0.3   # block_chance
+    - 0.3   # parry_chance
+    - 3.5   # life_steal        - EXTREME: drains life
+    - 2.5   # health_regen      - VERY HIGH: dark healing
+    - 0.3   # fire_damage
+    - 2.0   # water_damage       - HIGH: death's chill
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 2.5   # void_damage      - VERY HIGH: corrupting touch
+    - 0.5   # fire_resistance
+    - 2.0   # water_resistance   - HIGH: embraces cold
+    - 0.5   # lightning_resistance
+    - 0.3   # earth_resistance
+    - 0.3   # wind_resistance
+    - 2.5   # void_resistance   - VERY HIGH: embraces chaos
+    - 0.3   # fire_penetration
+    - 1.5   # water_penetration   - HIGH: chilling touch
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 2.0   # void_penetration   - HIGH: corrupting
+    - 0.3   # fire_increased_damage
+    - 1.5   # water_increased_damage   - HIGH: amplified cold
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 2.0   # void_increased_damage   - HIGH: amplified chaos
+    - 0.3   # fire_more_damage
+    - 1.2   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 1.5   # void_more_damage
+    - 1.5   # aggro_range
+    - 0.8   # reaction_delay
+    - 1.5   # charge_time
+    - 0.5   # charge_distance
+    - 0.5   # armor_penetration
+    - 1.5   # true_damage        - HIGH: drains essence
+    - 1.2   # accuracy
+    - 0.5   # knockback_resistance
+
+  # Elemental - Pure elemental being. ALL elements, no physical.
+  # "Neither living nor dead - just pure energy."
+  elemental:
+    - 1.5   # max_health        - MEDIUM: energy form
+    - 0.0   # physical_damage   - NONE: pure elemental
+    - 0.5   # armor             - LOW: energy form
+    - 1.5   # move_speed        - HIGH: floats
+    - 1.5   # attack_speed      - HIGH: energy pulses
+    - 1.5   # attack_range      - HIGH: energy projection
+    - 1.0   # attack_cooldown
+    - 1.0   # critical_chance
+    - 1.5   # critical_multiplier
+    - 1.5   # dodge_chance      - HIGH: shifts form
+    - 0.3   # block_chance
+    - 0.3   # parry_chance
+    - 0.5   # life_steal
+    - 1.5   # health_regen      - HIGH: regenerates energy
+    - 2.0   # fire_damage       - HIGH: all elements
+    - 2.0   # water_damage
+    - 2.0   # lightning_damage
+    - 2.0   # earth_damage
+    - 2.0   # wind_damage
+    - 2.0   # void_damage
+    - 2.0   # fire_resistance   - HIGH: elemental nature
+    - 2.0   # water_resistance
+    - 2.0   # lightning_resistance
+    - 2.0   # earth_resistance
+    - 2.0   # wind_resistance
+    - 2.0   # void_resistance
+    - 1.5   # fire_penetration   - HIGH: all penetration
+    - 1.5   # water_penetration
+    - 1.5   # lightning_penetration
+    - 1.5   # earth_penetration
+    - 1.5   # wind_penetration
+    - 1.5   # void_penetration
+    - 2.0   # fire_increased_damage   - HIGH: all amplified
+    - 2.0   # water_increased_damage
+    - 2.0   # lightning_increased_damage
+    - 2.0   # earth_increased_damage
+    - 2.0   # wind_increased_damage
+    - 2.0   # void_increased_damage
+    - 1.5   # fire_more_damage   - HIGH: all multiplicative
+    - 1.5   # water_more_damage
+    - 1.5   # lightning_more_damage
+    - 1.5   # earth_more_damage
+    - 1.5   # wind_more_damage
+    - 1.5   # void_more_damage
+    - 1.5   # aggro_range
+    - 1.2   # reaction_delay
+    - 1.0   # charge_time
+    - 1.0   # charge_distance
+    - 0.3   # armor_penetration  - LOW: elemental only
+    - 1.0   # true_damage
+    - 1.5   # accuracy
+    - 1.0   # knockback_resistance
+
+  # Shade - Shadow assassin. Chaos damage, extremely evasive.
+  # "You only see them when it's too late."
+  shade:
+    - 0.6   # max_health        - VERY LOW: shadow form
+    - 1.5   # physical_damage   - MEDIUM: shadow strikes
+    - 0.3   # armor             - MINIMAL: no substance
+    - 2.5   # move_speed        - VERY HIGH: flickers
+    - 2.0   # attack_speed      - HIGH: rapid shadow strikes
+    - 1.0   # attack_range
+    - 0.5   # attack_cooldown   - LOW: relentless
+    - 2.5   # critical_chance   - VERY HIGH: strikes from shadows
+    - 2.5   # critical_multiplier - VERY HIGH: lethal precision
+    - 3.0   # dodge_chance      - EXTREME: phases through
+    - 0.3   # block_chance      - MINIMAL: doesn't block
+    - 0.3   # parry_chance
+    - 1.0   # life_steal
+    - 0.3   # health_regen      - MINIMAL: shadow form
+    - 0.3   # fire_damage
+    - 0.5   # water_damage       - SOME: cold shadows
+    - 0.3   # lightning_damage
+    - 0.3   # earth_damage       - LOW: not earth focused
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 2.5   # void_damage      - VERY HIGH: shadow chaos
+    - 0.3   # fire_resistance   - LOW: light hurts
+    - 1.0   # water_resistance   - MEDIUM: darkness is cold
+    - 0.3   # lightning_resistance - LOW: light hurts
+    - 0.3   # earth_resistance
+    - 0.3   # wind_resistance
+    - 2.5   # void_resistance   - VERY HIGH: shadow nature
+    - 0.3   # fire_penetration
+    - 0.5   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 2.5   # void_penetration   - VERY HIGH: shadow strike
+    - 0.3   # fire_increased_damage
+    - 0.5   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.3   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 2.5   # void_increased_damage - VERY HIGH: amplified
+    - 0.3   # fire_more_damage
+    - 0.5   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.3   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 2.0   # void_more_damage   - HIGH: multiplicative
+    - 2.5   # aggro_range       - VERY HIGH: senses prey
+    - 2.5   # reaction_delay    - EXTREME: instant reactions
+    - 0.3   # charge_time       - MINIMAL: instant
+    - 2.0   # charge_distance   - HIGH: shadow step
+    - 1.0   # armor_penetration
+    - 1.5   # true_damage        - HIGH: shadow damage
+    - 2.5   # accuracy          - VERY HIGH: never misses
+    - 0.3   # knockback_resistance - MINIMAL: ethereal
+
+  # Guardian - Protector archetype. Shields allies, reflects damage.
+  # "Stand behind me."
+  guardian:
+    - 3.5   # max_health        - EXTREME: protector
+    - 1.0   # physical_damage   - NORMAL: not offensive
+    - 3.5   # armor             - EXTREME: heavy armor
+    - 0.5   # move_speed        - LOW: heavily armored
+    - 0.5   # attack_speed      - LOW: defensive stance
+    - 1.5   # attack_range      - MEDIUM: reach with shield
+    - 2.0   # attack_cooldown
+    - 0.5   # critical_chance   - LOW: not offensive
+    - 1.0   # critical_multiplier
+    - 0.5   # dodge_chance      - LOW: too heavy
+    - 3.5   # block_chance      - EXTREME: master blocker
+    - 2.5   # parry_chance      - VERY HIGH: shield parry
+    - 0.3   # life_steal
+    - 2.0   # health_regen      - HIGH: regenerates
+    - 0.3   # fire_damage
+    - 0.3   # water_damage
+    - 0.3   # lightning_damage
+    - 1.5   # earth_damage       - HIGH: earth affinity for guardian
+    - 0.3   # wind_damage        - LOW: not wind focused
+    - 0.3   # void_damage
+    - 2.5   # fire_resistance   - VERY HIGH: shielded
+    - 2.5   # water_resistance
+    - 2.5   # lightning_resistance
+    - 3.0   # earth_resistance   - EXTREME: earth affinity
+    - 1.5   # wind_resistance    - MEDIUM: somewhat resistant
+    - 2.5   # void_resistance
+    - 0.3   # fire_penetration
+    - 0.3   # water_penetration
+    - 0.3   # lightning_penetration
+    - 0.3   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.3   # void_penetration
+    - 0.3   # fire_increased_damage
+    - 0.3   # water_increased_damage
+    - 0.3   # lightning_increased_damage
+    - 0.5   # earth_increased_damage  - SOME: earth affinity
+    - 0.3   # wind_increased_damage
+    - 0.3   # void_increased_damage
+    - 0.3   # fire_more_damage
+    - 0.3   # water_more_damage
+    - 0.3   # lightning_more_damage
+    - 0.5   # earth_more_damage  - SOME: earth affinity
+    - 0.3   # wind_more_damage
+    - 0.3   # void_more_damage
+    - 1.0   # aggro_range
+    - 0.5   # reaction_delay    - LOW: defensive stance
+    - 2.5   # charge_time       - VERY HIGH: holds position
+    - 0.3   # charge_distance   - MINIMAL: doesn't charge
+    - 0.5   # armor_penetration
+    - 0.3   # true_damage
+    - 0.8   # accuracy
+    - 3.5   # knockback_resistance - EXTREME: immovable
+
+  # Executioner - Slow but devastating. One hit, one kill.
+  # "The swing is slow. You still can't dodge it."
+  executioner:
+    - 2.0   # max_health        - HIGH: bulky
+    - 3.5   # physical_damage   - EXTREME: massive hits
+    - 1.5   # armor             - MEDIUM: some protection
+    - 0.5   # move_speed        - VERY LOW: deliberate
+    - 0.3   # attack_speed      - VERY LOW: massive windup
+    - 1.5   # attack_range      - HIGH: huge weapon
+    - 3.0   # attack_cooldown   - VERY HIGH: recovery
+    - 1.0   # critical_chance   - NORMAL: doesn't need crits
+    - 3.0   # critical_multiplier - EXTREME: when it crits...
+    - 0.3   # dodge_chance      - MINIMAL: too slow
+    - 0.5   # block_chance
+    - 0.5   # parry_chance
+    - 0.5   # life_steal
+    - 1.0   # health_regen
+    - 0.5   # fire_damage
+    - 0.5   # water_damage
+    - 0.5   # lightning_damage
+    - 0.8   # earth_damage       - SOME: heavy weapon has earth affinity
+    - 0.3   # wind_damage        - LOW: too slow for wind
+    - 0.5   # void_damage
+    - 1.0   # fire_resistance
+    - 1.0   # water_resistance
+    - 1.0   # lightning_resistance
+    - 1.5   # earth_resistance   - MEDIUM: sturdy, grounded stance
+    - 0.8   # wind_resistance    - SOME: heavy so hard to push
+    - 1.0   # void_resistance
+    - 0.5   # fire_penetration
+    - 0.5   # water_penetration
+    - 0.5   # lightning_penetration
+    - 0.5   # earth_penetration
+    - 0.3   # wind_penetration
+    - 0.5   # void_penetration
+    - 0.5   # fire_increased_damage
+    - 0.5   # water_increased_damage
+    - 0.5   # lightning_increased_damage
+    - 0.5   # earth_increased_damage
+    - 0.3   # wind_increased_damage
+    - 0.5   # void_increased_damage
+    - 0.5   # fire_more_damage
+    - 0.5   # water_more_damage
+    - 0.5   # lightning_more_damage
+    - 0.5   # earth_more_damage
+    - 0.3   # wind_more_damage
+    - 0.5   # void_more_damage
+    - 1.0   # aggro_range
+    - 0.3   # reaction_delay    - VERY LOW: slow reactions
+    - 3.0   # charge_time       - EXTREME: massive windup
+    - 0.5   # charge_distance   - LOW: doesn't charge
+    - 3.0   # armor_penetration  - VERY HIGH: cleaves armor
+    - 2.5   # true_damage        - VERY HIGH: unstoppable force
+    - 1.0   # accuracy          - NORMAL: area of effect
+    - 2.5   # knockback_resistance - VERY HIGH: plants feet
+
+# -----------------------------------------------------------------------------
+# BALANCE NOTES
+# -----------------------------------------------------------------------------
+#
+# EXAMPLE CALCULATIONS (Level 10 mob at 500 blocks):
+#   base_pool = 10 * 15.0 = 150
+#   distance_bonus = 500 * 0.3 = 150
+#   total_pool = 300
+#
+#   With even distribution (300 / 42 stats = ~7.1 per stat):
+#   - max_health: 100 + (10.7 * 0.88) = ~109 HP
+#   - physical_damage: 10 + (10.7 * 0.067) = ~10.7 damage
+#   - critical_chance: 5 + (10.7 * 0.11) = ~6.2%
+#
+# TUNING TIPS:
+# - Increase points_per_level for faster power scaling
+# - Decrease distance_bonus_per_block for slower exploration difficulty
+# - Adjust individual stat factors to buff/nerf specific mechanics
+# - Modify alpha_weights to change which stats mobs tend to specialize in
+# - Use max_value caps to prevent extreme outliers

@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Sentinel.png"
+    }
+  ],
+  "Light": {
+    "Color": "#77AA88",
+    "Radius": 2
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

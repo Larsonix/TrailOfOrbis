@@ -96,7 +96,7 @@ The 6 Elements are rooted in Hytale's canonical lore :
 
 ---
 
-For the complete stat table covering all 153 computed stats, see [Stat Reference](complete-stat-reference).
+For the complete stat table covering all 246 computed stats, see [Stat Reference](complete-stat-reference).
 
 ---
 
@@ -310,6 +310,6 @@ Void is sustain and amplification. You heal through damage dealt, bypass defense
 
 ## Related Pages
 
-- [Stat Reference](complete-stat-reference) - All 153 computed stats
+- [Stat Reference](complete-stat-reference) - All 246 computed stats
 - [Status Effects](status-effects) - The 4 elemental Ailments
 - [Combat System](combat-system) - How attributes feed the damage pipeline

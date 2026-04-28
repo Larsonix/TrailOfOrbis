@@ -1,0 +1,10 @@
+{
+  "name": "loot",
+  "version": "1.0.0",
+  "description": "Loot Filter UI for Trail of Orbis",
+  "pages": [
+    "LootFilterPage"
+  ],
+  "huds": [],
+  "components": []
+}

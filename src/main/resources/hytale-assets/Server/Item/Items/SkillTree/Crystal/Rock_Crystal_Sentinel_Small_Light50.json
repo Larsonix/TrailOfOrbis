@@ -1,0 +1,41 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Rock_Crystal_Sentinel_Small_Light50.name"
+  },
+  "Icon": "Icons/ItemsGenerated/Rock_Crystal_Green_Small.png",
+  "Model": "Resources/Crystals/Crystal_Small.blockymodel",
+  "Texture": "Resources/Crystals/Crystal_Big_Textures/Sentinel.png",
+  "PlayerAnimationsId": "Item",
+  "IconProperties": {
+    "Scale": 0.6,
+    "Rotation": [
+      0,
+      0,
+      0
+    ],
+    "Translation": [
+      0,
+      -13
+    ]
+  },
+  "Tags": {
+    "Type": [
+      "Rock"
+    ],
+    "Family": [
+      "Crystal"
+    ]
+  },
+  "ItemEntity": {
+    "ParticleSystemId": null,
+    "ShowItemParticles": false
+  },
+  "Scale": 0.8,
+  "Light": {
+    "Color": "#365B3C",
+    "Radius": 6
+  },
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": true,
+  "Variant": true
+}

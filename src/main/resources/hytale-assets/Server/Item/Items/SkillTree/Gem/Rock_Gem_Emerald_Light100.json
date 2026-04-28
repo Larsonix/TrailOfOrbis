@@ -1,0 +1,34 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Rock_Gem_Emerald_Light100.name",
+    "Description": "server.items.Rock_Gem_Emerald_Light100.description"
+  },
+  "Icon": "Icons/ItemsGenerated/Rock_Gem_Emerald.png",
+  "Model": "Resources/Ores/Gem.blockymodel",
+  "Texture": "Resources/Ores/Gem_Textures/Emerald.png",
+  "PlayerAnimationsId": "Item",
+  "IconProperties": {
+    "Scale": 0.6,
+    "Rotation": [
+      0,
+      0,
+      0
+    ],
+    "Translation": [
+      0,
+      -13
+    ]
+  },
+  "ItemEntity": {
+    "ParticleSystemId": null,
+    "ShowItemParticles": false
+  },
+  "Scale": 0.8,
+  "Light": {
+    "Color": "#5b6",
+    "Radius": 0
+  },
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": true,
+  "Variant": true
+}

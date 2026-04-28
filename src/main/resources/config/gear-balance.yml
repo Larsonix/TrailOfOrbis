@@ -1,0 +1,459 @@
+# =============================================================================
+# GEAR BALANCE CONFIGURATION
+# =============================================================================
+# This file controls all gear balance values. Change these to adjust game feel.
+# After editing, use /rpg reload to apply changes without restart.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# POWER SCALING
+# -----------------------------------------------------------------------------
+# Controls how much power gear adds relative to player attributes.
+
+power_scaling:
+  # At item_level = player_level, a full Mythic set adds this % of attribute stats
+  # 0.5 = gear adds half as much total power as your attributes provide
+  # 1.0 = gear doubles your attribute-based power
+  # Recommended range: 0.3 - 0.7
+  gear_power_ratio: 0.5
+
+  # How much of total gear power each slot provides (must sum to 1.0)
+  # Weapons deal damage, so they get the largest share
+  # NOTE: Hytale has NO feet slot - movement stats go on legs
+  slot_weights:
+    weapon: 0.30      # 30% - highest for damage-dealing
+    chest: 0.20       # 20% - largest armor piece
+    legs: 0.23        # 23% - includes movement (no feet slot in Hytale)
+    head: 0.12        # 12%
+    hands: 0.08       # 8%
+    shield: 0.07      # 7% - optional slot
+
+  # Item level scaling - how stats grow with item level
+  # stat_value = base_value × (1 + item_level × level_scaling_factor)
+  level_scaling_factor: 0.02  # +2% per item level
+
+# -----------------------------------------------------------------------------
+# RARITY SYSTEM
+# -----------------------------------------------------------------------------
+# Each rarity tier has different stat power and modifier counts.
+
+rarity:
+  # Geometric 4× gaps: each tier is exactly 4× rarer than the previous.
+  # Weights form a clean power-of-4 sequence: 64, 16, 4, 1, 0.25, 0.0625, 0.016
+  # Total spread: 4,096× from Common to Unique
+  common:
+    stat_multiplier: 0.3      # 30% of base stats
+    max_modifiers: 1
+    prefix_range: [0, 1]      # Min-max prefixes
+    suffix_range: [0, 1]      # Min-max suffixes
+    drop_weight: 64           # 75.0% — ~1 in 1 drops
+
+  uncommon:
+    stat_multiplier: 0.5      # +0.2 jump
+    max_modifiers: 2
+    prefix_range: [0, 2]
+    suffix_range: [0, 2]
+    drop_weight: 16           # 18.75% — ~1 in 5 drops
+
+  rare:
+    stat_multiplier: 0.8      # +0.3 jump
+    max_modifiers: 3
+    prefix_range: [0, 3]
+    suffix_range: [0, 3]
+    drop_weight: 4            # 4.69% — ~1 in 21 drops
+
+  epic:
+    stat_multiplier: 1.2      # +0.4 jump (baseline shifted up)
+    max_modifiers: 4
+    prefix_range: [1, 3]
+    suffix_range: [1, 3]
+    drop_weight: 1            # 1.17% — ~1 in 85 drops
+
+  legendary:
+    stat_multiplier: 1.7      # +0.5 jump
+    max_modifiers: 5
+    prefix_range: [2, 3]      # 2-3 prefixes
+    suffix_range: [2, 3]      # 2-3 suffixes
+    drop_weight: 0.25         # 0.29% — ~1 in 341 drops
+
+  mythic:
+    stat_multiplier: 2.3      # +0.6 jump
+    max_modifiers: 6
+    prefix_range: [3, 3]      # Always 3 prefixes
+    suffix_range: [3, 3]      # Always 3 suffixes (6 total guaranteed)
+    min_roll_percentile: 0.75 # Rolls in top 25% of range
+    drop_weight: 0.0625       # 0.073% — ~1 in 1,365 drops
+
+  unique:
+    stat_multiplier: 2.8      # +0.5 jump (best stats)
+    max_modifiers: 6
+    prefix_range: [3, 3]      # Always 3 prefixes
+    suffix_range: [3, 3]      # Always 3 suffixes (6 total guaranteed)
+    min_roll_percentile: 0.80 # Rolls in top 20% of range
+    drop_weight: 0.016        # 0.018% — ~1 in 5,461 drops
+
+# -----------------------------------------------------------------------------
+# QUALITY SYSTEM
+# -----------------------------------------------------------------------------
+# Quality multiplies all modifier values on the item.
+
+quality:
+  # Quality 50 = 1.0x multiplier (baseline)
+  # Formula: multiplier = 0.5 + quality / (baseline × 2)
+  # Range: 0.51x (quality 1) to 1.51x (quality 101)
+  # Quality is meaningful (±50% swing) but cannot override a full rarity tier
+  baseline: 50
+
+  min: 1                      # Minimum quality
+  max: 100                    # Maximum quality (normal)
+  perfect: 101                # Perfect quality (drop-only)
+
+  # Drop distribution (must sum to 1.0)
+  drop_distribution:
+    poor: 0.15                # 1-25%
+    below_average: 0.25       # 26-49%
+    normal: 0.10              # Exactly 50%
+    above_average: 0.30       # 51-75%
+    excellent: 0.195          # 76-100%
+    perfect: 0.005            # 101% (0.5% chance)
+
+# -----------------------------------------------------------------------------
+# ATTRIBUTE REQUIREMENTS
+# -----------------------------------------------------------------------------
+# Gear requires minimum player attributes to equip.
+# Requirement = base_from_level × rarity_multiplier
+
+attribute_requirements:
+  # Base requirement formula
+  # At item level 50, base = 50 × 0.17 = 8-9 per required attribute
+  # NOTE: Reduced by 3× from original 0.5 for easier equipping
+  level_to_base_ratio: 0.17
+
+  # Minimum level before requirements apply
+  min_item_level_for_requirements: 5
+
+  # Rarity multipliers on the base requirement
+  # Mythic requires full base, Common requires almost nothing
+  rarity_multipliers:
+    common: 0.1               # Level 50 Common → 2-3 per attr
+    uncommon: 0.25            # Level 50 Uncommon → 6 per attr
+    rare: 0.5                 # Level 50 Rare → 12-13 per attr
+    epic: 0.75                # Level 50 Epic → 18-19 per attr
+    legendary: 0.9            # Level 50 Legendary → 22-23 per attr
+    mythic: 1.0               # Level 50 Mythic → 25 per attr
+    unique: 1.0               # Level 50 Unique → 25 per attr (same as mythic)
+
+# -----------------------------------------------------------------------------
+# MODIFIER SCALING
+# -----------------------------------------------------------------------------
+# How modifier values scale with item level.
+
+modifier_scaling:
+  # Global scaling factor applied to all modifiers
+  # Higher = stats grow faster with item level
+  global_scale_per_level: 0.02    # +2% per item level
+
+  # Roll variance - how much RNG affects the final value
+  # 0.3 = values can be 70%-130% of calculated base
+  roll_variance: 0.3
+
+  # Modifier weight categories (for drop pools)
+  weight_categories:
+    very_common: 100          # Physical Damage, Max Health, Armor
+    common: 50                # Elemental Damage, Resistances
+    uncommon: 25              # Crit Chance, Attack Speed
+    rare: 10                  # Life Steal, Crit Multiplier
+    very_rare: 5              # Penetration stats, True Damage
+
+# -----------------------------------------------------------------------------
+# LOOT DROPS
+# -----------------------------------------------------------------------------
+
+loot:
+  # Base chance for gear to drop from any mob (0.0-1.0)
+  base_drop_chance: 0.08            # 8% base chance
+
+  # How WIND attribute affects drop rarity (Ghost archetype = fortune/loot bonus)
+  # Higher rarity% = better chance for rare items
+  wind_to_rarity_percent: 0.5     # +0.5% rarity per WIND point
+
+  # Distance from spawn affects rarity
+  # Further from spawn = better drops
+  distance_scaling:
+    enabled: true
+    blocks_per_percent: 100       # +1% rarity per 100 blocks from spawn
+    max_bonus: 50                 # Cap at +50% rarity bonus
+
+  # Mob type bonuses
+  mob_bonuses:
+    normal:
+      quantity_bonus: 0
+      rarity_bonus: 0
+    elite:
+      quantity_bonus: 0.5         # +50% more drops
+      rarity_bonus: 0.25          # +25% rarity
+    boss:
+      quantity_bonus: 1.0         # +100% more drops
+      rarity_bonus: 0.5           # +50% rarity
+
+# -----------------------------------------------------------------------------
+# STONE DROP RATES
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# EXPONENTIAL SCALING
+# -----------------------------------------------------------------------------
+# Controls whether the centralized LevelScaling curve (config.yml → scaling)
+# is applied to gear modifier ranges in GearModifierRoller and ModifierPool.
+#
+# The actual scaling formula is: 7.35 × log10(level)^2.75 with asymptotic
+# diminishing returns. At level 100 → ~1.5×. Configured globally in config.yml.
+#
+# NOTE: The fields below (exponent, reference_level, etc.) are NOT ACTIVE.
+# They are retained from before scaling was centralized into LevelScaling.
+# Only 'enabled' has any effect. To tune the curve, edit config.yml → scaling.
+
+exponential_scaling:
+  enabled: true
+
+  # --- Fields below are NOT ACTIVE (retained for potential future per-system override) ---
+  exponent: 1.3
+  reference_level: 100
+  reference_multiplier: 25.0
+  base_multiplier: 1.0
+  soft_cap_level: 100
+  soft_cap_divisor: 2.0
+
+# -----------------------------------------------------------------------------
+# IMPLICIT DAMAGE (Weapon Base Damage)
+# -----------------------------------------------------------------------------
+# Weapons have a guaranteed "implicit" base damage stat that:
+# - Is NOT affected by gear quality (unlike modifiers)
+# - Scales with item level using LevelScaling (same curve as all RPG systems)
+# - Has a range displayed as "[153-198] Physical Damage"
+# - All weapons share the same base; 2H weapons get a flat multiplier
+# - Uses physical_damage for melee/ranged, spell_damage for magic weapons
+# - Thrown weapons (bomb, dart, kunai) are excluded entirely
+#
+# Formula: bonus = LevelScaling.getBonusPercent(level) / 100 × scale_factor
+#          scaledMin = base_min + bonus
+#          scaledMax = base_max + bonus
+#          if two-handed: scaledMin/Max *= two_handed_multiplier
+#          rolledValue = random(scaledMin, scaledMax)
+
+implicit_damage:
+  enabled: true
+
+  # Base damage range at level 1 (before LevelScaling growth)
+  # All one-handed weapons share this range
+  base_min: 3.0
+  base_max: 7.0
+
+  # How much LevelScaling bonus amplifies implicit damage
+  # Formula: implicit = base + (LevelScaling.getBonusPercent(level) / 100) × scale_factor
+  # Higher = more damage growth per level. At level 100 (~49% bonus), adds 49 damage.
+  scale_factor: 100.0
+
+  # Two-handed weapons get this multiplier applied to the final range
+  two_handed_multiplier: 1.5
+
+# -----------------------------------------------------------------------------
+# IMPLICIT DEFENSE (Armor Base Defense)
+# -----------------------------------------------------------------------------
+# Armor has a guaranteed "implicit" base defense stat that:
+# - Is NOT affected by gear quality (unlike modifiers)
+# - Scales with item level using LevelScaling (same curve as weapon implicit)
+# - Has a range displayed as "[72-98] Armor"
+# - Varies by armor material (plate→armor, leather→evasion, etc.)
+# - Varies by slot (chest is baseline, hands get less)
+# - Shields get block_chance instead
+#
+# Formula: bonus = LevelScaling.getBonusPercent(level) / 100 × scale_factor
+#          scaledMin = (base_min + bonus) × slot_multiplier
+#          scaledMax = (base_max + bonus) × slot_multiplier
+#          rolledValue = random(scaledMin, scaledMax)
+
+implicit_defense:
+  enabled: true
+
+  # Per-material defense config: which stat and how it scales
+  materials:
+    plate:
+      stat: armor
+      base_min: 5.0
+      base_max: 12.0
+      scale_factor: 80.0
+    leather:
+      stat: evasion
+      base_min: 4.0
+      base_max: 10.0
+      scale_factor: 70.0
+    cloth:
+      stat: energy_shield
+      base_min: 3.0
+      base_max: 8.0
+      scale_factor: 60.0
+    wood:
+      stat: max_health
+      base_min: 5.0
+      base_max: 15.0
+      scale_factor: 90.0
+    special:
+      stat: armor
+      base_min: 4.0
+      base_max: 10.0
+      scale_factor: 70.0
+
+  # Per-slot multiplier (chest is baseline)
+  slot_multipliers:
+    chest: 1.0
+    legs: 0.7
+    head: 0.6
+    hands: 0.5
+
+  # Shield gets block_chance (separate from armor materials)
+  shield:
+    stat: block_chance
+    base_min: 5.0
+    base_max: 15.0
+    scale_factor: 30.0
+
+# -----------------------------------------------------------------------------
+# STONE DROP RATES
+# -----------------------------------------------------------------------------
+
+stone_drops:
+  # Base chance for any stone to drop (before quantity bonuses)
+  base_drop_chance: 0.05          # 5% base chance
+
+  # NOTE: This stone_weights section is a DESIGN REFERENCE only.
+  # Actual stone drops use RarityRoller → StoneType.getByRarity() → random pick within tier.
+  # These weights are NOT read by code. Kept here for designer reference.
+  stone_weights:
+    # Rarity upgrade stones
+    uncommon_upgrade: 100
+    rare_upgrade: 50
+    epic_upgrade: 20
+
+    # Modifier manipulation
+    chaos_stone: 80
+    addition_stone: 60
+    removal_stone: 60
+    cleansing_stone: 40
+    prefix_stone: 30
+    suffix_stone: 30
+    swap_stone: 25
+    lock_stone: 15
+    tier_stone: 10
+    mirror_stone: 5
+
+    # Value reroll
+    lesser_divine: 40
+    greater_divine: 10
+
+    # Implicit reroll
+    calibration_stone: 20          # Rerolls weapon implicit within its range
+
+    # Special
+    corruption_stone: 8
+    quality_stone: 25
+
+# -----------------------------------------------------------------------------
+# VANILLA WEAPON PROFILES
+# -----------------------------------------------------------------------------
+# Automatic discovery of vanilla weapon attack patterns for effectiveness scaling.
+# At startup, the plugin enumerates ALL attacks for each vanilla weapon and computes:
+#   - Reference damage = √(min × max) (geometric mean)
+#   - Per-attack effectiveness = attack_damage / reference_damage
+#
+# This preserves vanilla attack differentiation:
+#   - Basic swings: ~0.2-0.5×
+#   - Signature moves: ~1.5-2.5×
+#   - Backstabs: ~3-4.5×
+#
+# The geometric mean naturally bounds multipliers without compression.
+
+vanilla_weapon_profiles:
+  # Whether to use automatically discovered weapon profiles for attack effectiveness
+  # If false, all weapons use fallback_reference_damage (uniform damage per hit)
+  # Set to true if you want vanilla combat feel (daggers hit light, axes hit heavy)
+  enabled: true
+
+  # Reference damage for weapons without detected profiles (e.g., custom mod weapons)
+  # Used when profile lookup fails
+  fallback_reference_damage: 20.0
+
+  # Clamp attack type multiplier to prevent extreme values
+  min_multiplier: 0.3   # Floor: basic swings never go below 30% damage
+  max_multiplier: 4.0   # Cap: backstabs/charged never exceed 400% damage
+
+  # Default profile for families not explicitly listed
+  default_profile:
+    backstab_multiplier: 3.0
+    normal_multipliers: [0.5, 0.65, 0.8, 1.0, 1.5, 2.0]
+
+  # Per-family profiles — two-tier lookup: ID-based name checked first, then tag-based.
+  # Tag-based families (canonical Hytale Family tag names)
+  family_profiles:
+    Dagger:
+      backstab_multiplier: 3.5
+      normal_multipliers: [0.3, 0.4, 0.5, 0.6, 0.8, 1.2, 1.8, 2.2]
+    Sword:
+      backstab_multiplier: 3.0
+      normal_multipliers: [0.5, 0.6, 0.8, 1.0, 1.5, 2.0]
+    Longsword:
+      backstab_multiplier: 3.0
+      normal_multipliers: [0.5, 0.6, 0.8, 1.0, 1.5, 2.0]
+    Axe:
+      backstab_multiplier: 2.8
+      normal_multipliers: [0.6, 0.8, 1.0, 1.5, 2.0]
+    Spear:
+      backstab_multiplier: 2.5
+      normal_multipliers: [0.6, 0.8, 1.0, 1.5]
+    Mace:
+      backstab_multiplier: 2.5
+      normal_multipliers: [0.6, 0.8, 1.0, 1.5, 2.0]
+    Club:
+      backstab_multiplier: 2.5
+      normal_multipliers: [0.6, 0.8, 1.0, 1.5, 2.0]
+    Bow:
+      backstab_multiplier: 1.0
+      normal_multipliers: [0.4, 0.6, 0.8, 1.0, 1.5, 2.0]
+    Crossbow:
+      backstab_multiplier: 1.0
+      normal_multipliers: [0.5, 1.0, 1.5]
+    # ID-based overrides (more specific, checked before tag family)
+    Claws:
+      backstab_multiplier: 3.5
+      normal_multipliers: [0.3, 0.4, 0.5, 0.7, 1.0, 1.5, 2.2]
+    Battleaxe:
+      backstab_multiplier: 2.5
+      normal_multipliers: [0.7, 0.9, 1.2, 1.8]
+    Shortbow:
+      backstab_multiplier: 1.0
+      normal_multipliers: [0.4, 0.6, 0.8, 1.0, 1.5, 2.0]
+
+# -----------------------------------------------------------------------------
+# LEVEL BLENDING
+# -----------------------------------------------------------------------------
+# Pulls drop levels toward the player's level so gear stays relevant.
+#
+# Formula:
+#   blendedLevel = sourceLevel + clamp((playerLevel - sourceLevel) × pull_factor, -max_offset, +max_offset)
+#   finalLevel   = blendedLevel + random(±variance)
+#
+# Example with defaults (pull_factor=0.3, max_offset=5, variance=2):
+#   Player lv58 kills lv23 mob → source=23, pull=+10.5 → clamped to +5 → drop lv28 ±2
+#   Player lv10 kills lv23 mob → source=23, pull=-3.9  → drop lv19 ±2
+#
+# Applies to: mob gear drops, realm map drops, victory rewards, container loot.
+# Drop *chance* and rarity are NOT affected — only the item/map level.
+
+level_blending:
+  enabled: true
+  # Fraction of the gap to close (0.0 = no pull, 1.0 = full pull toward player)
+  pull_factor: 0.3
+  # Maximum absolute offset from source level due to blending
+  max_offset: 5
+  # Random ±N variance applied after blending
+  variance: 2

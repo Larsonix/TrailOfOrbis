@@ -1,0 +1,33 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Rock_Gem_Warlock_Light100.name"
+  },
+  "Icon": "Icons/ItemsGenerated/Rock_Gem_Voidstone.png",
+  "Model": "Resources/Ores/Gem.blockymodel",
+  "Texture": "Resources/Ores/Gem_Textures_Dim/Warlock_Light100.png",
+  "PlayerAnimationsId": "Item",
+  "IconProperties": {
+    "Scale": 0.6,
+    "Rotation": [
+      0,
+      0,
+      0
+    ],
+    "Translation": [
+      0,
+      -13
+    ]
+  },
+  "ItemEntity": {
+    "ParticleSystemId": null,
+    "ShowItemParticles": false
+  },
+  "Scale": 0.8,
+  "Light": {
+    "Color": "#9E8EEF",
+    "Radius": 10
+  },
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": true,
+  "Variant": true
+}

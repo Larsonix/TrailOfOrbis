@@ -1,0 +1,39 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Ingredient_Juggernaut_Essence_Light50.name",
+    "Description": "server.items.Ingredient_Juggernaut_Essence_Light50.description"
+  },
+  "Icon": "Icons/ItemsGenerated/Ingredient_Fire_Essence.png",
+  "Model": "Resources/Ingredients/Essence.blockymodel",
+  "Texture": "Resources/Ingredients/Essence_Textures_Dim/Juggernaut_Essence_Texture_Light50.png",
+  "PlayerAnimationsId": "Item",
+  "IconProperties": {
+    "Scale": 0.6,
+    "Rotation": [
+      0,
+      0,
+      0
+    ],
+    "Translation": [
+      0,
+      -13
+    ]
+  },
+  "Tags": {
+    "Type": [
+      "Ingredient"
+    ]
+  },
+  "ItemEntity": {
+    "ParticleSystemId": null,
+    "ShowItemParticles": false
+  },
+  "Scale": 0.8,
+  "Light": {
+    "Color": "#664363",
+    "Radius": 6
+  },
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": true,
+  "Variant": true
+}

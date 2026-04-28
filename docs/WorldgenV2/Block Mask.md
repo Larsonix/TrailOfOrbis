@@ -1,0 +1,27 @@
+World Generation
+Technical Hytale Generator
+Block Mask
+Determines which Materials get to replace which other Materials when placing content in the world.
+
+Official Hytale Documentation
+All content on this section is provided by Hypixel Studios Canada Inc. and is presented without any substantial changes, aside from visual design adjustments by the HytaleModding Team.
+Source and Destination Material Explained
+If we're trying to place bricks in water, then bricks is the Source Material, and water is the Destination Material.
+
+Source Material: the Material we're trying to place.
+Destination Material: the Material that exists where we want to place the Source Material.;
+DontPlace
+If a Source Material is in the DontPlace BlockSet then it will not be placed.
+
+DontReplace
+By default no Source Material can replace any Destination Materials that belongs to this set. This rule is overridden by the Advanced rules below.
+
+Advanced
+The Advanced rules override the rules above for specific BlockSets. Each rule is made of a Source BlockSet that identifies the Source Material the rule applies to, and a CanReplace BlockSet that determines the Materials the Source can replace.
+
+Parameters:
+Name	Description
+DontPlace	BlockSet slot.
+DontReplace	BlockSet slot.
+Advanced	list of rules.
+Written by Hypixel Studios Canada Inc.

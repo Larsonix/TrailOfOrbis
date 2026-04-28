@@ -1,0 +1,2643 @@
+{
+  "$Title": "[ROOT] Biome - Realm Mountains Arena (R90)",
+  "Name": "Realm_Mountains_R90",
+  "Terrain": {
+    "Type": "DAOTerrain",
+    "Density": {
+      "Type": "Sum",
+      "Skip": false,
+      "Inputs": [
+        {
+          "Type": "CurveMapper",
+          "Skip": false,
+          "Curve": {
+            "Type": "Manual",
+            "Points": [
+              {
+                "In": -50,
+                "Out": 1
+              },
+              {
+                "In": -1,
+                "Out": 1
+              },
+              {
+                "In": 0,
+                "Out": 0
+              },
+              {
+                "In": 1,
+                "Out": -2
+              },
+              {
+                "In": 50,
+                "Out": -2
+              }
+            ]
+          },
+          "Inputs": [
+            {
+              "Type": "Sum",
+              "Skip": false,
+              "Inputs": [
+                {
+                  "Type": "BaseHeight",
+                  "Skip": false,
+                  "BaseHeightName": "Ceiling",
+                  "Distance": true
+                },
+                {
+                  "Type": "Axis",
+                  "Skip": false,
+                  "Axis": {
+                    "X": 0,
+                    "Y": 1,
+                    "Z": 0
+                  },
+                  "Curve": {
+                    "Type": "Manual",
+                    "Points": [
+                      {
+                        "In": 0,
+                        "Out": 0
+                      },
+                      {
+                        "In": 45,
+                        "Out": 7
+                      },
+                      {
+                        "In": 90,
+                        "Out": 15
+                      }
+                    ]
+                  }
+                },
+                {
+                  "Type": "Normalizer",
+                  "Skip": false,
+                  "FromMin": -1,
+                  "FromMax": 1,
+                  "ToMin": -2,
+                  "ToMax": 2,
+                  "Inputs": [
+                    {
+                      "Type": "SimplexNoise2D",
+                      "Skip": false,
+                      "Lacunarity": 2,
+                      "Persistence": 0.5,
+                      "Octaves": 2,
+                      "Scale": 15,
+                      "Seed": "ceiling_bumps"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Type": "Axis",
+          "Skip": false,
+          "Axis": {
+            "X": 0,
+            "Y": 1,
+            "Z": 0
+          },
+          "Curve": {
+            "Type": "Manual",
+            "Points": [
+              {
+                "In": 0,
+                "Out": 0
+              },
+              {
+                "In": 85,
+                "Out": 0
+              },
+              {
+                "In": 95,
+                "Out": 7
+              },
+              {
+                "In": 105,
+                "Out": 7
+              },
+              {
+                "In": 106,
+                "Out": -2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "MaterialProvider": {
+    "Type": "Solidity",
+    "Solid": {
+      "Type": "Queue",
+      "Queue": [
+        {
+          "Type": "SpaceAndDepth",
+          "LayerContext": "DEPTH_INTO_FLOOR",
+          "MaxExpectedDepth": 4,
+          "Layers": [
+            {
+              "Type": "ConstantThickness",
+              "Thickness": 1,
+              "Material": {
+                "Type": "FieldFunction",
+                "FieldFunction": {
+                  "Type": "SimplexNoise2D",
+                  "Skip": false,
+                  "Lacunarity": 2,
+                  "Persistence": 0.3,
+                  "Octaves": 1,
+                  "Scale": 50,
+                  "Seed": "mine_mats"
+                },
+                "Delimiters": [
+                  {
+                    "From": -1.0,
+                    "To": 0.0,
+                    "Material": {
+                      "Type": "Constant",
+                      "Material": {
+                        "Solid": "Rock_Stone"
+                      }
+                    }
+                  },
+                  {
+                    "From": 0.0,
+                    "To": 1.0,
+                    "Material": {
+                      "Type": "Constant",
+                      "Material": {
+                        "Solid": "Rock_Basalt"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "Type": "ConstantThickness",
+              "Thickness": 2,
+              "Material": {
+                "Type": "Constant",
+                "Material": {
+                  "Solid": "Rock_Slate"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "Type": "SpaceAndDepth",
+          "LayerContext": "DEPTH_INTO_CEILING",
+          "MaxExpectedDepth": 4,
+          "Layers": [
+            {
+              "Type": "ConstantThickness",
+              "Thickness": 1,
+              "Material": {
+                "Type": "FieldFunction",
+                "FieldFunction": {
+                  "Type": "SimplexNoise2D",
+                  "Skip": false,
+                  "Lacunarity": 2,
+                  "Persistence": 0.3,
+                  "Octaves": 1,
+                  "Scale": 50,
+                  "Seed": "mine_mats"
+                },
+                "Delimiters": [
+                  {
+                    "From": -1.0,
+                    "To": 0.0,
+                    "Material": {
+                      "Type": "Constant",
+                      "Material": {
+                        "Solid": "Rock_Stone"
+                      }
+                    }
+                  },
+                  {
+                    "From": 0.0,
+                    "To": 1.0,
+                    "Material": {
+                      "Type": "Constant",
+                      "Material": {
+                        "Solid": "Rock_Basalt"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "Type": "ConstantThickness",
+              "Thickness": 2,
+              "Material": {
+                "Type": "Constant",
+                "Material": {
+                  "Solid": "Rock_Slate"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "Type": "SimpleHorizontal",
+          "TopY": 88,
+          "BottomY": 86,
+          "Material": {
+            "Type": "Constant",
+            "Material": {
+              "Solid": "Rock_Basalt"
+            }
+          }
+        },
+        {
+          "Type": "SimpleHorizontal",
+          "TopY": 80,
+          "BottomY": 77,
+          "Material": {
+            "Type": "Constant",
+            "Material": {
+              "Solid": "Rock_Shale"
+            }
+          }
+        },
+        {
+          "Type": "SimpleHorizontal",
+          "TopY": 72,
+          "BottomY": 69,
+          "Material": {
+            "Type": "Constant",
+            "Material": {
+              "Solid": "Rock_Slate"
+            }
+          }
+        },
+        {
+          "Type": "SimpleHorizontal",
+          "TopY": 62,
+          "BottomY": 60,
+          "Material": {
+            "Type": "Constant",
+            "Material": {
+              "Solid": "Rock_Sandstone"
+            }
+          }
+        },
+        {
+          "Type": "Constant",
+          "Material": {
+            "Solid": "Rock_Stone"
+          }
+        }
+      ]
+    },
+    "Empty": {
+      "Type": "Queue",
+      "Queue": [
+        {
+          "Type": "Constant",
+          "Material": {
+            "Solid": "Empty"
+          }
+        }
+      ]
+    }
+  },
+  "Props": [
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "mine_rocks_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.21,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 32,
+              "Seed": "mine_rocks_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 16,
+            "ScaleY": 16,
+            "ScaleZ": 16,
+            "Jitter": 0.4,
+            "Seed": "mine_rocks_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Stone/Small",
+              "Weight": 4
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Small",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Shale/Small",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Slate/Small",
+              "Weight": 2
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "mine_rocks_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    },
+                    {
+                      "Solid": "Rock_Basalt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "mineral_deposits_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.2,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 50,
+              "Seed": "mineral_deposits_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 25,
+            "ScaleY": 25,
+            "ScaleZ": 25,
+            "Jitter": 0.4,
+            "Seed": "mineral_deposits_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "FieldFunction",
+        "Skip": false,
+        "FieldFunction": {
+          "Type": "SimplexNoise2D",
+          "Skip": false,
+          "Lacunarity": 2,
+          "Persistence": 0.5,
+          "Octaves": 1,
+          "Scale": 60,
+          "Seed": "mine_zones"
+        },
+        "Delimiters": [
+          {
+            "Min": -1.0,
+            "Max": -0.1,
+            "Assignments": {
+              "Type": "Constant",
+              "Skip": false,
+              "Prop": {
+                "Type": "Prefab",
+                "Skip": false,
+                "WeightedPrefabPaths": [
+                  {
+                    "Path": "Rock_Formations/Rocks/Geodes/White",
+                    "Weight": 3
+                  },
+                  {
+                    "Path": "Rock_Formations/Rocks/Geodes/Cyan",
+                    "Weight": 2
+                  },
+                  {
+                    "Path": "Rock_Formations/Rocks/Calcite/Small",
+                    "Weight": 3
+                  }
+                ],
+                "LegacyPath": false,
+                "LoadEntities": false,
+                "Directionality": {
+                  "Type": "Random",
+                  "Seed": "mineral_deposits_dir",
+                  "Pattern": {
+                    "Type": "Floor",
+                    "Skip": false,
+                    "Origin": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Empty"
+                          }
+                        ]
+                      }
+                    },
+                    "Floor": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Rock_Stone"
+                          },
+                          {
+                            "Solid": "Rock_Basalt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "Scanner": {
+                  "Type": "ColumnLinear",
+                  "Skip": false,
+                  "MaxY": 60,
+                  "MinY": -20,
+                  "RelativeToPosition": false,
+                  "BaseHeightName": "Base",
+                  "TopDownOrder": true,
+                  "ResultCap": 1
+                },
+                "MoldingDirection": "None",
+                "MoldingChildren": false
+              }
+            }
+          },
+          {
+            "Min": -0.1,
+            "Max": 1.0,
+            "Assignments": {
+              "Type": "Constant",
+              "Skip": false,
+              "Prop": {
+                "Type": "Prefab",
+                "Skip": false,
+                "WeightedPrefabPaths": [
+                  {
+                    "Path": "Rock_Formations/Rocks/Quartzite/Small",
+                    "Weight": 3
+                  },
+                  {
+                    "Path": "Rock_Formations/Rocks/Quartzite/Large",
+                    "Weight": 1
+                  },
+                  {
+                    "Path": "Rock_Formations/Rocks/Basalt/Large",
+                    "Weight": 2
+                  }
+                ],
+                "LegacyPath": false,
+                "LoadEntities": false,
+                "Directionality": {
+                  "Type": "Random",
+                  "Seed": "mineral_deposits_dir",
+                  "Pattern": {
+                    "Type": "Floor",
+                    "Skip": false,
+                    "Origin": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Empty"
+                          }
+                        ]
+                      }
+                    },
+                    "Floor": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Rock_Stone"
+                          },
+                          {
+                            "Solid": "Rock_Basalt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "Scanner": {
+                  "Type": "ColumnLinear",
+                  "Skip": false,
+                  "MaxY": 60,
+                  "MinY": -20,
+                  "RelativeToPosition": false,
+                  "BaseHeightName": "Base",
+                  "TopDownOrder": true,
+                  "ResultCap": 1
+                },
+                "MoldingDirection": "None",
+                "MoldingChildren": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "stalagmites_floor_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.15,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 36,
+              "Seed": "stalagmites_floor_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 18,
+            "ScaleY": 18,
+            "ScaleZ": 18,
+            "Jitter": 0.4,
+            "Seed": "stalagmites_floor_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Stalactites/Basalt/Floor",
+              "Weight": 4
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Hexagon",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Shale/Large",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "stalagmites_floor_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    },
+                    {
+                      "Solid": "Rock_Basalt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 8,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "mine_floor_detail_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.1925,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 24,
+              "Seed": "mine_floor_detail_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 12,
+            "ScaleY": 12,
+            "ScaleZ": 12,
+            "Jitter": 0.4,
+            "Seed": "mine_floor_detail_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Stone/Small",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Slate/Small",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Shale/Small",
+              "Weight": 2
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Calcite/Small",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "mine_floor_detail_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    },
+                    {
+                      "Solid": "Rock_Basalt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 60,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "mine_stalactites_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.26249999999999996,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 28,
+              "Seed": "mine_stalactites_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 14,
+            "ScaleY": 14,
+            "ScaleZ": 14,
+            "Jitter": 0.4,
+            "Seed": "mine_stalactites_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "FieldFunction",
+        "Skip": false,
+        "FieldFunction": {
+          "Type": "SimplexNoise2D",
+          "Skip": false,
+          "Lacunarity": 2,
+          "Persistence": 0.5,
+          "Octaves": 1,
+          "Scale": 60,
+          "Seed": "mine_zones"
+        },
+        "Delimiters": [
+          {
+            "Min": -1.0,
+            "Max": -0.1,
+            "Assignments": {
+              "Type": "Constant",
+              "Skip": false,
+              "Prop": {
+                "Type": "Prefab",
+                "Skip": false,
+                "WeightedPrefabPaths": [
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt_Crystal_Blue/Ceiling",
+                    "Weight": 3
+                  },
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt_Crystal_Purple/Ceiling",
+                    "Weight": 2
+                  },
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt/Ceiling",
+                    "Weight": 3
+                  }
+                ],
+                "LegacyPath": false,
+                "LoadEntities": false,
+                "Directionality": {
+                  "Type": "Random",
+                  "Seed": "mine_stalactites_dir",
+                  "Pattern": {
+                    "Type": "Ceiling",
+                    "Skip": false,
+                    "Origin": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Empty"
+                          }
+                        ]
+                      }
+                    },
+                    "Ceiling": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Rock_Stone"
+                          },
+                          {
+                            "Solid": "Rock_Basalt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "Scanner": {
+                  "Type": "ColumnLinear",
+                  "Skip": false,
+                  "MaxY": 5,
+                  "MinY": -40,
+                  "RelativeToPosition": false,
+                  "BaseHeightName": "Ceiling",
+                  "TopDownOrder": false,
+                  "ResultCap": 1
+                },
+                "MoldingDirection": "None",
+                "MoldingChildren": false
+              }
+            }
+          },
+          {
+            "Min": -0.1,
+            "Max": 1.0,
+            "Assignments": {
+              "Type": "Constant",
+              "Skip": false,
+              "Prop": {
+                "Type": "Prefab",
+                "Skip": false,
+                "WeightedPrefabPaths": [
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt/Ceiling",
+                    "Weight": 5
+                  },
+                  {
+                    "Path": "Rock_Formations/Stalactites/Stone/Ceiling",
+                    "Weight": 3
+                  }
+                ],
+                "LegacyPath": false,
+                "LoadEntities": false,
+                "Directionality": {
+                  "Type": "Random",
+                  "Seed": "mine_stalactites_dir",
+                  "Pattern": {
+                    "Type": "Ceiling",
+                    "Skip": false,
+                    "Origin": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Empty"
+                          }
+                        ]
+                      }
+                    },
+                    "Ceiling": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Rock_Stone"
+                          },
+                          {
+                            "Solid": "Rock_Basalt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "Scanner": {
+                  "Type": "ColumnLinear",
+                  "Skip": false,
+                  "MaxY": 5,
+                  "MinY": -40,
+                  "RelativeToPosition": false,
+                  "BaseHeightName": "Ceiling",
+                  "TopDownOrder": false,
+                  "ResultCap": 1
+                },
+                "MoldingDirection": "None",
+                "MoldingChildren": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "crystal_ceiling_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.2,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 50,
+              "Seed": "crystal_ceiling_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 25,
+            "ScaleY": 25,
+            "ScaleZ": 25,
+            "Jitter": 0.4,
+            "Seed": "crystal_ceiling_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "FieldFunction",
+        "Skip": false,
+        "FieldFunction": {
+          "Type": "SimplexNoise2D",
+          "Skip": false,
+          "Lacunarity": 2,
+          "Persistence": 0.5,
+          "Octaves": 1,
+          "Scale": 60,
+          "Seed": "mine_zones"
+        },
+        "Delimiters": [
+          {
+            "Min": -1.0,
+            "Max": -0.1,
+            "Assignments": {
+              "Type": "Constant",
+              "Skip": false,
+              "Prop": {
+                "Type": "Prefab",
+                "Skip": false,
+                "WeightedPrefabPaths": [
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt_Crystal_Blue/Ceiling",
+                    "Weight": 4
+                  },
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt_Crystal_Purple/Ceiling",
+                    "Weight": 3
+                  },
+                  {
+                    "Path": "Rock_Formations/Stalactites/Basalt_Crystal_Red/Ceiling",
+                    "Weight": 2
+                  }
+                ],
+                "LegacyPath": false,
+                "LoadEntities": false,
+                "Directionality": {
+                  "Type": "Random",
+                  "Seed": "crystal_ceiling_dir",
+                  "Pattern": {
+                    "Type": "Ceiling",
+                    "Skip": false,
+                    "Origin": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Empty"
+                          }
+                        ]
+                      }
+                    },
+                    "Ceiling": {
+                      "Type": "BlockSet",
+                      "Skip": false,
+                      "BlockSet": {
+                        "Inclusive": true,
+                        "Materials": [
+                          {
+                            "Solid": "Rock_Stone"
+                          },
+                          {
+                            "Solid": "Rock_Basalt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "Scanner": {
+                  "Type": "ColumnLinear",
+                  "Skip": false,
+                  "MaxY": 5,
+                  "MinY": -40,
+                  "RelativeToPosition": false,
+                  "BaseHeightName": "Ceiling",
+                  "TopDownOrder": false,
+                  "ResultCap": 1
+                },
+                "MoldingDirection": "None",
+                "MoldingChildren": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 0,
+      "Positions": {
+        "Type": "Occurrence",
+        "Skip": false,
+        "Seed": "basalt_columns_occ",
+        "FieldFunction": {
+          "Type": "Normalizer",
+          "Skip": false,
+          "FromMin": -1,
+          "FromMax": 1,
+          "ToMin": 0.0,
+          "ToMax": 0.06,
+          "Inputs": [
+            {
+              "Type": "SimplexNoise2D",
+              "Skip": false,
+              "Lacunarity": 2,
+              "Persistence": 0.5,
+              "Octaves": 1,
+              "Scale": 80,
+              "Seed": "basalt_columns_density"
+            }
+          ]
+        },
+        "Positions": {
+          "Type": "Mesh2D",
+          "Skip": false,
+          "PointsY": 0,
+          "PointGenerator": {
+            "Type": "Mesh",
+            "ScaleX": 40,
+            "ScaleY": 40,
+            "ScaleZ": 40,
+            "Jitter": 0.4,
+            "Seed": "basalt_columns_r90"
+          }
+        }
+      },
+      "Assignments": {
+        "Type": "Constant",
+        "Skip": false,
+        "Prop": {
+          "Type": "Prefab",
+          "Skip": false,
+          "WeightedPrefabPaths": [
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Hexagon",
+              "Weight": 3
+            },
+            {
+              "Path": "Rock_Formations/Rocks/Basalt/Large",
+              "Weight": 1
+            }
+          ],
+          "LegacyPath": false,
+          "LoadEntities": false,
+          "Directionality": {
+            "Type": "Random",
+            "Seed": "basalt_columns_dir",
+            "Pattern": {
+              "Type": "Floor",
+              "Skip": false,
+              "Origin": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Empty"
+                    }
+                  ]
+                }
+              },
+              "Floor": {
+                "Type": "BlockSet",
+                "Skip": false,
+                "BlockSet": {
+                  "Inclusive": true,
+                  "Materials": [
+                    {
+                      "Solid": "Rock_Stone"
+                    },
+                    {
+                      "Solid": "Rock_Basalt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "Scanner": {
+            "Type": "ColumnLinear",
+            "Skip": false,
+            "MaxY": 8,
+            "MinY": -20,
+            "RelativeToPosition": false,
+            "BaseHeightName": "Base",
+            "TopDownOrder": true,
+            "ResultCap": 1
+          },
+          "MoldingDirection": "None",
+          "MoldingChildren": false
+        }
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 1,
+      "Positions": {
+        "Type": "Mesh2D",
+        "Skip": false,
+        "PointsY": 0,
+        "PointGenerator": {
+          "Type": "Mesh",
+          "ScaleX": 1,
+          "ScaleY": 1,
+          "ScaleZ": 1,
+          "Jitter": 0.0,
+          "Seed": "mine_moss_mesh"
+        }
+      },
+      "Assignments": {
+        "Type": "FieldFunction",
+        "Skip": false,
+        "FieldFunction": {
+          "Type": "SimplexNoise2D",
+          "Skip": false,
+          "Lacunarity": 2,
+          "Persistence": 0.4,
+          "Octaves": 1,
+          "Scale": 25,
+          "Seed": "mine_moss"
+        },
+        "Delimiters": [
+          {
+            "Min": -1.0,
+            "Max": -0.2,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_sparse",
+              "SkipChance": 0.95,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "Min": -0.2,
+            "Max": 0.4,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_moderate",
+              "SkipChance": 0.8,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "Min": 0.4,
+            "Max": 1.0,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_dense",
+              "SkipChance": 0.5,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 35,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Skip": false,
+      "Runtime": 1,
+      "Positions": {
+        "Type": "Mesh2D",
+        "Skip": false,
+        "PointsY": 0,
+        "PointGenerator": {
+          "Type": "Mesh",
+          "ScaleX": 1,
+          "ScaleY": 1,
+          "ScaleZ": 1,
+          "Jitter": 0.0,
+          "Seed": "mine_moss_ceil_mesh"
+        }
+      },
+      "Assignments": {
+        "Type": "FieldFunction",
+        "Skip": false,
+        "FieldFunction": {
+          "Type": "SimplexNoise2D",
+          "Skip": false,
+          "Lacunarity": 2,
+          "Persistence": 0.4,
+          "Octaves": 1,
+          "Scale": 25,
+          "Seed": "mine_moss_ceiling"
+        },
+        "Delimiters": [
+          {
+            "Min": -1.0,
+            "Max": -0.2,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_ceil_sparse",
+              "SkipChance": 0.98,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "Min": -0.2,
+            "Max": 0.4,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_ceil_mod",
+              "SkipChance": 0.95,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "Min": 0.4,
+            "Max": 1.0,
+            "Assignments": {
+              "Type": "Weighted",
+              "Skip": false,
+              "Seed": "mine_moss_ceil_dense",
+              "SkipChance": 0.75,
+              "WeightedAssignments": [
+                {
+                  "Weight": 20,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Block_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 15,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Green_Dark"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 5,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Fern"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Ceiling",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Ceiling": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Rock_Stone"
+                                },
+                                {
+                                  "Solid": "Rock_Basalt"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 5,
+                        "MinY": -55,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Ceiling",
+                        "TopDownOrder": false,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "EnvironmentProvider": {
+    "Type": "Constant",
+    "Environment": "Realm_Mountains_Env"
+  },
+  "TintProvider": {
+    "Type": "DensityDelimited",
+    "Density": {
+      "Type": "SimplexNoise2D",
+      "Skip": false,
+      "Lacunarity": 5,
+      "Persistence": 0.2,
+      "Octaves": 2,
+      "Scale": 100,
+      "Seed": "tints"
+    },
+    "Delimiters": [
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#3a2a1a"
+        },
+        "Range": {
+          "MinInclusive": -1.0,
+          "MaxExclusive": -0.3333
+        }
+      },
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#2a1a0a"
+        },
+        "Range": {
+          "MinInclusive": -0.3333,
+          "MaxExclusive": 0.3333
+        }
+      },
+      {
+        "Tint": {
+          "Type": "Constant",
+          "Color": "#4a3a2a"
+        },
+        "Range": {
+          "MinInclusive": 0.3333,
+          "MaxExclusive": 1.0
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+# TrailOfOrbis Ailment System Configuration
+# PoE2-style elemental ailments with chance-based application
+
+# Master switch for the ailment system
+enabled: true
+
+# Tick rate for DoT processing in seconds
+# Lower = smoother damage but more CPU, higher = chunkier damage
+# Recommended: 0.25 (4 ticks per second)
+tick_rate_seconds: 0.25
+
+# =============================================================================
+# BURN (Fire Ailment)
+# =============================================================================
+# Deals damage over time. Magnitude = DPS.
+# Formula: DPS = (fire_damage * damage_ratio + burn_damage_stat) / duration
+burn:
+  # Base % chance to apply on fire hit (before statusEffectChance bonus)
+  base_chance: 10.0
+
+  # Base duration in seconds (before statusEffectDuration bonus)
+  base_duration: 4.0
+
+  # Ratio of fire damage dealt as total burn damage
+  # 0.5 = 50% of fire damage dealt over duration
+  damage_ratio: 0.5
+
+# =============================================================================
+# FREEZE (Cold Ailment)
+# =============================================================================
+# Slows movement and action speed. Magnitude = slow %.
+# Formula: slow% = min(max_slow, max(min_magnitude, water_damage / max_health * 100))
+freeze:
+  # Base % chance to apply on water hit
+  base_chance: 10.0
+
+  # Base duration in seconds
+  base_duration: 3.0
+
+  # Maximum slow percentage (cap)
+  max_slow_percent: 30.0
+
+  # Minimum slow percentage (floor for weak hits)
+  min_magnitude: 5.0
+
+# =============================================================================
+# SHOCK (Lightning Ailment)
+# =============================================================================
+# Increases damage taken by target. Magnitude = +damage %.
+# Formula: +dmg% = min(max_increase, max(min_magnitude, lightning_damage / max_health * 100))
+shock:
+  # Base % chance to apply on lightning hit
+  base_chance: 10.0
+
+  # Base duration in seconds (shorter because powerful)
+  base_duration: 2.0
+
+  # Maximum damage increase percentage (cap)
+  max_damage_increase: 50.0
+
+  # Minimum damage increase percentage (floor for weak hits)
+  min_magnitude: 5.0
+
+# =============================================================================
+# POISON (Chaos Ailment)
+# =============================================================================
+# Stacking damage over time. Each stack has independent duration.
+# Formula: DPS per stack = (void_damage * damage_ratio + poison_damage_stat) / duration
+poison:
+  # Base % chance to apply on void hit
+  base_chance: 10.0
+
+  # Base duration in seconds per stack
+  base_duration: 5.0
+
+  # Ratio of void damage dealt as total poison damage per stack
+  # 0.3 = 30% of void damage dealt per stack
+  damage_ratio: 0.3
+
+  # Maximum number of poison stacks that can accumulate
+  max_stacks: 10
+
+# =============================================================================
+# APPLICATION FORMULAS (Reference)
+# =============================================================================
+# Application chance: base_chance + player.statusEffectChance
+# Duration: base_duration * (1 + player.statusEffectDuration / 100)
+#
+# Magnitude calculations:
+# - BURN DPS: (hit_damage * 0.5 + burn_damage_stat) / duration
+# - FREEZE slow%: clamp(hit_damage / max_health * 100, min_magnitude, max_slow_percent)
+# - SHOCK +dmg%: clamp(hit_damage / max_health * 100, min_magnitude, max_damage_increase)
+# - POISON DPS: (hit_damage * 0.3 + poison_damage_stat) / duration (per stack)
+#
+# Thresholds (from DefensiveStats):
+# - burnThreshold: If fire damage < threshold, reduced chance to apply
+# - freezeThreshold: If water damage < threshold, reduced chance to apply
+# - shockThreshold: If lightning damage < threshold, reduced chance to apply

@@ -1,0 +1,147 @@
+# Hexcode Skill Tree Overlay
+# Loaded ONLY when Hexcode plugin detected. Appends modifiers to existing nodes.
+# Does NOT replace base modifiers - only adds Hexcode-relevant stats.
+
+overlay:
+
+  # ===================================================================
+  # WATER ARM - Arcane Mage (Primary Hex Caster)
+  # ===================================================================
+
+  water_frostbite_notable:  # Arcane Surge
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 5, type: FLAT }
+    description: "Your hex glyphs carry greater arcane weight, expanding your volatility reserves."
+
+  water_evasion_notable:  # Wellspring
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 3, type: FLAT }
+      - { stat: MAGIC_POWER, value: 0.5, type: PERCENT }
+    description: "A deep well of mana sustains longer hex chains and amplifies their power."
+
+  water_shatter_notable:  # Shatter
+    append_modifiers:
+      - { stat: DRAW_ACCURACY, value: 2, type: PERCENT }
+      - { stat: MAGIC_POWER, value: 3, type: PERCENT }
+    description: "Mastery over glyph strokes - your drawn glyphs are more precise and powerful."
+
+  water_precision_notable:  # Permafrost
+    append_modifiers:
+      - { stat: DRAW_ACCURACY, value: 3, type: PERCENT }
+
+  water_synergy_1:  # Arcane Accumulation
+    append_synergy_modifiers:
+      - stat: VOLATILITY_MAX
+        value: 1.0
+        modifier_type: FLAT
+
+  water_synergy_hub:  # Heart of Water
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 5, type: FLAT }
+      - { stat: MAGIC_POWER, value: 1, type: PERCENT }
+
+  water_keystone_1:  # Glacial Mastery
+    append_modifiers:
+      - { stat: DRAW_ACCURACY, value: 5, type: PERCENT }
+      - { stat: VOLATILITY_MAX, value: 8, type: FLAT }
+
+  water_keystone_2:  # Arcane Reservoir
+    append_modifiers:
+      - { stat: MAGIC_CHARGES, value: 1, type: FLAT }
+      - { stat: VOLATILITY_MAX, value: 15, type: FLAT }
+    description: "Your mana pool fuels an additional active hex. Volatility budget deepens substantially, at the cost of higher mana consumption."
+
+  # ===================================================================
+  # WARLOCK ARM - Dark Caster (Hex Power Amplification)
+  # ===================================================================
+
+  warlock_hex_notable:  # Dark Arcana
+    append_modifiers:
+      - { stat: MAGIC_POWER, value: 5, type: PERCENT }
+    description: "Dark knowledge amplifies the raw magnitude of your hex constructs."
+
+  warlock_ritual_notable:  # Mind Drain
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 3, type: FLAT }
+
+  warlock_malice_notable:  # Eldritch Blast
+    append_modifiers:
+      - { stat: MAGIC_POWER, value: 3, type: PERCENT }
+      - { stat: DRAW_ACCURACY, value: 2, type: PERCENT }
+    description: "Forbidden study sharpens both glyph precision and hex potency."
+
+  warlock_damnation_notable:  # Cursed Knowledge
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 5, type: FLAT }
+
+  warlock_synergy_hub:  # Nexus of Warlock
+    append_modifiers:
+      - { stat: MAGIC_POWER, value: 3, type: PERCENT }
+      - { stat: VOLATILITY_MAX, value: 3, type: FLAT }
+
+  warlock_keystone_1:  # Soul Siphon
+    append_modifiers:
+      - { stat: MAGIC_POWER, value: 8, type: PERCENT }
+      - { stat: MAGIC_CHARGES, value: 1, type: FLAT }
+
+  # ===================================================================
+  # TEMPEST ARM - Mobile Mage (Cast Speed)
+  # ===================================================================
+
+  tempest_squall_notable:  # Swift Cast
+    append_modifiers:
+      - { stat: CAST_SPEED, value: 3, type: PERCENT }
+    description: "Storm winds hasten your hex deployment."
+
+  tempest_tailwind_notable:  # Arcane Gust
+    append_modifiers:
+      - { stat: CAST_SPEED, value: 5, type: PERCENT }
+
+  tempest_cyclone_notable:  # Windborne
+    append_modifiers:
+      - { stat: MAGIC_POWER, value: 3, type: PERCENT }
+      - { stat: CAST_SPEED, value: 2, type: PERCENT }
+
+  tempest_maelstrom_notable:  # Eye of the Storm
+    append_modifiers:
+      - { stat: CAST_SPEED, value: 3, type: PERCENT }
+
+  tempest_synergy_hub:  # Nexus of Tempest
+    append_modifiers:
+      - { stat: CAST_SPEED, value: 5, type: PERCENT }
+
+  tempest_keystone_1:  # Arcane Velocity
+    append_modifiers:
+      - { stat: CAST_SPEED, value: 10, type: PERCENT }
+      - { stat: MAGIC_POWER, value: 5, type: PERCENT }
+    description: "Lightning reflexes allow near-instant hex materialization."
+
+  # ===================================================================
+  # LICH ARM - Tanky Dark Mage (Sustained Channeling)
+  # ===================================================================
+
+  lich_grasp_notable:  # Death's Embrace
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 5, type: FLAT }
+
+  lich_crypt_notable:  # Necrotic Armor
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 3, type: FLAT }
+
+  lich_requiem_notable:  # Soul Anchor
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 3, type: FLAT }
+
+  lich_decay_notable:  # Withering Presence
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 4, type: FLAT }
+
+  lich_synergy_hub:  # Nexus of Lich
+    append_modifiers:
+      - { stat: VOLATILITY_MAX, value: 8, type: FLAT }
+
+  lich_keystone_2:  # Undying Shell - sustained channeling theme
+    append_modifiers:
+      - { stat: MAGIC_CHARGES, value: 1, type: FLAT }
+      - { stat: VOLATILITY_MAX, value: 15, type: FLAT }
+    description: "Undying will sustains multiple hexes simultaneously. Your volatility reserves deepen beyond mortal limits."

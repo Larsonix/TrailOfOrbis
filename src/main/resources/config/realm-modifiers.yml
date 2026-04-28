@@ -1,0 +1,192 @@
+# ═══════════════════════════════════════════════════════════════════
+# Realm Modifiers Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Configuration for modifier generation on Realm Maps.
+#
+# Modifier values now scale with map level using LevelScaling.
+# Formula: effectiveLevel = (multiplier - 1.0) * transitionLevel
+#          scaled = base + effectiveLevel * scale_per_level
+#
+# At default settings (transition=100, decayDivisor=5):
+#   Level 1:   effectiveLevel ~= 0    (base values only)
+#   Level 10:  effectiveLevel ~= 7    (small boost)
+#   Level 50:  effectiveLevel ~= 32   (moderate boost)
+#   Level 100: effectiveLevel ~= 50   (full transition value)
+#   Level 500: effectiveLevel ~= 132  (diminishing returns)
+#
+# Binary modifiers (min == max) ignore scaling entirely.
+#
+# Quality scaling: all modifier values are multiplied by
+# qualityMultiplier = 0.5 + quality/100.0 (same as gear).
+# Quality 1 = 0.51x, Quality 50 = 1.0x, Quality 101 = 1.51x.
+
+# ═══════════════════════════════════════════════════════════════════
+# Modifier Counts by Rarity (Separate Prefix/Suffix)
+# ═══════════════════════════════════════════════════════════════════
+# Prefixes = difficulty modifiers, Suffixes = reward modifiers.
+# Each rolled independently, like gear modifiers.
+
+modifier-counts:
+  common:
+    max_modifiers: 1
+    prefix_range: [0, 1]
+    suffix_range: [0, 1]
+  uncommon:
+    max_modifiers: 2
+    prefix_range: [0, 2]
+    suffix_range: [0, 2]
+  rare:
+    max_modifiers: 3
+    prefix_range: [0, 3]
+    suffix_range: [0, 3]
+  epic:
+    max_modifiers: 4
+    prefix_range: [1, 3]
+    suffix_range: [1, 3]
+  legendary:
+    max_modifiers: 5
+    prefix_range: [2, 3]
+    suffix_range: [2, 3]
+  mythic:
+    max_modifiers: 6
+    prefix_range: [3, 3]
+    suffix_range: [3, 3]
+
+# ═══════════════════════════════════════════════════════════════════
+# Prefix Weights (Difficulty Modifiers)
+# ═══════════════════════════════════════════════════════════════════
+# Individual modifier weights within the prefix pool.
+# Set to 0 to disable a specific modifier.
+
+prefix-weights:
+  monster-damage: 15
+  monster-health: 15
+  monster-speed: 10
+  monster-attack-speed: 8
+  reduced-time: 8
+  reduced-healing: 10
+  no-regeneration: 5
+
+# ═══════════════════════════════════════════════════════════════════
+# Suffix Weights (Reward Modifiers)
+# ═══════════════════════════════════════════════════════════════════
+# Individual modifier weights within the suffix pool.
+# Set to 0 to disable a specific modifier.
+
+suffix-weights:
+  item-quantity: 15
+  item-rarity: 15
+  experience-bonus: 12
+  stone-drop-bonus: 8
+  extra-monsters: 10
+  elite-chance: 7
+
+# ═══════════════════════════════════════════════════════════════════
+# Per-Modifier Settings (Level-Scaled)
+# ═══════════════════════════════════════════════════════════════════
+# Numeric modifiers use base_min/base_max + scale_per_level.
+# Binary modifiers (min == max) use flat min/max, no scaling.
+#
+# Scaling targets (with default LevelScaling config):
+#   Level 10 map:  small modifier values (gentle)
+#   Level 100 map: moderate values (approaching old maximums)
+#   Level 500+ map: near-maximum values
+
+modifier-settings:
+  # ---- PREFIX MODIFIERS (Difficulty) ----
+
+  # +X% Monster Damage
+  # Level 10: ~8-17%, Level 100: ~42-55%, Level 500+: ~108-121%
+  monster-damage:
+    base_min: 3
+    base_max: 15
+    scale_per_level: 1.5
+    enabled: true
+
+  # +X% Monster Life
+  # Level 10: ~13-25%, Level 100: ~60-105%, Level 500+: ~200-250%
+  monster-health:
+    base_min: 5
+    base_max: 20
+    scale_per_level: 2.0
+    enabled: true
+
+  # +X% Monster Speed
+  monster-speed:
+    base_min: 2
+    base_max: 8
+    scale_per_level: 0.6
+    enabled: true
+
+  # +X% Monster Attack Speed
+  monster-attack-speed:
+    base_min: 3
+    base_max: 10
+    scale_per_level: 0.8
+    enabled: true
+
+  # +X% Reduced Time
+  reduced-time:
+    base_min: 5
+    base_max: 10
+    scale_per_level: 0.6
+    enabled: true
+
+  # +X% Reduced Healing (display-only, effect deferred)
+  reduced-healing:
+    base_min: 10
+    base_max: 20
+    scale_per_level: 0.8
+    enabled: true
+
+  # No Regeneration - binary modifier (no scaling, display-only)
+  no-regeneration:
+    min: 1
+    max: 1
+    enabled: true
+    incompatible-with:
+      - reduced-healing  # Can't have both
+
+  # ---- SUFFIX MODIFIERS (Reward) ----
+
+  # +X% Item Quantity
+  item-quantity:
+    base_min: 2
+    base_max: 10
+    scale_per_level: 0.8
+    enabled: true
+
+  # +X% Item Rarity
+  item-rarity:
+    base_min: 2
+    base_max: 8
+    scale_per_level: 0.6
+    enabled: true
+
+  # +X% Experience (display-only, effect deferred)
+  experience-bonus:
+    base_min: 3
+    base_max: 12
+    scale_per_level: 0.8
+    enabled: true
+
+  # +X% Stone Drops (display-only, effect deferred)
+  stone-drop-bonus:
+    base_min: 2
+    base_max: 6
+    scale_per_level: 0.5
+    enabled: true
+
+  # +X% Monster Count
+  extra-monsters:
+    base_min: 3
+    base_max: 10
+    scale_per_level: 0.8
+    enabled: true
+
+  # +X% Elite Chance
+  elite-chance:
+    base_min: 2
+    base_max: 6
+    scale_per_level: 0.5
+    enabled: true

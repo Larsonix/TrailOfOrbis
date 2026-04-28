@@ -1,0 +1,72 @@
+{
+  "$Title": "[ROOT] Biome - Skill Sanctum Void",
+  "Name": "Sanctum_Void",
+
+  "Terrain": {
+    "Type": "DAOTerrain",
+    "Density": {
+      "Type": "Constant",
+      "Skip": false,
+      "Value": -1
+    }
+  },
+
+  "MaterialProvider": {
+    "Type": "Constant",
+    "Material": {
+      "Solid": "Empty"
+    }
+  },
+
+  "Props": [{
+    "Skip": true,
+    "Runtime": 0,
+    "Positions": {
+      "Type": "List",
+      "Skip": false,
+      "Positions": [{
+        "X": 0,
+        "Y": 65,
+        "Z": -20
+      }]
+    },
+    "Assignments": {
+      "Type": "Constant",
+      "Prop": {
+        "Type": "Column",
+        "Skip": false,
+        "ColumnBlocks": [{
+          "Y": 0,
+          "Material": {
+            "Solid": "Rock_Stone"
+          }
+        }],
+        "Directionality": {
+          "Type": "Static",
+          "Rotation": 0,
+          "Pattern": {
+            "Type": "BlockType",
+            "Skip": false,
+            "Material": {
+              "Solid": "Empty"
+            }
+          }
+        },
+        "Scanner": {
+          "Type": "Origin",
+          "Skip": false
+        }
+      }
+    }
+  }],
+
+  "EnvironmentProvider": {
+    "Type": "Constant",
+    "Environment": "Env_Default_Void"
+  },
+
+  "TintProvider": {
+    "Type": "Constant",
+    "Color": "#1a1a2e"
+  }
+}

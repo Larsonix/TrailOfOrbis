@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG water damage - light blue text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#44CCFF"
+}

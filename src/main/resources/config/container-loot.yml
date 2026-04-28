@@ -1,0 +1,253 @@
+# Container Loot Configuration
+# Controls how vanilla container loot is replaced with RPG gear, stones, and maps
+
+# Master toggle for the container loot system
+enabled: true
+
+# Where to apply loot replacement:
+#   realm_only  — Only in realm instance worlds (overworld chests stay vanilla)
+#   all_worlds  — Replace loot in all worlds (overworld + realms)
+#   disabled    — Do not replace loot anywhere
+scope: all_worlds
+
+# When true, clears ALL vanilla items and fills with RPG loot (in realm worlds).
+# When false, selectively removes weapons/armor and preserves materials/tools.
+clear_all_vanilla: true
+
+# Which container types to process
+sources:
+  # Treasure chests (quest-related) fire TreasureChestOpeningEvent
+  treasure_chests: true
+  # Regular containers (chests, barrels, crates) use change detection
+  regular_containers: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOOT SCALING
+# ═══════════════════════════════════════════════════════════════════════════════
+# Determines gear level and rarity based on the opening player's level
+
+loot_scaling:
+  # Level ranges for gear scaling
+  # player_level_range: [min, max] inclusive
+  # gear_level_range: [min, max] - gear will be generated within this range
+  # rarity_weights: weighted chances for each rarity tier
+  level_ranges:
+    - player_level_range: [1, 10]
+      gear_level_range: [1, 5]
+      rarity_weights:
+        common: 70
+        uncommon: 25
+        rare: 5
+        epic: 0
+        legendary: 0
+        mythic: 0
+
+    - player_level_range: [11, 20]
+      gear_level_range: [5, 15]
+      rarity_weights:
+        common: 50
+        uncommon: 35
+        rare: 12
+        epic: 3
+        legendary: 0
+        mythic: 0
+
+    - player_level_range: [21, 35]
+      gear_level_range: [15, 30]
+      rarity_weights:
+        common: 35
+        uncommon: 40
+        rare: 18
+        epic: 6
+        legendary: 1
+        mythic: 0
+
+    - player_level_range: [36, 50]
+      gear_level_range: [30, 50]
+      rarity_weights:
+        common: 25
+        uncommon: 40
+        rare: 22
+        epic: 10
+        legendary: 3
+        mythic: 0
+
+    - player_level_range: [51, 75]
+      gear_level_range: [50, 75]
+      rarity_weights:
+        common: 15
+        uncommon: 35
+        rare: 28
+        epic: 15
+        legendary: 6
+        mythic: 1
+
+    - player_level_range: [76, 100]
+      gear_level_range: [75, 100]
+      rarity_weights:
+        common: 10
+        uncommon: 30
+        rare: 30
+        epic: 20
+        legendary: 8
+        mythic: 2
+
+  # Default range if player level doesn't match any range
+  default_gear_level_range: [1, 5]
+  default_rarity_weights:
+    common: 70
+    uncommon: 25
+    rare: 5
+    epic: 0
+    legendary: 0
+    mythic: 0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTAINER TIERS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Different container types have different loot quality
+#
+# min_items / max_items: Total RPG items placed when clear_all_vanilla is true.
+#   Stones and maps roll first, gear fills the remaining slots.
+# min_gear_drops / max_gear_drops: Used in selective mode (clear_all_vanilla: false).
+
+container_tiers:
+  # Basic containers - standard chests, barrels, crates
+  basic:
+    patterns:
+      - "Chest"
+      - "Barrel"
+      - "Crate"
+      - "Storage*"
+    loot_multiplier: 1.0
+    rarity_bonus: 0.0
+    map_chance_multiplier: 1.0
+    stone_chance_multiplier: 1.0
+    min_gear_drops: 1
+    max_gear_drops: 3
+    min_items: 3
+    max_items: 5
+
+  # Dungeon containers - found in dungeons and caves
+  dungeon:
+    patterns:
+      - "Dungeon_*"
+      - "Treasure_*"
+      - "Hidden_*"
+      - "Cave_*"
+    loot_multiplier: 1.5
+    rarity_bonus: 0.15
+    map_chance_multiplier: 2.0
+    stone_chance_multiplier: 1.5
+    min_gear_drops: 2
+    max_gear_drops: 4
+    min_items: 4
+    max_items: 7
+
+  # Boss containers - rewards from boss encounters
+  boss:
+    patterns:
+      - "Boss_*"
+      - "Legendary_*"
+      - "Raid_*"
+      - "Altar_*"
+    loot_multiplier: 2.0
+    rarity_bonus: 0.30
+    map_chance_multiplier: 4.0
+    stone_chance_multiplier: 2.0
+    min_gear_drops: 3
+    max_gear_drops: 6
+    min_items: 6
+    max_items: 10
+    guaranteed_rare_or_better: true
+
+  # Special containers - unique/quest related
+  special:
+    patterns:
+      - "Quest_*"
+      - "Reward_*"
+      - "Artifact_*"
+    loot_multiplier: 1.75
+    rarity_bonus: 0.25
+    map_chance_multiplier: 3.0
+    stone_chance_multiplier: 2.0
+    min_gear_drops: 2
+    max_gear_drops: 5
+    min_items: 5
+    max_items: 8
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STONE DROPS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Currency stones that can drop from containers
+
+stone_drops:
+  enabled: true
+  # Base chance per roll to get a stone (0.30 = 30%)
+  base_chance: 0.30
+  # Maximum stone rolls per container
+  max_per_container: 2
+  # Stone rarity weights (uses GearRarity)
+  rarity_weights:
+    common: 40
+    uncommon: 35
+    rare: 18
+    epic: 6
+    legendary: 1
+    mythic: 0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAP DROPS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Realm maps that can drop from containers
+
+map_drops:
+  enabled: true
+  # Base chance per roll to get a map (0.10 = 10%)
+  base_chance: 0.10
+  # Maximum map rolls per container
+  max_per_container: 1
+  # Map level offset from player level (can be negative for lower level maps)
+  level_offset_range: [-5, 5]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ITEM REMOVAL (Selective Mode Only)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Controls which vanilla items are removed in selective mode (clear_all_vanilla: false).
+# Ignored when clear_all_vanilla is true — all vanilla items are removed.
+
+item_removal:
+  # Remove vanilla weapons (replaced with RPG gear)
+  remove_weapons: true
+  # Remove vanilla armor (replaced with RPG gear)
+  remove_armor: true
+  # Keep materials (wood, stone, ingots, etc.)
+  preserve_materials: true
+  # Keep consumables (food, potions, etc.)
+  preserve_consumables: true
+  # Keep tools (pickaxes, axes, shovels - non-combat)
+  preserve_tools: true
+
+  # Specific item IDs to always preserve (even if they're weapons/armor)
+  preserved_items: []
+
+  # Specific item IDs to always remove (even if they're materials)
+  removed_items: []
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ADVANCED
+# ═══════════════════════════════════════════════════════════════════════════════
+
+advanced:
+  # How long to remember processed containers (milliseconds)
+  # After this time, containers can be re-processed
+  container_memory_duration_ms: 3600000  # 1 hour
+
+  # Clean up old container entries every N milliseconds
+  cleanup_interval_ms: 300000  # 5 minutes
+
+  # Skip loot replacement for players in creative mode
+  skip_creative_mode: true
+
+  # Log loot replacements (for debugging)
+  debug_logging: false

@@ -1,0 +1,213 @@
+World Generation
+Technical Hytale Generator
+Material Providers
+Determines which Material to use where.
+
+Official Hytale Documentation
+All content on this section is provided by Hypixel Studios Canada Inc. and is presented without any substantial changes, aside from visual design adjustments by the HytaleModding Team.
+Constant
+Provides one constant block type.
+
+Parameters:
+Name	Description
+BlockType	string name of the Hytale block type, for example: “Rock_Stone”.
+Solidity
+Separates into Solid and Empty terrain blocks and provides a Material Provider slot for each of the two selections.
+
+Parameters:
+Name	Description
+Solid	Material Provider slot.
+Empty	Material Provider slot.
+Queue
+Goes through a queue of Material Provider slots from highest to lowest priority. If a Material Provider in the queue doesn’t provide a block type the next one in the queue is queried. If no slot provides a block then the Queue Material Provider will not provide a block. The query stops at the first slot that provides a block.
+
+Parameters:
+Name	Description
+Queue	list of Material Provider slots. The slots are queried from top to bottom.
+SimpleHorizontal
+Applies the child Material Provider on a vertical range.;
+
+If a BaseHeight is provided, the TopY and BottomY values are relative to the BaseHeight, otherwise they're relative to the world's Y coordinate.
+
+Parameters:
+Name	Description
+TopY	integer Y coordinate that defines the vertical top exclusive limit of the region.
+Top BaseHeight	string. BaseHeight name.
+BottomY	integer Y coordinate that defines the vertical bottom inclusive limit of the region.
+Bottom BaseHeight	string. BaseHeight name.
+Material	Material Provider slot to query for the selected region.
+Striped
+Applies a Material Provider slot on a set of horizontal stripes of blocks of varying thickness and position. Below is an example image of basalt stripes into a stone cliff.
+
+Parameters:
+Name	Description
+Stripes	list of stripe assets each containing a TopY and BottomY keys: TopY: any integer representing a world Y value, is inclusive. BottomY: any integer representing a world Y value, is inclusive.
+Material	Material Provider slot to query for the selected region.
+Weighted
+Picks the Material Provider slot to query from a list. Each slot has a weight which determines the likelihood for it to be picked.
+
+Parameters:
+Name	Description
+Seed	string.
+SkipChance	value from 0.0 to 1.0 determining the percentage of blocks that are skipped. When a block is skipped this Material Provider basically provides no block and it skips picking a slot all together.
+WeightedMaterials	List of weighted Material Provider slots: Weight: value above 0. Greater value results in higher likelihood of being picked. Material: Material Provider slot.
+FieldFunction
+Selects a 3D region using a noise function and value delimiters. The delimiters link a Material Provider slot to a specific range of values in the noise function. The noise function shares seeds with the DAOTerrain density function.
+
+Parameters:
+Name	Description
+FieldFunction	defines the field value for each block. Like in the example above, this is the same type of asset as the one used in DAOTerrain to define density.
+Delimiters	list of delimiters. Higher in the list results in higher priority.
+From	any floating point value defining the minimum limit of the delimiter’s range.
+To	any floating point value defining the maximum limit of the delimiter’s range.
+Material	Material Provider slot linked to this delimiter.
+SpaceAndDepth
+Allows placing layers of blocks on a terrain’s floor or ceiling surfaces. Layers of Material are piled on each other inside the surface (floor or ceiling) like a cake. There are multiple Layer types, each type providing a unique way to define its thickness. Below is an example of two layers into the floor of our terrain.
+
+Example of DepthAndSpace Material Provider
+
+Conditions let you skip this Material Provider if they are not met. An example of this could be a condition that only places grass if there is at least 5 blocks of empty above the surface.
+
+Parameters:
+Name	Description
+LayerContext	string. The context the layers are applied on. For example if the context is DEPTH_INTO_FLOOR then the layers will be applied relative to the depth into the floor. So the first layer will be the topmost block of the floor, and each consecutive layer will build deeper under the previous layer. The graphic above illustrates that.Possible values: DEPTH_INTO_FLOOR and DEPTH_INTO_CEILING.
+MaxExpectedDepth	Positive Integer. This value helps the system optimize this Material Provider by not performing more depth lookups than necessary. Ideally you should set this value at the maximum expected depth all of the layers combined can have.For example, if I have 3 layers in my provider as such: first layer is 1 block thick, second layer is 2 to 4 blocks thick and the third layer is 0 to 5 blocks thick, then my MaxExpectedDepth value should be the maximum of all these layers, in my case 1 + 4 + 5 = 10. Setting a value that is too small might cut off the extreme ends of a layer, while setting a value that is too large might result in poor performance for super complex configs.
+Condition	slot for a Condition object, see the Condition’s documentation below. The Material Provider returns no block if the Condition isn’t met for the current block.
+Layers	List of Layer objects, see the Layer’s documentation below. The Material Provider will pile the layers from the top of the list down as it gets deeper into the context. The diagram above shows that.
+Condition
+A Condition object checks if the environment is valid to determine whether the Material Provider should be run for the current block. If the Condition fails for a block then the Material Provider will return no block.
+
+An example of Condition could be to check if there is at least 5 blocks of empty space above the floor. This condition could be useful if you want dirt blocks in tight spaces instead of grass. An example of that is shown below.
+
+Example of Condition checking space above floor
+
+See the JSON code here.
+
+The Condition’s ContextToCheck parameter is the information from the block’s context that you can query in your Condition. In the example above we are checking the SPACE_ABOVE_FLOOR context, which is the number of blocks above the floor. There are currently two possible context values you can use:
+
+SPACE_ABOVE_FLOOR
+SPACE_BELOW_CEILING
+There are multiple Condition types that allow you to compose more complex Conditions from simpler ones. Below are the different types.
+
+EqualsCondition
+
+Validates only if a context value is equal to the Condition’s configured value.
+
+Parameters:
+Name	Description
+ContextToCheck	string and can have two values, namely SPACE_ABOVE_FLOOR and SPACE_BELOW_CEILING. These are documented above.
+Value	any integer. The only valid value of this Condition, if the context value is different then the Condition fails.
+GreaterThanCondition
+
+Validates only if a context value is greater than the Condition’s configured threshold.
+
+Parameters:
+Name	Description
+ContextToCheck	string and can have two values, namely SPACE_ABOVE_FLOOR and SPACE_BELOW_CEILING. These are documented above.
+Threshold	any integer. For the condition to succeed the context value must be greater than the threshold value.
+SmallerThanCondition
+
+Validates only if a context value is smaller than the Condition’s configured threshold.
+
+Parameters:
+Name	Description
+ContextToCheck	string and can have two values, namely SPACE_ABOVE_FLOOR and SPACE_BELOW_CEILING. These are documented above.
+Threshold	any integer. For the condition to succeed the context value must be smaller than the threshold value.
+AndCondition
+
+AND operator logical Condition. Validates only if all of its Condition slots also validate.
+
+Parameters:
+Name	Description
+Conditions	List of Condition slots.
+OrCondition
+
+OR operator logical Condition. Validates if any of its Condition slots also validate.
+
+Parameters:
+Name	Description
+Conditions	List of Condition slots.
+NotCondition
+
+NOT operator logical Condition. Validates if its Condition slot does not validate.
+
+Parameters:
+Name	Description
+Condition	Condition slot. Note that this is a single slot and not a list like the AND and the OR variants.
+AlwaysTrueCondition
+
+This Condition type always validates.
+
+Layer
+In the DepthAndSpace Material Provider type, Layers are stacked into the depth of the floor or ceiling. Layers have a thickness and Material Provider.
+
+Below are some examples that illustrate how layers work.
+
+Example 1:
+
+Layer 1: grass of thickness 1.
+Example of Layer 1 grass thickness 1
+
+Example 2:
+
+Layer 1: grass of thickness 1.
+Layer 2: dirt of thickness ranging from 2 to 3.
+Example of Layer 2 grass and dirt
+
+Example 3:
+
+Layer 1: mud of thickness 1 to 5 defined by a 2D simplex noise function.
+Layer 2: dirt of thickness ranging from 2 to 3.
+Example of Layer 3 mud and dirt
+
+Example 4: This example shows how this can work not only on floors but also on the ceilings by changing the LayerContext value to DEPTH_INTO_CEILING.
+
+Layer 1: dirt of thickness in range 2 to 3.
+Example of Layer 4 dirt on ceiling
+
+End of examples.
+
+Below are documented the different types of Layers.
+
+ConstantThickness
+
+Has the same thickness everywhere.
+
+Parameters:
+Name	Description
+Material	slot for Material Provider.
+Thickness	integer greater or equal to 0, the thickness in blocks.
+RangeThickness
+
+The thickness varies per XZ coordinate and is defined by a range of possible values.
+
+Parameters:
+Name	Description
+Material	slot for Material Provider.
+RangeMin	integer greater or equal to 0, the minimum value in blocks the range can have.
+RangeMax	integer greater or equal to 0, the maximum inclusive value in blocks the range can have.
+Seed	string.
+WeightedThickness
+
+The thickness varies per XZ coordinate and is picked from a list of weighted thickness values.
+
+Parameters:
+Name	Description
+Material	slot for Material Provider.
+PossibleThicknesses	a list of weighted thickness values.
+Seed	the seed used when picking the thickness.
+NoiseThickness
+
+The thickness varies per XZ coordinate and is determined by a noise function tree. Note that the thickness value is determined by the function output, this is why in the example below I normalized the output to be from 0 to 5 because I wanted the thickest point to be around 5 blocks.
+
+Parameters:
+Name	Description
+Material	slot for Material Provider.
+ThicknessFunctionXZ	a noise function tree. This function is only sampled with XZ inputs with a constant Y of 0. In other words, this function is sampled like a 2D function on the XZ plane.
+Imported
+Imports an exported MaterialProvider..
+
+Parameters:
+Name	Description
+Name	string. The exported MaterialProvider.
+Written by Hypixel Studios Canada Inc.

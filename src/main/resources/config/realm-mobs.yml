@@ -1,0 +1,577 @@
+# ═══════════════════════════════════════════════════════════════════
+# Realm Mob Pool Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Defines which mobs spawn in each biome type.
+#
+# IMPORTANT: Mob IDs MUST match exact Hytale NPC role names (PascalCase)!
+# Invalid IDs will silently fail to spawn. Check server logs for
+# "Unknown NPC type" warnings.
+#
+# Elite System:
+# Elite is a SPAWN-TIME MODIFIER, not a mob pool. Any mob (regular or boss)
+# can roll to become elite at spawn time based on the elite chance settings.
+# Elite mobs receive bonus stats (2x stats, 1.5x health, 3x XP).
+# An elite boss is possible and gets BOTH elite AND boss multipliers!
+
+# ═══════════════════════════════════════════════════════════════════
+# Spawn Settings
+# ═══════════════════════════════════════════════════════════════════
+
+spawn-settings:
+  # Base chance for a mob to roll elite at spawn (5%)
+  # This applies to ANY mob (regular or boss)
+  base-elite-chance: 0.05
+
+  # Additional elite chance per realm level (+0.01% per level)
+  elite-chance-per-level: 0.0001
+
+  # Maximum elite spawn chance (25%)
+  max-elite-chance: 0.25
+
+  # Base chance for boss mob spawn (% of total mobs drawn from boss pool)
+  base-boss-chance: 0.03
+
+  # Additional boss chance per realm level (+0.05% per level)
+  boss-chance-per-level: 0.0005
+
+  # Maximum boss spawn chance (10% cap)
+  max-boss-chance: 0.10
+
+  # Visual scale multipliers — make special mobs visually larger
+  # 1.0 = normal size, 1.5 = 50% bigger. Stacks: elite boss = elite × boss
+  elite-scale: 1.20
+  boss-scale: 1.50
+
+  # Minimum distance from player for spawns (blocks)
+  min-distance: 20
+
+  # Maximum distance from player for spawns (blocks)
+  max-distance: 50
+
+  # Number of mobs to spawn per batch
+  batch-size: 5
+
+  # Ticks between spawn batches (100 = 5 seconds)
+  interval-ticks: 100
+
+  # Safe zone around player spawn point where mobs cannot spawn (blocks)
+  # This prevents mobs from spawning directly at the realm entry/respawn location
+  # Different from min-distance which controls distance from players during gameplay
+  # Set to 0 to disable
+  spawn-exclusion-radius: 20
+
+  # Player count scaling - mobs get stronger with more players
+  # Formula: multiplier^(playerCount - 1)
+  # With 2 players: 1.2^1 = 1.2x stats
+  # With 3 players: 1.2^2 = 1.44x stats
+  # With 4 players: 1.2^3 = 1.728x stats
+  player-scaling-multiplier: 1.2
+
+  # Whether player scaling affects mob damage (true) or only health (false)
+  player-scaling-affects-damage: true
+
+  # Global multiplier for realm mob spawn counts (1.0 = no change)
+  # Applied to the calculated total mob count for all realms
+  # Stacks with extra-monsters map modifier
+  spawn-count-multiplier: 1.0
+
+  # Level fraction for AI-spawned minions (e.g., wolves summoned by orcs)
+  # Minions get realm_level * this value (0.75 = 75% of realm level)
+  # Prevents recursive degradation: all minions use the same fraction of the realm level
+  minion-level-fraction: 0.75
+
+# ═══════════════════════════════════════════════════════════════════
+# Biome Mob Pools
+# ═══════════════════════════════════════════════════════════════════
+# Each biome has two pools: regular and boss.
+# Weight affects spawn probability relative to other mobs in the pool.
+#
+# Note: Elite is NOT a pool - any mob can roll elite at spawn time!
+#
+# Valid mob IDs are found in: Assets/Server/NPC/Roles/
+# Common hostile mobs:
+#   Trorks: Trork_Guard, Trork_Hunter, Trork_Warrior, Trork_Brawler,
+#           Trork_Sentry, Trork_Mauler, Trork_Shaman, Trork_Chieftain
+#   Goblins: Goblin_Scrapper, Goblin_Lobber, Goblin_Miner, Goblin_Thief,
+#            Goblin_Scavenger, Goblin_Ogre, Goblin_Duke
+#   Outlanders: Outlander_Marauder, Outlander_Hunter, Outlander_Stalker,
+#               Outlander_Berserker, Outlander_Brute, Outlander_Cultist,
+#               Outlander_Priest, Outlander_Sorcerer, Outlander_Peon
+#   Scaraks: Scarak_Fighter, Scarak_Defender, Scarak_Seeker, Scarak_Louse,
+#            Scarak_Broodmother
+#   Undead: Zombie, Zombie_Frost, Zombie_Burnt, Zombie_Sand, Skeleton,
+#           Ghoul, Wraith, Wraith_Lantern, Shadow_Knight, Werewolf, Risen_Knight
+#   Skeletons (Themed): Skeleton_Frost_Knight, Skeleton_Frost_Scout,
+#           Skeleton_Frost_Archer, Skeleton_Frost_Mage,
+#           Skeleton_Burnt_Knight, Skeleton_Burnt_Gunner, Skeleton_Burnt_Wizard,
+#           Skeleton_Sand_Archer, Skeleton_Sand_Mage,
+#           Skeleton_Pirate_Captain, Skeleton_Pirate_Striker, Skeleton_Pirate_Gunner
+#   Creatures: Wolf_Black, Wolf_White, Bear_Grizzly, Bear_Polar, Crocodile,
+#              Hyena, Leopard_Snow, Spider, Spider_Cave, Scorpion, Snake_Cobra,
+#              Snake_Marsh, Raptor_Cave, Rex_Cave, Molerat, Rat, Toad_Rhino,
+#              Toad_Rhino_Magma, Lizard_Sand
+#   Plants: Snapdragon, Hedera, Bramblekin, Bramblekin_Shaman, Kweebec_Razorleaf
+#   Mythic: Emberwulf, Fen_Stalker, Yeti, Cactee
+#   Dragons: Dragon_Fire, Dragon_Frost
+#   Void: Crawler_Void, Spectre_Void, Spawn_Void, Eye_Void, Larva_Void,
+#         Golem_Guardian_Void
+#   Elemental: Golem_Crystal_Earth, Golem_Crystal_Frost, Golem_Crystal_Flame,
+#              Golem_Crystal_Sand, Golem_Firesteel
+
+biome-pools:
+  # ─────────────────────────────────────────────────────────────────
+  # FOREST - Trork Tribal Territory
+  # Theme: Trork raiders defending their woodland domain
+  # ─────────────────────────────────────────────────────────────────
+  forest:
+    regular:
+      # Tank - Heavy melee brute
+      - id: "Trork_Brawler"
+        weight: 20
+      # Melee DPS - Balanced fighter
+      - id: "Trork_Warrior"
+        weight: 25
+      # Melee - Standard soldier
+      - id: "Trork_Guard"
+        weight: 20
+      # Ranged - Bow attacks
+      - id: "Trork_Hunter"
+        weight: 20
+      # Support - Magic/heals
+      - id: "Trork_Shaman"
+        weight: 10
+      # Heavy - Slow but hard-hitting
+      - id: "Trork_Mauler"
+        weight: 5
+    boss:
+      # Unique: Trork faction leader
+      - id: "Trork_Chieftain"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # DESERT - Scorched Ruins
+  # Theme: Fire undead + desert creatures. Pure Burnt Skeletons (no Sand).
+  # Sand Skeletons moved to SAND_TOMBS (underground sandstone tomb biome)
+  # ─────────────────────────────────────────────────────────────────
+  desert:
+    regular:
+      # Melee DPS - Fire undead warrior
+      - id: "Skeleton_Burnt_Knight"
+        weight: 22
+      # Ranged - Fire undead gunner
+      - id: "Skeleton_Burnt_Gunner"
+        weight: 18
+      # Magic - Fire undead mage
+      - id: "Skeleton_Burnt_Wizard"
+        weight: 15
+      # Creature - Desert predator, armored scorpion
+      - id: "Scorpion"
+        weight: 18
+      # Creature - Swift desert reptile
+      - id: "Lizard_Sand"
+        weight: 12
+      # Plant beast - Animated cactus creature, desert-exclusive
+      - id: "Cactee"
+        weight: 15
+    boss:
+      # Fire undead summoner — raises skeletal minions
+      - id: "Skeleton_Burnt_Praetorian"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # VOLCANO - Infernal Wasteland
+  # Theme: Fire undead, elemental creatures, and incandescent risen
+  # ─────────────────────────────────────────────────────────────────
+  volcano:
+    regular:
+      # Tank - Molten guardian
+      - id: "Golem_Firesteel"
+        weight: 12
+      # Melee DPS - Fire undead
+      - id: "Skeleton_Burnt_Knight"
+        weight: 16
+      # Ranged - Gunpowder weapons
+      - id: "Skeleton_Burnt_Gunner"
+        weight: 14
+      # Magic - Fire magic
+      - id: "Skeleton_Burnt_Wizard"
+        weight: 12
+      # Incandescent melee - glowing volcanic undead (confirmed spawnable)
+      - id: "Skeleton_Incandescent_Fighter"
+        weight: 12
+      # Incandescent magic - glowing fire mage
+      - id: "Skeleton_Incandescent_Mage"
+        weight: 8
+      # Creature - Fire wolf
+      - id: "Emberwulf"
+        weight: 12
+      # Backup - Lava toad
+      - id: "Toad_Rhino_Magma"
+        weight: 8
+      # Slug_Magma removed — NPC role doesn't exist in current Hytale build
+    boss:
+      # Unique: Molten crystal golem — volcanic elemental guardian
+      # Dragon_Fire is dead (no attacks/animations, same as Dragon_Frost)
+      - id: "Golem_Crystal_Flame"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # TUNDRA - Outlander Frontier
+  # Theme: Pure Outlander ice-tribe + arctic wildlife
+  # Frost Skeletons moved to FROZEN_CRYPTS (underground frost tomb biome)
+  # All Outlander roles confirmed Intelligent/Aggressive = spawnable
+  # ─────────────────────────────────────────────────────────────────
+  tundra:
+    regular:
+      # Melee raider - primary frontline
+      - id: "Outlander_Marauder"
+        weight: 20
+      # Ranged hunter - bow attacks from distance
+      - id: "Outlander_Hunter"
+        weight: 18
+      # Rage berserker - fast aggressive melee DPS
+      - id: "Outlander_Berserker"
+        weight: 17
+      # Heavy brute - tank, slow but devastating
+      - id: "Outlander_Brute"
+        weight: 15
+      # Stealth stalker - ambush, flanking
+      - id: "Outlander_Stalker"
+        weight: 12
+      # Arctic bear - heavy wildlife tank
+      - id: "Bear_Polar"
+        weight: 10
+      # Arctic wolf pack - fast flanking wildlife
+      - id: "Wolf_White"
+        weight: 8
+    boss:
+      # Towering ice giant — confirmed working
+      - id: "Yeti"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # SWAMP - The Rotting Marsh
+  # Theme: ALL zombies + undead spirits. Toxic water mutates the dead.
+  # UNIQUE pool: no mobs shared with other biomes. Swamp is PURE undead horror.
+  # All 7 zombie types + Ghoul + Wraith = the zombie graveyard biome.
+  # (No other biome uses ANY zombie type — Volcano/Tundra/Desert use Skeletons instead.)
+  # ─────────────────────────────────────────────────────────────────
+  swamp:
+    regular:
+      # Spectral lantern carrier — drifts through fog, ranged spectral attacks
+      - id: "Wraith_Lantern"
+        weight: 16
+      # Base zombie — rotting dead risen from the marsh
+      - id: "Zombie"
+        weight: 15
+      # Ghostly ranged — drifts between dead trees, spectral projectiles
+      - id: "Wraith"
+        weight: 14
+      # Small mutant swarm �� fast, low HP, attacks in groups
+      - id: "Zombie_Aberrant_Small"
+        weight: 12
+      # Large mutant — massive aberrant, slow but devastating
+      - id: "Zombie_Aberrant_Big"
+        weight: 10
+      # Burnt zombie — charred remains, fire-touched corpse from deep bog
+      - id: "Zombie_Burnt"
+        weight: 9
+      # Sand zombie — ancient corpse preserved in marsh clay, now risen
+      - id: "Zombie_Sand"
+        weight: 8
+      # Frost zombie — frozen corpse from cursed cold pockets in the bog
+      - id: "Zombie_Frost"
+        weight: 7
+      # NOTE: Ghoul CANNOT SPAWN — returns null from spawnEntity() (April 21, 2026)
+    boss:
+      # Aberrant lord — the swamp's ultimate mutation, massive twisted horror
+      - id: "Zombie_Aberrant"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # MOUNTAINS - Goblin Stronghold
+  # Theme: Goblin mining operations and defenses
+  # ─────────────────────────────────────────────────────────────────
+  mountains:
+    regular:
+      # Tank - Heavy brute
+      - id: "Goblin_Ogre"
+        weight: 15
+      # Melee DPS - Basic fighter
+      - id: "Goblin_Scrapper"
+        weight: 25
+      # Ranged - Throws projectiles
+      - id: "Goblin_Lobber"
+        weight: 20
+      # Stealth - Sneaky attacker
+      - id: "Goblin_Thief"
+        weight: 15
+      # Worker - Pickaxe fighter
+      - id: "Goblin_Miner"
+        weight: 15
+      # Creature - Mountain beast
+      - id: "Bear_Grizzly"
+        weight: 10
+    boss:
+      # Unique: Multi-phase boss
+      - id: "Goblin_Duke"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # BEACH - The Sunken Corsair
+  # Theme: Undead pirate crew + coastal scavenger fauna
+  # Identity: 9 pirate skeleton variants (3 roles × 3 AI behaviors)
+  # + Hyena scavenger packs (UNTESTED — if fails, redistribute to pirates)
+  # ─────────────────────────────────────────────────────────────────
+  beach:
+    regular:
+      # ── PIRATE CREW (confirmed working — Undead/Skeleton_Pirate) ──
+      # Cutlass melee — aggressive swordsman
+      - id: "Skeleton_Pirate_Striker"
+        weight: 15
+      # Cutlass melee — patrolling variant
+      - id: "Skeleton_Pirate_Striker_Patrol"
+        weight: 8
+      # Cutlass melee — roaming variant
+      - id: "Skeleton_Pirate_Striker_Wander"
+        weight: 7
+      # Ranged — pistol/rifle shots
+      - id: "Skeleton_Pirate_Gunner"
+        weight: 15
+      # Ranged — patrolling gunner
+      - id: "Skeleton_Pirate_Gunner_Patrol"
+        weight: 7
+      # Ranged — roaming gunner
+      - id: "Skeleton_Pirate_Gunner_Wander"
+        weight: 5
+      # Tank — heavy captain, shield-bearing
+      - id: "Skeleton_Pirate_Captain"
+        weight: 8
+      # Tank — patrolling captain
+      - id: "Skeleton_Pirate_Captain_Patrol"
+        weight: 5
+      # Tank — roaming captain
+      - id: "Skeleton_Pirate_Captain_Wander"
+        weight: 5
+      # ── COASTAL FAUNA (UNTESTED — Creature/Mammal) ──
+      # Scavenger pack — feeds on pirate carrion, aggressive when disturbed
+      - id: "Hyena"
+        weight: 25
+    boss:
+      # Pirate Lord — scaled-up captain commanding the sunken port
+      - id: "Skeleton_Pirate_Captain"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # JUNGLE - The Living Wilds
+  # Theme: Apex predators and dangerous beasts — the jungle hunts you.
+  # Every mob has a distinct combat mechanic for varied encounters.
+  #
+  # CONFIRMED DEAD (neutral faction, spawnEntity returns null):
+  #   Kweebec_Razorleaf, Bramblekin, Bramblekin_Shaman, Hedera,
+  #   Feran_*, Snapdragon — ALL "Plants" category NPCs fail.
+  #   See server logs 2026-04-20.
+  #
+  # WORKING: Only Creatures category (hostile by default) spawn.
+  # ─────────────────────────────────────────────────────────────────
+  jungle:
+    regular:
+      # Trapper — web ambush from canopy, drops onto player, slows with webs
+      # Creates kill zones in dense vegetation. Dangerous in groups.
+      - id: "Spider"
+        weight: 18
+      # Assassin — burst charge from undergrowth, massive initial damage
+      # Ambush predator that punishes players who stop moving.
+      - id: "Crocodile"
+        weight: 15
+      # Pack flanker — dark jungle wolves that attack from multiple angles
+      # Fast, low HP individually, dangerous in coordinated packs.
+      - id: "Wolf_Black"
+        weight: 15
+      # Harasser — hit-and-run dinosaur pack, fast and relentless
+      # Never stops chasing, wears down players over time.
+      - id: "Raptor_Cave"
+        weight: 14
+      # Plant beast — massive mythic plant predator, tanky and devastating
+      # Confirmed spawnable (Creature/Mythic, NOT neutral). Jungle signature.
+      - id: "Snapdragon"
+        weight: 10
+      # DoT specialist — venomous snake, small and sneaky, poison damage
+      # Easy to miss in dense vegetation, stacking poison is lethal.
+      - id: "Snake_Cobra"
+        weight: 10
+      # Swamp horror — mythic beast that stalks through dense vegetation
+      # Large, tough, terrifying presence in the undergrowth.
+      - id: "Fen_Stalker"
+        weight: 8
+      # Toad brute — massive amphibian, charges and stomps
+      # Tanky, slow, devastating when it connects.
+      - id: "Toad_Rhino"
+        weight: 5
+      # Venomous marsh snake — poison attacks, hides in undergrowth
+      - id: "Snake_Marsh"
+        weight: 5
+    boss:
+      # Rex — apex predator dinosaur, the top of the jungle food chain
+      # Massive, fast for its size, devastating bite attacks.
+      # NO boss camp structure — Rex spawns in the open jungle, not in a camp.
+      - id: "Rex_Cave"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # CAVERNS - The Scarak Hive
+  # Theme: Insectoid colony infesting the crystal caves
+  # Identity: Pure Scarak faction — the hive, the swarm, the queen
+  # Broodmother confirmed working (was Beach boss). All Scarak are Intelligent/Aggressive.
+  # ─────────────────────────────────────────────────────────────────
+  caverns:
+    regular:
+      # Primary melee — bulk of the hive workforce
+      - id: "Scarak_Fighter"
+        weight: 25
+      # Tank — armored front-line defenders of the queen
+      - id: "Scarak_Defender"
+        weight: 20
+      # Fast scout — flanking, fast attacks, alerts the hive
+      - id: "Scarak_Seeker"
+        weight: 20
+      # Swarm — small swarming insects, overwhelming numbers
+      - id: "Scarak_Louse"
+        weight: 20
+      # Elite guard — royal guard protecting inner hive, tougher
+      - id: "Scarak_Fighter_Royal_Guard"
+        weight: 15
+    boss:
+      # Hive queen — massive broodmother, 50% scale boost
+      - id: "Scarak_Broodmother"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # FROZEN CRYPTS - Underground Ice Tomb
+  # Theme: Pure Frost Skeleton army — ancient warriors frozen in time
+  # Identity: ALL 8 Frost Skeleton roles EXCLUSIVE (removed from Tundra)
+  # Boss: Golem_Crystal_Frost (ice elemental titan — untested, same category as working golems)
+  # ─────────────────────────────────────────────────────────────────
+  frozen_crypts:
+    regular:
+      # Heavy melee — armored frost knight
+      - id: "Skeleton_Frost_Knight"
+        weight: 16
+      # Standard melee — frost fighter
+      - id: "Skeleton_Frost_Fighter"
+        weight: 14
+      # Standard soldier — frost frontline
+      - id: "Skeleton_Frost_Soldier"
+        weight: 13
+      # Fast melee — frost scout, flanking
+      - id: "Skeleton_Frost_Scout"
+        weight: 13
+      # Ranged bow — frost archer
+      - id: "Skeleton_Frost_Archer"
+        weight: 13
+      # Ranged — frost ranger
+      - id: "Skeleton_Frost_Ranger"
+        weight: 11
+      # Magic — frost mage
+      - id: "Skeleton_Frost_Mage"
+        weight: 10
+      # Heavy magic — frost archmage (rare, powerful)
+      - id: "Skeleton_Frost_Archmage"
+        weight: 10
+    boss:
+      # Ice crystal golem — frozen titan awakened from the tomb
+      - id: "Golem_Crystal_Frost"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # SAND TOMBS - Underground Sandstone Pyramid
+  # Theme: Pure Sand Skeleton army — ancient tomb guardians
+  # Identity: ALL 8 Sand Skeleton roles EXCLUSIVE (removed from Desert)
+  # Boss: Golem_Crystal_Sand (sand elemental titan — untested, same category as working golems)
+  # ─────────────────────────────────────────────────────────────────
+  sand_tombs:
+    regular:
+      # Ranged — sand archer
+      - id: "Skeleton_Sand_Archer"
+        weight: 15
+      # Melee — sand guard, armored defender
+      - id: "Skeleton_Sand_Guard"
+        weight: 14
+      # Stealth — sand assassin, ambush
+      - id: "Skeleton_Sand_Assassin"
+        weight: 13
+      # Ranged — sand ranger
+      - id: "Skeleton_Sand_Ranger"
+        weight: 13
+      # Fast — sand scout, flanking
+      - id: "Skeleton_Sand_Scout"
+        weight: 12
+      # Standard — sand soldier, frontline
+      - id: "Skeleton_Sand_Soldier"
+        weight: 12
+      # Magic — sand mage
+      - id: "Skeleton_Sand_Mage"
+        weight: 11
+      # Heavy magic — sand archmage (rare, powerful)
+      - id: "Skeleton_Sand_Archmage"
+        weight: 10
+    boss:
+      # Sand crystal golem — sandstone titan awakened from the tomb
+      - id: "Golem_Crystal_Sand"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # VOID - Eldritch Dimension
+  # Theme: Pure void corruption
+  # ─────────────────────────────────────────────────────────────────
+  void:
+    regular:
+      # Tank - Void colossus (lower weight as also boss)
+      - id: "Golem_Guardian_Void"
+        weight: 10
+      # Melee DPS - Void beast
+      - id: "Crawler_Void"
+        weight: 25
+      # Ranged - Ghost attacker
+      - id: "Spectre_Void"
+        weight: 25
+      # Magic - Floating eye
+      - id: "Eye_Void"
+        weight: 15
+      # Swarm - Small void spawn
+      - id: "Spawn_Void"
+        weight: 15
+      # Backup - Void larva
+      - id: "Larva_Void"
+        weight: 10
+    boss:
+      # Unique: Void elemental (note: also in regular pool as miniboss)
+      - id: "Golem_Guardian_Void"
+        weight: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # CORRUPTED - Dark Cult Territory
+  # Theme: Dark magic users and transformed creatures
+  # ─────────────────────────────────────────────────────────────────
+  corrupted:
+    regular:
+      # Tank - Dark warrior
+      - id: "Shadow_Knight"
+        weight: 15
+      # Melee DPS - Transformed beast
+      - id: "Werewolf"
+        weight: 20
+      # Ranged - Dark magic
+      - id: "Outlander_Sorcerer"
+        weight: 20
+      # Magic - Cult spells
+      - id: "Outlander_Cultist"
+        weight: 20
+      # Support - Dark healer
+      - id: "Outlander_Priest"
+        weight: 15
+      # NOTE: Ghoul CANNOT SPAWN — returns null from spawnEntity() (April 21, 2026)
+    boss:
+      # Unique: Undead paladin
+      - id: "Risen_Knight"
+        weight: 10

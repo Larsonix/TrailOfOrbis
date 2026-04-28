@@ -1,0 +1,366 @@
+# =============================================================================
+# Mob Scaling Configuration
+# =============================================================================
+# Controls how mobs scale their levels and stats based on player proximity
+# and distance from world origin.
+#
+# OVERVIEW:
+# ---------
+# Mobs dynamically scale based on two primary factors:
+#   1. PLAYER LEVEL: Mobs near players scale to match player power
+#   2. DISTANCE: Mobs far from spawn are progressively stronger
+#
+# This creates a natural difficulty progression where:
+#   - Spawn area is safe for new players
+#   - Exploration is rewarded with greater challenge and loot
+#   - Grouped players face proportionally stronger enemies
+#
+# =============================================================================
+
+# Master switch for the entire mob scaling system
+enabled: true
+
+# -----------------------------------------------------------------------------
+# SAFE ZONE CONFIGURATION
+# -----------------------------------------------------------------------------
+# Area near world origin (0,0) where mobs don't scale.
+# This protects new players in the spawn area.
+#
+# ZONES:
+#   0 -------- radius -------- transition_end -------- ...
+#   [  SAFE ZONE  ]  [  TRANSITION  ]  [  FULL SCALING  ]
+#   No scaling       Gradual ramp      Full distance bonus
+
+safe_zone:
+  # Radius in blocks from origin (0,0) where NO scaling applies
+  # Mobs in this area stay at their base level
+  # Default: 0 (disabled - scaling starts from origin)
+  radius: 0.0
+
+  # Distance where transition zone ends and full scaling begins
+  # Between radius and transition_end, scaling gradually increases
+  # Default: 0 (disabled - full scaling from origin)
+  transition_end: 0.0
+
+# -----------------------------------------------------------------------------
+# DISTANCE-BASED SCALING
+# -----------------------------------------------------------------------------
+# Controls how mob difficulty increases with distance from world origin.
+#
+# FORMULA:
+#   bonus_pool = (distance - scaling_start) * pool_per_block
+#   bonus_pool = min(bonus_pool, max_bonus_pool)  // if max_bonus_pool > 0
+#
+# EXAMPLE (default settings, scaling_start=0):
+#   At origin:      0 * 0.5 = 0 bonus pool (level 1 mobs)
+#   At 100 blocks:  100 * 0.5 = 50 bonus pool
+#   At 500 blocks:  500 * 0.5 = 250 bonus pool
+#   At 1000 blocks: 1000 * 0.5 = 500 bonus pool
+#   At 3000 blocks: 3000 * 0.5 = 1500 bonus pool
+
+distance_scaling:
+  # Distance (blocks) where scaling begins
+  # Should match or exceed safe_zone.transition_end
+  # Default: 0 (scaling starts from origin)
+  scaling_start: 0.0
+
+  # Bonus stat pool points per block of distance
+  # Higher values = faster difficulty increase with distance
+  # Default: 0.5 (500 pool at 1000 blocks)
+  pool_per_block: 0.5
+
+  # Maximum bonus pool from distance (0 = no cap)
+  # Use this to cap difficulty for extreme distances
+  # Default: 0 (unlimited)
+  max_bonus_pool: 0.0
+
+# -----------------------------------------------------------------------------
+# PLAYER DETECTION
+# -----------------------------------------------------------------------------
+# Controls how nearby players affect mob levels.
+#
+# MOB LEVEL CALCULATION:
+#   1. Find all players within detection_radius
+#   2. Use highest player level as base mob level
+#   3. If players are grouped (within group_radius), apply multiplier
+#
+# GROUPING EXAMPLE (2 players at level 50, within group_radius):
+#   base_level = 50
+#   multiplier = 1.0 + (1 extra player * 0.2) = 1.2
+#   final_level = 50 * 1.2 = 60
+
+player_detection:
+  # Enable/disable player-based level scaling
+  # When false, mobs only scale based on distance from origin
+  # Default: false
+  enabled: false
+
+  # Radius to search for nearby players (blocks)
+  # Covers typical chunk loading range
+  # Default: 256 blocks
+  detection_radius: 256.0
+
+  # Radius for players to be considered "grouped" (blocks)
+  # Players within this distance of each other trigger group scaling
+  # Default: 40 blocks
+  group_radius: 40.0
+
+  # Multiplier per additional grouped player
+  # Applied to mob level for each extra player in the group
+  # Formula: level * (1 + (extra_players * (group_multiplier - 1)))
+  # Default: 1.2 (+20% per extra player)
+  group_multiplier: 1.2
+
+# -----------------------------------------------------------------------------
+# SPAWN MULTIPLIER SYSTEM
+# -----------------------------------------------------------------------------
+# High-level players attract more hostile mobs.
+# When a hostile mob spawns near a player, additional copies may spawn.
+#
+# FORMULA:
+#   multiplier = 1 + floor(highest_player_level / level_per_multiplier)
+#   multiplier = min(multiplier, max_multiplier)
+#
+# EXAMPLE (default settings, level_per_multiplier = 50):
+#   Level 1-49:    1x spawns (normal)
+#   Level 50-99:   2x spawns (1 additional mob)
+#   Level 100-149: 3x spawns (2 additional mobs)
+#   Level 150-199: 4x spawns (3 additional mobs)
+#   Level 450+:    10x spawns (capped at max_multiplier)
+
+spawn_multiplier:
+  # Enable/disable spawn multiplication
+  # Default: true
+  enabled: true
+
+  # Radius to detect nearby players for spawn calculation (blocks)
+  # Default: 250 blocks
+  detection_radius: 250.0
+
+  # Player levels required per +1x spawn rate
+  # Lower values = more aggressive spawn scaling
+  # Default: 40 levels
+  level_per_multiplier: 40
+
+  # Maximum spawn multiplier (safety cap)
+  # Prevents server overload from too many spawns
+  # Default: 100
+  max_multiplier: 100
+
+  # Maximum radius for additional mob spawn offset from original (blocks)
+  # Additional mobs spawn randomly within this radius
+  # Default: 150 blocks
+  spawn_offset_radius: 150.0
+
+  # Minimum distance from original spawn for additional mobs (blocks)
+  # Prevents mobs from stacking on same spot
+  # Default: 2 blocks
+  spawn_offset_min_distance: 2.0
+
+  # Only multiply hostile mob spawns
+  # When true, friendly/neutral mobs spawn normally
+  # Default: true
+  hostile_only: true
+
+# -----------------------------------------------------------------------------
+# DYNAMIC LEVEL REFRESH
+# -----------------------------------------------------------------------------
+# Periodically updates mob levels and stats as players move or level up.
+#
+# Without this system:
+#   - Mobs only scale at spawn time
+#   - If a player levels up, existing mobs stay at old level
+#   - If a player moves away, mobs keep their distance bonus
+#
+# With this system:
+#   - Mobs near players update periodically
+#   - Levels adjust to match current player positions
+#   - Creates smooth difficulty transitions
+
+dynamic_refresh:
+  # Enable/disable dynamic refresh
+  # Default: true
+  enabled: true
+
+  # How often to refresh mob levels (seconds)
+  # Lower values = smoother updates, higher server load
+  # Default: 0.5 seconds (2 updates per second)
+  interval_seconds: 0.5
+
+  # Only refresh mobs within this distance of any player (blocks)
+  # Mobs far from players don't need frequent updates
+  # Default: 250 blocks
+  player_proximity_radius: 250.0
+
+  # Minimum level change required to trigger a stat update
+  # Prevents unnecessary recalculations for tiny changes
+  # Default: 1 level
+  level_change_threshold: 1
+
+# -----------------------------------------------------------------------------
+# BALANCE NOTES
+# -----------------------------------------------------------------------------
+#
+# DIFFICULTY CURVE EXAMPLES:
+#
+# Conservative (slower progression):
+#   pool_per_block: 0.15
+#   level_per_multiplier: 100
+#
+# Default (balanced):
+#   pool_per_block: 0.3
+#   level_per_multiplier: 50
+#
+# Aggressive (faster progression):
+#   pool_per_block: 0.5
+#   level_per_multiplier: 25
+#
+# TUNING TIPS:
+# - Increase safe_zone.radius if spawn is too dangerous
+# - Decrease pool_per_block if distant areas are too hard
+# - Increase level_per_multiplier if too many mobs spawn
+# - Disable spawn_multiplier if server performance suffers
+
+# -----------------------------------------------------------------------------
+# ELEMENTAL STATS
+# -----------------------------------------------------------------------------
+# Controls mob elemental damage, resistances, and penetration.
+#
+# ELEMENTAL AFFINITY:
+# Mobs gain elemental affinity based on keywords in their role name:
+#   - Fire: fire, flame, inferno, blaze, magma, lava, ember, scorch, burn, pyro
+#   - Water: ice, frost, cold, frozen, snow, winter, chill, glacier, arctic, cryo
+#   - Lightning: lightning, thunder, storm, electric, spark, shock, volt, tempest, electro
+#   - Void: chaos, void, dark, shadow, corrupt, demon, abyss, blight, unholy, evil, cursed
+#
+# Mobs without elemental keywords have a chance (random_affinity_chance) to
+# gain a random element for variety.
+#
+# SCALING EXAMPLES (default settings, level 100 mob with fire affinity):
+#   Flat fire damage:     100 × 2.0 = 200
+#   Fire resistance:      min(100 × 0.5, 50) + 15 = 65% (capped at 70%)
+#   Other resistances:    min(100 × 0.5, 50) = 50%
+#   Fire penetration:     min(100 × 0.3, 30) + 10 = 40% (capped at 50%)
+
+elemental:
+  # ==================== Damage Scaling ====================
+
+  # Flat elemental damage per mob level for affinity element
+  # Level 50 mob = 50 × 2.0 = 100 flat elemental damage
+  # Default: 2.0
+  damage_per_level: 2.0
+
+  # ==================== Resistance Scaling ====================
+
+  # Base resistance gain per mob level (applies to ALL elements)
+  # Level 100 mob = 100 × 0.5 = 50% base resistance
+  # Default: 0.5
+  resistance_per_level: 0.5
+
+  # Maximum base resistance before affinity bonus (%)
+  # Non-affinity elements are capped at this value
+  # Default: 50.0
+  max_base_resistance: 50.0
+
+  # Extra resistance for mob's primary affinity element (%)
+  # Added on top of base resistance, subject to max_affinity_resistance cap
+  # Default: 15.0
+  affinity_resistance_bonus: 15.0
+
+  # Maximum resistance with affinity bonus (%)
+  # Hard cap for affinity element resistance
+  # Default: 70.0
+  max_affinity_resistance: 70.0
+
+  # ==================== Penetration Scaling ====================
+
+  # Base penetration gain per mob level for affinity element only
+  # Non-affinity mobs get no penetration
+  # Level 100 mob = 100 × 0.3 = 30% base penetration
+  # Default: 0.3
+  penetration_per_level: 0.3
+
+  # Maximum base penetration before affinity bonus (%)
+  # Default: 30.0
+  max_base_penetration: 30.0
+
+  # Extra penetration for mob's primary affinity element (%)
+  # Default: 10.0
+  affinity_penetration_bonus: 10.0
+
+  # Maximum penetration with affinity bonus (%)
+  # Hard cap prevents mobs from fully bypassing resistances
+  # Default: 50.0
+  max_affinity_penetration: 50.0
+
+  # NOTE: Elemental affinity assignment is now configured in mob-elements.yml
+  # which provides NPCGroup detection (e.g., Void creatures → VOID damage),
+  # configurable keywords, explicit overrides, and blacklists.
+  # NO RANDOM ELEMENTS - elemental damage should be predictable for players.
+
+# -----------------------------------------------------------------------------
+# ELITE CHANCE
+# -----------------------------------------------------------------------------
+# Any hostile mob has a chance to become elite at spawn time.
+# Elite mobs receive 1.5x stats and 1.5x XP (same as ELITE classification).
+#
+# NOTE: This REPLACES the old deterministic elite system. Roles like
+# "trork_chieftain" or "*Berserker*" are no longer automatically elite -
+# they roll for elite status like any other hostile mob.
+
+elite_chance:
+  enabled: true
+
+  # Base chance for a mob to roll elite (5%)
+  base_chance: 0.05
+
+  # Additional elite chance per mob level (+0.01% per level)
+  # At level 100: 5% + (100 * 0.01%) = 6%
+  # At level 200: 5% + (200 * 0.01%) = 7%
+  chance_per_level: 0.0001
+
+  # Maximum elite spawn chance (25%)
+  max_chance: 0.25
+
+# -----------------------------------------------------------------------------
+# EXPONENTIAL SCALING (Mob Stats)
+# -----------------------------------------------------------------------------
+# Controls whether the centralized LevelScaling curve (config.yml → scaling)
+# is applied to mob HP in MobScalingSystem.applyStatModifiers().
+#
+# The actual scaling formula is: 7.35 × log10(level)^2.75 with asymptotic
+# diminishing returns. At level 100 → ~1.5×. Configured globally in config.yml.
+#
+# NOTE: The fields below (exponent, reference_level, etc.) are NOT ACTIVE.
+# They are retained from before scaling was centralized into LevelScaling.
+# Only 'enabled' has any effect. To tune the curve, edit config.yml → scaling.
+
+exponential_scaling:
+  enabled: true
+
+  # --- Fields below are NOT ACTIVE (retained for potential future per-system override) ---
+  exponent: 1.3
+  reference_level: 100
+  reference_multiplier: 20.0
+  base_multiplier: 1.0
+  soft_cap_level: 100
+  soft_cap_divisor: 2.0
+
+# -----------------------------------------------------------------------------
+# GLOBAL BALANCE MULTIPLIERS
+# -----------------------------------------------------------------------------
+# Quick tuning knobs for overall mob power. Applied AFTER all other calculations.
+# 1.0 = no change, 1.2 = +20%, 0.8 = -20%.
+#
+# These multiply the final computed values, so they're a clean uniform buff/nerf
+# regardless of mob level, archetype, or classification.
+
+balance_multipliers:
+  # Multiplier on mob HP (applied to rpgTargetHP in the weighted HP formula)
+  health: 1.2
+
+  # Multiplier on mob physical damage (applied to rpgTargetDmg in the weighted damage formula)
+  physical_damage: 1.2
+
+  # Multiplier on mob elemental flat damage (applied when converting stats to MobStats)
+  elemental_damage: 1.2

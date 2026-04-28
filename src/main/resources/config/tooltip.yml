@@ -1,0 +1,66 @@
+# ============================================================================
+# TOOLTIP CONFIGURATION
+# ============================================================================
+# Controls the appearance and content of rich item tooltips.
+# Uses Hytale's native Message API for styling (hex colors, bold, italic).
+
+# ----------------------------------------------------------------------------
+# SECTION VISIBILITY
+# ----------------------------------------------------------------------------
+# Toggle individual tooltip sections on/off.
+sections:
+  # Show rarity badge (e.g., "[LEGENDARY]")
+  rarity_badge: true
+
+  # Show item level (e.g., "Item Level: 45")
+  item_level: true
+
+  # Show quality rating (e.g., "Quality: Excellent (92%)")
+  quality: true
+
+  # Show stat modifiers (e.g., "+25 Physical Damage")
+  modifiers: true
+
+  # Show attribute requirements (e.g., "✓ Strength: 30")
+  requirements: true
+
+# ----------------------------------------------------------------------------
+# STYLING OPTIONS
+# ----------------------------------------------------------------------------
+styling:
+  # Apply bold styling to high-rarity item names
+  bold_high_rarity: true
+
+  # Minimum rarity to receive bold styling
+  # Options: COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC
+  bold_threshold: EPIC
+
+# ----------------------------------------------------------------------------
+# ITEM NAME FORMAT
+# ----------------------------------------------------------------------------
+# Controls how item names are displayed with prefix/suffix modifiers.
+# Example: "Sharp Iron Sword of the Bear"
+name_format:
+  # Include first prefix in item name (e.g., "Sharp" → "Sharp Iron Sword")
+  include_prefix: true
+
+  # Include first suffix in item name (e.g., "of the Bear" → "Iron Sword of the Bear")
+  include_suffix: true
+
+# ----------------------------------------------------------------------------
+# EXAMPLE TOOLTIP OUTPUT
+# ----------------------------------------------------------------------------
+# With all sections enabled, a tooltip might look like:
+#
+# [LEGENDARY]                     (gold, bold)
+# Item Level: 45                  (gray label, white value)
+# Quality: Excellent (92%)        (gray label, green value)
+#
+# +25.5 Physical Damage           (green)
+# +15% Attack Speed               (green)
+# +12 Strength                    (green)
+# -5% Movement Speed              (red)
+#
+# Requirements:
+# ✓ Strength: 30                  (green - met)
+# ✗ Dexterity: 25                 (red - unmet)

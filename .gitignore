@@ -1,11 +1,147 @@
-# Ignore everything
-*
+# ===== Build outputs =====
+build/
+bin/
+out/
+target/
+*.class
 
-# Allow wiki content
-!Wiki/
-!Wiki/content/
-!Wiki/content/**
-!Wiki/custom-css-theme.css
+# ===== Gradle =====
+.gradle/
+.kotlin/
 
-# Allow gitignore itself
-!.gitignore
+# ===== IDE =====
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+*.ipr
+*.iws
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Local configuration =====
+.env
+.env.local
+local.properties
+key.properties
+
+# ===== Logs =====
+*.log
+build.log
+
+# ===== Database files =====
+*.mv.db
+*.trace.db
+*.h2.db
+
+# ===== Internal tooling (AI assistant, Obsidian vault) =====
+CLAUDE.md
+.claude/
+.claudeignore
+.clinerules
+.mcp.json
+.obsidian/
+
+# ===== Documentation — selective inclusion =====
+# Public docs (WorldgenV2, HyUI, design, reference, research, realms, changelogs) are tracked.
+# Internal-only content is excluded below.
+
+# AI prompt files within docs
+docs/WorldgenV2/CLAUDE_TERRAIN_PROMPT.md
+docs/research/NEXT_RESEARCH_PROMPT.md
+
+# Internal planning & roadmaps
+docs/plan/
+docs/prompts/
+
+# Analysis of other mods (not ours to share)
+docs/vendor/
+docs/fubsyrpg/
+docs/dungeonmod/
+docs/multiclass-leveling/
+
+# Files primarily built from vendor mod analysis
+docs/reference/hytale-modding/mod-examples.md
+docs/reference/INFORMATION_SOURCES.md
+docs/design/custom-skills-comparison.md
+docs/design/loot4everyone.md
+docs/research/item-comparison-tooltips.md
+docs/reference/hexcode-analysis.md
+docs/reference/hexcode-glyph-deepdive.md
+docs/reference/hexcode-spellcrafting-guide.md
+docs/reference/voile-analysis.md
+
+# HyUI cloned repo metadata
+docs/HyUI/.git/
+
+# Internal audit & review files
+docs/reference/full-audit-2026-03-27.md
+docs/reference/remaining-improvements-2026-03-27.md
+docs/reference/quality-audit-map.md
+docs/reference/refactoring-plan.md
+docs/reference/stale-comments.md
+docs/reference/stat-review-checklist.md
+docs/reference/stat-review-findings.md
+docs/reference/stat-system-audit.md
+
+# ===== Obsidian vault & project management (not public) =====
+10-Projects/
+20-Areas/
+30-Resources/
+40-Archive/
+Memory/
+.index/
+db/
+reports/
+AllLogs/
+
+# ===== Obsidian vault structure =====
+00-Inbox/
+Common/
+Daily/
+Guides/
+Templates/
+
+# ===== Vendor mods (development reference, not redistributable) =====
+vendor/
+
+# ===== Recovery / backup artifacts =====
+_recovery*/
+_backup*/
+_corrupted_backup/
+_deployed_jar_backup_pre_corruption.jar
+
+# ===== Binary / media (tracked selectively via LFS or explicit includes) =====
+*.jar
+!libs/*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# ===== Legacy root manifest (real one is in src/main/resources/) =====
+/manifest.json
+
+# ===== Local JDK cache =====
+.jdk/
+
+# ===== Python bytecache =====
+__pycache__/
+*.pyc
+
+# ===== Internal command reference =====
+QUICKSTART.md
+
+# ===== Commission / private work =====
+LadyPaladraStonesDesignCommission/
+
+# ===== Wiki platform config & analysis (not part of mod source) =====
+# Wiki content IS tracked — it ships in the JAR via Voile
+# But the HytaleModding.dev platform files are not part of the mod
+Wiki/hytale-docs-main/
+Wiki/custom-css-theme.css
+Wiki/content/Larsonix_TrailOfOrbis.json
+Wiki/voile-extracted/
+Wiki/VOILE_ANALYSIS.md

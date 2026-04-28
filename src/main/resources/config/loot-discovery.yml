@@ -1,0 +1,142 @@
+# =============================================================================
+# LOOT DISCOVERY CONFIGURATION
+# =============================================================================
+# Dynamic item discovery for loot drops.
+#
+# Instead of maintaining a static list of item IDs, the plugin automatically
+# discovers droppable weapons and armor by scanning Hytale's item registry.
+# This makes the plugin compatible with ANY mod that properly registers
+# weapons/armor using Hytale's standard Item API.
+#
+# Detection works by checking:
+#   - item.getWeapon() != null -> Weapon
+#   - item.getArmor() != null  -> Armor (with slot from ArmorSlot)
+#
+# Items are automatically excluded if they:
+#   - Have quality "Technical", "Debug", "Developer", or "Tool"
+#   - Have hideFromSearch=true in their quality
+#   - Are stackable (maxStack > 1)
+#   - Match blacklist patterns
+# =============================================================================
+
+# Whether dynamic discovery is enabled
+# If false, falls back to static loot-items.yml
+enabled: true
+
+# What item types to include in discovery
+include_weapons: true    # Weapons (item.getWeapon() != null)
+include_armor: true      # Armor (item.getArmor() != null)
+include_shields: true    # Shields (weapons that go in off_hand)
+
+# =============================================================================
+# BLACKLIST
+# =============================================================================
+# Exclude specific items or entire mods from loot drops.
+#
+# Item patterns support wildcards:
+#   - "*" matches any characters (e.g., "Tool_*" matches all tools)
+#   - "?" matches a single character
+#
+# Mod blacklist uses the mod's Group name from manifest.json
+# (e.g., "BuilderTools" would block all items from that mod)
+# =============================================================================
+
+blacklist:
+  # Item ID patterns to exclude
+  items:
+    - "Tool_*"              # All tools
+    - "*_Debug_*"           # Debug items
+    - "*_Template_*"        # Template items
+    - "*_Creative_*"        # Creative mode items
+    - "*_Editor_*"          # Editor tools
+    # Uncomment to exclude specific vanilla items:
+    # - "Weapon_Staff_Wood"
+    # - "Armor_Crude_*"
+
+  # Mods to completely exclude (by pack ID or full "PackId:PackName")
+  mods: []
+    # Example:
+    # - "BuilderTools"       # Exclude all items from BuilderTools mod
+    # - "AdminTools"         # Exclude all items from AdminTools mod
+
+# =============================================================================
+# SLOT WEIGHTS
+# =============================================================================
+# Controls how often each slot type drops.
+# Higher weight = more likely to drop.
+#
+# Total weights determine probability:
+#   weapon weight = 30, total = 100 -> 30% chance for weapon drops
+#
+# These weights only affect which SLOT is chosen when a drop occurs.
+# Drop chance and rarity are controlled by mob-scaling.yml and gear-balance.yml.
+# =============================================================================
+
+slot_weights:
+  weapon: 30      # 30% - Weapons most common
+  head: 10        # 10% - Head armor less common
+  chest: 20       # 20% - Chest armor moderately common
+  legs: 15        # 15% - Leg armor moderate
+  hands: 15       # 15% - Hand armor moderate
+  off_hand: 10    # 10% - Shields/offhand less common
+
+# =============================================================================
+# CATEGORY WEIGHTS (Stratified Selection)
+# =============================================================================
+# Controls the relative chance of each weapon type or armor material being
+# selected WITHIN a slot. This prevents skins with many variants (e.g. swords)
+# from dominating drops over rarer types (e.g. daggers).
+#
+# Selection is two-tier:
+#   1. Pick a category using these weights
+#   2. Pick a random skin within that category
+#
+# Set a weight to 0.0 to prevent that category from dropping.
+# Categories with no discovered items are automatically skipped.
+# =============================================================================
+
+weapon_category_weights:
+  SWORD: 1.0
+  DAGGER: 1.0
+  AXE: 1.0
+  MACE: 1.0
+  CLAWS: 1.0
+  CLUB: 1.0
+  LONGSWORD: 1.0
+  BATTLEAXE: 1.0
+  SPEAR: 1.0
+  SHORTBOW: 1.0
+  CROSSBOW: 1.0
+  BLOWGUN: 1.0
+  STAFF: 1.0
+  WAND: 1.0
+  SPELLBOOK: 1.0
+  UNKNOWN: 1.0
+
+armor_category_weights:
+  CLOTH: 1.0
+  LEATHER: 1.0
+  PLATE: 1.0
+  WOOD: 1.0
+  SPECIAL: 1.0
+
+# =============================================================================
+# SOUND SET OVERRIDES (Armor Material Classification)
+# =============================================================================
+# Armor material is auto-detected from each item's ItemSoundSet:
+#   ISS_Armor_Heavy   -> PLATE   (metal/heavy armor)
+#   ISS_Armor_Leather -> LEATHER (agility-focused armor)
+#   ISS_Armor_Cloth   -> CLOTH   (magic-focused armor)
+#
+# Unknown sound sets fall back to item ID name parsing, then SPECIAL.
+# Custom mod sound sets with "heavy"/"leather"/"cloth" in the name are
+# detected automatically via substring matching.
+#
+# Use this section to override the mapping for mods with unusual sound sets.
+# Keys are ItemSoundSet IDs (case-insensitive), values are ArmorMaterial names.
+# =============================================================================
+
+sound_set_overrides: {}
+  # Example:
+  # "ISS_MyMod_DragonArmor": "PLATE"
+  # "ISS_MyMod_SilkRobes": "CLOTH"

@@ -1,0 +1,256 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# SKILL TREE LAYOUT CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The skill tree uses a 3D star pattern with 14 arms (6 elemental + 8 octant)
+# extending from the center. Elemental arms follow cardinal directions:
+#
+#              VOID (+Y up)
+#                 |
+#                 |
+#    WATER ───────+─────── FIRE
+#     (-X)       /|\       (+X)
+#               / | \
+#         EARTH   |   LIGHTNING
+#        (-Z)     |     (+Z)
+#                 |
+#              WIND (-Y down)
+#
+# Each arm has: entry node -> 4 clusters -> synergy nodes -> keystones
+# Clusters follow a 3D diamond pattern where branch nodes spread diagonally.
+#
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCALING: Convert layout units to world blocks
+# ═══════════════════════════════════════════════════════════════════════════════
+scaling:
+  # Base multiplier for all coordinates
+  layoutScale: 0.07
+
+  # Push nodes outward from center (1.0 = no expansion, 1.5 = 50% further)
+  radialExpansion: 1.2
+
+  # World Y coordinate for the origin node
+  baseHeight: 65.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DISTANCES: All values in layout units (before scaling)
+# ═══════════════════════════════════════════════════════════════════════════════
+distances:
+  # How far entry nodes are from center
+  entryFromOrigin: 70
+
+  # Distance from center to first cluster
+  clusterStart: 100
+
+  # Gap between cluster centers along the arm
+  # Should be slightly larger than cluster length to avoid overlap
+  clusterSpacing: 95
+
+  # General spacing between nodes
+  nodeSpacing: 30
+
+  # Perpendicular offset for alternating clusters (left/right of arm axis)
+  branchOffset: 25
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OCTANT DISTANCES: Diagonal arms start further from origin
+# ═══════════════════════════════════════════════════════════════════════════════
+octant:
+  # How far octant entry nodes are from center (vs 70 for elemental arms)
+  entryFromOrigin: 200
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CORE REGION: Central nodes (not part of any arm)
+# ═══════════════════════════════════════════════════════════════════════════════
+core:
+  # Spacing between core chain nodes
+  chainSpacing: 50
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLUSTER TEMPLATE: The 6-node pattern for each cluster
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Each cluster has 6 nodes arranged in a diamond pattern:
+#
+#                    [_3] (perp1+, perp2+)
+#                   /
+#   [_1]──[_2]──[_branch]──[_notable]
+#                   \
+#                    [_4] (perp1-, perp2-)
+#
+# Coordinates are relative to the cluster center:
+#   - along:  Distance along the arm direction (outward from center)
+#   - perp1:  First perpendicular axis (sideways spread)
+#   - perp2:  Second perpendicular axis (other sideways / creates 3D depth)
+#
+# TIP: Make _3 and _4 go in OPPOSITE directions on both perp axes
+#      for true 3D separation (diagonal spread, not flat plane)
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+clusterTemplate:
+  # First node - cluster start
+  _1:
+    along: 0
+    perp1: 0
+    perp2: 0
+
+  # Second node - progressing along arm
+  _2:
+    along: 25
+    perp1: 0
+    perp2: 0
+
+  # Branch point - where paths split
+  _branch:
+    along: 45
+    perp1: 0
+    perp2: 0
+
+  # Upper branch - diagonal up-right (positive on both perp axes)
+  _3:
+    along: 60
+    perp1: 20
+    perp2: 20
+
+  # Lower branch - diagonal down-left (negative on both perp axes)
+  _4:
+    along: 60
+    perp1: -20
+    perp2: -20
+
+  # Notable node - end of cluster (centered)
+  _notable:
+    along: 75
+    perp1: 0
+    perp2: 0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SYNERGY & KEYSTONE SETTINGS
+# ═══════════════════════════════════════════════════════════════════════════════
+endNodes:
+  # Perpendicular spread for keystone pair
+  keystoneSpread: 30
+
+  # Extension distance from notable to synergy nodes
+  synergyExtension: 30
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARM CLUSTERS: Names of the 4 clusters on each arm (inner to outer)
+# ═══════════════════════════════════════════════════════════════════════════════
+armClusters:
+  fire:
+    - fury
+    - inferno
+    - bloodlust
+    - berserker
+  water:
+    - frostbite
+    - precision
+    - evasion
+    - shatter
+  lightning:
+    - storm
+    - velocity
+    - chain
+    - overcharge
+  earth:
+    - vitality
+    - regen
+    - fortitude
+    - guardian
+  void:
+    - corruption
+    - entropy
+    - drain
+    - oblivion
+  wind:
+    - flow
+    - arcane
+    - adaptation
+    - depth
+  # Octant arms (diagonal directions — cube corners)
+  havoc:
+    - carnage
+    - frenzy
+    - ruin
+    - mayhem
+  juggernaut:
+    - conquest
+    - dominion
+    - bloodforge
+    - tyrant
+  striker:
+    - quicksilver
+    - precision
+    - ambush
+    - flurry
+  warden:
+    - garrison
+    - outrider
+    - ironclad
+    - palisade
+  warlock:
+    - hex
+    - ritual
+    - malice
+    - damnation
+  lich:
+    - grasp
+    - crypt
+    - requiem
+    - decay
+  tempest:
+    - squall
+    - tailwind
+    - cyclone
+    - maelstrom
+  sentinel:
+    - aegis
+    - vigilance
+    - restoration
+    - haven
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BRIDGE NODES: Connect adjacent arms (3 nodes each)
+# ═══════════════════════════════════════════════════════════════════════════════
+bridgeNodes:
+  # Horizontal ring (4 corners)
+  fire_lightning: ["1", "2", "3"]
+  lightning_water: ["1", "2", "3"]
+  water_earth: ["1", "2", "3"]
+  earth_fire: ["1", "2", "3"]
+  # Vertical to VOID (+Y)
+  fire_void: ["1", "2", "3"]
+  lightning_void: ["1", "2", "3"]
+  water_void: ["1", "2", "3"]
+  earth_void: ["1", "2", "3"]
+  # Vertical to WIND (-Y)
+  fire_wind: ["1", "2", "3"]
+  lightning_wind: ["1", "2", "3"]
+  water_wind: ["1", "2", "3"]
+  earth_wind: ["1", "2", "3"]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI CANVAS (for 2D rendering, not used in 3D world layout)
+# ═══════════════════════════════════════════════════════════════════════════════
+canvas:
+  width: 1200
+  height: 1000
+  centerX: 600
+  centerY: 500
+
+nodeSizes:
+  basic:
+    width: 44
+    height: 44
+  notable:
+    width: 54
+    height: 54
+  keystone:
+    width: 64
+    height: 64
+  origin:
+    width: 35
+    height: 35

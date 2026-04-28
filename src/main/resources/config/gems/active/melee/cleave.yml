@@ -1,0 +1,35 @@
+# Cleave — Physical melee, front cone AoE
+id: cleave
+name: "Cleave"
+description: "A wide sweeping attack that hits all enemies in front of you."
+
+tags:
+  element: [Physical]
+  damage_type: [Attack]
+  delivery: [Melee, AoE, Cone]
+  timing: [Instant]
+  role: [Strike]
+  mechanical: [Hit, Crit]
+
+weapon_categories: [Melee1H]
+gear_slots: [Any]
+
+damage:
+  base_percent: 120
+  element: Physical
+  aoe_radius: 2.5
+
+cost:
+  type: stamina
+  amount: 3
+
+cooldown: 2.0
+cast_type: QUICK_CAST
+
+quality_bonuses:
+  aoe_radius: 0.01
+  cooldown_reduction: 0.003
+
+visuals:
+  cast_sound: "melee_swing_heavy"
+  impact_particles: "slash_arc"

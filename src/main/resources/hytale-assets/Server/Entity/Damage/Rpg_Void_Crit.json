@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG void critical hit - bright purple text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#DD88FF"
+}

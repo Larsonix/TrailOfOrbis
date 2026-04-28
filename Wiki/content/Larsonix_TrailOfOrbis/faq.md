@@ -183,7 +183,7 @@ Adamantite Gateway (Tier 6). It removes the level cap entirely - any map level w
 ## Technical
 
 **Q : How do I see detailed stats ?**
-`/stats` opens a breakdown of all 153 computed stat fields across 5 categories.
+`/stats` opens a breakdown of all 246 computed stat fields across 4 categories.
 
 **Q : How do I see damage numbers in combat ?**
 `/too combat detail` toggles the detailed damage breakdown in chat. Shows every stage of the pipeline per hit.

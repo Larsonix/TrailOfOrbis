@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Warlock.png"
+    }
+  ],
+  "Light": {
+    "Color": "#9944CC",
+    "Radius": 2
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

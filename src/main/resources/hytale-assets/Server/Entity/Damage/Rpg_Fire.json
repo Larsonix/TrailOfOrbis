@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG fire damage - orange text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#FF6600"
+}

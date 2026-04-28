@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG wind damage - light green text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#88FF88"
+}

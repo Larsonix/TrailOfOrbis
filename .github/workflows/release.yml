@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Gradle daemon runs on Java 21; toolchain auto-provisions Java 25 for compilation
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build
+
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract changelog section for current version from wiki changelog
+          VERSION_ESCAPED=$(echo "$VERSION" | sed 's/\./\\./g')
+          CHANGELOG=$(sed -n "/^## ${VERSION_ESCAPED}/,/^## /{ /^## ${VERSION_ESCAPED}/d; /^## /d; p; }" \
+            Wiki/content/Larsonix_TrailOfOrbis/changelog.md | head -100)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="Release v${VERSION}"
+          fi
+          echo "$CHANGELOG" > CHANGELOG_CURRENT.md
+          {
+            echo "content<<CHANGELOG_EOF"
+            echo "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+      # --- GitHub Release ---
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/TrailOfOrbis-*.jar
+          body_path: CHANGELOG_CURRENT.md
+
+      # --- CurseForge Upload ---
+      - name: Upload to CurseForge
+        if: ${{ secrets.CF_API_TOKEN != '' }}
+        uses: itsmeow/curseforge-upload@v3
+        with:
+          token: ${{ secrets.CF_API_TOKEN }}
+          project_id: ${{ secrets.CF_PROJECT_ID }}
+          game_endpoint: hytale
+          file_path: build/libs/TrailOfOrbis-${{ env.VERSION }}.jar
+          release_type: release
+          changelog_type: markdown
+          changelog: ${{ steps.changelog.outputs.content }}
+          display_name: "Trail of Orbis ${{ env.VERSION }}"
+          relations: "hyui:embeddedLibrary"
+
+      # --- ModTale Upload ---
+      - name: Upload to ModTale
+        if: ${{ secrets.MODTALE_API_KEY != '' }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.modtale.net/api/v1/projects/${{ secrets.MODTALE_PROJECT_ID }}/versions" \
+            -H "X-MODTALE-KEY: ${{ secrets.MODTALE_API_KEY }}" \
+            -F "file=@build/libs/TrailOfOrbis-${VERSION}.jar" \
+            -F "versionNumber=${VERSION}" \
+            -F "channel=RELEASE" \
+            -F "changelog=$(cat CHANGELOG_CURRENT.md)")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "ModTale upload successful (HTTP $HTTP_CODE)"
+          else
+            echo "ModTale upload failed (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi

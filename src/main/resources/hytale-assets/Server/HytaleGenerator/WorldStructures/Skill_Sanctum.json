@@ -1,0 +1,12 @@
+{
+  "Type": "NoiseRange",
+  "Biomes": [],
+  "DefaultBiome": "Sanctum_Void",
+  "DefaultTransitionDistance": 32,
+  "MaxBiomeEdgeDistance": 32,
+  "Density": {
+    "Type": "Constant",
+    "Skip": false,
+    "Value": 0
+  }
+}

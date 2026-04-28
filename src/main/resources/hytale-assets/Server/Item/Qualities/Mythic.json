@@ -1,0 +1,16 @@
+{
+  "QualityValue": 6,
+  "ItemTooltipTexture": "UI/ItemQualities/Tooltips/ItemTooltipMythic.png",
+  "ItemTooltipArrowTexture": "UI/ItemQualities/Tooltips/ItemTooltipMythicArrow.png",
+  "SlotTexture": "UI/ItemQualities/Slots/SlotMythic.png",
+  "BlockSlotTexture": "UI/ItemQualities/Slots/SlotMythic.png",
+  "SpecialSlotTexture": "UI/ItemQualities/Slots/SlotMythic.png",
+  "TextColor": "#ff4500",
+  "LocalizationKey": "server.general.qualities.Mythic",
+  "VisibleQualityLabel": true,
+  "RenderSpecialSlot": true,
+  "ItemEntityConfig": {
+    "ParticleSystemId": "Drop_Legendary",
+    "ParticleColor": "#ff4500"
+  }
+}

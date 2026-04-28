@@ -1,0 +1,137 @@
+# =============================================================================
+# Colored Combat Text Configuration
+# =============================================================================
+# Controls per-element damage number colors, font sizes, durations, and
+# animations for floating combat text shown to the attacker.
+#
+# OVERVIEW:
+# ---------
+# Each damage hit resolves to a "profile" that controls text appearance:
+#   - color: Hex RGB color (e.g., "#FF6600" for fire orange)
+#   - fontSize: Pixel size (vanilla: 68.0)
+#   - duration: Visibility in seconds (vanilla: 0.4)
+#   - hitAngleStrength: Directional influence from hit angle (0.0-10.0)
+#   - animations: Scale, position drift, and opacity keyframes
+#
+# Profile resolution order:
+#   1. Avoidance (dodged/blocked/parried/missed) — highest priority
+#   2. Primary element of the damage (fire/water/lightning/earth/wind/void)
+#   3. DamageType fallback (magic/physical)
+#   4. Crit variant if the hit was critical
+#   5. Fallback to physical_normal if nothing matches
+#
+# =============================================================================
+
+enabled: true
+
+# -----------------------------------------------------------------------------
+# DEFAULTS
+# -----------------------------------------------------------------------------
+# Base settings inherited by all profiles unless overridden.
+# Matches vanilla CombatText template behavior.
+defaults:
+  fontSize: 68.0
+  duration: 0.4
+  hitAngleStrength: 2.0
+  animations:
+    - { type: SCALE, startAt: 0.0, endAt: 1.0, startScale: 1.0, endScale: 0.5 }
+    - { type: POSITION, startAt: 0.0, endAt: 1.0, positionOffsetY: -80.0 }
+    - { type: OPACITY, startAt: 0.5, endAt: 1.0, startOpacity: 1.0, endOpacity: 0.0 }
+
+# -----------------------------------------------------------------------------
+# ELEMENT PROFILES
+# -----------------------------------------------------------------------------
+# Each element has "normal" and "crit" variants.
+# Colors sourced from DamageType enum (already validated in-game).
+# Only specify fields that differ from defaults.
+elements:
+  physical:
+    normal:
+      color: "#FFFFFF"
+    crit:
+      color: "#FF4444"
+      fontSize: 82.0
+      duration: 0.5
+      animations:
+        # Pop effect: start near-full → overshoot → shrink. Container is 200×200px;
+        # startScale must be ≥0.85 to avoid clipping fontSize 82 text.
+        - { type: SCALE, startAt: 0.0, endAt: 0.15, startScale: 0.85, endScale: 1.0 }
+        - { type: SCALE, startAt: 0.15, endAt: 1.0, startScale: 1.0, endScale: 0.3 }
+        - { type: POSITION, startAt: 0.0, endAt: 1.0, positionOffsetY: -100.0 }
+        - { type: OPACITY, startAt: 0.4, endAt: 1.0, startOpacity: 1.0, endOpacity: 0.0 }
+
+  fire:
+    normal:
+      color: "#FF6600"
+    crit:
+      color: "#FF2200"
+      fontSize: 82.0
+
+  water:
+    normal:
+      color: "#44CCFF"
+    crit:
+      color: "#88EEFF"
+      fontSize: 82.0
+
+  lightning:
+    normal:
+      color: "#FFEE00"
+    crit:
+      color: "#FFFFAA"
+      fontSize: 82.0
+
+  earth:
+    normal:
+      color: "#CC8833"
+    crit:
+      color: "#FFAA44"
+      fontSize: 82.0
+
+  wind:
+    normal:
+      color: "#88FF88"
+    crit:
+      color: "#CCFFCC"
+      fontSize: 82.0
+
+  void:
+    normal:
+      color: "#AA44FF"
+    crit:
+      color: "#DD88FF"
+      fontSize: 82.0
+
+  magic:
+    normal:
+      color: "#44AAFF"
+    crit:
+      color: "#FF44FF"
+      fontSize: 82.0
+
+# -----------------------------------------------------------------------------
+# AVOIDANCE PROFILES
+# -----------------------------------------------------------------------------
+# Styled for "status" text (Dodged, Blocked, Parried, Miss).
+# Typically smaller, muted colors, slower fade.
+avoidance:
+  dodged:
+    color: "#AAAAAA"
+    fontSize: 54.0
+    duration: 0.6
+    animations:
+      - { type: SCALE, startAt: 0.0, endAt: 0.1, startScale: 0.8, endScale: 1.0 }
+      - { type: POSITION, startAt: 0.0, endAt: 1.0, positionOffsetY: -40.0 }
+      - { type: OPACITY, startAt: 0.3, endAt: 1.0, startOpacity: 1.0, endOpacity: 0.0 }
+  blocked:
+    color: "#CCCCCC"
+    fontSize: 58.0
+    duration: 0.5
+  parried:
+    color: "#FFD700"
+    fontSize: 58.0
+    duration: 0.5
+  missed:
+    color: "#888888"
+    fontSize: 50.0
+    duration: 0.6

@@ -1,0 +1,394 @@
+# =============================================================================
+# EQUIPMENT STAT RESTRICTIONS
+# =============================================================================
+# Defines which modifiers can roll on each equipment type.
+# This creates meaningful item identity (daggers = crit, staves = magic, etc.)
+#
+# DESIGN: "Action vs Sustain" Classification
+# - Prefixes = Action (damage, speed, movement, ailments)
+# - Suffixes = Sustain (resources, defenses, recovery)
+#
+# SLOT IDENTITY (Feb 2026 refactor):
+# - Weapons + Gloves = OFFENSIVE (damage, crit, speed)
+# - Armor + Shield = DEFENSIVE (resources, resistances, regen)
+# - Gloves (hands) are hybrid: offensive prefixes + material-based suffixes
+# - Shields are hybrid: thorns/accuracy prefixes + defensive suffixes
+#
+# Format:
+#   {type}:
+#     prefixes: [list of allowed prefix IDs]
+#     suffixes: [list of allowed suffix IDs]
+#
+# REQUIREMENT: Every equipment type must have at least 6 modifiers (3 prefix + 3 suffix)
+# =============================================================================
+
+# =============================================================================
+# WEAPON PROFILES
+# =============================================================================
+# Weapons get offensive prefixes. Each type has a distinct stat identity.
+# NOTE: Life steal/leech are rare weapon-only suffixes.
+# NOTE: Elemental damage is RARE on physical weapons (equipment-stats restricts it).
+
+weapons:
+  # ---------------------------------------------------------------------------
+  # MELEE - One-Handed
+  # ---------------------------------------------------------------------------
+
+  sword:
+    # Balanced melee - good at everything
+    # Prefixes: 6 (physical + crit + speed)
+    # Suffixes: 7 (parry + life steal + accuracy + conditional + stamina)
+    prefixes: [sharp, heavy, precise, deadly, brutal, swift]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  dagger:
+    # Fast, crit-focused
+    # Prefixes: 5 (crit-heavy)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [sharp, precise, deadly, swift, piercing]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_execution, of_the_berserker, of_second_wind]
+
+  axe:
+    # High damage, armor penetration
+    # Prefixes: 5 (damage + pen)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [sharp, heavy, brutal, piercing, deadly]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  mace:
+    # Blunt damage, armor crushing
+    # Prefixes: 5 (damage + pen)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [heavy, brutal, piercing, swift, deadly]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_execution, of_the_berserker, of_second_wind]
+
+  claws:
+    # Fast attacks, life steal focused
+    # Prefixes: 5 (speed + crit)
+    # Suffixes: 6 (life steal + accuracy + conditional)
+    prefixes: [sharp, precise, deadly, swift, piercing]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  club:
+    # Primitive, simple stats
+    # Prefixes: 3 (basic damage)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [heavy, brutal, piercing]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  # ---------------------------------------------------------------------------
+  # MELEE - Two-Handed
+  # ---------------------------------------------------------------------------
+
+  longsword:
+    # Slow, high damage
+    # Prefixes: 6 (balanced damage)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [sharp, heavy, brutal, precise, deadly, piercing]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  battleaxe:
+    # Very high damage, armor shred
+    # Prefixes: 4 (damage focused)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [heavy, brutal, piercing, deadly]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_execution, of_the_berserker, of_second_wind]
+
+  spear:
+    # Reach, balanced
+    # Prefixes: 6 (balanced)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [sharp, heavy, precise, deadly, keen, piercing]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  # ---------------------------------------------------------------------------
+  # RANGED - Physical Projectile
+  # ---------------------------------------------------------------------------
+
+  shortbow:
+    # Fast projectile
+    # Prefixes: 6 (speed + crit)
+    # Suffixes: 8 (life steal + accuracy + conditional + venom)
+    prefixes: [sharp, precise, deadly, keen, swift, velocity]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_focus, of_venom, of_toxicity, of_execution, of_second_wind]
+
+  crossbow:
+    # Slow, high damage projectile
+    # Prefixes: 6 (damage + pen)
+    # Suffixes: 8 (life steal + accuracy + conditional + venom)
+    prefixes: [sharp, heavy, precise, deadly, keen, piercing]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_focus, of_venom, of_toxicity, of_execution, of_second_wind]
+
+  blowgun:
+    # Fast, status-focused (allows elemental/ailment on this physical weapon)
+    # Prefixes: 5 (ailment application)
+    # Suffixes: 8 (life steal + accuracy + venom + DoT)
+    prefixes: [igniting, chilling, electrifying, velocity, precise]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_focus, of_venom, of_toxicity, of_scorching, of_second_wind]
+
+  # ---------------------------------------------------------------------------
+  # RANGED - Thrown
+  # ---------------------------------------------------------------------------
+
+  bomb:
+    # Explosive, fire-focused (allows elemental)
+    # Prefixes: 4 (fire + chaos)
+    # Suffixes: 7 (basic weapon suffixes + accuracy + DoT)
+    prefixes: [blazing, chaotic, deadly, igniting]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_scorching, of_incineration, of_flame_infusion, of_second_wind]
+
+  dart:
+    # Fast throwing
+    # Prefixes: 4 (speed + crit)
+    # Suffixes: 8 (life steal + accuracy + venom + DoT)
+    prefixes: [sharp, precise, swift, velocity]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_focus, of_venom, of_toxicity, of_execution, of_second_wind]
+
+  kunai:
+    # Fast throwing, crit
+    # Prefixes: 5 (crit + speed)
+    # Suffixes: 8 (life steal + accuracy + venom + DoT)
+    prefixes: [sharp, precise, deadly, swift, velocity]
+    suffixes: [vampiric, of_the_vampire, of_parrying, of_accuracy, of_focus, of_venom, of_toxicity, of_execution, of_second_wind]
+
+  # ---------------------------------------------------------------------------
+  # MAGIC - NO physical damage prefixes!
+  # ---------------------------------------------------------------------------
+
+  staff:
+    # Spell damage focused - all elemental welcome
+    # Prefixes: 15 (spell + elemental + ailment + hex)
+    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, nullifying, swift, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+
+  wand:
+    # Fast casting, mana efficiency
+    # Prefixes: 13 (spell + elemental + hex)
+    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, swift, precise, elemental, chaotic, nullifying, hex_spell_damage, hex_spell_crit, hex_status_effect]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+
+  spellbook:
+    # Mana-focused, all elements
+    # Prefixes: 15 (spell + elemental + hex)
+    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, swift, nullifying, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+
+  # ---------------------------------------------------------------------------
+  # OFFHAND - Shield
+  # ---------------------------------------------------------------------------
+
+  shield:
+    # Defensive + thorns/block prefixes
+    # Prefixes: 6 (thorns + block mechanics)
+    # Suffixes: 7 (defensive + accuracy)
+    prefixes: [thorned, barbed, reflecting, blocking, bulwark, guardian]
+    suffixes: [of_the_fortress, of_iron_skin, of_stability, of_the_whale, of_vitality, of_accuracy, of_focus]
+
+# =============================================================================
+# ARMOR PROFILES
+# =============================================================================
+# Armor gets defensive/utility modifiers. Material determines available suffixes.
+# Note: Hytale has NO feet slot - movement stats go on LEGS!
+#
+# NEW: Movement stats are now PREFIXES (action = moving faster)
+# Legs armor gets access to movement prefixes.
+# Hands (gloves) get OFFENSIVE prefixes (damage, crit, speed)
+
+armor_materials:
+  # ---------------------------------------------------------------------------
+  # CLOTH - Magic-focused
+  # ---------------------------------------------------------------------------
+  cloth:
+    # Elemental resistances are now PREFIXES (active damage mitigation)
+    base_prefixes:
+      - fireproof
+      - frostward
+      - insulated
+      - voidward
+      - stoneward
+      - windward
+    base_suffixes:
+      - of_the_sage
+      - of_wisdom
+      - of_the_arcane
+      - of_vitality
+      - of_regeneration
+      - of_the_barrier
+
+  # ---------------------------------------------------------------------------
+  # LEATHER - Agility-focused
+  # ---------------------------------------------------------------------------
+  leather:
+    # Crit defense (resilient) is now a PREFIX (active damage mitigation)
+    base_prefixes:
+      - resilient
+    base_suffixes:
+      - of_evasion
+      - of_the_shadow
+      - of_vigor
+      - of_vitality
+      - of_regeneration
+      - of_endurance
+      - of_the_cat
+      - of_stability
+      - of_stamina
+      - of_alacrity
+
+  # ---------------------------------------------------------------------------
+  # PLATE - Defense-focused
+  # ---------------------------------------------------------------------------
+  plate:
+    # Block mechanics (ironclad, enduring) are now PREFIXES (active damage mitigation)
+    base_prefixes:
+      - ironclad
+      - enduring
+    base_suffixes:
+      - of_the_whale
+      - of_vitality
+      - of_the_fortress
+      - of_iron_skin
+      - of_stone
+      - of_stability
+      - of_regeneration
+
+  # ---------------------------------------------------------------------------
+  # WOOD - Hybrid (primitive/druid)
+  # ---------------------------------------------------------------------------
+  wood:
+    base_prefixes: []
+    base_suffixes:
+      - of_vitality
+      - of_regeneration
+      - of_the_fortress
+      - of_vigor
+      - of_stability
+      - of_endurance
+      - of_stamina
+      - of_alacrity
+
+  # ---------------------------------------------------------------------------
+  # SPECIAL - Full access (quest items, unique gear)
+  # ---------------------------------------------------------------------------
+  special:
+    # No restrictions - all modifiers allowed
+    base_prefixes: []
+    base_suffixes: []
+
+# ---------------------------------------------------------------------------
+# ARMOR SLOT BONUSES
+# ---------------------------------------------------------------------------
+# Additional modifiers available based on armor slot.
+# These are ADDED to the material's base modifiers.
+#
+# Movement prefixes are exclusive to LEGS (action = moving faster)
+# Offensive prefixes are available to HANDS (gloves are hybrid)
+
+armor_slots:
+  head:
+    additional_prefixes: []
+    additional_suffixes:
+      - of_wisdom
+      - of_the_arcane
+    # Head for perception, mana regen
+
+  chest:
+    additional_prefixes: []
+    additional_suffixes:
+      - of_regeneration
+      - of_restoration
+      - of_recovery
+    # Chest is the main defense piece
+
+  legs:
+    # Movement PREFIXES (action = moving faster)
+    additional_prefixes:
+      - fleet
+      - striding
+      - sprinting
+      - leaping
+      - climbing
+      - sneaking
+    additional_suffixes:
+      - of_endurance
+      - of_the_cat
+      - of_stamina
+      - of_alacrity
+    # Legs handle all movement (no feet slot in Hytale)
+
+  hands:
+    # OFFENSIVE prefixes (gloves are hybrid - deal damage!)
+    additional_prefixes:
+      - sharp
+      - heavy
+      - precise
+      - deadly
+      - brutal
+      - keen
+      - swift
+      - climbing
+      - arcane
+      - empowered
+      - blazing
+      - frozen
+      - shocking
+    additional_suffixes:
+      - of_endurance
+      - of_vigor
+      - of_accuracy
+      - of_focus
+      - of_stamina
+      - of_alacrity
+    # Gloves for attack speed, damage, climbing
+
+# =============================================================================
+# MODIFIER COUNT VERIFICATION (Updated Feb 2026 - Prefix/Suffix Rebalance)
+# =============================================================================
+# Every equipment type MUST have at least 6 modifiers (3 prefix + 3 suffix).
+# Rebalanced: Moved 20 prefixes to suffixes for better build diversity.
+#
+# MELEE WEAPONS (physical): ~5-6 prefixes, ~6 suffixes
+# - sword:      6 prefixes + 6 suffixes = 12 total ✓
+# - dagger:     5 prefixes + 6 suffixes = 11 total ✓
+# - axe:        5 prefixes + 6 suffixes = 11 total ✓
+# - mace:       5 prefixes + 6 suffixes = 11 total ✓
+# - claws:      5 prefixes + 6 suffixes = 11 total ✓
+# - club:       3 prefixes + 6 suffixes = 9 total ✓
+# - longsword:  6 prefixes + 6 suffixes = 12 total ✓
+# - battleaxe:  4 prefixes + 6 suffixes = 10 total ✓
+# - spear:      6 prefixes + 6 suffixes = 12 total ✓
+#
+# RANGED WEAPONS (projectile): ~4-6 prefixes, ~7-8 suffixes
+# - shortbow:   6 prefixes + 8 suffixes = 14 total ✓
+# - crossbow:   6 prefixes + 8 suffixes = 14 total ✓
+# - blowgun:    5 prefixes + 8 suffixes = 13 total ✓
+# - bomb:       4 prefixes + 7 suffixes = 11 total ✓
+# - dart:       4 prefixes + 8 suffixes = 12 total ✓
+# - kunai:      5 prefixes + 8 suffixes = 13 total ✓
+#
+# MAGIC WEAPONS: 13-15 prefixes, 22 suffixes (includes hex modifiers)
+# - staff:      15 prefixes + 22 suffixes = 37 total ✓
+# - wand:       13 prefixes + 22 suffixes = 35 total ✓
+# - spellbook:  15 prefixes + 22 suffixes = 37 total ✓
+#
+# SHIELD:
+# - shield:     6 prefixes + 7 suffixes = 13 total ✓
+#   (accuracy moved from prefix to suffix)
+#
+# ARMOR (material pools + slot bonuses):
+# - cloth head:    6 + 0 prefixes = 6, 6 + 2 = 8 suffixes ✓
+# - leather legs:  1 + 6 prefixes = 7, 8 + 2 = 10 suffixes ✓
+# - plate chest:   2 + 0 prefixes = 2, 7 + 3 = 10 suffixes ✓
+# - hands (any):   13 prefixes + material suffixes + 4 = varies ✓
+#   (accuracy moved to suffix, added of_accuracy/of_focus)
+#
+# =============================================================================
+# FALLBACK BEHAVIOR
+# =============================================================================
+# Equipment types not listed above get NO restrictions (all modifiers allowed).
+# This includes:
+#   - unknown_weapon: Falls back to full weapon modifier pool
+#   - unknown_armor: Falls back to full armor modifier pool
+#   - special_*: Full access for quest/unique items

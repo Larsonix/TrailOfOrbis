@@ -1,0 +1,32 @@
+{
+  "Version": 4,
+  "UUID": {
+    "$binary": "HaSvXhqCSjOkPZQSQUY/Ow==",
+    "$type": "04"
+  },
+  "Seed": 12345,
+  "SpawnProvider": {
+    "Id": "Global",
+    "SpawnPoint": {
+      "X": 0.0,
+      "Y": 65.0,
+      "Z": 0.0,
+      "Pitch": 0.0,
+      "Yaw": 0.0,
+      "Roll": 0.0
+    }
+  },
+  "WorldGen": {
+    "Type": "HytaleGenerator",
+    "WorldStructure": "Skill_Sanctum"
+  },
+  "WorldMap": {
+    "Type": "Disabled"
+  },
+  "ChunkStorage": {
+    "Type": "Hytale"
+  },
+  "ChunkGenerator": {
+    "Type": "Hytale"
+  }
+}

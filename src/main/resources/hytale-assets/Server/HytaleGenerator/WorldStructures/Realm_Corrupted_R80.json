@@ -1,0 +1,31 @@
+{
+  "Type": "NoiseRange",
+  "Biomes": [],
+  "DefaultBiome": "Realm_Corrupted_R80",
+  "DefaultTransitionDistance": 32,
+  "MaxBiomeEdgeDistance": 32,
+  "Framework": [
+    {
+      "Type": "DecimalConstants",
+      "Entries": [
+        {
+          "Name": "Base",
+          "Value": 64
+        },
+        {
+          "Name": "Water",
+          "Value": 64
+        },
+        {
+          "Name": "Bedrock",
+          "Value": 0
+        }
+      ]
+    }
+  ],
+  "Density": {
+    "Type": "Constant",
+    "Skip": false,
+    "Value": 0
+  }
+}

@@ -1,0 +1,137 @@
+# =============================================================================
+# Mob Elemental Affinity Configuration
+# =============================================================================
+# Controls how mobs gain elemental damage types.
+#
+# DESIGN PHILOSOPHY:
+# - Most mobs should deal PHYSICAL damage only (predictable for players)
+# - Elemental damage should be thematic and obvious (fire mage → FIRE)
+# - No random elements - players should be able to strategize
+#
+# DETECTION PRIORITY (highest to lowest):
+# 1. Blacklist check → no element if blacklisted
+# 2. Explicit overrides → exact role name match
+# 3. NPCGroup membership → Void group = VOID damage
+# 4. Role name keywords → "fire_mage" = FIRE damage
+# 5. Default → null (physical only, NO random!)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# NPCGroup → Element Mapping (Most Reliable)
+# -----------------------------------------------------------------------------
+# Maps Hytale NPCGroup names to element types.
+# This is the most reliable method since Hytale's Void creatures are
+# already grouped together in the "Void" NPCGroup.
+#
+# Supported elements: FIRE, WATER, LIGHTNING, EARTH, WIND, VOID
+
+group_elements:
+  # All creatures in Hytale's Void NPCGroup deal VOID damage
+  Void: VOID
+
+# -----------------------------------------------------------------------------
+# Role Name Keywords → Element Mapping
+# -----------------------------------------------------------------------------
+# Maps keywords found in role names to element types.
+# Keywords are matched case-insensitively using substring search.
+#
+# CONSERVATIVE LIST: Only include keywords that clearly indicate
+# elemental mobs. Generic names like "mage" or "wizard" are excluded
+# since not all mages are necessarily elemental.
+
+keywords:
+  FIRE:
+    - fire
+    - flame
+    - inferno
+    - magma
+    - lava
+    - ember
+    - blaze
+    - pyro
+    - burn
+    - scorch
+
+  WATER:
+    - ice
+    - frost
+    - frozen
+    - glacier
+    - arctic
+    - snow
+    - winter
+    - chill
+    - cryo
+
+  LIGHTNING:
+    - lightning
+    - thunder
+    - shock
+    - electric
+    - volt
+    - spark
+    - electro
+
+  EARTH:
+    - stone
+    - rock
+    - earth
+    - crystal
+    - golem
+    - boulder
+    - mineral
+    - cave
+
+  WIND:
+    - wind
+    - gust
+    - tornado
+    - tempest
+    - cyclone
+    - breeze
+    - gale
+    - air
+
+  VOID:
+    - void
+    - shadow
+    - dark
+    - corrupt
+    - abyss
+    - blight
+
+# -----------------------------------------------------------------------------
+# Explicit Role Overrides (Highest Priority)
+# -----------------------------------------------------------------------------
+# Map specific role names directly to elements.
+# Use this for edge cases where group/keyword detection doesn't work.
+#
+# Format: role_name: ELEMENT
+
+overrides: {}
+# Example:
+#   special_fire_boss: FIRE
+#   shadow_assassin: VOID
+#   frost_giant: WATER
+
+# -----------------------------------------------------------------------------
+# Blacklist (Never Elemental)
+# -----------------------------------------------------------------------------
+# Mobs matching these criteria will ALWAYS deal physical damage only,
+# regardless of their name or group membership.
+
+blacklist:
+  # Specific role names to blacklist
+  roles: []
+  # Example:
+  #   - fire_civilian  # Despite name, this NPC doesn't do damage
+
+  # NPCGroup names to blacklist (entire group = physical only)
+  # By default, all passive/neutral creatures are physical
+  groups:
+    - Prey
+    - PreyBig
+    - Critters
+    - Birds
+    - Aquatic

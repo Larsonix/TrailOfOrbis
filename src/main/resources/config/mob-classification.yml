@@ -1,0 +1,46 @@
+# Mob Classification Configuration
+# 5-tier system: PASSIVE, MINOR, HOSTILE, ELITE, BOSS
+#
+# Classification uses Hytale's NPCGroups and dynamic entity discovery.
+# See entity-discovery.yml for detection patterns and group mappings.
+#
+# Tier Overview:
+#   PASSIVE  - Non-combat creatures (critters, birds, fish)
+#   MINOR    - Small hostiles with reduced XP (larvae, foxes)
+#   HOSTILE  - Standard combat enemies (trorks, goblins, predators)
+#   ELITE    - Mini-bosses (captains, chieftains, ogres)
+#   BOSS     - Major bosses (dragons, zone bosses)
+
+# XP Multipliers (Base XP * Multiplier)
+xp_multipliers:
+  PASSIVE: 0.1    # 10% XP for passive creatures (chickens, rabbits, etc.)
+  MINOR: 0.5      # 50% XP for small hostiles (larvae, foxes) - prevents farming
+  HOSTILE: 1.0    # Base XP for standard enemies
+  ELITE: 1.5      # +50% XP for mini-bosses
+  BOSS: 5.0       # +400% XP for major bosses
+
+# Stat Multipliers (Applied to HP, Damage, etc.)
+stat_multipliers:
+  PASSIVE: 0.1    # 10% scaling for passive creatures (minimal stats)
+  MINOR: 1.0      # Normal scaling - they're still combat mobs
+  HOSTILE: 1.0    # Base scaling for standard enemies
+  ELITE: 1.5      # +50% stats for mini-bosses
+  BOSS: 3.0       # +200% stats for major bosses
+
+# Elite mobs (mini-bosses, captains, veterans)
+# NOTE: Elite list is now EMPTY - elites are determined by random roll at spawn.
+# See mob-scaling.yml elite_chance section for the new random elite system.
+# Any hostile mob can now roll elite at spawn time (5% base chance, scaling with level).
+elites: []
+
+# Boss mobs (raid bosses, zone bosses, dragons)
+# Role names are case-insensitive
+bosses:
+  # Dragons
+  - "dragon_fire"
+  - "dragon_frost"
+
+  # Zone bosses
+  - "yeti"
+  - "goblin_duke"
+  - "scarak_broodmother"

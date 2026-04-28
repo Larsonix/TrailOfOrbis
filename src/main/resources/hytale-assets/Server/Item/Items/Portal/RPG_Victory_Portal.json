@@ -1,0 +1,20 @@
+{
+  "Parent": "Portal_Return",
+  "BlockType": {
+    "Interactions": {
+      "CollisionEnter": {
+        "Interactions": [
+          {
+            "Type": "RealmVictoryPortal",
+            "Next": {
+              "Type": "Simple",
+              "Effects": {
+                "LocalSoundEventId": "SFX_Portal_Neutral_Teleport_Local"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

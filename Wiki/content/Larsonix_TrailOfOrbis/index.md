@@ -41,7 +41,7 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 |:-------|------:|
 | Elemental Attributes | 6 |
 | Attribute-derived stats | 30 (5 per element, zero overlap) |
-| Computed stat fields | 153 across 5 categories |
+| Computed stat fields | 246 across 4 categories |
 | Skill Tree nodes | 485 (14 arms × 32 + 36 bridge + 1 origin) |
 | Gear Modifier definitions | 101 (prefixes + suffixes) |
 | Equipment types | 42 (18 weapons, 20 armor, shield, 2 unknown) |
@@ -59,7 +59,7 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 
 ### Progression
 - **[Leveling](leveling-experience)** - Kill mobs to earn XP. Each level gives you +1 Attribute Point and +1 Skill Point. Effort-based scaling up to level 1,000,000.
-- **[The 6 Elements](attributes)** - Fire, Water, Lightning, Earth, Wind, and Void. Each grants 5 unique stats per point. 30 attribute-derived stats, **153 computed stat fields** total, zero overlap.
+- **[The 6 Elements](attributes)** - Fire, Water, Lightning, Earth, Wind, and Void. Each grants 5 unique stats per point. 30 attribute-derived stats, **246 computed stat fields** total, zero overlap.
 - **[Skill Tree](skill-tree)** - 485 nodes across 15 regions you explore physically in a 3D instance. Walk up to glowing orbs, press F to allocate. 6 elemental arms, 8 octant hybrid arms, 12 bridge paths. Free respec anytime.
 - **[Realms](procedural-dungeons)** - The core game loop. Consumable maps open portals to procedural instanced dungeons. Maps drop at **12% per kill from level 1**. 14 biome types, 4 sizes, 13 Map Modifiers. Difficulty and rewards scale together.
 - **[Ancient Gateways](ancient-gateways)** - Every Portal Device is a tiered gateway that limits which map levels it can channel. Mine overworld ores to upgrade through 7 tiers : Copper (max level 10) to Adamantite (unlimited). The bridge between vanilla exploration and Realm progression.

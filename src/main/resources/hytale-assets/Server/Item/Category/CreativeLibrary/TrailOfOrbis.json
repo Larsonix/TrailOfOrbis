@@ -1,0 +1,11 @@
+{
+  "Order": 4,
+  "Icon": "Icons/ItemCategories/Stones.png",
+  "Children": [
+    {
+      "Id": "Stones",
+      "Name": "Stones",
+      "Icon": "Icons/ItemCategories/Stones.png"
+    }
+  ]
+}

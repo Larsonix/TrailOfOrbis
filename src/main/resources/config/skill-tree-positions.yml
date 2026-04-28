@@ -1,0 +1,2532 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# SKILL TREE NODE POSITIONS
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Coordinates are in world blocks relative to sanctum center (0, 65, 0).
+#
+# Directions:
+#   - X+ = East (Fire)    X- = West (Water)
+#   - Z+ = South (Lightning)    Z- = North (Earth)
+#   - Y+ = Up (Void)    Y- = Down (Wind)
+#
+# ══════════════════════════════════════════════════════════════════════════════
+
+nodes:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CORE (origin only)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  origin:
+    x: 0.0
+    y: 64.0
+    z: 0.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # HORIZONTAL CORNER BRIDGES (4 bridges, 3 nodes each)
+  # Connect adjacent outer cluster notables around the horizontal ring
+  # Arcs curve inward toward center (chord interpolation between endpoints)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  # FIRE_BERSERKER ↔ LIGHTNING_OVERCHARGE (corner at +X/+Z)
+  bridge_fire_lightning_1:
+    x: 25.0
+    y: 65.0
+    z: 12.0
+
+  bridge_fire_lightning_2:
+    x: 18.0
+    y: 65.0
+    z: 18.0
+
+  bridge_fire_lightning_3:
+    x: 12.0
+    y: 65.0
+    z: 25.0
+
+  # LIGHTNING_CHAIN ↔ WATER_SHATTER (corner at -X/+Z)
+  bridge_lightning_water_1:
+    x: -12.0
+    y: 65.0
+    z: 24.0
+
+  bridge_lightning_water_2:
+    x: -18.0
+    y: 65.0
+    z: 18.0
+
+  bridge_lightning_water_3:
+    x: -25.0
+    y: 65.0
+    z: 12.0
+
+  # WATER_EVASION ↔ EARTH_FORTITUDE (corner at -X/-Z)
+  bridge_water_earth_1:
+    x: -24.0
+    y: 65.0
+    z: -12.0
+
+  bridge_water_earth_2:
+    x: -18.0
+    y: 65.0
+    z: -18.0
+
+  bridge_water_earth_3:
+    x: -12.0
+    y: 65.0
+    z: -24.0
+
+  # EARTH_GUARDIAN ↔ FIRE_BLOODLUST (corner at +X/-Z)
+  bridge_earth_fire_1:
+    x: 12.0
+    y: 65.0
+    z: -25.0
+
+  bridge_earth_fire_2:
+    x: 18.0
+    y: 65.0
+    z: -18.0
+
+  bridge_earth_fire_3:
+    x: 25.0
+    y: 65.0
+    z: -12.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # VERTICAL BRIDGES - UPWARD TO VOID (4 bridges, 3 nodes each)
+  # Connect horizontal synergy_1 nodes to void synergy nodes (tier 5 ↔ tier 5)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  # FIRE_SYNERGY_1 ↔ VOID_SYNERGY_1
+  bridge_fire_void_1:
+    x: 21.0
+    y: 77.0
+    z: 1.0
+
+  bridge_fire_void_2:
+    x: 16.0
+    y: 82.0
+    z: 1.5
+
+  bridge_fire_void_3:
+    x: 11.0
+    y: 87.0
+    z: 1.0
+
+  # LIGHTNING_SYNERGY_1 ↔ VOID_SYNERGY_4
+  bridge_lightning_void_1:
+    x: 1.0
+    y: 79.0
+    z: 20.0
+
+  bridge_lightning_void_2:
+    x: 1.5
+    y: 86.0
+    z: 14.0
+
+  bridge_lightning_void_3:
+    x: 1.0
+    y: 92.0
+    z: 9.0
+
+  # WATER_SYNERGY_1 ↔ VOID_SYNERGY_2
+  bridge_water_void_1:
+    x: -21.0
+    y: 77.0
+    z: -1.0
+
+  bridge_water_void_2:
+    x: -16.0
+    y: 82.0
+    z: -1.5
+
+  bridge_water_void_3:
+    x: -11.0
+    y: 87.0
+    z: -1.0
+
+  # EARTH_SYNERGY_1 ↔ VOID_SYNERGY_3
+  bridge_earth_void_1:
+    x: -1.0
+    y: 79.0
+    z: -20.0
+
+  bridge_earth_void_2:
+    x: -1.5
+    y: 86.0
+    z: -14.0
+
+  bridge_earth_void_3:
+    x: -1.0
+    y: 92.0
+    z: -9.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # VERTICAL BRIDGES - DOWNWARD TO WIND (4 bridges, 3 nodes each)
+  # Connect horizontal synergy_2 nodes to wind synergy nodes (tier 5 ↔ tier 5)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  # FIRE_SYNERGY_2 ↔ WIND_SYNERGY_1
+  bridge_fire_wind_1:
+    x: 21.0
+    y: 53.0
+    z: 1.0
+
+  bridge_fire_wind_2:
+    x: 16.0
+    y: 48.0
+    z: 1.5
+
+  bridge_fire_wind_3:
+    x: 11.0
+    y: 43.0
+    z: 1.0
+
+  # LIGHTNING_SYNERGY_2 ↔ WIND_SYNERGY_4
+  bridge_lightning_wind_1:
+    x: 1.0
+    y: 51.0
+    z: 20.0
+
+  bridge_lightning_wind_2:
+    x: 1.5
+    y: 44.0
+    z: 14.0
+
+  bridge_lightning_wind_3:
+    x: 1.0
+    y: 38.0
+    z: 9.0
+
+  # WATER_SYNERGY_2 ↔ WIND_SYNERGY_2
+  bridge_water_wind_1:
+    x: -21.0
+    y: 53.0
+    z: -1.0
+
+  bridge_water_wind_2:
+    x: -16.0
+    y: 48.0
+    z: -1.5
+
+  bridge_water_wind_3:
+    x: -11.0
+    y: 43.0
+    z: -1.0
+
+  # EARTH_SYNERGY_2 ↔ WIND_SYNERGY_3
+  bridge_earth_wind_1:
+    x: -1.0
+    y: 51.0
+    z: -20.0
+
+  bridge_earth_wind_2:
+    x: -1.5
+    y: 44.0
+    z: -14.0
+
+  bridge_earth_wind_3:
+    x: -1.0
+    y: 38.0
+    z: -9.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FIRE (32 nodes) - +X direction
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  fire_entry:
+    x: 5.0
+    y: 65.0
+    z: 0.0
+
+  fire_fury_1:
+    x: 7.0
+    y: 67.0
+    z: 0.0
+
+  fire_fury_2:
+    x: 9.0
+    y: 68.0
+    z: 0.0
+
+  fire_fury_3:
+    x: 13.0
+    y: 68.0
+    z: 2.0
+
+  fire_fury_4:
+    x: 13.0
+    y: 68.0
+    z: -2.0
+
+  fire_fury_branch:
+    x: 11.0
+    y: 68.0
+    z: 0.0
+
+  fire_fury_notable:
+    x: 16.0
+    y: 68.0
+    z: 0.0
+
+  fire_inferno_1:
+    x: 7.0
+    y: 63.0
+    z: 0.0
+
+  fire_inferno_2:
+    x: 9.0
+    y: 62.0
+    z: 0.0
+
+  fire_inferno_3:
+    x: 13.0
+    y: 62.0
+    z: 2.0
+
+  fire_inferno_4:
+    x: 13.0
+    y: 62.0
+    z: -2.0
+
+  fire_inferno_branch:
+    x: 11.0
+    y: 62.0
+    z: 0.0
+
+  fire_inferno_notable:
+    x: 16.0
+    y: 62.0
+    z: 0.0
+
+  fire_bloodlust_1:
+    x: 18.0
+    y: 66.5
+    z: -3.0
+
+  fire_bloodlust_2:
+    x: 21.0
+    y: 65.0
+    z: -6.0
+
+  fire_bloodlust_3:
+    x: 27.0
+    y: 67.0
+    z: -6.0
+
+  fire_bloodlust_4:
+    x: 27.0
+    y: 63.0
+    z: -6.0
+
+  fire_bloodlust_branch:
+    x: 24.0
+    y: 65.0
+    z: -6.0
+
+  fire_bloodlust_notable:
+    x: 31.0
+    y: 65.0
+    z: -6.0
+
+  fire_berserker_1:
+    x: 18.0
+    y: 63.5
+    z: 3.0
+
+  fire_berserker_2:
+    x: 21.0
+    y: 65.0
+    z: 6.0
+
+  fire_berserker_3:
+    x: 27.0
+    y: 67.0
+    z: 6.0
+
+  fire_berserker_4:
+    x: 27.0
+    y: 63.0
+    z: 6.0
+
+  fire_berserker_branch:
+    x: 24.0
+    y: 65.0
+    z: 6.0
+
+  fire_berserker_notable:
+    x: 31.0
+    y: 65.0
+    z: 6.0
+
+  fire_synergy_1:
+    x: 26.0
+    y: 72.0
+    z: 0.0
+
+  fire_synergy_2:
+    x: 26.0
+    y: 58.0
+    z: 0.0
+
+  fire_synergy_3:
+    x: 34.0
+    y: 65.0
+    z: -3.0
+
+  fire_synergy_4:
+    x: 34.0
+    y: 65.0
+    z: 3.0
+
+  fire_synergy_hub:
+    x: 37.0
+    y: 65.0
+    z: 0.0
+
+  fire_keystone_1:
+    x: 40.0
+    y: 65.0
+    z: 4.0
+
+  fire_keystone_2:
+    x: 40.0
+    y: 65.0
+    z: -4.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WATER (32 nodes) - -X direction
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  water_entry:
+    x: -5.0
+    y: 65.0
+    z: 0.0
+
+  water_frostbite_1:
+    x: -7.0
+    y: 67.0
+    z: 0.0
+
+  water_frostbite_2:
+    x: -9.0
+    y: 68.0
+    z: 0.0
+
+  water_frostbite_3:
+    x: -13.0
+    y: 68.0
+    z: 2.0
+
+  water_frostbite_4:
+    x: -13.0
+    y: 68.0
+    z: -2.0
+
+  water_frostbite_branch:
+    x: -11.0
+    y: 68.0
+    z: 0.0
+
+  water_frostbite_notable:
+    x: -16.0
+    y: 68.0
+    z: 0.0
+
+  water_precision_1:
+    x: -7.0
+    y: 63.0
+    z: 0.0
+
+  water_precision_2:
+    x: -9.0
+    y: 62.0
+    z: 0.0
+
+  water_precision_3:
+    x: -13.0
+    y: 62.0
+    z: 2.0
+
+  water_precision_4:
+    x: -13.0
+    y: 62.0
+    z: -2.0
+
+  water_precision_branch:
+    x: -11.0
+    y: 62.0
+    z: 0.0
+
+  water_precision_notable:
+    x: -16.0
+    y: 62.0
+    z: 0.0
+
+  water_evasion_1:
+    x: -18.0
+    y: 66.5
+    z: -3.0
+
+  water_evasion_2:
+    x: -21.0
+    y: 65.0
+    z: -6.0
+
+  water_evasion_3:
+    x: -27.0
+    y: 67.0
+    z: -6.0
+
+  water_evasion_4:
+    x: -27.0
+    y: 63.0
+    z: -6.0
+
+  water_evasion_branch:
+    x: -24.0
+    y: 65.0
+    z: -6.0
+
+  water_evasion_notable:
+    x: -30.0
+    y: 65.0
+    z: -6.0
+
+  water_shatter_1:
+    x: -18.0
+    y: 63.5
+    z: 3.0
+
+  water_shatter_2:
+    x: -21.0
+    y: 65.0
+    z: 6.0
+
+  water_shatter_3:
+    x: -27.0
+    y: 67.0
+    z: 6.0
+
+  water_shatter_4:
+    x: -27.0
+    y: 63.0
+    z: 6.0
+
+  water_shatter_branch:
+    x: -24.0
+    y: 65.0
+    z: 6.0
+
+  water_shatter_notable:
+    x: -31.0
+    y: 65.0
+    z: 6.0
+
+  water_synergy_1:
+    x: -26.0
+    y: 72.0
+    z: 0.0
+
+  water_synergy_2:
+    x: -26.0
+    y: 58.0
+    z: 0.0
+
+  water_synergy_3:
+    x: -34.0
+    y: 65.0
+    z: -3.0
+
+  water_synergy_4:
+    x: -34.0
+    y: 65.0
+    z: 3.0
+
+  water_synergy_hub:
+    x: -37.0
+    y: 65.0
+    z: 0.0
+
+  water_keystone_1:
+    x: -40.0
+    y: 65.0
+    z: 4.0
+
+  water_keystone_2:
+    x: -40.0
+    y: 65.0
+    z: -4.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # LIGHTNING (32 nodes) - +Z direction
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  lightning_entry:
+    x: 0.0
+    y: 65.0
+    z: 5.0
+
+  lightning_storm_1:
+    x: 0.0
+    y: 67.0
+    z: 7.0
+
+  lightning_storm_2:
+    x: 0.0
+    y: 68.0
+    z: 9.0
+
+  lightning_storm_3:
+    x: 2.0
+    y: 68.0
+    z: 13.0
+
+  lightning_storm_4:
+    x: -2.0
+    y: 68.0
+    z: 13.0
+
+  lightning_storm_branch:
+    x: 0.0
+    y: 68.0
+    z: 11.0
+
+  lightning_storm_notable:
+    x: 0.0
+    y: 68.0
+    z: 16.0
+
+  lightning_velocity_1:
+    x: 0.0
+    y: 63.0
+    z: 7.0
+
+  lightning_velocity_2:
+    x: 0.0
+    y: 62.0
+    z: 9.0
+
+  lightning_velocity_3:
+    x: 2.0
+    y: 62.0
+    z: 13.0
+
+  lightning_velocity_4:
+    x: -2.0
+    y: 62.0
+    z: 13.0
+
+  lightning_velocity_branch:
+    x: 0.0
+    y: 62.0
+    z: 11.0
+
+  lightning_velocity_notable:
+    x: 0.0
+    y: 62.0
+    z: 16.0
+
+  lightning_chain_1:
+    x: -3.0
+    y: 66.5
+    z: 18.0
+
+  lightning_chain_2:
+    x: -6.0
+    y: 65.0
+    z: 21.0
+
+  lightning_chain_3:
+    x: -6.0
+    y: 67.0
+    z: 27.0
+
+  lightning_chain_4:
+    x: -6.0
+    y: 63.0
+    z: 27.0
+
+  lightning_chain_branch:
+    x: -6.0
+    y: 65.0
+    z: 24.0
+
+  lightning_chain_notable:
+    x: -6.0
+    y: 65.0
+    z: 30.0
+
+  lightning_overcharge_1:
+    x: 3.0
+    y: 63.5
+    z: 18.0
+
+  lightning_overcharge_2:
+    x: 6.0
+    y: 65.0
+    z: 21.0
+
+  lightning_overcharge_3:
+    x: 6.0
+    y: 67.0
+    z: 27.0
+
+  lightning_overcharge_4:
+    x: 6.0
+    y: 63.0
+    z: 27.0
+
+  lightning_overcharge_branch:
+    x: 6.0
+    y: 65.0
+    z: 24.0
+
+  lightning_overcharge_notable:
+    x: 6.0
+    y: 65.0
+    z: 31.0
+
+  lightning_synergy_1:
+    x: 0.0
+    y: 72.0
+    z: 26.0
+
+  lightning_synergy_2:
+    x: 0.0
+    y: 58.0
+    z: 26.0
+
+  lightning_synergy_3:
+    x: -3.0
+    y: 65.0
+    z: 34.0
+
+  lightning_synergy_4:
+    x: 3.0
+    y: 65.0
+    z: 34.0
+
+  lightning_synergy_hub:
+    x: 0.0
+    y: 65.0
+    z: 37.0
+
+  lightning_keystone_1:
+    x: 4.0
+    y: 65.0
+    z: 40.0
+
+  lightning_keystone_2:
+    x: -4.0
+    y: 65.0
+    z: 40.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # EARTH (32 nodes) - -Z direction
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  earth_entry:
+    x: 0.0
+    y: 65.0
+    z: -5.0
+
+  earth_vitality_1:
+    x: 0.0
+    y: 67.0
+    z: -7.0
+
+  earth_vitality_2:
+    x: 0.0
+    y: 68.0
+    z: -9.0
+
+  earth_vitality_3:
+    x: 2.0
+    y: 68.0
+    z: -13.0
+
+  earth_vitality_4:
+    x: -2.0
+    y: 68.0
+    z: -13.0
+
+  earth_vitality_branch:
+    x: 0.0
+    y: 68.0
+    z: -11.0
+
+  earth_vitality_notable:
+    x: 0.0
+    y: 68.0
+    z: -16.0
+
+  earth_regen_1:
+    x: 0.0
+    y: 63.0
+    z: -7.0
+
+  earth_regen_2:
+    x: 0.0
+    y: 62.0
+    z: -9.0
+
+  earth_regen_3:
+    x: 2.0
+    y: 62.0
+    z: -13.0
+
+  earth_regen_4:
+    x: -2.0
+    y: 62.0
+    z: -13.0
+
+  earth_regen_branch:
+    x: 0.0
+    y: 62.0
+    z: -11.0
+
+  earth_regen_notable:
+    x: 0.0
+    y: 62.0
+    z: -16.0
+
+  earth_fortitude_1:
+    x: -3.0
+    y: 66.5
+    z: -18.0
+
+  earth_fortitude_2:
+    x: -6.0
+    y: 65.0
+    z: -21.0
+
+  earth_fortitude_3:
+    x: -6.0
+    y: 67.0
+    z: -27.0
+
+  earth_fortitude_4:
+    x: -6.0
+    y: 63.0
+    z: -27.0
+
+  earth_fortitude_branch:
+    x: -6.0
+    y: 65.0
+    z: -24.0
+
+  earth_fortitude_notable:
+    x: -6.0
+    y: 65.0
+    z: -30.0
+
+  earth_guardian_1:
+    x: 3.0
+    y: 63.5
+    z: -18.0
+
+  earth_guardian_2:
+    x: 6.0
+    y: 65.0
+    z: -21.0
+
+  earth_guardian_3:
+    x: 6.0
+    y: 67.0
+    z: -27.0
+
+  earth_guardian_4:
+    x: 6.0
+    y: 63.0
+    z: -27.0
+
+  earth_guardian_branch:
+    x: 6.0
+    y: 65.0
+    z: -24.0
+
+  earth_guardian_notable:
+    x: 6.0
+    y: 65.0
+    z: -31.0
+
+  earth_synergy_1:
+    x: 0.0
+    y: 72.0
+    z: -26.0
+
+  earth_synergy_2:
+    x: 0.0
+    y: 58.0
+    z: -26.0
+
+  earth_synergy_3:
+    x: -3.0
+    y: 65.0
+    z: -34.0
+
+  earth_synergy_4:
+    x: 3.0
+    y: 65.0
+    z: -34.0
+
+  earth_synergy_hub:
+    x: 0.0
+    y: 65.0
+    z: -37.0
+
+  earth_keystone_1:
+    x: 4.0
+    y: 65.0
+    z: -40.0
+
+  earth_keystone_2:
+    x: -4.0
+    y: 65.0
+    z: -40.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # VOID (32 nodes) - +Y direction (upward)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  void_entry:
+    x: 0.0
+    y: 70.0
+    z: 0.0
+
+  void_corruption_1:
+    x: 2.0
+    y: 72.0
+    z: 0.0
+
+  void_corruption_2:
+    x: 3.0
+    y: 74.0
+    z: 0.0
+
+  void_corruption_3:
+    x: 3.0
+    y: 78.0
+    z: 2.0
+
+  void_corruption_4:
+    x: 3.0
+    y: 78.0
+    z: -2.0
+
+  void_corruption_branch:
+    x: 3.0
+    y: 76.0
+    z: 0.0
+
+  void_corruption_notable:
+    x: 3.0
+    y: 81.0
+    z: 0.0
+
+  void_entropy_1:
+    x: -2.0
+    y: 72.0
+    z: 0.0
+
+  void_entropy_2:
+    x: -3.0
+    y: 74.0
+    z: 0.0
+
+  void_entropy_3:
+    x: -3.0
+    y: 78.0
+    z: 2.0
+
+  void_entropy_4:
+    x: -3.0
+    y: 78.0
+    z: -2.0
+
+  void_entropy_branch:
+    x: -3.0
+    y: 76.0
+    z: 0.0
+
+  void_entropy_notable:
+    x: -3.0
+    y: 81.0
+    z: 0.0
+
+  void_drain_1:
+    x: 1.5
+    y: 83.0
+    z: -3.0
+
+  void_drain_2:
+    x: 0.0
+    y: 86.0
+    z: -6.0
+
+  void_drain_3:
+    x: 2.0
+    y: 92.0
+    z: -6.0
+
+  void_drain_4:
+    x: -2.0
+    y: 92.0
+    z: -6.0
+
+  void_drain_branch:
+    x: 0.0
+    y: 89.0
+    z: -6.0
+
+  void_drain_notable:
+    x: 0.0
+    y: 95.0
+    z: -6.0
+
+  void_oblivion_1:
+    x: -1.5
+    y: 83.0
+    z: 3.0
+
+  void_oblivion_2:
+    x: 0.0
+    y: 86.0
+    z: 6.0
+
+  void_oblivion_3:
+    x: 2.0
+    y: 92.0
+    z: 6.0
+
+  void_oblivion_4:
+    x: -2.0
+    y: 92.0
+    z: 6.0
+
+  void_oblivion_branch:
+    x: 0.0
+    y: 89.0
+    z: 6.0
+
+  void_oblivion_notable:
+    x: 0.0
+    y: 96.0
+    z: 6.0
+
+  void_synergy_1:
+    x: 7.0
+    y: 91.0
+    z: 0.0
+
+  void_synergy_2:
+    x: -7.0
+    y: 91.0
+    z: 0.0
+
+  void_synergy_3:
+    x: 0.0
+    y: 99.0
+    z: -3.0
+
+  void_synergy_4:
+    x: 0.0
+    y: 99.0
+    z: 3.0
+
+  void_synergy_hub:
+    x: 0.0
+    y: 102.0
+    z: 0.0
+
+  void_keystone_1:
+    x: 0.0
+    y: 105.0
+    z: 4.0
+
+  void_keystone_2:
+    x: 0.0
+    y: 105.0
+    z: -4.0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WATER (32 nodes) - -Y direction (downward)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  wind_entry:
+    x: 0.0
+    y: 60.0
+    z: 0.0
+
+  wind_flow_1:
+    x: 2.0
+    y: 58.0
+    z: 0.0
+
+  wind_flow_2:
+    x: 3.0
+    y: 56.0
+    z: 0.0
+
+  wind_flow_3:
+    x: 3.0
+    y: 52.0
+    z: 2.0
+
+  wind_flow_4:
+    x: 3.0
+    y: 52.0
+    z: -2.0
+
+  wind_flow_branch:
+    x: 3.0
+    y: 54.0
+    z: 0.0
+
+  wind_flow_notable:
+    x: 3.0
+    y: 49.0
+    z: 0.0
+
+  wind_arcane_1:
+    x: -2.0
+    y: 58.0
+    z: 0.0
+
+  wind_arcane_2:
+    x: -3.0
+    y: 56.0
+    z: 0.0
+
+  wind_arcane_3:
+    x: -3.0
+    y: 52.0
+    z: 2.0
+
+  wind_arcane_4:
+    x: -3.0
+    y: 52.0
+    z: -2.0
+
+  wind_arcane_branch:
+    x: -3.0
+    y: 54.0
+    z: 0.0
+
+  wind_arcane_notable:
+    x: -3.0
+    y: 49.0
+    z: 0.0
+
+  wind_adaptation_1:
+    x: 1.5
+    y: 47.0
+    z: -3.0
+
+  wind_adaptation_2:
+    x: 0.0
+    y: 44.0
+    z: -6.0
+
+  wind_adaptation_3:
+    x: 2.0
+    y: 38.0
+    z: -6.0
+
+  wind_adaptation_4:
+    x: -2.0
+    y: 38.0
+    z: -6.0
+
+  wind_adaptation_branch:
+    x: 0.0
+    y: 41.0
+    z: -6.0
+
+  wind_adaptation_notable:
+    x: 0.0
+    y: 35.0
+    z: -6.0
+
+  wind_depth_1:
+    x: -1.5
+    y: 47.0
+    z: 3.0
+
+  wind_depth_2:
+    x: 0.0
+    y: 44.0
+    z: 6.0
+
+  wind_depth_3:
+    x: 2.0
+    y: 38.0
+    z: 6.0
+
+  wind_depth_4:
+    x: -2.0
+    y: 38.0
+    z: 6.0
+
+  wind_depth_branch:
+    x: 0.0
+    y: 41.0
+    z: 6.0
+
+  wind_depth_notable:
+    x: 0.0
+    y: 34.0
+    z: 6.0
+
+  wind_synergy_1:
+    x: 7.0
+    y: 39.0
+    z: 0.0
+
+  wind_synergy_2:
+    x: -7.0
+    y: 39.0
+    z: 0.0
+
+  wind_synergy_3:
+    x: 0.0
+    y: 31.0
+    z: -3.0
+
+  wind_synergy_4:
+    x: 0.0
+    y: 31.0
+    z: 3.0
+
+  wind_synergy_hub:
+    x: 0.0
+    y: 28.0
+    z: 0.0
+
+  wind_keystone_1:
+    x: 0.0
+    y: 25.0
+    z: 4.0
+
+  wind_keystone_2:
+    x: 0.0
+    y: 25.0
+    z: -4.0
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # OCTANT ARMS (8 arms × 32 nodes = 256 nodes)
+  # Rotated copies of FIRE arm's hand-tuned positions
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # HAVOC (+1, +1, +1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  havoc_entry:
+    x: 9.7
+    y: 74.7
+    z: 9.7
+
+  havoc_carnage_1:
+    x: 9.4
+    y: 75.8
+    z: 12.2
+
+  havoc_carnage_2:
+    x: 9.8
+    y: 77.0
+    z: 14.1
+
+  havoc_carnage_branch:
+    x: 11.0
+    y: 78.1
+    z: 15.2
+
+  havoc_carnage_3:
+    x: 13.0
+    y: 77.6
+    z: 17.2
+
+  havoc_carnage_4:
+    x: 11.3
+    y: 80.9
+    z: 15.6
+
+  havoc_carnage_notable:
+    x: 13.9
+    y: 81.0
+    z: 18.1
+
+  havoc_frenzy_1:
+    x: 12.2
+    y: 75.8
+    z: 9.4
+
+  havoc_frenzy_2:
+    x: 14.1
+    y: 77.0
+    z: 9.8
+
+  havoc_frenzy_branch:
+    x: 15.2
+    y: 78.1
+    z: 11.0
+
+  havoc_frenzy_3:
+    x: 17.2
+    y: 77.6
+    z: 13.0
+
+  havoc_frenzy_4:
+    x: 15.6
+    y: 80.9
+    z: 11.3
+
+  havoc_frenzy_notable:
+    x: 18.1
+    y: 81.0
+    z: 13.9
+
+  havoc_ruin_1:
+    x: 14.9
+    y: 84.6
+    z: 17.0
+
+  havoc_ruin_2:
+    x: 16.4
+    y: 88.8
+    z: 16.4
+
+  havoc_ruin_branch:
+    x: 18.2
+    y: 90.5
+    z: 18.2
+
+  havoc_ruin_3:
+    x: 18.5
+    y: 92.3
+    z: 21.3
+
+  havoc_ruin_4:
+    x: 21.3
+    y: 92.3
+    z: 18.5
+
+  havoc_ruin_notable:
+    x: 22.2
+    y: 94.6
+    z: 22.2
+
+  havoc_mayhem_1:
+    x: 19.5
+    y: 79.7
+    z: 17.3
+
+  havoc_mayhem_2:
+    x: 21.3
+    y: 79.0
+    z: 21.3
+
+  havoc_mayhem_branch:
+    x: 23.1
+    y: 80.7
+    z: 23.1
+
+  havoc_mayhem_3:
+    x: 23.4
+    y: 82.5
+    z: 26.2
+
+  havoc_mayhem_4:
+    x: 26.2
+    y: 82.5
+    z: 23.4
+
+  havoc_mayhem_notable:
+    x: 27.1
+    y: 84.8
+    z: 27.1
+
+  havoc_synergy_1:
+    x: 16.8
+    y: 86.8
+    z: 26.7
+
+  havoc_synergy_2:
+    x: 26.7
+    y: 86.8
+    z: 16.8
+
+  havoc_synergy_3:
+    x: 25.2
+    y: 93.9
+    z: 25.2
+
+  havoc_synergy_4:
+    x: 27.6
+    y: 89.0
+    z: 27.6
+
+  havoc_synergy_hub:
+    x: 28.1
+    y: 93.1
+    z: 28.1
+
+  havoc_keystone_1:
+    x: 31.5
+    y: 91.6
+    z: 31.5
+
+  havoc_keystone_2:
+    x: 28.2
+    y: 98.1
+    z: 28.2
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JUGGERNAUT (+1, +1, -1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  juggernaut_entry:
+    x: 9.7
+    y: 74.7
+    z: -9.7
+
+  juggernaut_conquest_1:
+    x: 12.2
+    y: 75.8
+    z: -9.4
+
+  juggernaut_conquest_2:
+    x: 14.1
+    y: 77.0
+    z: -9.8
+
+  juggernaut_conquest_branch:
+    x: 15.2
+    y: 78.1
+    z: -11.0
+
+  juggernaut_conquest_3:
+    x: 17.2
+    y: 77.6
+    z: -13.0
+
+  juggernaut_conquest_4:
+    x: 15.6
+    y: 80.9
+    z: -11.3
+
+  juggernaut_conquest_notable:
+    x: 18.1
+    y: 81.0
+    z: -13.9
+
+  juggernaut_dominion_1:
+    x: 9.4
+    y: 75.8
+    z: -12.2
+
+  juggernaut_dominion_2:
+    x: 9.8
+    y: 77.0
+    z: -14.1
+
+  juggernaut_dominion_branch:
+    x: 11.0
+    y: 78.1
+    z: -15.2
+
+  juggernaut_dominion_3:
+    x: 13.0
+    y: 77.6
+    z: -17.2
+
+  juggernaut_dominion_4:
+    x: 11.3
+    y: 80.9
+    z: -15.6
+
+  juggernaut_dominion_notable:
+    x: 13.9
+    y: 81.0
+    z: -18.1
+
+  juggernaut_bloodforge_1:
+    x: 17.0
+    y: 84.6
+    z: -14.9
+
+  juggernaut_bloodforge_2:
+    x: 16.4
+    y: 88.8
+    z: -16.4
+
+  juggernaut_bloodforge_branch:
+    x: 18.2
+    y: 90.5
+    z: -18.2
+
+  juggernaut_bloodforge_3:
+    x: 21.3
+    y: 92.3
+    z: -18.5
+
+  juggernaut_bloodforge_4:
+    x: 18.5
+    y: 92.3
+    z: -21.3
+
+  juggernaut_bloodforge_notable:
+    x: 22.2
+    y: 94.6
+    z: -22.2
+
+  juggernaut_tyrant_1:
+    x: 17.3
+    y: 79.7
+    z: -19.5
+
+  juggernaut_tyrant_2:
+    x: 21.3
+    y: 79.0
+    z: -21.3
+
+  juggernaut_tyrant_branch:
+    x: 23.1
+    y: 80.7
+    z: -23.1
+
+  juggernaut_tyrant_3:
+    x: 26.2
+    y: 82.5
+    z: -23.4
+
+  juggernaut_tyrant_4:
+    x: 23.4
+    y: 82.5
+    z: -26.2
+
+  juggernaut_tyrant_notable:
+    x: 27.1
+    y: 84.8
+    z: -27.1
+
+  juggernaut_synergy_1:
+    x: 26.7
+    y: 86.8
+    z: -16.8
+
+  juggernaut_synergy_2:
+    x: 16.8
+    y: 86.8
+    z: -26.7
+
+  juggernaut_synergy_3:
+    x: 25.2
+    y: 93.9
+    z: -25.2
+
+  juggernaut_synergy_4:
+    x: 27.6
+    y: 89.0
+    z: -27.6
+
+  juggernaut_synergy_hub:
+    x: 28.1
+    y: 93.1
+    z: -28.1
+
+  juggernaut_keystone_1:
+    x: 31.5
+    y: 91.6
+    z: -31.5
+
+  juggernaut_keystone_2:
+    x: 28.2
+    y: 98.1
+    z: -28.2
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # STRIKER (+1, -1, +1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  striker_entry:
+    x: 9.7
+    y: 55.3
+    z: 9.7
+
+  striker_quicksilver_1:
+    x: 9.4
+    y: 54.2
+    z: 12.2
+
+  striker_quicksilver_2:
+    x: 9.8
+    y: 53.0
+    z: 14.1
+
+  striker_quicksilver_branch:
+    x: 11.0
+    y: 51.9
+    z: 15.2
+
+  striker_quicksilver_3:
+    x: 11.3
+    y: 49.1
+    z: 15.6
+
+  striker_quicksilver_4:
+    x: 13.0
+    y: 52.4
+    z: 17.2
+
+  striker_quicksilver_notable:
+    x: 13.9
+    y: 49.0
+    z: 18.1
+
+  striker_precision_1:
+    x: 12.2
+    y: 54.2
+    z: 9.4
+
+  striker_precision_2:
+    x: 14.1
+    y: 53.0
+    z: 9.8
+
+  striker_precision_branch:
+    x: 15.2
+    y: 51.9
+    z: 11.0
+
+  striker_precision_3:
+    x: 15.6
+    y: 49.1
+    z: 11.3
+
+  striker_precision_4:
+    x: 17.2
+    y: 52.4
+    z: 13.0
+
+  striker_precision_notable:
+    x: 18.1
+    y: 49.0
+    z: 13.9
+
+  striker_ambush_1:
+    x: 17.3
+    y: 50.3
+    z: 19.5
+
+  striker_ambush_2:
+    x: 21.3
+    y: 51.0
+    z: 21.3
+
+  striker_ambush_branch:
+    x: 23.1
+    y: 49.3
+    z: 23.1
+
+  striker_ambush_3:
+    x: 23.4
+    y: 47.5
+    z: 26.2
+
+  striker_ambush_4:
+    x: 26.2
+    y: 47.5
+    z: 23.4
+
+  striker_ambush_notable:
+    x: 27.1
+    y: 45.2
+    z: 27.1
+
+  striker_flurry_1:
+    x: 17.0
+    y: 45.4
+    z: 14.9
+
+  striker_flurry_2:
+    x: 16.4
+    y: 41.2
+    z: 16.4
+
+  striker_flurry_branch:
+    x: 18.2
+    y: 39.5
+    z: 18.2
+
+  striker_flurry_3:
+    x: 18.5
+    y: 37.7
+    z: 21.3
+
+  striker_flurry_4:
+    x: 21.3
+    y: 37.7
+    z: 18.5
+
+  striker_flurry_notable:
+    x: 22.2
+    y: 35.4
+    z: 22.2
+
+  striker_synergy_1:
+    x: 16.8
+    y: 43.2
+    z: 26.7
+
+  striker_synergy_2:
+    x: 26.7
+    y: 43.2
+    z: 16.8
+
+  striker_synergy_3:
+    x: 27.6
+    y: 41.0
+    z: 27.6
+
+  striker_synergy_4:
+    x: 25.2
+    y: 36.1
+    z: 25.2
+
+  striker_synergy_hub:
+    x: 28.1
+    y: 36.9
+    z: 28.1
+
+  striker_keystone_1:
+    x: 28.2
+    y: 31.9
+    z: 28.2
+
+  striker_keystone_2:
+    x: 31.5
+    y: 38.4
+    z: 31.5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WARDEN (+1, -1, -1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  warden_entry:
+    x: 9.7
+    y: 55.3
+    z: -9.7
+
+  warden_garrison_1:
+    x: 12.2
+    y: 54.2
+    z: -9.4
+
+  warden_garrison_2:
+    x: 14.1
+    y: 53.0
+    z: -9.8
+
+  warden_garrison_branch:
+    x: 15.2
+    y: 51.9
+    z: -11.0
+
+  warden_garrison_3:
+    x: 15.6
+    y: 49.1
+    z: -11.3
+
+  warden_garrison_4:
+    x: 17.2
+    y: 52.4
+    z: -13.0
+
+  warden_garrison_notable:
+    x: 18.1
+    y: 49.0
+    z: -13.9
+
+  warden_outrider_1:
+    x: 9.4
+    y: 54.2
+    z: -12.2
+
+  warden_outrider_2:
+    x: 9.8
+    y: 53.0
+    z: -14.1
+
+  warden_outrider_branch:
+    x: 11.0
+    y: 51.9
+    z: -15.2
+
+  warden_outrider_3:
+    x: 11.3
+    y: 49.1
+    z: -15.6
+
+  warden_outrider_4:
+    x: 13.0
+    y: 52.4
+    z: -17.2
+
+  warden_outrider_notable:
+    x: 13.9
+    y: 49.0
+    z: -18.1
+
+  warden_ironclad_1:
+    x: 19.5
+    y: 50.3
+    z: -17.3
+
+  warden_ironclad_2:
+    x: 21.3
+    y: 51.0
+    z: -21.3
+
+  warden_ironclad_branch:
+    x: 23.1
+    y: 49.3
+    z: -23.1
+
+  warden_ironclad_3:
+    x: 26.2
+    y: 47.5
+    z: -23.4
+
+  warden_ironclad_4:
+    x: 23.4
+    y: 47.5
+    z: -26.2
+
+  warden_ironclad_notable:
+    x: 27.1
+    y: 45.2
+    z: -27.1
+
+  warden_palisade_1:
+    x: 14.9
+    y: 45.4
+    z: -17.0
+
+  warden_palisade_2:
+    x: 16.4
+    y: 41.2
+    z: -16.4
+
+  warden_palisade_branch:
+    x: 18.2
+    y: 39.5
+    z: -18.2
+
+  warden_palisade_3:
+    x: 21.3
+    y: 37.7
+    z: -18.5
+
+  warden_palisade_4:
+    x: 18.5
+    y: 37.7
+    z: -21.3
+
+  warden_palisade_notable:
+    x: 22.2
+    y: 35.4
+    z: -22.2
+
+  warden_synergy_1:
+    x: 26.7
+    y: 43.2
+    z: -16.8
+
+  warden_synergy_2:
+    x: 16.8
+    y: 43.2
+    z: -26.7
+
+  warden_synergy_3:
+    x: 27.6
+    y: 41.0
+    z: -27.6
+
+  warden_synergy_4:
+    x: 25.2
+    y: 36.1
+    z: -25.2
+
+  warden_synergy_hub:
+    x: 28.1
+    y: 36.9
+    z: -28.1
+
+  warden_keystone_1:
+    x: 28.2
+    y: 31.9
+    z: -28.2
+
+  warden_keystone_2:
+    x: 31.5
+    y: 38.4
+    z: -31.5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WARLOCK (-1, +1, +1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  warlock_entry:
+    x: -9.7
+    y: 74.7
+    z: 9.7
+
+  warlock_hex_1:
+    x: -12.2
+    y: 75.8
+    z: 9.4
+
+  warlock_hex_2:
+    x: -14.1
+    y: 77.0
+    z: 9.8
+
+  warlock_hex_branch:
+    x: -15.2
+    y: 78.1
+    z: 11.0
+
+  warlock_hex_3:
+    x: -17.2
+    y: 77.6
+    z: 13.0
+
+  warlock_hex_4:
+    x: -15.6
+    y: 80.9
+    z: 11.3
+
+  warlock_hex_notable:
+    x: -18.1
+    y: 81.0
+    z: 13.9
+
+  warlock_ritual_1:
+    x: -9.4
+    y: 75.8
+    z: 12.2
+
+  warlock_ritual_2:
+    x: -9.8
+    y: 77.0
+    z: 14.1
+
+  warlock_ritual_branch:
+    x: -11.0
+    y: 78.1
+    z: 15.2
+
+  warlock_ritual_3:
+    x: -13.0
+    y: 77.6
+    z: 17.2
+
+  warlock_ritual_4:
+    x: -11.3
+    y: 80.9
+    z: 15.6
+
+  warlock_ritual_notable:
+    x: -13.9
+    y: 81.0
+    z: 18.1
+
+  warlock_malice_1:
+    x: -17.0
+    y: 84.6
+    z: 14.9
+
+  warlock_malice_2:
+    x: -16.4
+    y: 88.8
+    z: 16.4
+
+  warlock_malice_branch:
+    x: -18.2
+    y: 90.5
+    z: 18.2
+
+  warlock_malice_3:
+    x: -21.3
+    y: 92.3
+    z: 18.5
+
+  warlock_malice_4:
+    x: -18.5
+    y: 92.3
+    z: 21.3
+
+  warlock_malice_notable:
+    x: -22.2
+    y: 94.6
+    z: 22.2
+
+  warlock_damnation_1:
+    x: -17.3
+    y: 79.7
+    z: 19.5
+
+  warlock_damnation_2:
+    x: -21.3
+    y: 79.0
+    z: 21.3
+
+  warlock_damnation_branch:
+    x: -23.1
+    y: 80.7
+    z: 23.1
+
+  warlock_damnation_3:
+    x: -26.2
+    y: 82.5
+    z: 23.4
+
+  warlock_damnation_4:
+    x: -23.4
+    y: 82.5
+    z: 26.2
+
+  warlock_damnation_notable:
+    x: -27.1
+    y: 84.8
+    z: 27.1
+
+  warlock_synergy_1:
+    x: -26.7
+    y: 86.8
+    z: 16.8
+
+  warlock_synergy_2:
+    x: -16.8
+    y: 86.8
+    z: 26.7
+
+  warlock_synergy_3:
+    x: -25.2
+    y: 93.9
+    z: 25.2
+
+  warlock_synergy_4:
+    x: -27.6
+    y: 89.0
+    z: 27.6
+
+  warlock_synergy_hub:
+    x: -28.1
+    y: 93.1
+    z: 28.1
+
+  warlock_keystone_1:
+    x: -31.5
+    y: 91.6
+    z: 31.5
+
+  warlock_keystone_2:
+    x: -28.2
+    y: 98.1
+    z: 28.2
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # LICH (-1, +1, -1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  lich_entry:
+    x: -9.7
+    y: 74.7
+    z: -9.7
+
+  lich_grasp_1:
+    x: -9.4
+    y: 75.8
+    z: -12.2
+
+  lich_grasp_2:
+    x: -9.8
+    y: 77.0
+    z: -14.1
+
+  lich_grasp_branch:
+    x: -11.0
+    y: 78.1
+    z: -15.2
+
+  lich_grasp_3:
+    x: -13.0
+    y: 77.6
+    z: -17.2
+
+  lich_grasp_4:
+    x: -11.3
+    y: 80.9
+    z: -15.6
+
+  lich_grasp_notable:
+    x: -13.9
+    y: 81.0
+    z: -18.1
+
+  lich_crypt_1:
+    x: -12.2
+    y: 75.8
+    z: -9.4
+
+  lich_crypt_2:
+    x: -14.1
+    y: 77.0
+    z: -9.8
+
+  lich_crypt_branch:
+    x: -15.2
+    y: 78.1
+    z: -11.0
+
+  lich_crypt_3:
+    x: -17.2
+    y: 77.6
+    z: -13.0
+
+  lich_crypt_4:
+    x: -15.6
+    y: 80.9
+    z: -11.3
+
+  lich_crypt_notable:
+    x: -18.1
+    y: 81.0
+    z: -13.9
+
+  lich_requiem_1:
+    x: -14.9
+    y: 84.6
+    z: -17.0
+
+  lich_requiem_2:
+    x: -16.4
+    y: 88.8
+    z: -16.4
+
+  lich_requiem_branch:
+    x: -18.2
+    y: 90.5
+    z: -18.2
+
+  lich_requiem_3:
+    x: -18.5
+    y: 92.3
+    z: -21.3
+
+  lich_requiem_4:
+    x: -21.3
+    y: 92.3
+    z: -18.5
+
+  lich_requiem_notable:
+    x: -22.2
+    y: 94.6
+    z: -22.2
+
+  lich_decay_1:
+    x: -19.5
+    y: 79.7
+    z: -17.3
+
+  lich_decay_2:
+    x: -21.3
+    y: 79.0
+    z: -21.3
+
+  lich_decay_branch:
+    x: -23.1
+    y: 80.7
+    z: -23.1
+
+  lich_decay_3:
+    x: -23.4
+    y: 82.5
+    z: -26.2
+
+  lich_decay_4:
+    x: -26.2
+    y: 82.5
+    z: -23.4
+
+  lich_decay_notable:
+    x: -27.1
+    y: 84.8
+    z: -27.1
+
+  lich_synergy_1:
+    x: -16.8
+    y: 86.8
+    z: -26.7
+
+  lich_synergy_2:
+    x: -26.7
+    y: 86.8
+    z: -16.8
+
+  lich_synergy_3:
+    x: -25.2
+    y: 93.9
+    z: -25.2
+
+  lich_synergy_4:
+    x: -27.6
+    y: 89.0
+    z: -27.6
+
+  lich_synergy_hub:
+    x: -28.1
+    y: 93.1
+    z: -28.1
+
+  lich_keystone_1:
+    x: -31.5
+    y: 91.6
+    z: -31.5
+
+  lich_keystone_2:
+    x: -28.2
+    y: 98.1
+    z: -28.2
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # TEMPEST (-1, -1, +1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  tempest_entry:
+    x: -9.7
+    y: 55.3
+    z: 9.7
+
+  tempest_squall_1:
+    x: -12.2
+    y: 54.2
+    z: 9.4
+
+  tempest_squall_2:
+    x: -14.1
+    y: 53.0
+    z: 9.8
+
+  tempest_squall_branch:
+    x: -15.2
+    y: 51.9
+    z: 11.0
+
+  tempest_squall_3:
+    x: -15.6
+    y: 49.1
+    z: 11.3
+
+  tempest_squall_4:
+    x: -17.2
+    y: 52.4
+    z: 13.0
+
+  tempest_squall_notable:
+    x: -18.1
+    y: 49.0
+    z: 13.9
+
+  tempest_tailwind_1:
+    x: -9.4
+    y: 54.2
+    z: 12.2
+
+  tempest_tailwind_2:
+    x: -9.8
+    y: 53.0
+    z: 14.1
+
+  tempest_tailwind_branch:
+    x: -11.0
+    y: 51.9
+    z: 15.2
+
+  tempest_tailwind_3:
+    x: -11.3
+    y: 49.1
+    z: 15.6
+
+  tempest_tailwind_4:
+    x: -13.0
+    y: 52.4
+    z: 17.2
+
+  tempest_tailwind_notable:
+    x: -13.9
+    y: 49.0
+    z: 18.1
+
+  tempest_cyclone_1:
+    x: -19.5
+    y: 50.3
+    z: 17.3
+
+  tempest_cyclone_2:
+    x: -21.3
+    y: 51.0
+    z: 21.3
+
+  tempest_cyclone_branch:
+    x: -23.1
+    y: 49.3
+    z: 23.1
+
+  tempest_cyclone_3:
+    x: -26.2
+    y: 47.5
+    z: 23.4
+
+  tempest_cyclone_4:
+    x: -23.4
+    y: 47.5
+    z: 26.2
+
+  tempest_cyclone_notable:
+    x: -27.1
+    y: 45.2
+    z: 27.1
+
+  tempest_maelstrom_1:
+    x: -14.9
+    y: 45.4
+    z: 17.0
+
+  tempest_maelstrom_2:
+    x: -16.4
+    y: 41.2
+    z: 16.4
+
+  tempest_maelstrom_branch:
+    x: -18.2
+    y: 39.5
+    z: 18.2
+
+  tempest_maelstrom_3:
+    x: -21.3
+    y: 37.7
+    z: 18.5
+
+  tempest_maelstrom_4:
+    x: -18.5
+    y: 37.7
+    z: 21.3
+
+  tempest_maelstrom_notable:
+    x: -22.2
+    y: 35.4
+    z: 22.2
+
+  tempest_synergy_1:
+    x: -26.7
+    y: 43.2
+    z: 16.8
+
+  tempest_synergy_2:
+    x: -16.8
+    y: 43.2
+    z: 26.7
+
+  tempest_synergy_3:
+    x: -27.6
+    y: 41.0
+    z: 27.6
+
+  tempest_synergy_4:
+    x: -25.2
+    y: 36.1
+    z: 25.2
+
+  tempest_synergy_hub:
+    x: -28.1
+    y: 36.9
+    z: 28.1
+
+  tempest_keystone_1:
+    x: -28.2
+    y: 31.9
+    z: 28.2
+
+  tempest_keystone_2:
+    x: -31.5
+    y: 38.4
+    z: 31.5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SENTINEL (-1, -1, -1)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  sentinel_entry:
+    x: -9.7
+    y: 55.3
+    z: -9.7
+
+  sentinel_aegis_1:
+    x: -9.4
+    y: 54.2
+    z: -12.2
+
+  sentinel_aegis_2:
+    x: -9.8
+    y: 53.0
+    z: -14.1
+
+  sentinel_aegis_branch:
+    x: -11.0
+    y: 51.9
+    z: -15.2
+
+  sentinel_aegis_3:
+    x: -11.3
+    y: 49.1
+    z: -15.6
+
+  sentinel_aegis_4:
+    x: -13.0
+    y: 52.4
+    z: -17.2
+
+  sentinel_aegis_notable:
+    x: -13.9
+    y: 49.0
+    z: -18.1
+
+  sentinel_vigilance_1:
+    x: -12.2
+    y: 54.2
+    z: -9.4
+
+  sentinel_vigilance_2:
+    x: -14.1
+    y: 53.0
+    z: -9.8
+
+  sentinel_vigilance_branch:
+    x: -15.2
+    y: 51.9
+    z: -11.0
+
+  sentinel_vigilance_3:
+    x: -15.6
+    y: 49.1
+    z: -11.3
+
+  sentinel_vigilance_4:
+    x: -17.2
+    y: 52.4
+    z: -13.0
+
+  sentinel_vigilance_notable:
+    x: -18.1
+    y: 49.0
+    z: -13.9
+
+  sentinel_restoration_1:
+    x: -17.3
+    y: 50.3
+    z: -19.5
+
+  sentinel_restoration_2:
+    x: -21.3
+    y: 51.0
+    z: -21.3
+
+  sentinel_restoration_branch:
+    x: -23.1
+    y: 49.3
+    z: -23.1
+
+  sentinel_restoration_3:
+    x: -23.4
+    y: 47.5
+    z: -26.2
+
+  sentinel_restoration_4:
+    x: -26.2
+    y: 47.5
+    z: -23.4
+
+  sentinel_restoration_notable:
+    x: -27.1
+    y: 45.2
+    z: -27.1
+
+  sentinel_haven_1:
+    x: -17.0
+    y: 45.4
+    z: -14.9
+
+  sentinel_haven_2:
+    x: -16.4
+    y: 41.2
+    z: -16.4
+
+  sentinel_haven_branch:
+    x: -18.2
+    y: 39.5
+    z: -18.2
+
+  sentinel_haven_3:
+    x: -18.5
+    y: 37.7
+    z: -21.3
+
+  sentinel_haven_4:
+    x: -21.3
+    y: 37.7
+    z: -18.5
+
+  sentinel_haven_notable:
+    x: -22.2
+    y: 35.4
+    z: -22.2
+
+  sentinel_synergy_1:
+    x: -16.8
+    y: 43.2
+    z: -26.7
+
+  sentinel_synergy_2:
+    x: -26.7
+    y: 43.2
+    z: -16.8
+
+  sentinel_synergy_3:
+    x: -27.6
+    y: 41.0
+    z: -27.6
+
+  sentinel_synergy_4:
+    x: -25.2
+    y: 36.1
+    z: -25.2
+
+  sentinel_synergy_hub:
+    x: -28.1
+    y: 36.9
+    z: -28.1
+
+  sentinel_keystone_1:
+    x: -28.2
+    y: 31.9
+    z: -28.2
+
+  sentinel_keystone_2:
+    x: -31.5
+    y: 38.4
+    z: -31.5

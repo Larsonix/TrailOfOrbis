@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG earth damage - brown text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#CC8833"
+}

@@ -1,0 +1,23 @@
+{
+  "TranslationProperties": {
+    "Name": "RPG Invisible Green Light"
+  },
+  "Quality": "Technical",
+  "PlayerAnimationsId": "Block",
+  "BlockType": {
+    "Material": "Solid",
+    "DrawType": "Model",
+    "Opacity": "Transparent",
+    "CustomModel": "Blocks/RPG/Invisible_Light.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "BlockTextures/RPG/Transparent.png",
+        "Weight": 1
+      }
+    ],
+    "Light": {
+      "Color": "#0f0",
+      "Radius": 1
+    }
+  }
+}

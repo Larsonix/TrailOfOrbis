@@ -1,0 +1,35 @@
+{
+  "TranslationProperties": {
+    "Name": "Support Gem",
+    "Description": "A support gem that modifies an ability."
+  },
+  "Quality": "Uncommon",
+  "Model": "Resources/Crystals/Crystal_Fragment.blockymodel",
+  "Texture": "Resources/Crystals/Crystal_Fragment_Textures/Blue.png",
+  "PlayerAnimationsId": "Item",
+  "MaxStack": 1,
+  "Tags": {
+    "Type": [
+      "Gem"
+    ],
+    "Family": [
+      "SkillGem"
+    ]
+  },
+  "IconProperties": {
+    "Scale": 0.75,
+    "Translation": [
+      -0.3,
+      0.3
+    ],
+    "Rotation": [
+      34.315,
+      29.815,
+      22.5
+    ]
+  },
+  "Scale": 1.2,
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": false,
+  "Icon": "Icons/ItemsGenerated/Ingredient_Crystal_Fragments_Blue.png"
+}

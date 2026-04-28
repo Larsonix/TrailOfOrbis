@@ -1,0 +1,64 @@
+# Hexcode Spell Damage Integration
+# Maps Hexcode damage source IDs to RPG damage types, elements, and display names.
+# When Hexcode spells deal damage via EnvironmentSource("hex_xxx"),
+# this config controls how it flows through the RPG damage pipeline.
+
+enabled: true
+
+# Maximum elemental resistance cap for spell damage (%)
+max_resistance_cap: 75
+
+# Maximum total damage amplification from Shock + Erode combined.
+# 2.0 = 200% = double damage max. Caps the Shock conditional multiplier
+# in our pipeline. Erode (Hexcode) runs in a separate pipeline stage —
+# this cap limits our contribution only.
+max_damage_amplification: 2.0
+
+# Maps source ID -> { type: DamageType, element: ElementType }
+# DamageType: PHYSICAL, MAGIC, FIRE, WATER, LIGHTNING, EARTH, WIND, VOID
+# ElementType: FIRE, WATER, LIGHTNING, EARTH, WIND, VOID (or null for none)
+# "default" entry used for any unmapped hex_ source
+damage_type_map:
+  hex_bolt:
+    type: MAGIC
+    element: LIGHTNING
+  hex_combust:
+    type: FIRE
+    element: FIRE
+  hex_gust:
+    type: WIND
+    element: WIND
+  hex_glaciate:
+    type: WATER
+    element: WATER
+  hex_ensnare:
+    type: EARTH
+    element: EARTH
+  hex_phase:
+    type: MAGIC
+    element: VOID
+  default:
+    type: MAGIC
+
+# Realm pedestal placement — when Hexcode is loaded, realms may spawn a pedestal
+realm_pedestal:
+  enabled: true
+  spawn_chance: 15            # % chance per realm
+  min_distance_from_spawn: 20 # blocks from spawn point
+  max_distance_from_spawn: 40 # blocks from spawn point
+  tier_by_realm_tier:         # Pedestal tier scales with realm difficulty
+    1: "Hexcode_Pedestal_Thorium"
+    2: "Hexcode_Pedestal_Fire"
+    3: "Hexcode_Pedestal_Arcane"
+    4: "Hexcode_Pedestal_Void"
+    5: "Hexcode_Pedestal_Void"
+
+# Display names for death recap / combat log
+spell_display_names:
+  hex_bolt: "Lightning Bolt"
+  hex_combust: "Combustion"
+  hex_gust: "Gust"
+  hex_glaciate: "Glaciate"
+  hex_ensnare: "Ensnare"
+  hex_phase: "Phase Crush"
+  default: "Hex Spell"

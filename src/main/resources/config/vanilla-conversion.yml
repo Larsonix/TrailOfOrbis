@@ -1,0 +1,137 @@
+# =============================================================================
+# Vanilla Item Conversion Configuration
+# =============================================================================
+# Converts vanilla Hytale weapons and armor into RPG gear when acquired
+# through mob drops, chest loot, or crafting.
+#
+# OVERVIEW:
+# ---------
+# When enabled, vanilla weapons and armor are automatically converted to RPG
+# gear with random stats, modifiers, and quality. The item's material determines
+# the maximum rarity it can roll (e.g., wood can only be Common, steel can be Epic).
+#
+# ACQUISITION SOURCES:
+# - Mob drops: Uses the mob's level
+# - Chest loot: Uses distance from spawn to determine level
+# - Crafting: Uses the player's current RPG level
+#
+# Items picked up from the ground (dropped by players) are NOT converted.
+# =============================================================================
+
+# Master switch for the entire conversion system
+enabled: true
+
+# -----------------------------------------------------------------------------
+# CONVERSION SOURCES
+# -----------------------------------------------------------------------------
+# Enable/disable conversion for specific acquisition methods.
+# Ground pickups are intentionally excluded to prevent exploit loops.
+
+sources:
+  # Convert weapons/armor dropped by mobs
+  mob_drops: true
+
+  # Convert weapons/armor found in treasure chests
+  chest_loot: true
+
+  # Convert weapons/armor created through crafting
+  crafting: true
+
+# -----------------------------------------------------------------------------
+# ITEM FILTERING
+# -----------------------------------------------------------------------------
+# Control which items can be converted using whitelist/blacklist.
+#
+# WHITELIST: When non-empty, ONLY these item IDs are converted
+# BLACKLIST: These item IDs are NEVER converted (takes priority over whitelist)
+#
+# Item IDs follow Hytale naming: e.g., "Weapon_Sword_Iron", "Armor_Steel_Chest"
+
+# Only convert these items (empty = all weapons/armor)
+whitelist: []
+
+# Never convert these items (overrides whitelist)
+blacklist: []
+
+# -----------------------------------------------------------------------------
+# MATERIAL TIER MAPPINGS
+# -----------------------------------------------------------------------------
+# Maps material names to maximum rarity tiers.
+#
+# When an item is converted, its rarity is rolled randomly but CAPPED at the
+# maximum allowed by its material. A wooden sword cannot be Epic, but an iron
+# sword could roll anywhere from Common to Rare.
+#
+# RARITY TIERS (lowest to highest):
+# COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC
+#
+# Material is extracted from item ID:
+# - "Weapon_Sword_Iron" -> "iron"
+# - "Armor_Steel_Chest" -> "steel"
+
+material_tiers:
+  # Natural/primitive materials
+  wood: COMMON
+  bone: COMMON
+  stone: COMMON
+
+  # Early metals
+  copper: UNCOMMON
+  bronze: RARE
+
+  # Standard metals
+  iron: RARE
+  steel: EPIC
+
+  # Advanced/magical materials
+  cobalt: LEGENDARY
+  mithril: LEGENDARY
+  adamantite: MYTHIC
+  obsidian: MYTHIC
+
+  # Special materials (if they exist)
+  gold: RARE         # Fragile but magical
+  silver: RARE       # Good vs undead
+  leather: UNCOMMON  # Light armor
+  hide: COMMON       # Basic armor
+  cloth: COMMON      # Robes
+
+# Default max rarity for materials not listed above
+default_max_rarity: RARE
+
+# -----------------------------------------------------------------------------
+# LEVEL CALCULATION
+# -----------------------------------------------------------------------------
+# How item levels are determined for different acquisition sources.
+
+level_calculation:
+  # Minimum possible item level
+  min_level: 1
+
+  # Maximum possible item level
+  max_level: 1000000
+
+  # Level offset for crafted items (added to player's level)
+  # Negative values make crafted items slightly weaker
+  # Positive values make crafted items slightly stronger
+  crafting_level_offset: 0
+
+  # For chest loot, use DistanceBonusCalculator formula:
+  # level = 1 + (distance_from_spawn - 100) / 75
+  # This is already configured in mob-scaling.yml
+
+# -----------------------------------------------------------------------------
+# RARITY BONUSES
+# -----------------------------------------------------------------------------
+# Additional rarity bonus applied during conversion (stacks with other bonuses).
+# Higher values shift the probability toward rarer results.
+
+rarity_bonus:
+  # Bonus for mob drops (higher = rarer drops from mobs)
+  mob_drops: 0.0
+
+  # Bonus for chest loot (treasure chests tend to have better items)
+  chest_loot: 0.5
+
+  # Bonus for crafting (skilled crafters can make better items)
+  crafting: 0.0

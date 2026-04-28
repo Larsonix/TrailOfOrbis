@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Lich.png"
+    }
+  ],
+  "Light": {
+    "Color": "#6677AA",
+    "Radius": 2
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

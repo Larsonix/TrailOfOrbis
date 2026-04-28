@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG critical hit damage type - red damage text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#FF4444"
+}

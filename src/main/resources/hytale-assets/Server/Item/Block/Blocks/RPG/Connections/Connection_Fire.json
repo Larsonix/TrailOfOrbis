@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Fire.png"
+    }
+  ],
+  "Light": {
+    "Color": "#FF7855",
+    "Radius": 2
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Lightning.png"
+    }
+  ],
+  "Light": {
+    "Color": "#FFEE55",
+    "Radius": 2
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

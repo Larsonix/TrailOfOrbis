@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG water critical hit - bright cyan text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#88EEFF"
+}

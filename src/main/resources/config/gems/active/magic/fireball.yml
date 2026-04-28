@@ -1,0 +1,42 @@
+# Fireball — Fire spell, AoE projectile
+id: fireball
+name: "Fireball"
+description: "Hurl a ball of fire that explodes on impact, dealing fire damage in an area."
+
+tags:
+  element: [Fire]
+  damage_type: [Spell]
+  delivery: [Ranged, Projectile, AoE]
+  timing: [Instant]
+  role: [Strike, Applier]
+  mechanical: [Hit, Crit]
+
+weapon_categories: [Magic]
+gear_slots: [Any]
+
+damage:
+  base_percent: 180
+  element: Fire
+  aoe_radius: 3.0
+
+cost:
+  type: mana
+  amount: 15
+
+cooldown: 3.0
+cast_type: QUICK_CAST
+
+ailment:
+  type: Burn
+  base_chance: 60
+
+quality_bonuses:
+  ailment_chance: 0.1
+  aoe_radius: 0.01
+  cooldown_reduction: 0.005
+
+visuals:
+  projectile: "Weapon_Bomb_Fire"
+  cast_sound: "spell_fire_cast"
+  impact_sound: "explosion_fire"
+  impact_particles: "fire_burst"

@@ -1,7 +1,7 @@
 ---
 name: Stat Reference
 title: Complete Stat Reference
-description: All 153 computed stats organized by category, plus the 30 attribute grants
+description: All 246 computed stats organized by category, plus the 30 attribute grants
 author: Larsonix
 sort-index: 10
 order: 28
@@ -10,7 +10,7 @@ published: true
 
 # Complete Stat Reference
 
-30 attribute-derived stats (5 per element, zero overlap) feed into 153 computed fields across resources, offense, defense, movement, elements, and utility. Your final stats are the sum of base values + attribute grants + gear modifiers + skill tree bonuses.
+30 attribute-derived stats (5 per element, zero overlap) feed into 246 computed fields across resources, offense, defense, and movement. Your final stats are the sum of base values + attribute grants + gear modifiers + skill tree bonuses.
 
 This page is the full reference. For a quick overview, see [The 6 Elements](attributes).
 
@@ -103,7 +103,7 @@ A bruiser build : hits hard, survives counterattacks.
 
 ## Computed Stats by Category
 
-The full ComputedStats structure contains 153 fields organized into 6 categories plus 2 utility fields. These are the stats the game engine actually reads to determine combat outcomes.
+The full ComputedStats structure contains 246 fields organized into 4 categories. These are the stats the game engine actually reads to determine combat outcomes.
 
 ### Resource Stats (20 fields)
 

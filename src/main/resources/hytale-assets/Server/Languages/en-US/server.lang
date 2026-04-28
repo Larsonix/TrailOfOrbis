@@ -1,0 +1,19 @@
+general.qualities.Mythic = Mythic
+general.qualities.Unique = Unique
+
+general.damageCauses.rpg_physical = physical damage
+general.damageCauses.rpg_physical_crit = a critical strike
+general.damageCauses.rpg_magic = arcane forces
+general.damageCauses.rpg_magic_crit = a devastating spell
+general.damageCauses.rpg_fire = fire
+general.damageCauses.rpg_fire_crit = a searing blaze
+general.damageCauses.rpg_water = water
+general.damageCauses.rpg_water_crit = a crushing torrent
+general.damageCauses.rpg_lightning = lightning
+general.damageCauses.rpg_lightning_crit = a thunderous bolt
+general.damageCauses.rpg_earth = earth
+general.damageCauses.rpg_earth_crit = a devastating quake
+general.damageCauses.rpg_wind = wind
+general.damageCauses.rpg_wind_crit = a vicious gale
+general.damageCauses.rpg_void = the void
+general.damageCauses.rpg_void_crit = a void eruption

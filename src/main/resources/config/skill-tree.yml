@@ -1,0 +1,7455 @@
+feedback:
+  banner:
+    enabled: true
+    basic:
+      duration: 0.5
+      fade_in: 0.1
+      fade_out: 0.2
+    notable:
+      duration: 1.0
+      fade_in: 0.2
+      fade_out: 0.3
+    keystone:
+      duration: 1.0
+      fade_in: 0.2
+      fade_out: 0.3
+  sound:
+    enabled: true
+    basic: SFX_Discovery_Z1_Short
+    notable: SFX_Discovery_Z1_Medium
+    keystone: SFX_Discovery_Z3_Medium
+  chat:
+    enabled: true
+    show_borders: true
+  toast:
+    enabled: true
+nodes:
+  origin:
+    name: Origin
+    description: The heart of the galaxy - your journey begins here
+    region: CORE
+    tier: 0
+    startNode: true
+    connections:
+    - fire_entry
+    - water_entry
+    - lightning_entry
+    - earth_entry
+    - void_entry
+    - wind_entry
+    modifiers: []
+  fire_entry:
+    name: Path of Fire
+    description: +5% Physical Damage
+    region: FIRE
+    tier: 1
+    connections:
+    - origin
+    - fire_fury_1
+    - fire_inferno_1
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  fire_fury_1:
+    name: Ignition I
+    description: +6% Physical Damage
+    region: FIRE
+    tier: 1
+    connections:
+    - fire_entry
+    - fire_fury_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  fire_fury_2:
+    name: Ignition II
+    description: +5.2 Crit Multiplier
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_fury_1
+    - fire_fury_branch
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 5.2
+      type: FLAT
+  fire_fury_branch:
+    name: Searing Focus
+    description: +3.3% Physical Damage, +2.5 Crit Multiplier
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_fury_2
+    - fire_fury_3
+    - fire_fury_4
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 2.5
+      type: FLAT
+  fire_fury_3:
+    name: Ignition III
+    description: +6% Physical Damage
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_fury_branch
+    - fire_fury_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  fire_fury_4:
+    name: Critical Edge
+    description: +6.3 Crit Multiplier
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_fury_branch
+    - fire_fury_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 6.3
+      type: FLAT
+  fire_fury_notable:
+    name: Searing Strikes
+    description: +15% Fire Damage, +12.5% Physical Damage
+    region: FIRE
+    tier: 4
+    notable: true
+    connections:
+    - fire_fury_3
+    - fire_fury_4
+    - fire_synergy_1
+    - fire_bloodlust_1
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  fire_inferno_1:
+    name: Pyre I
+    description: +6% Burn Damage
+    region: FIRE
+    tier: 1
+    connections:
+    - fire_entry
+    - fire_inferno_2
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  fire_inferno_2:
+    name: Pyre II
+    description: +3.8% Ignite Chance
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_inferno_1
+    - fire_inferno_branch
+    modifiers:
+    - stat: IGNITE_CHANCE
+      value: 3.8
+      type: FLAT
+  fire_inferno_branch:
+    name: Burning Path
+    description: +3.3% Burn Damage, +2.1% Ignite Chance
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_inferno_2
+    - fire_inferno_3
+    - fire_inferno_4
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: IGNITE_CHANCE
+      value: 2.1
+      type: FLAT
+  fire_inferno_3:
+    name: Pyre III
+    description: +6% Burn Damage
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_inferno_branch
+    - fire_inferno_notable
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  fire_inferno_4:
+    name: Ignite Mastery
+    description: +3.9% Ignite Chance
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_inferno_branch
+    - fire_inferno_notable
+    modifiers:
+    - stat: IGNITE_CHANCE
+      value: 3.9
+      type: FLAT
+  fire_inferno_notable:
+    name: Pyromaniac
+    description: +15% Burn Duration, +14% DoT Damage
+    region: FIRE
+    tier: 4
+    notable: true
+    connections:
+    - fire_inferno_3
+    - fire_inferno_4
+    - fire_synergy_2
+    - fire_berserker_1
+    modifiers:
+    - stat: BURN_DURATION_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+  fire_bloodlust_1:
+    name: Eruption I
+    description: +5% Charged Attack Damage
+    region: FIRE
+    tier: 1
+    connections:
+    - fire_fury_notable
+    - fire_bloodlust_2
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  fire_bloodlust_2:
+    name: Eruption II
+    description: +5% Physical Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_bloodlust_1
+    - fire_bloodlust_branch
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  fire_bloodlust_branch:
+    name: Volcanic Path
+    description: +3% Charged Attack Damage, +3.3% Physical Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_bloodlust_2
+    - fire_bloodlust_3
+    - fire_bloodlust_4
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+  fire_bloodlust_3:
+    name: Eruption III
+    description: +6.8% Charged Attack Damage
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_bloodlust_branch
+    - fire_bloodlust_notable
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  fire_bloodlust_4:
+    name: Power Surge
+    description: +6% Physical Damage
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_bloodlust_branch
+    - fire_bloodlust_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  fire_bloodlust_notable:
+    name: Executioner
+    description: +15% Execute Damage, +9 Crit Multiplier
+    region: FIRE
+    tier: 4
+    notable: true
+    connections:
+    - fire_bloodlust_3
+    - fire_bloodlust_4
+    - fire_synergy_3
+    - bridge_earth_fire_3
+    modifiers:
+    - stat: EXECUTE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 9.0
+      type: FLAT
+  fire_berserker_1:
+    name: Inferno I
+    description: +4.8 Crit Multiplier
+    region: FIRE
+    tier: 1
+    connections:
+    - fire_inferno_notable
+    - fire_berserker_2
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 4.8
+      type: FLAT
+  fire_berserker_2:
+    name: Inferno II
+    description: +5.6% Charged Attack Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_berserker_1
+    - fire_berserker_branch
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 5.6
+      type: PERCENT
+  fire_berserker_branch:
+    name: Blazing Path
+    description: +2.5 Crit Multiplier, +3% Charged Attack Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_berserker_2
+    - fire_berserker_3
+    - fire_berserker_4
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 2.5
+      type: FLAT
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  fire_berserker_3:
+    name: Inferno III
+    description: +6.3 Crit Multiplier
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_berserker_branch
+    - fire_berserker_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 6.3
+      type: FLAT
+  fire_berserker_4:
+    name: Charged Fury
+    description: +6.8% Charged Attack Damage
+    region: FIRE
+    tier: 3
+    connections:
+    - fire_berserker_branch
+    - fire_berserker_notable
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  fire_berserker_notable:
+    name: Blazing Fury
+    description: +10 Fire Penetration, +15% Charged Attack Damage
+    region: FIRE
+    tier: 4
+    notable: true
+    connections:
+    - fire_berserker_3
+    - fire_berserker_4
+    - fire_synergy_4
+    - bridge_fire_lightning_1
+    modifiers:
+    - stat: FIRE_PENETRATION
+      value: 10.0
+      type: FLAT
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+  fire_synergy_1:
+    name: Strength in Numbers
+    description: Per 3 Fire nodes, +2% Physical Damage (max +20%)
+    region: FIRE
+    tier: 5
+    notable: true
+    connections:
+    - fire_fury_notable
+    - fire_synergy_hub
+    - bridge_fire_void_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: FIRE
+      per_count: 3
+      bonus:
+        stat: PHYSICAL_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  fire_synergy_2:
+    name: Infernal Mastery
+    description: Per 3 Fire nodes, +3% Fire Damage (max +30%)
+    region: FIRE
+    tier: 5
+    notable: true
+    connections:
+    - fire_inferno_notable
+    - fire_synergy_hub
+    - bridge_fire_wind_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: FIRE
+      per_count: 3
+      bonus:
+        stat: FIRE_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  fire_synergy_3:
+    name: Burning Resolve
+    description: Per 3 Fire nodes, +0.5% Crit Multiplier (max +5%)
+    region: FIRE
+    tier: 5
+    notable: true
+    connections:
+    - fire_bloodlust_notable
+    - fire_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: FIRE
+      per_count: 3
+      bonus:
+        stat: CRITICAL_MULTIPLIER
+        value: 0.5
+        modifierType: FLAT
+      cap: 5.0
+    modifiers: []
+  fire_synergy_4:
+    name: Charged Momentum
+    description: Per 3 Fire nodes, +1% Charged Attack Damage (max +10%)
+    region: FIRE
+    tier: 5
+    notable: true
+    connections:
+    - fire_berserker_notable
+    - fire_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: FIRE
+      per_count: 3
+      bonus:
+        stat: CHARGED_ATTACK_DAMAGE_PERCENT
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  fire_synergy_hub:
+    name: Heart of Fire
+    description: +5% Fire Damage, +5% Physical Damage
+    region: FIRE
+    tier: 5
+    notable: true
+    connections:
+    - fire_synergy_1
+    - fire_synergy_2
+    - fire_synergy_3
+    - fire_synergy_4
+    - fire_keystone_1
+    - fire_keystone_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  fire_keystone_1:
+    name: Inferno Master
+    description: Convert 40% Physical to Fire, +15% Fire Damage Multiplier. -20% Max HP
+    region: FIRE
+    tier: 6
+    keystone: true
+    connections:
+    - fire_synergy_hub
+    modifiers:
+    - stat: PHYSICAL_TO_FIRE_CONVERSION
+      value: 40.0
+      type: PERCENT
+    - stat: FIRE_DAMAGE_MULTIPLIER
+      value: 15.0
+      type: FLAT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -20.0
+      type: PERCENT
+  fire_keystone_2:
+    name: Berserker
+    description: Deal 30% more damage, +5% Life Steal. Take 20% increased damage
+    region: FIRE
+    tier: 6
+    keystone: true
+    connections:
+    - fire_synergy_hub
+    modifiers:
+    - stat: DAMAGE_MULTIPLIER
+      value: 30.0
+      type: MULTIPLIER
+    - stat: LIFE_STEAL
+      value: 3.0
+      type: FLAT
+    drawbacks:
+    - stat: DAMAGE_TAKEN_PERCENT
+      value: 20.0
+      type: PERCENT
+  bridge_fire_lightning_1:
+    name: Charged Strike I
+    description: +5 Physical Damage, +5 Lightning Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_berserker_notable
+    - bridge_fire_lightning_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: LIGHTNING_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_fire_lightning_2:
+    name: Charged Strike II
+    description: +4% Physical Damage, +4% Lightning Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_lightning_1
+    - bridge_fire_lightning_3
+    - havoc_entry
+    - striker_entry
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_fire_lightning_3:
+    name: Thundering Blows
+    description: +7 Physical Damage, +7 Lightning Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_lightning_2
+    - lightning_overcharge_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: LIGHTNING_DAMAGE
+      value: 7.0
+      type: FLAT
+  water_entry:
+    name: Path of Water
+    description: +5% Spell Damage
+    region: WATER
+    tier: 1
+    connections:
+    - origin
+    - water_frostbite_1
+    - water_precision_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  water_frostbite_1:
+    name: Torrent I
+    description: +5% Spell Damage
+    region: WATER
+    tier: 1
+    connections:
+    - water_entry
+    - water_frostbite_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  water_frostbite_2:
+    name: Torrent II
+    description: +8.2 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - water_frostbite_1
+    - water_frostbite_branch
+    modifiers:
+    - stat: MAX_MANA
+      value: 8.2
+      type: FLAT
+  water_frostbite_branch:
+    name: Flowing Current
+    description: +4.1% Spell Damage, +4.5 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - water_frostbite_2
+    - water_frostbite_3
+    - water_frostbite_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 4.1
+      type: PERCENT
+    - stat: MAX_MANA
+      value: 4.5
+      type: FLAT
+  water_frostbite_3:
+    name: Torrent III
+    description: +7.5% Spell Damage
+    region: WATER
+    tier: 3
+    connections:
+    - water_frostbite_branch
+    - water_frostbite_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 7.5
+      type: PERCENT
+  water_frostbite_4:
+    name: Mana Surge
+    description: +9.9 Max Mana
+    region: WATER
+    tier: 3
+    connections:
+    - water_frostbite_branch
+    - water_frostbite_notable
+    modifiers:
+    - stat: MAX_MANA
+      value: 9.9
+      type: FLAT
+  water_frostbite_notable:
+    name: Arcane Surge
+    description: +14% Water Damage, +12.5% Spell Damage
+    region: WATER
+    tier: 4
+    notable: true
+    connections:
+    - water_frostbite_3
+    - water_frostbite_4
+    - water_synergy_1
+    - water_evasion_1
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  water_precision_1:
+    name: Glacier I
+    description: +3% Freeze Chance
+    region: WATER
+    tier: 1
+    connections:
+    - water_entry
+    - water_precision_2
+    modifiers:
+    - stat: FREEZE_CHANCE
+      value: 3.0
+      type: FLAT
+  water_precision_2:
+    name: Glacier II
+    description: +11 Energy Shield
+    region: WATER
+    tier: 2
+    connections:
+    - water_precision_1
+    - water_precision_branch
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 11.0
+      type: FLAT
+  water_precision_branch:
+    name: Frost Barrier
+    description: +2.1% Freeze Chance, +6.6 Energy Shield
+    region: WATER
+    tier: 2
+    connections:
+    - water_precision_2
+    - water_precision_3
+    - water_precision_4
+    modifiers:
+    - stat: FREEZE_CHANCE
+      value: 2.1
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 6.6
+      type: FLAT
+  water_precision_3:
+    name: Glacier III
+    description: +3.9% Freeze Chance
+    region: WATER
+    tier: 3
+    connections:
+    - water_precision_branch
+    - water_precision_notable
+    modifiers:
+    - stat: FREEZE_CHANCE
+      value: 3.9
+      type: FLAT
+  water_precision_4:
+    name: Arcane Shield
+    description: +13.2 Energy Shield
+    region: WATER
+    tier: 3
+    connections:
+    - water_precision_branch
+    - water_precision_notable
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 13.2
+      type: FLAT
+  water_precision_notable:
+    name: Permafrost
+    description: +12% Freeze Chance, +15% Damage vs Frozen
+    region: WATER
+    tier: 4
+    notable: true
+    connections:
+    - water_precision_3
+    - water_precision_4
+    - water_synergy_2
+    - water_shatter_1
+    modifiers:
+    - stat: FREEZE_CHANCE
+      value: 12.0
+      type: FLAT
+    - stat: DAMAGE_VS_FROZEN_PERCENT
+      value: 15.0
+      type: PERCENT
+  water_evasion_1:
+    name: Depths I
+    description: +1.2 Mana Regen/s
+    region: WATER
+    tier: 1
+    connections:
+    - water_frostbite_notable
+    - water_evasion_2
+    modifiers:
+    - stat: MANA_REGEN
+      value: 1.2
+      type: FLAT
+  water_evasion_2:
+    name: Depths II
+    description: +8.2 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - water_evasion_1
+    - water_evasion_branch
+    modifiers:
+    - stat: MAX_MANA
+      value: 8.2
+      type: FLAT
+  water_evasion_branch:
+    name: Deep Currents
+    description: +0.9 Mana Regen/s, +4.5 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - water_evasion_2
+    - water_evasion_3
+    - water_evasion_4
+    modifiers:
+    - stat: MANA_REGEN
+      value: 0.9
+      type: FLAT
+    - stat: MAX_MANA
+      value: 4.5
+      type: FLAT
+  water_evasion_3:
+    name: Depths III
+    description: +1.8 Mana Regen/s
+    region: WATER
+    tier: 3
+    connections:
+    - water_evasion_branch
+    - water_evasion_notable
+    modifiers:
+    - stat: MANA_REGEN
+      value: 1.8
+      type: FLAT
+  water_evasion_4:
+    name: Mana Well
+    description: +9.9 Max Mana
+    region: WATER
+    tier: 3
+    connections:
+    - water_evasion_branch
+    - water_evasion_notable
+    modifiers:
+    - stat: MAX_MANA
+      value: 9.9
+      type: FLAT
+  water_evasion_notable:
+    name: Wellspring
+    description: +12.5% Max Mana, +5 Mana Regen/s, +10 Energy Shield
+    region: WATER
+    tier: 4
+    notable: true
+    connections:
+    - water_evasion_3
+    - water_evasion_4
+    - water_synergy_3
+    - bridge_water_earth_1
+    modifiers:
+    - stat: MAX_MANA_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: MANA_REGEN
+      value: 5.0
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 10.0
+      type: FLAT
+  water_shatter_1:
+    name: Confluence I
+    description: +5% Spell Damage
+    region: WATER
+    tier: 1
+    connections:
+    - water_precision_notable
+    - water_shatter_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  water_shatter_2:
+    name: Confluence II
+    description: +11 Energy Shield
+    region: WATER
+    tier: 2
+    connections:
+    - water_shatter_1
+    - water_shatter_branch
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 11.0
+      type: FLAT
+  water_shatter_branch:
+    name: Arcane Confluence
+    description: +4.1% Spell Damage, +6.6 Energy Shield
+    region: WATER
+    tier: 2
+    connections:
+    - water_shatter_2
+    - water_shatter_3
+    - water_shatter_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 4.1
+      type: PERCENT
+    - stat: ENERGY_SHIELD
+      value: 6.6
+      type: FLAT
+  water_shatter_3:
+    name: Confluence III
+    description: +7.5% Spell Damage
+    region: WATER
+    tier: 3
+    connections:
+    - water_shatter_branch
+    - water_shatter_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 7.5
+      type: PERCENT
+  water_shatter_4:
+    name: Barrier Mastery
+    description: +13.2 Energy Shield
+    region: WATER
+    tier: 3
+    connections:
+    - water_shatter_branch
+    - water_shatter_notable
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 13.2
+      type: FLAT
+  water_shatter_notable:
+    name: Shatter
+    description: +10 Water Penetration, +12.5% Spell Damage
+    region: WATER
+    tier: 4
+    notable: true
+    connections:
+    - water_shatter_3
+    - water_shatter_4
+    - water_synergy_4
+    - bridge_lightning_water_3
+    modifiers:
+    - stat: WATER_PENETRATION
+      value: 10.0
+      type: FLAT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  water_synergy_1:
+    name: Arcane Accumulation
+    description: Per 3 Water nodes, +2% Spell Damage (max +20%)
+    region: WATER
+    tier: 5
+    notable: true
+    connections:
+    - water_frostbite_notable
+    - water_synergy_hub
+    - bridge_water_void_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WATER
+      per_count: 3
+      bonus:
+        stat: SPELL_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  water_synergy_2:
+    name: Tidal Force
+    description: Per 3 Water nodes, +3% Water Damage (max +30%)
+    region: WATER
+    tier: 5
+    notable: true
+    connections:
+    - water_precision_notable
+    - water_synergy_hub
+    - bridge_water_wind_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WATER
+      per_count: 3
+      bonus:
+        stat: WATER_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  water_synergy_3:
+    name: Frost Intensification
+    description: Per 3 Water nodes, +1% Freeze Chance (max +10%)
+    region: WATER
+    tier: 5
+    notable: true
+    connections:
+    - water_evasion_notable
+    - water_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WATER
+      per_count: 3
+      bonus:
+        stat: FREEZE_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  water_synergy_4:
+    name: Barrier Growth
+    description: Per 3 Water nodes, +2 Energy Shield (max +20)
+    region: WATER
+    tier: 5
+    notable: true
+    connections:
+    - water_shatter_notable
+    - water_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WATER
+      per_count: 3
+      bonus:
+        stat: ENERGY_SHIELD
+        value: 2.0
+        modifierType: FLAT
+      cap: 20.0
+    modifiers: []
+  water_synergy_hub:
+    name: Heart of Water
+    description: +5% Water Damage, +5% Spell Damage
+    region: WATER
+    tier: 5
+    notable: true
+    connections:
+    - water_synergy_1
+    - water_synergy_2
+    - water_synergy_3
+    - water_synergy_4
+    - water_keystone_1
+    - water_keystone_2
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  water_keystone_1:
+    name: Glacial Mastery
+    description: +10% Freeze Chance, +30% Damage vs Frozen, +10% Water Damage Multiplier. -15% Non-Crit Damage
+    region: WATER
+    tier: 6
+    keystone: true
+    connections:
+    - water_synergy_hub
+    modifiers:
+    - stat: FREEZE_CHANCE
+      value: 10.0
+      type: FLAT
+    - stat: DAMAGE_VS_FROZEN_PERCENT
+      value: 30.0
+      type: PERCENT
+    - stat: WATER_DAMAGE_MULTIPLIER
+      value: 10.0
+      type: FLAT
+    drawbacks:
+    - stat: NON_CRIT_DAMAGE_PERCENT
+      value: -15.0
+      type: PERCENT
+  water_keystone_2:
+    name: Arcane Reservoir
+    description: +20% Damage from Mana, +20% Max Mana. +25% Mana Cost
+    region: WATER
+    tier: 6
+    keystone: true
+    connections:
+    - water_synergy_hub
+    modifiers:
+    - stat: DAMAGE_FROM_MANA_PERCENT
+      value: 20.0
+      type: PERCENT
+    - stat: MAX_MANA_PERCENT
+      value: 20.0
+      type: PERCENT
+    drawbacks:
+    - stat: MANA_COST_PERCENT
+      value: 25.0
+      type: PERCENT
+  bridge_water_void_1:
+    name: Dark Frost I
+    description: +5 Water Damage, +5 Void Damage
+    region: WATER
+    tier: 2
+    connections:
+    - water_synergy_1
+    - bridge_water_void_2
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_water_void_2:
+    name: Dark Frost II
+    description: +4% Water Damage, +4% Void Damage
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_void_1
+    - bridge_water_void_3
+    - warlock_entry
+    - lich_entry
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_water_void_3:
+    name: Void Chill
+    description: +7 Water Damage, +7 Void Damage
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_void_2
+    - void_synergy_2
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 7.0
+      type: FLAT
+  lightning_entry:
+    name: Path of Lightning
+    description: +2.5% Attack Speed
+    region: LIGHTNING
+    tier: 1
+    connections:
+    - origin
+    - lightning_storm_1
+    - lightning_velocity_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 2.5
+      type: PERCENT
+  lightning_storm_1:
+    name: Surge I
+    description: +5% Attack Speed
+    region: LIGHTNING
+    tier: 1
+    connections:
+    - lightning_entry
+    - lightning_storm_2
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.0
+      type: PERCENT
+  lightning_storm_2:
+    name: Surge II
+    description: +3.8% Crit Chance
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_storm_1
+    - lightning_storm_branch
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.8
+      type: FLAT
+  lightning_storm_branch:
+    name: Quick Reflexes
+    description: +3% Attack Speed, +2.1% Crit Chance
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_storm_2
+    - lightning_storm_3
+    - lightning_storm_4
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 2.1
+      type: FLAT
+  lightning_storm_3:
+    name: Surge III
+    description: +6.8% Attack Speed
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_storm_branch
+    - lightning_storm_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 6.8
+      type: PERCENT
+  lightning_storm_4:
+    name: Keen Instinct
+    description: +3.9% Crit Chance
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_storm_branch
+    - lightning_storm_notable
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.9
+      type: FLAT
+  lightning_storm_notable:
+    name: Lightning Reflexes
+    description: +14% Attack Speed, +8% Crit Chance
+    region: LIGHTNING
+    tier: 4
+    notable: true
+    connections:
+    - lightning_storm_3
+    - lightning_storm_4
+    - lightning_synergy_1
+    - lightning_chain_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 8.0
+      type: FLAT
+  lightning_velocity_1:
+    name: Tempest I
+    description: +3% Shock Chance
+    region: LIGHTNING
+    tier: 1
+    connections:
+    - lightning_entry
+    - lightning_velocity_2
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 3.0
+      type: FLAT
+  lightning_velocity_2:
+    name: Tempest II
+    description: +3% Move Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_velocity_1
+    - lightning_velocity_branch
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  lightning_velocity_branch:
+    name: Storm Front
+    description: +2.1% Shock Chance, +3% Move Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_velocity_2
+    - lightning_velocity_3
+    - lightning_velocity_4
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 2.1
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  lightning_velocity_3:
+    name: Tempest III
+    description: +3.9% Shock Chance
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_velocity_branch
+    - lightning_velocity_notable
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  lightning_velocity_4:
+    name: Swift Storm
+    description: +3.6% Move Speed
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_velocity_branch
+    - lightning_velocity_notable
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.6
+      type: PERCENT
+  lightning_velocity_notable:
+    name: Static Field
+    description: +12% Shock Chance, +15% Damage vs Shocked
+    region: LIGHTNING
+    tier: 4
+    notable: true
+    connections:
+    - lightning_velocity_3
+    - lightning_velocity_4
+    - lightning_synergy_2
+    - lightning_overcharge_1
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 12.0
+      type: FLAT
+    - stat: DAMAGE_VS_SHOCKED_PERCENT
+      value: 15.0
+      type: PERCENT
+  lightning_chain_1:
+    name: Arc I
+    description: +1 Stamina Regen
+    region: LIGHTNING
+    tier: 1
+    connections:
+    - lightning_storm_notable
+    - lightning_chain_2
+    modifiers:
+    - stat: STAMINA_REGEN
+      value: 1.0
+      type: FLAT
+  lightning_chain_2:
+    name: Arc II
+    description: +5.6% Attack Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_chain_1
+    - lightning_chain_branch
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.6
+      type: PERCENT
+  lightning_chain_branch:
+    name: Crackling Energy
+    description: +0.8 Stamina Regen, +3% Attack Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_chain_2
+    - lightning_chain_3
+    - lightning_chain_4
+    modifiers:
+    - stat: STAMINA_REGEN
+      value: 0.8
+      type: FLAT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  lightning_chain_3:
+    name: Arc III
+    description: +1.5 Stamina Regen
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_chain_branch
+    - lightning_chain_notable
+    modifiers:
+    - stat: STAMINA_REGEN
+      value: 1.5
+      type: FLAT
+  lightning_chain_4:
+    name: Rapid Strikes
+    description: +6.8% Attack Speed
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_chain_branch
+    - lightning_chain_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 6.8
+      type: PERCENT
+  lightning_chain_notable:
+    name: Quickening
+    description: +5 Stamina Regen, +14% Attack Speed, +12.5% Move Speed
+    region: LIGHTNING
+    tier: 4
+    notable: true
+    connections:
+    - lightning_chain_3
+    - lightning_chain_4
+    - lightning_synergy_3
+    - bridge_lightning_water_1
+    modifiers:
+    - stat: STAMINA_REGEN
+      value: 5.0
+      type: FLAT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  lightning_overcharge_1:
+    name: Conduit I
+    description: +3% Crit Chance
+    region: LIGHTNING
+    tier: 1
+    connections:
+    - lightning_velocity_notable
+    - lightning_overcharge_2
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  lightning_overcharge_2:
+    name: Conduit II
+    description: +3% Move Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_overcharge_1
+    - lightning_overcharge_branch
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  lightning_overcharge_branch:
+    name: Charged Conduit
+    description: +2.1% Crit Chance, +3% Move Speed
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_overcharge_2
+    - lightning_overcharge_3
+    - lightning_overcharge_4
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 2.1
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  lightning_overcharge_3:
+    name: Conduit III
+    description: +3.9% Crit Chance
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_overcharge_branch
+    - lightning_overcharge_notable
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.9
+      type: FLAT
+  lightning_overcharge_4:
+    name: Blitz
+    description: +3.6% Move Speed
+    region: LIGHTNING
+    tier: 3
+    connections:
+    - lightning_overcharge_branch
+    - lightning_overcharge_notable
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.6
+      type: PERCENT
+  lightning_overcharge_notable:
+    name: Chain Strike
+    description: +10 Lightning Penetration, +8% Crit Chance
+    region: LIGHTNING
+    tier: 4
+    notable: true
+    connections:
+    - lightning_overcharge_3
+    - lightning_overcharge_4
+    - lightning_synergy_4
+    - bridge_fire_lightning_3
+    modifiers:
+    - stat: LIGHTNING_PENETRATION
+      value: 10.0
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 8.0
+      type: FLAT
+  lightning_synergy_1:
+    name: Storm Buildup
+    description: Per 3 Lightning nodes, +1% Attack Speed (max +10%)
+    region: LIGHTNING
+    tier: 5
+    notable: true
+    connections:
+    - lightning_storm_notable
+    - lightning_synergy_hub
+    - bridge_lightning_void_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: LIGHTNING
+      per_count: 3
+      bonus:
+        stat: ATTACK_SPEED_PERCENT
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  lightning_synergy_2:
+    name: Voltage Surge
+    description: Per 3 Lightning nodes, +3% Lightning Damage (max +30%)
+    region: LIGHTNING
+    tier: 5
+    notable: true
+    connections:
+    - lightning_velocity_notable
+    - lightning_synergy_hub
+    - bridge_lightning_wind_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: LIGHTNING
+      per_count: 3
+      bonus:
+        stat: LIGHTNING_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  lightning_synergy_3:
+    name: Chain Reaction
+    description: Per 3 Lightning nodes, +0.5% Crit Chance (max +5%)
+    region: LIGHTNING
+    tier: 5
+    notable: true
+    connections:
+    - lightning_chain_notable
+    - lightning_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: LIGHTNING
+      per_count: 3
+      bonus:
+        stat: CRITICAL_CHANCE
+        value: 0.5
+        modifierType: FLAT
+      cap: 5.0
+    modifiers: []
+  lightning_synergy_4:
+    name: Static Charge
+    description: Per 3 Lightning nodes, +1% Shock Chance (max +10%)
+    region: LIGHTNING
+    tier: 5
+    notable: true
+    connections:
+    - lightning_overcharge_notable
+    - lightning_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: LIGHTNING
+      per_count: 3
+      bonus:
+        stat: SHOCK_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  lightning_synergy_hub:
+    name: Heart of Lightning
+    description: +5% Lightning Damage, +5% Attack Speed
+    region: LIGHTNING
+    tier: 5
+    notable: true
+    connections:
+    - lightning_synergy_1
+    - lightning_synergy_2
+    - lightning_synergy_3
+    - lightning_synergy_4
+    - lightning_keystone_1
+    - lightning_keystone_2
+    modifiers:
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.0
+      type: PERCENT
+  lightning_keystone_1:
+    name: Thundergod
+    description: +25% Damage vs Shocked, +15% Shock Chance, +15% Lightning Damage Multiplier. -25 Armor
+    region: LIGHTNING
+    tier: 6
+    keystone: true
+    connections:
+    - lightning_synergy_hub
+    modifiers:
+    - stat: DAMAGE_VS_SHOCKED_PERCENT
+      value: 25.0
+      type: PERCENT
+    - stat: SHOCK_CHANCE
+      value: 15.0
+      type: FLAT
+    - stat: LIGHTNING_DAMAGE_MULTIPLIER
+      value: 15.0
+      type: FLAT
+    drawbacks:
+    - stat: ARMOR
+      value: -25.0
+      type: FLAT
+  lightning_keystone_2:
+    name: Overcharge
+    description: +15% Damage to Mana Conversion, +20% Attack Speed. -15% Max HP, -10% Move Speed
+    region: LIGHTNING
+    tier: 6
+    keystone: true
+    connections:
+    - lightning_synergy_hub
+    modifiers:
+    - stat: DAMAGE_TO_MANA_CONVERSION
+      value: 15.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 20.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -15.0
+      type: PERCENT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: -10.0
+      type: PERCENT
+  bridge_lightning_water_1:
+    name: Frozen Lightning I
+    description: +5 Lightning Damage, +5 Water Damage
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - lightning_chain_notable
+    - bridge_lightning_water_2
+    modifiers:
+    - stat: LIGHTNING_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: WATER_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_lightning_water_2:
+    name: Frozen Lightning II
+    description: +4% Lightning Damage, +4% Water Damage
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - bridge_lightning_water_1
+    - bridge_lightning_water_3
+    - warlock_entry
+    - tempest_entry
+    modifiers:
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: WATER_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_lightning_water_3:
+    name: Storm Shatter
+    description: +7 Lightning Damage, +12 Max Health
+    region: LIGHTNING
+    tier: 2
+    connections:
+    - bridge_lightning_water_2
+    - water_shatter_notable
+    modifiers:
+    - stat: LIGHTNING_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: MAX_HEALTH
+      value: 12.0
+      type: FLAT
+  earth_entry:
+    name: Path of Earth
+    description: +5% Max Health
+    region: EARTH
+    tier: 1
+    connections:
+    - origin
+    - earth_vitality_1
+    - earth_regen_1
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  earth_vitality_1:
+    name: Bastion I
+    description: +5% Max Health
+    region: EARTH
+    tier: 1
+    connections:
+    - earth_entry
+    - earth_vitality_2
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  earth_vitality_2:
+    name: Bastion II
+    description: +15 Armor
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_vitality_1
+    - earth_vitality_branch
+    modifiers:
+    - stat: ARMOR
+      value: 15.0
+      type: FLAT
+  earth_vitality_branch:
+    name: Fortified Wall
+    description: +4.1% Max Health, +9 Armor
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_vitality_2
+    - earth_vitality_3
+    - earth_vitality_4
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 4.1
+      type: PERCENT
+    - stat: ARMOR
+      value: 9.0
+      type: FLAT
+  earth_vitality_3:
+    name: Bastion III
+    description: +7.5% Max Health
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_vitality_branch
+    - earth_vitality_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 7.5
+      type: PERCENT
+  earth_vitality_4:
+    name: Iron Plates
+    description: +18 Armor
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_vitality_branch
+    - earth_vitality_notable
+    modifiers:
+    - stat: ARMOR
+      value: 18.0
+      type: FLAT
+  earth_vitality_notable:
+    name: Ironhide
+    description: +15% Max Health, +10 Armor, +5 Physical Resistance
+    region: EARTH
+    tier: 4
+    notable: true
+    connections:
+    - earth_vitality_3
+    - earth_vitality_4
+    - earth_synergy_1
+    - earth_fortitude_1
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+    - stat: PHYSICAL_RESISTANCE
+      value: 5.0
+      type: FLAT
+  earth_regen_1:
+    name: Bedrock I
+    description: +0.8 HP/s Regen
+    region: EARTH
+    tier: 1
+    connections:
+    - earth_entry
+    - earth_regen_2
+    modifiers:
+    - stat: HEALTH_REGEN
+      value: 0.2
+      type: FLAT
+  earth_regen_2:
+    name: Bedrock II
+    description: +2.6 KB Resistance
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_regen_1
+    - earth_regen_branch
+    modifiers:
+    - stat: KNOCKBACK_RESISTANCE
+      value: 2.6
+      type: FLAT
+  earth_regen_branch:
+    name: Unyielding
+    description: +0.6 HP/s Regen, +3.5% Health Regen %
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_regen_2
+    - earth_regen_3
+    - earth_regen_4
+    modifiers:
+    - stat: HEALTH_REGEN
+      value: 0.15
+      type: FLAT
+    - stat: KNOCKBACK_RESISTANCE
+      value: 1.5
+      type: FLAT
+  earth_regen_3:
+    name: Bedrock III
+    description: +1.1 HP/s Regen
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_regen_branch
+    - earth_regen_notable
+    modifiers:
+    - stat: HEALTH_REGEN
+      value: 0.15
+      type: FLAT
+  earth_regen_4:
+    name: Immovable
+    description: +3.1 KB Resistance
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_regen_branch
+    - earth_regen_notable
+    modifiers:
+    - stat: KNOCKBACK_RESISTANCE
+      value: 3.1
+      type: FLAT
+  earth_regen_notable:
+    name: Unbreakable
+    description: +12.5% Health Regen, +10 KB Resistance, +12.5% Health Recovery
+    region: EARTH
+    tier: 4
+    notable: true
+    connections:
+    - earth_regen_3
+    - earth_regen_4
+    - earth_synergy_2
+    - earth_guardian_1
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: KNOCKBACK_RESISTANCE
+      value: 10.0
+      type: FLAT
+    - stat: HEALTH_RECOVERY_PERCENT
+      value: 12.5
+      type: PERCENT
+  earth_fortitude_1:
+    name: Rampart I
+    description: +12 Armor
+    region: EARTH
+    tier: 1
+    connections:
+    - earth_vitality_notable
+    - earth_fortitude_2
+    modifiers:
+    - stat: ARMOR
+      value: 12.0
+      type: FLAT
+  earth_fortitude_2:
+    name: Rampart II
+    description: +4% Block Chance
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_fortitude_1
+    - earth_fortitude_branch
+    modifiers:
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 4.0
+      type: FLAT
+  earth_fortitude_branch:
+    name: Shield Wall
+    description: +9 Armor, +3% Block Chance
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_fortitude_2
+    - earth_fortitude_3
+    - earth_fortitude_4
+    modifiers:
+    - stat: ARMOR
+      value: 9.0
+      type: FLAT
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 3.0
+      type: FLAT
+  earth_fortitude_3:
+    name: Rampart III
+    description: +18 Armor
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_fortitude_branch
+    - earth_fortitude_notable
+    modifiers:
+    - stat: ARMOR
+      value: 18.0
+      type: FLAT
+  earth_fortitude_4:
+    name: Shield Mastery
+    description: +5% Block Chance
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_fortitude_branch
+    - earth_fortitude_notable
+    modifiers:
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 5.0
+      type: FLAT
+  earth_fortitude_notable:
+    name: Stoneguard
+    description: +5% Block Chance, +10 Armor, +12.5% Shield Effectiveness
+    region: EARTH
+    tier: 4
+    notable: true
+    connections:
+    - earth_fortitude_3
+    - earth_fortitude_4
+    - earth_synergy_3
+    - bridge_water_earth_3
+    modifiers:
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 5.0
+      type: FLAT
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+    - stat: SHIELD_EFFECTIVENESS_PERCENT
+      value: 12.5
+      type: PERCENT
+  earth_guardian_1:
+    name: Bulwark I
+    description: +5% Max Health
+    region: EARTH
+    tier: 1
+    connections:
+    - earth_regen_notable
+    - earth_guardian_2
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  earth_guardian_2:
+    name: Bulwark II
+    description: +2.6 KB Resistance
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_guardian_1
+    - earth_guardian_branch
+    modifiers:
+    - stat: KNOCKBACK_RESISTANCE
+      value: 2.6
+      type: FLAT
+  earth_guardian_branch:
+    name: Mountain's Base
+    description: +4.1% Max Health, +1.5 KB Resistance
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_guardian_2
+    - earth_guardian_3
+    - earth_guardian_4
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 4.1
+      type: PERCENT
+    - stat: KNOCKBACK_RESISTANCE
+      value: 1.5
+      type: FLAT
+  earth_guardian_3:
+    name: Bulwark III
+    description: +7.5% Max Health
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_guardian_branch
+    - earth_guardian_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 7.5
+      type: PERCENT
+  earth_guardian_4:
+    name: Steadfast
+    description: +3.1 KB Resistance
+    region: EARTH
+    tier: 3
+    connections:
+    - earth_guardian_branch
+    - earth_guardian_notable
+    modifiers:
+    - stat: KNOCKBACK_RESISTANCE
+      value: 3.1
+      type: FLAT
+  earth_guardian_notable:
+    name: Mountain's Resolve
+    description: +14.0% Max Health Percent, +5.0 Block Damage Reduction, +12.5% Health Recovery Percent
+    region: EARTH
+    tier: 4
+    notable: true
+    connections:
+    - earth_guardian_3
+    - earth_guardian_4
+    - earth_synergy_4
+    - bridge_earth_fire_1
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: BLOCK_DAMAGE_REDUCTION
+      value: 5.0
+      type: FLAT
+    - stat: HEALTH_RECOVERY_PERCENT
+      value: 12.5
+      type: PERCENT
+  earth_synergy_1:
+    name: Bedrock Foundation
+    description: Per 3 Earth nodes, +2% Max Health (max +20%)
+    region: EARTH
+    tier: 5
+    notable: true
+    connections:
+    - earth_vitality_notable
+    - earth_synergy_hub
+    - bridge_earth_void_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: EARTH
+      per_count: 3
+      bonus:
+        stat: MAX_HEALTH_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  earth_synergy_2:
+    name: Mountain's Might
+    description: Per 3 Earth nodes, +3% Earth Damage (max +30%)
+    region: EARTH
+    tier: 5
+    notable: true
+    connections:
+    - earth_regen_notable
+    - earth_synergy_hub
+    - bridge_earth_wind_1
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: EARTH
+      per_count: 3
+      bonus:
+        stat: EARTH_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  earth_synergy_3:
+    name: Shield Attunement
+    description: Per 3 Earth nodes, +1% Block Chance (max +10%)
+    region: EARTH
+    tier: 5
+    notable: true
+    connections:
+    - earth_fortitude_notable
+    - earth_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: EARTH
+      per_count: 3
+      bonus:
+        stat: PASSIVE_BLOCK_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  earth_synergy_4:
+    name: Enduring Fortitude
+    description: Per 3 Earth nodes, +5 Armor (max +50)
+    region: EARTH
+    tier: 5
+    notable: true
+    connections:
+    - earth_guardian_notable
+    - earth_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: EARTH
+      per_count: 3
+      bonus:
+        stat: ARMOR
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  earth_synergy_hub:
+    name: Heart of Earth
+    description: +5.0% Max Health Percent, +5.0% Max Health Percent
+    region: EARTH
+    tier: 5
+    notable: true
+    connections:
+    - earth_synergy_1
+    - earth_synergy_2
+    - earth_synergy_3
+    - earth_synergy_4
+    - earth_keystone_1
+    - earth_keystone_2
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  earth_keystone_1:
+    name: Living Fortress
+    description: +15% Armor, +7% Block Chance, +5% Block Heal. -20% Damage, -15% Attack Speed
+    region: EARTH
+    tier: 6
+    keystone: true
+    connections:
+    - earth_synergy_hub
+    modifiers:
+    - stat: ARMOR_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 7.0
+      type: FLAT
+    - stat: BLOCK_HEAL_PERCENT
+      value: 5.0
+      type: FLAT
+    drawbacks:
+    - stat: DAMAGE_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: -15.0
+      type: PERCENT
+  earth_keystone_2:
+    name: Tectonic Bulwark
+    description: +25% Max Health, +10% Physical Resistance, +20% Thorns Damage. -25% Move Speed, -20% Evasion
+    region: EARTH
+    tier: 6
+    keystone: true
+    connections:
+    - earth_synergy_hub
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 25.0
+      type: PERCENT
+    - stat: PHYSICAL_RESISTANCE
+      value: 10.0
+      type: FLAT
+    - stat: THORNS_DAMAGE_PERCENT
+      value: 20.0
+      type: PERCENT
+    drawbacks:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: -25.0
+      type: PERCENT
+    - stat: EVASION_PERCENT
+      value: -20.0
+      type: PERCENT
+  bridge_earth_wind_1:
+    name: Verdant Flow I
+    description: +8 Max Health, +9 Max Mana
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_synergy_2
+    - bridge_earth_wind_2
+    modifiers:
+    - stat: MAX_HEALTH
+      value: 8.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 9.0
+      type: FLAT
+  bridge_earth_wind_2:
+    name: Verdant Flow II
+    description: +4% Max Health, +4% Max Mana
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_wind_1
+    - bridge_earth_wind_3
+    - warden_entry
+    - sentinel_entry
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: MAX_MANA_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_earth_wind_3:
+    name: Life Stream
+    description: +12 Max Health, +14.4 Max Mana
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_wind_2
+    - wind_adaptation_notable
+    modifiers:
+    - stat: MAX_HEALTH
+      value: 12.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 14.4
+      type: FLAT
+  void_entry:
+    name: Path of Void
+    description: +0.6 Life Steal
+    region: VOID
+    tier: 1
+    connections:
+    - origin
+    - void_corruption_1
+    - void_entropy_1
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_corruption_1:
+    name: Blight I
+    description: +0.6 Life Steal
+    region: VOID
+    tier: 1
+    connections:
+    - void_entry
+    - void_corruption_2
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_corruption_2:
+    name: Blight II
+    description: +5.6% DoT Damage
+    region: VOID
+    tier: 2
+    connections:
+    - void_corruption_1
+    - void_corruption_branch
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.6
+      type: PERCENT
+  void_corruption_branch:
+    name: Festering Touch
+    description: +0.4 Life Steal, +3% DoT Damage
+    region: VOID
+    tier: 2
+    connections:
+    - void_corruption_2
+    - void_corruption_3
+    - void_corruption_4
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  void_corruption_3:
+    name: Blight III
+    description: +0.9 Life Steal
+    region: VOID
+    tier: 3
+    connections:
+    - void_corruption_branch
+    - void_corruption_notable
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_corruption_4:
+    name: Decay
+    description: +6.8% DoT Damage
+    region: VOID
+    tier: 3
+    connections:
+    - void_corruption_branch
+    - void_corruption_notable
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  void_corruption_notable:
+    name: Sanguine Drain
+    description: +3 Life Steal, +14% DoT Damage, +3 Life Leech
+    region: VOID
+    tier: 4
+    notable: true
+    connections:
+    - void_corruption_3
+    - void_corruption_4
+    - void_synergy_1
+    - void_drain_1
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.4
+      type: FLAT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: LIFE_LEECH
+      value: 0.4
+      type: FLAT
+  void_entropy_1:
+    name: Entropy I
+    description: +0.6% Status Effect Duration
+    region: VOID
+    tier: 1
+    connections:
+    - void_entry
+    - void_entropy_2
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.6
+      type: FLAT
+  void_entropy_2:
+    name: Entropy II
+    description: +3.1 Mana on Kill
+    region: VOID
+    tier: 2
+    connections:
+    - void_entropy_1
+    - void_entropy_branch
+    modifiers:
+    - stat: MANA_ON_KILL
+      value: 3.1
+      type: FLAT
+  void_entropy_branch:
+    name: Spreading Decay
+    description: +0.5 Status Effect Duration, +1.9 Mana on Kill
+    region: VOID
+    tier: 2
+    connections:
+    - void_entropy_2
+    - void_entropy_3
+    - void_entropy_4
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.45
+      type: FLAT
+    - stat: MANA_ON_KILL
+      value: 1.9
+      type: FLAT
+  void_entropy_3:
+    name: Entropy III
+    description: +0.9% Status Effect Duration
+    region: VOID
+    tier: 3
+    connections:
+    - void_entropy_branch
+    - void_entropy_notable
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.9
+      type: FLAT
+  void_entropy_4:
+    name: Soul Reaper
+    description: +3.8 Mana on Kill
+    region: VOID
+    tier: 3
+    connections:
+    - void_entropy_branch
+    - void_entropy_notable
+    modifiers:
+    - stat: MANA_ON_KILL
+      value: 3.8
+      type: FLAT
+  void_entropy_notable:
+    name: Lingering Torment
+    description: +10% Status Effect Duration, +5% Enemy Resistance Reduction
+    region: VOID
+    tier: 4
+    notable: true
+    connections:
+    - void_entropy_3
+    - void_entropy_4
+    - void_synergy_2
+    - void_oblivion_1
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 10.0
+      type: FLAT
+    - stat: ENEMY_RESISTANCE_REDUCTION
+      value: 5.0
+      type: FLAT
+  void_drain_1:
+    name: Shadow I
+    description: +0.1% True Damage
+    region: VOID
+    tier: 1
+    connections:
+    - void_corruption_notable
+    - void_drain_2
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.1
+      type: FLAT
+  void_drain_2:
+    name: Shadow II
+    description: +0.8 Life Steal
+    region: VOID
+    tier: 2
+    connections:
+    - void_drain_1
+    - void_drain_branch
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_drain_branch:
+    name: Dark Embrace
+    description: +0.1 True Damage, +0.4 Life Steal
+    region: VOID
+    tier: 2
+    connections:
+    - void_drain_2
+    - void_drain_3
+    - void_drain_4
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.08
+      type: FLAT
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_drain_3:
+    name: Shadow III
+    description: +0.15% True Damage
+    region: VOID
+    tier: 3
+    connections:
+    - void_drain_branch
+    - void_drain_notable
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.15
+      type: FLAT
+  void_drain_4:
+    name: Essence Tap
+    description: +0.9 Life Steal
+    region: VOID
+    tier: 3
+    connections:
+    - void_drain_branch
+    - void_drain_notable
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.2
+      type: FLAT
+  void_drain_notable:
+    name: Essence Harvest
+    description: +5% True Damage, +3% Life Leech, +2 Mana on Kill
+    region: VOID
+    tier: 4
+    notable: true
+    connections:
+    - void_drain_3
+    - void_drain_4
+    - void_synergy_3
+    - bridge_earth_void_3
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: LIFE_LEECH
+      value: 0.4
+      type: FLAT
+    - stat: MANA_ON_KILL
+      value: 2.0
+      type: FLAT
+  void_oblivion_1:
+    name: Abyss I
+    description: +5% DoT Damage
+    region: VOID
+    tier: 1
+    connections:
+    - void_entropy_notable
+    - void_oblivion_2
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  void_oblivion_2:
+    name: Abyss II
+    description: +3.1 Mana on Kill
+    region: VOID
+    tier: 2
+    connections:
+    - void_oblivion_1
+    - void_oblivion_branch
+    modifiers:
+    - stat: MANA_ON_KILL
+      value: 3.1
+      type: FLAT
+  void_oblivion_branch:
+    name: Abyssal Depths
+    description: +3% DoT Damage, +1.9 Mana on Kill
+    region: VOID
+    tier: 2
+    connections:
+    - void_oblivion_2
+    - void_oblivion_3
+    - void_oblivion_4
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: MANA_ON_KILL
+      value: 1.9
+      type: FLAT
+  void_oblivion_3:
+    name: Abyss III
+    description: +6.8% DoT Damage
+    region: VOID
+    tier: 3
+    connections:
+    - void_oblivion_branch
+    - void_oblivion_notable
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  void_oblivion_4:
+    name: Void Harvest
+    description: +3.8 Mana on Kill
+    region: VOID
+    tier: 3
+    connections:
+    - void_oblivion_branch
+    - void_oblivion_notable
+    modifiers:
+    - stat: MANA_ON_KILL
+      value: 3.8
+      type: FLAT
+  void_oblivion_notable:
+    name: Void Corruption
+    description: +15% DoT Damage, +10 Void Penetration
+    region: VOID
+    tier: 4
+    notable: true
+    connections:
+    - void_oblivion_3
+    - void_oblivion_4
+    - void_synergy_4
+    - bridge_lightning_void_3
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: VOID_PENETRATION
+      value: 10.0
+      type: FLAT
+  void_synergy_1:
+    name: Dark Accumulation
+    description: Per 3 Void nodes, +1% Life Steal (max +10%)
+    region: VOID
+    tier: 5
+    notable: true
+    connections:
+    - void_corruption_notable
+    - void_synergy_hub
+    - bridge_fire_void_3
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: VOID
+      per_count: 3
+      bonus:
+        stat: LIFE_STEAL
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  void_synergy_2:
+    name: Void Resonance
+    description: Per 3 Void nodes, +3% Void Damage (max +30%)
+    region: VOID
+    tier: 5
+    notable: true
+    connections:
+    - void_entropy_notable
+    - void_synergy_hub
+    - bridge_water_void_3
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: VOID
+      per_count: 3
+      bonus:
+        stat: VOID_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  void_synergy_3:
+    name: Soul Harvest
+    description: Per 3 Void nodes, +2% DoT Damage (max +20%)
+    region: VOID
+    tier: 5
+    notable: true
+    connections:
+    - void_drain_notable
+    - void_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: VOID
+      per_count: 3
+      bonus:
+        stat: DOT_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  void_synergy_4:
+    name: Entropy Growth
+    description: Per 3 Void nodes, +1% Status Duration (max +10%)
+    region: VOID
+    tier: 5
+    notable: true
+    connections:
+    - void_oblivion_notable
+    - void_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: VOID
+      per_count: 3
+      bonus:
+        stat: STATUS_EFFECT_DURATION
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  void_synergy_hub:
+    name: Heart of Void
+    description: +5% Void Damage, +5% DoT Damage
+    region: VOID
+    tier: 5
+    notable: true
+    connections:
+    - void_synergy_1
+    - void_synergy_2
+    - void_synergy_3
+    - void_synergy_4
+    - void_keystone_1
+    - void_keystone_2
+    modifiers:
+    - stat: VOID_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  void_keystone_1:
+    name: Void Walker
+    description: +30% Damage to Void Conversion, +15% Void Damage Multiplier. -20% Max HP, -5% Elemental Resistance
+    region: VOID
+    tier: 6
+    keystone: true
+    connections:
+    - void_synergy_hub
+    modifiers:
+    - stat: DAMAGE_TO_VOID_CONVERSION
+      value: 30.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_MULTIPLIER
+      value: 15.0
+      type: FLAT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: ELEMENTAL_RESISTANCE
+      value: -5.0
+      type: FLAT
+  void_keystone_2:
+    name: Parasitic Link
+    description: +10% Life Leech, +15% True Damage. -10% Damage, +15% Damage Taken
+    region: VOID
+    tier: 6
+    keystone: true
+    connections:
+    - void_synergy_hub
+    modifiers:
+    - stat: LIFE_LEECH
+      value: 1.2
+      type: FLAT
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 15.0
+      type: FLAT
+    drawbacks:
+    - stat: DAMAGE_PERCENT
+      value: -10.0
+      type: PERCENT
+    - stat: DAMAGE_TAKEN_PERCENT
+      value: 15.0
+      type: PERCENT
+  bridge_lightning_void_1:
+    name: Storm Void I
+    description: +5 Lightning Damage, +5 Void Damage
+    region: VOID
+    tier: 2
+    connections:
+    - lightning_synergy_1
+    - bridge_lightning_void_2
+    modifiers:
+    - stat: LIGHTNING_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_lightning_void_2:
+    name: Storm Void II
+    description: +4% Lightning Damage, +4% Void Damage
+    region: VOID
+    tier: 2
+    connections:
+    - bridge_lightning_void_1
+    - bridge_lightning_void_3
+    - havoc_entry
+    - warlock_entry
+    modifiers:
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_lightning_void_3:
+    name: Void Storm
+    description: +7 Void Damage, +14.4 Max Mana
+    region: VOID
+    tier: 2
+    connections:
+    - bridge_lightning_void_2
+    - void_oblivion_notable
+    modifiers:
+    - stat: VOID_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 14.4
+      type: FLAT
+  wind_entry:
+    name: Path of Wind
+    description: +12 Evasion
+    region: WIND
+    tier: 1
+    connections:
+    - origin
+    - wind_flow_1
+    - wind_arcane_1
+    modifiers:
+    - stat: EVASION
+      value: 12.0
+      type: FLAT
+  wind_flow_1:
+    name: Gale I
+    description: +12 Evasion
+    region: WIND
+    tier: 1
+    connections:
+    - wind_entry
+    - wind_flow_2
+    modifiers:
+    - stat: EVASION
+      value: 12.0
+      type: FLAT
+  wind_flow_2:
+    name: Gale II
+    description: +6.2% Projectile Damage
+    region: WIND
+    tier: 2
+    connections:
+    - wind_flow_1
+    - wind_flow_branch
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 6.2
+      type: PERCENT
+  wind_flow_branch:
+    name: Windswept
+    description: +9 Evasion, +4.1% Projectile Damage
+    region: WIND
+    tier: 2
+    connections:
+    - wind_flow_2
+    - wind_flow_3
+    - wind_flow_4
+    modifiers:
+    - stat: EVASION
+      value: 9.0
+      type: FLAT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 4.1
+      type: PERCENT
+  wind_flow_3:
+    name: Gale III
+    description: +18 Evasion
+    region: WIND
+    tier: 3
+    connections:
+    - wind_flow_branch
+    - wind_flow_notable
+    modifiers:
+    - stat: EVASION
+      value: 18.0
+      type: FLAT
+  wind_flow_4:
+    name: Archer's Might
+    description: +7.5% Projectile Damage
+    region: WIND
+    tier: 3
+    connections:
+    - wind_flow_branch
+    - wind_flow_notable
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 7.5
+      type: PERCENT
+  wind_flow_notable:
+    name: Wind Archer
+    description: +15% Projectile Damage, +10 Evasion, +12.5% Wind Damage
+    region: WIND
+    tier: 4
+    notable: true
+    connections:
+    - wind_flow_3
+    - wind_flow_4
+    - wind_synergy_1
+    - wind_adaptation_1
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+    - stat: WIND_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  wind_arcane_1:
+    name: Zephyr I
+    description: +9 Accuracy
+    region: WIND
+    tier: 1
+    connections:
+    - wind_entry
+    - wind_arcane_2
+    modifiers:
+    - stat: ACCURACY
+      value: 9.0
+      type: FLAT
+  wind_arcane_2:
+    name: Zephyr II
+    description: +5.6% Projectile Speed
+    region: WIND
+    tier: 2
+    connections:
+    - wind_arcane_1
+    - wind_arcane_branch
+    modifiers:
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 5.6
+      type: PERCENT
+  wind_arcane_branch:
+    name: Tailwind
+    description: +6.8 Accuracy, +3% Projectile Speed
+    region: WIND
+    tier: 2
+    connections:
+    - wind_arcane_2
+    - wind_arcane_3
+    - wind_arcane_4
+    modifiers:
+    - stat: ACCURACY
+      value: 6.8
+      type: FLAT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  wind_arcane_3:
+    name: Zephyr III
+    description: +13.5 Accuracy
+    region: WIND
+    tier: 3
+    connections:
+    - wind_arcane_branch
+    - wind_arcane_notable
+    modifiers:
+    - stat: ACCURACY
+      value: 13.5
+      type: FLAT
+  wind_arcane_4:
+    name: Swift Arrow
+    description: +6.8% Projectile Speed
+    region: WIND
+    tier: 3
+    connections:
+    - wind_arcane_branch
+    - wind_arcane_notable
+    modifiers:
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 6.8
+      type: PERCENT
+  wind_arcane_notable:
+    name: Eagle Eye
+    description: +10 Accuracy, +15% Projectile Speed, +12.5% Accuracy
+    region: WIND
+    tier: 4
+    notable: true
+    connections:
+    - wind_arcane_3
+    - wind_arcane_4
+    - wind_synergy_2
+    - wind_depth_1
+    modifiers:
+    - stat: ACCURACY
+      value: 10.0
+      type: FLAT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: ACCURACY_PERCENT
+      value: 12.5
+      type: PERCENT
+  wind_adaptation_1:
+    name: Drift I
+    description: +3% Jump Force
+    region: WIND
+    tier: 1
+    connections:
+    - wind_flow_notable
+    - wind_adaptation_2
+    modifiers:
+    - stat: JUMP_FORCE_PERCENT
+      value: 3.0
+      type: PERCENT
+  wind_adaptation_2:
+    name: Drift II
+    description: +15 Evasion
+    region: WIND
+    tier: 2
+    connections:
+    - wind_adaptation_1
+    - wind_adaptation_branch
+    modifiers:
+    - stat: EVASION
+      value: 15.0
+      type: FLAT
+  wind_adaptation_branch:
+    name: Updraft
+    description: +3% Jump Force, +9 Evasion
+    region: WIND
+    tier: 2
+    connections:
+    - wind_adaptation_2
+    - wind_adaptation_3
+    - wind_adaptation_4
+    modifiers:
+    - stat: JUMP_FORCE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EVASION
+      value: 9.0
+      type: FLAT
+  wind_adaptation_3:
+    name: Drift III
+    description: +3.6% Jump Force
+    region: WIND
+    tier: 3
+    connections:
+    - wind_adaptation_branch
+    - wind_adaptation_notable
+    modifiers:
+    - stat: JUMP_FORCE_PERCENT
+      value: 3.6
+      type: PERCENT
+  wind_adaptation_4:
+    name: Nimble Feet
+    description: +18 Evasion
+    region: WIND
+    tier: 3
+    connections:
+    - wind_adaptation_branch
+    - wind_adaptation_notable
+    modifiers:
+    - stat: EVASION
+      value: 18.0
+      type: FLAT
+  wind_adaptation_notable:
+    name: Skybound
+    description: +12.5% Jump Force, +10 Evasion, +12.5% Move Speed
+    region: WIND
+    tier: 4
+    notable: true
+    connections:
+    - wind_adaptation_3
+    - wind_adaptation_4
+    - wind_synergy_3
+    - bridge_earth_wind_3
+    modifiers:
+    - stat: JUMP_FORCE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  wind_depth_1:
+    name: Marksman I
+    description: +5% Projectile Damage
+    region: WIND
+    tier: 1
+    connections:
+    - wind_arcane_notable
+    - wind_depth_2
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  wind_depth_2:
+    name: Marksman II
+    description: +11.2 Accuracy
+    region: WIND
+    tier: 2
+    connections:
+    - wind_depth_1
+    - wind_depth_branch
+    modifiers:
+    - stat: ACCURACY
+      value: 11.2
+      type: FLAT
+  wind_depth_branch:
+    name: Steady Aim
+    description: +4.1% Projectile Damage, +6.8 Accuracy
+    region: WIND
+    tier: 2
+    connections:
+    - wind_depth_2
+    - wind_depth_3
+    - wind_depth_4
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 4.1
+      type: PERCENT
+    - stat: ACCURACY
+      value: 6.8
+      type: FLAT
+  wind_depth_3:
+    name: Marksman III
+    description: +7.5% Projectile Damage
+    region: WIND
+    tier: 3
+    connections:
+    - wind_depth_branch
+    - wind_depth_notable
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 7.5
+      type: PERCENT
+  wind_depth_4:
+    name: Eagle Vision
+    description: +13.5 Accuracy
+    region: WIND
+    tier: 3
+    connections:
+    - wind_depth_branch
+    - wind_depth_notable
+    modifiers:
+    - stat: ACCURACY
+      value: 13.5
+      type: FLAT
+  wind_depth_notable:
+    name: Sharpshooter
+    description: +14% Projectile Damage, +10 Wind Penetration
+    region: WIND
+    tier: 4
+    notable: true
+    connections:
+    - wind_depth_3
+    - wind_depth_4
+    - wind_synergy_4
+    - bridge_lightning_wind_3
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: WIND_PENETRATION
+      value: 10.0
+      type: FLAT
+  wind_synergy_1:
+    name: Wind Convergence
+    description: Per 3 Wind nodes, +2% Projectile Damage (max +20%)
+    region: WIND
+    tier: 5
+    notable: true
+    connections:
+    - wind_flow_notable
+    - wind_synergy_hub
+    - bridge_fire_wind_3
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WIND
+      per_count: 3
+      bonus:
+        stat: PROJECTILE_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  wind_synergy_2:
+    name: Gale Force
+    description: Per 3 Wind nodes, +3% Wind Damage (max +30%)
+    region: WIND
+    tier: 5
+    notable: true
+    connections:
+    - wind_arcane_notable
+    - wind_synergy_hub
+    - bridge_water_wind_3
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WIND
+      per_count: 3
+      bonus:
+        stat: WIND_DAMAGE_PERCENT
+        value: 3.0
+        modifierType: PERCENT
+      cap: 30.0
+    modifiers: []
+  wind_synergy_3:
+    name: Eye Training
+    description: Per 3 Wind nodes, +5 Accuracy (max +50)
+    region: WIND
+    tier: 5
+    notable: true
+    connections:
+    - wind_adaptation_notable
+    - wind_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WIND
+      per_count: 3
+      bonus:
+        stat: ACCURACY
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  wind_synergy_4:
+    name: Updraft
+    description: Per 3 Wind nodes, +5 Evasion (max +50)
+    region: WIND
+    tier: 5
+    notable: true
+    connections:
+    - wind_depth_notable
+    - wind_synergy_hub
+    synergy:
+      type: ELEMENTAL_COUNT
+      element: WIND
+      per_count: 3
+      bonus:
+        stat: EVASION
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  wind_synergy_hub:
+    name: Heart of Wind
+    description: +5% Wind Damage, +5% Projectile Damage
+    region: WIND
+    tier: 5
+    notable: true
+    connections:
+    - wind_synergy_1
+    - wind_synergy_2
+    - wind_synergy_3
+    - wind_synergy_4
+    - wind_keystone_1
+    - wind_keystone_2
+    modifiers:
+    - stat: WIND_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  wind_keystone_1:
+    name: Phantom
+    description: '+25% Evasion, +15% Projectile Damage. On Evade: +10% Move Speed for 3s. -30 Armor, -20% Max HP'
+    region: WIND
+    tier: 6
+    keystone: true
+    connections:
+    - wind_synergy_hub
+    modifiers:
+    - stat: EVASION_PERCENT
+      value: 25.0
+      type: PERCENT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    conditional:
+      trigger: ON_EVADE
+      duration: 3.0
+      stacking: REFRESH
+      effects:
+      - stat: MOVEMENT_SPEED_PERCENT
+        value: 10.0
+        modifierType: PERCENT
+    drawbacks:
+    - stat: ARMOR
+      value: -30.0
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: -20.0
+      type: PERCENT
+  wind_keystone_2:
+    name: Sky Piercer
+    description: +20% Projectile Damage, +20% Projectile Speed, +10 Spell Penetration. -25% Melee Damage, -15% Block Chance
+    region: WIND
+    tier: 6
+    keystone: true
+    connections:
+    - wind_synergy_hub
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 20.0
+      type: PERCENT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 20.0
+      type: PERCENT
+    - stat: SPELL_PENETRATION
+      value: 10.0
+      type: FLAT
+    drawbacks:
+    - stat: MELEE_DAMAGE_PERCENT
+      value: -25.0
+      type: PERCENT
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: -15.0
+      type: FLAT
+  bridge_lightning_wind_1:
+    name: Storm Depths I
+    description: +5 Lightning Damage, +9 Max Mana
+    region: WIND
+    tier: 2
+    connections:
+    - lightning_synergy_2
+    - bridge_lightning_wind_2
+    modifiers:
+    - stat: LIGHTNING_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 9.0
+      type: FLAT
+  bridge_lightning_wind_2:
+    name: Storm Depths II
+    description: +4% Lightning Damage, +4% Spell Damage
+    region: WIND
+    tier: 2
+    connections:
+    - bridge_lightning_wind_1
+    - bridge_lightning_wind_3
+    - striker_entry
+    - tempest_entry
+    modifiers:
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_lightning_wind_3:
+    name: Abyssal Storm
+    description: +7 Lightning Damage, +14.4 Max Mana
+    region: WIND
+    tier: 2
+    connections:
+    - bridge_lightning_wind_2
+    - wind_depth_notable
+    modifiers:
+    - stat: LIGHTNING_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 14.4
+      type: FLAT
+  bridge_water_earth_1:
+    name: Frozen Earth I
+    description: +5 Water Damage, +10 Armor
+    region: WATER
+    tier: 2
+    connections:
+    - water_evasion_notable
+    - bridge_water_earth_2
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+  bridge_water_earth_2:
+    name: Frozen Earth II
+    description: +4% Water Damage, +10 Armor
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_earth_1
+    - bridge_water_earth_3
+    - lich_entry
+    - sentinel_entry
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+  bridge_water_earth_3:
+    name: Glacial Fortress
+    description: +7 Water Damage, +10 Armor
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_earth_2
+    - earth_fortitude_notable
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+  bridge_earth_fire_1:
+    name: Burning Earth I
+    description: +10.0 Armor, +5.0 Armor
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_guardian_notable
+    - bridge_earth_fire_2
+    modifiers:
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+  bridge_earth_fire_2:
+    name: Burning Earth II
+    description: +5% Block Chance, +1.5 Life Steal
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_fire_1
+    - bridge_earth_fire_3
+    - juggernaut_entry
+    - warden_entry
+    modifiers:
+    - stat: PASSIVE_BLOCK_CHANCE
+      value: 5.0
+      type: PERCENT
+    - stat: LIFE_STEAL
+      value: 0.5
+      type: FLAT
+  bridge_earth_fire_3:
+    name: Wild Fury
+    description: +10.0 Armor, +8.0 Armor
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_fire_2
+    - fire_bloodlust_notable
+    modifiers:
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+    - stat: ARMOR
+      value: 8.0
+      type: FLAT
+  bridge_fire_void_1:
+    name: Burning Void I
+    description: +5 Physical Damage, +5 Void Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_synergy_1
+    - bridge_fire_void_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_fire_void_2:
+    name: Burning Void II
+    description: +4% Physical Damage, +4% Void Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_void_1
+    - bridge_fire_void_3
+    - havoc_entry
+    - juggernaut_entry
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_fire_void_3:
+    name: Infernal Corruption
+    description: +7 Physical Damage, +7 Void Damage
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_void_2
+    - void_synergy_1
+    modifiers:
+    - stat: PHYSICAL_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 7.0
+      type: FLAT
+  bridge_earth_void_1:
+    name: Decaying Growth I
+    description: +8 Max Health, +5 Void Damage
+    region: EARTH
+    tier: 2
+    connections:
+    - earth_synergy_1
+    - bridge_earth_void_2
+    modifiers:
+    - stat: MAX_HEALTH
+      value: 8.0
+      type: FLAT
+    - stat: VOID_DAMAGE
+      value: 5.0
+      type: FLAT
+  bridge_earth_void_2:
+    name: Decaying Growth II
+    description: +4% Max Health, +4% Void Damage
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_void_1
+    - bridge_earth_void_3
+    - juggernaut_entry
+    - lich_entry
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_earth_void_3:
+    name: Soul Garden
+    description: +12 Max Health, +1.5 Life Steal
+    region: EARTH
+    tier: 2
+    connections:
+    - bridge_earth_void_2
+    - void_drain_notable
+    modifiers:
+    - stat: MAX_HEALTH
+      value: 12.0
+      type: FLAT
+    - stat: LIFE_STEAL
+      value: 0.5
+      type: FLAT
+  bridge_fire_wind_1:
+    name: Steam Power I
+    description: +4% Fire Damage, +9 Max Mana
+    region: FIRE
+    tier: 2
+    connections:
+    - fire_synergy_2
+    - bridge_fire_wind_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: MAX_MANA
+      value: 9.0
+      type: FLAT
+  bridge_fire_wind_2:
+    name: Steam Power II
+    description: +4% Fire Damage, +4% Max Mana
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_wind_1
+    - bridge_fire_wind_3
+    - striker_entry
+    - warden_entry
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: MAX_MANA_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_fire_wind_3:
+    name: Boiling Currents
+    description: +6% Fire Damage, +14.4 Max Mana
+    region: FIRE
+    tier: 2
+    connections:
+    - bridge_fire_wind_2
+    - wind_synergy_1
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+    - stat: MAX_MANA
+      value: 14.4
+      type: FLAT
+  bridge_water_wind_1:
+    name: Frigid Waters I
+    description: +5 Water Damage, +9 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - water_synergy_2
+    - bridge_water_wind_2
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 5.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 9.0
+      type: FLAT
+  bridge_water_wind_2:
+    name: Frigid Waters II
+    description: +4% Water Damage, +4% Spell Damage
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_wind_1
+    - bridge_water_wind_3
+    - tempest_entry
+    - sentinel_entry
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  bridge_water_wind_3:
+    name: Arctic Arcana
+    description: +7 Water Damage, +14.4 Max Mana
+    region: WATER
+    tier: 2
+    connections:
+    - bridge_water_wind_2
+    - wind_synergy_2
+    modifiers:
+    - stat: WATER_DAMAGE
+      value: 7.0
+      type: FLAT
+    - stat: MAX_MANA
+      value: 14.4
+      type: FLAT
+  havoc_entry:
+    name: Path of Havoc
+    description: +5.2 Crit Multiplier
+    region: HAVOC
+    tier: 1
+    connections:
+    - bridge_fire_void_2
+    - bridge_fire_lightning_2
+    - bridge_lightning_void_2
+    - havoc_carnage_1
+    - havoc_frenzy_1
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 5.2
+      type: FLAT
+  havoc_carnage_1:
+    name: Carnage I
+    description: +5.2 Crit Multiplier
+    region: HAVOC
+    tier: 1
+    connections:
+    - havoc_entry
+    - havoc_carnage_2
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 5.2
+      type: FLAT
+  havoc_carnage_2:
+    name: Carnage II
+    description: +6% Physical Damage
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_carnage_1
+    - havoc_carnage_branch
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  havoc_carnage_branch:
+    name: Carnage Focus
+    description: +3.1 Crit Multiplier, +3% Physical Damage
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_carnage_2
+    - havoc_carnage_3
+    - havoc_carnage_4
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 3.1
+      type: FLAT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  havoc_carnage_3:
+    name: Carnage III
+    description: +3.9% Ignite Chance
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_carnage_branch
+    - havoc_carnage_notable
+    modifiers:
+    - stat: IGNITE_CHANCE
+      value: 3.9
+      type: FLAT
+  havoc_carnage_4:
+    name: Carnage IV
+    description: +7.7 Crit Multiplier
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_carnage_branch
+    - havoc_carnage_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 7.7
+      type: FLAT
+  havoc_carnage_notable:
+    name: Killing Spree
+    description: +15% Attack Speed, +12% Crit Chance
+    region: HAVOC
+    tier: 4
+    notable: true
+    connections:
+    - havoc_carnage_3
+    - havoc_carnage_4
+    - havoc_synergy_1
+    - havoc_ruin_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 12.0
+      type: FLAT
+  havoc_frenzy_1:
+    name: Frenzy I
+    description: +5% Attack Speed
+    region: HAVOC
+    tier: 1
+    connections:
+    - havoc_entry
+    - havoc_frenzy_2
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.0
+      type: PERCENT
+  havoc_frenzy_2:
+    name: Frenzy II
+    description: +3% Crit Chance
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_frenzy_1
+    - havoc_frenzy_branch
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  havoc_frenzy_branch:
+    name: Frenzy Focus
+    description: +3% Attack Speed, +1.5% Crit Chance
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_frenzy_2
+    - havoc_frenzy_3
+    - havoc_frenzy_4
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 1.5
+      type: FLAT
+  havoc_frenzy_3:
+    name: Frenzy III
+    description: +2.5 Stamina Regen
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_frenzy_branch
+    - havoc_frenzy_notable
+    modifiers:
+    - stat: STAMINA_REGEN
+      value: 2.5
+      type: FLAT
+  havoc_frenzy_4:
+    name: Frenzy IV
+    description: +6.8% Attack Speed
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_frenzy_branch
+    - havoc_frenzy_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 6.8
+      type: PERCENT
+  havoc_frenzy_notable:
+    name: Storm of Blades
+    description: +14% Attack Speed, +12 Crit Multiplier, +12.5% Physical Damage
+    region: HAVOC
+    tier: 4
+    notable: true
+    connections:
+    - havoc_frenzy_3
+    - havoc_frenzy_4
+    - havoc_synergy_2
+    - havoc_mayhem_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 12.0
+      type: FLAT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  havoc_ruin_1:
+    name: Ruin I
+    description: +5% DoT Damage
+    region: HAVOC
+    tier: 1
+    connections:
+    - havoc_carnage_notable
+    - havoc_ruin_2
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  havoc_ruin_2:
+    name: Ruin II
+    description: +0.6 Life Steal
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_ruin_1
+    - havoc_ruin_branch
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.4
+      type: FLAT
+  havoc_ruin_branch:
+    name: Ruin Focus
+    description: +3% DoT Damage, +0.4 Life Steal
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_ruin_2
+    - havoc_ruin_3
+    - havoc_ruin_4
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIFE_STEAL
+      value: 0.3
+      type: FLAT
+  havoc_ruin_3:
+    name: Ruin III
+    description: +4% Burn Damage
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_ruin_branch
+    - havoc_ruin_notable
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  havoc_ruin_4:
+    name: Ruin IV
+    description: +6.8% DoT Damage
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_ruin_branch
+    - havoc_ruin_notable
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  havoc_ruin_notable:
+    name: Death's Touch
+    description: +15% DoT Damage, +5% True Damage, +5% Status Effect Duration
+    region: HAVOC
+    tier: 4
+    notable: true
+    connections:
+    - havoc_ruin_3
+    - havoc_ruin_4
+    - havoc_synergy_3
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 5.0
+      type: PERCENT
+    - stat: STATUS_EFFECT_DURATION
+      value: 5.0
+      type: PERCENT
+  havoc_mayhem_1:
+    name: Mayhem I
+    description: +0.5% True Damage
+    region: HAVOC
+    tier: 1
+    connections:
+    - havoc_frenzy_notable
+    - havoc_mayhem_2
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.5
+      type: PERCENT
+  havoc_mayhem_2:
+    name: Mayhem II
+    description: +4.8 Crit Multiplier
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_mayhem_1
+    - havoc_mayhem_branch
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 4.8
+      type: FLAT
+  havoc_mayhem_branch:
+    name: Mayhem Focus
+    description: +0.4% True Damage, +2 Crit Multiplier
+    region: HAVOC
+    tier: 2
+    connections:
+    - havoc_mayhem_2
+    - havoc_mayhem_3
+    - havoc_mayhem_4
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.4
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 2.0
+      type: FLAT
+  havoc_mayhem_3:
+    name: Mayhem III
+    description: +3.9% Shock Chance
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_mayhem_branch
+    - havoc_mayhem_notable
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  havoc_mayhem_4:
+    name: Mayhem IV
+    description: +0.8% True Damage
+    region: HAVOC
+    tier: 3
+    connections:
+    - havoc_mayhem_branch
+    - havoc_mayhem_notable
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.8
+      type: PERCENT
+  havoc_mayhem_notable:
+    name: Bloodbath
+    description: +15.0% Physical Damage, +3.0 Life Steal
+    region: HAVOC
+    tier: 4
+    notable: true
+    connections:
+    - havoc_mayhem_3
+    - havoc_mayhem_4
+    - havoc_synergy_4
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: LIFE_STEAL
+      value: 2.2
+      type: FLAT
+  havoc_synergy_1:
+    name: Chaos Resonance
+    description: Per 3 Havoc nodes, +2.0% Crit Multiplier (max +20.0%)
+    region: HAVOC
+    tier: 5
+    notable: true
+    connections:
+    - havoc_carnage_notable
+    - havoc_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: CRITICAL_MULTIPLIER
+        value: 2.0
+        modifierType: FLAT
+      cap: 20.0
+    modifiers: []
+  havoc_synergy_2:
+    name: Shattered Defenses
+    description: Per 3 Havoc nodes, +1.0% Armor Penetration (max +10.0%)
+    region: HAVOC
+    tier: 5
+    notable: true
+    connections:
+    - havoc_frenzy_notable
+    - havoc_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ARMOR_PENETRATION
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  havoc_synergy_3:
+    name: Bloodlust
+    description: Per 3 Havoc nodes, +2.0% Execute Damage (max +20.0%)
+    region: HAVOC
+    tier: 5
+    notable: true
+    connections:
+    - havoc_ruin_notable
+    - havoc_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: EXECUTE_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  havoc_synergy_4:
+    name: Rampage Buildup
+    description: Per 3 Havoc nodes, +1.0% True Damage (max +10.0%)
+    region: HAVOC
+    tier: 5
+    notable: true
+    connections:
+    - havoc_mayhem_notable
+    - havoc_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: PERCENT_HIT_AS_TRUE_DAMAGE
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  havoc_synergy_hub:
+    name: Nexus of Havoc
+    description: +3.0% Fire Damage, +3.0% Void Damage, +3.0% Lightning Damage
+    region: HAVOC
+    tier: 5
+    notable: true
+    connections:
+    - havoc_synergy_1
+    - havoc_synergy_2
+    - havoc_synergy_3
+    - havoc_synergy_4
+    - havoc_keystone_1
+    - havoc_keystone_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  havoc_keystone_1:
+    name: Rampage
+    description: +8.0% Attack Speed, +4.0 Crit Multiplier, +2.0% DoT Damage. -15.0% Max Health
+    region: HAVOC
+    tier: 6
+    keystone: true
+    connections:
+    - havoc_synergy_hub
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 8.0
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 4.0
+      type: FLAT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 2.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -15.0
+      type: PERCENT
+  havoc_keystone_2:
+    name: Chain Detonation
+    description: +1.0 Detonate DoT on Crit, +10.0 Crit Chance. -30.0% Status Duration
+    region: HAVOC
+    tier: 6
+    keystone: true
+    connections:
+    - havoc_synergy_hub
+    modifiers:
+    - stat: DETONATE_DOT_ON_CRIT
+      value: 1.0
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 10.0
+      type: FLAT
+    drawbacks:
+    - stat: STATUS_EFFECT_DURATION
+      value: -30.0
+      type: PERCENT
+  juggernaut_entry:
+    name: Path of Juggernaut
+    description: +4% Physical Damage
+    region: JUGGERNAUT
+    tier: 1
+    connections:
+    - bridge_fire_void_2
+    - bridge_earth_fire_2
+    - bridge_earth_void_2
+    - juggernaut_conquest_1
+    - juggernaut_dominion_1
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  juggernaut_conquest_1:
+    name: Conquest I
+    description: +6% Physical Damage
+    region: JUGGERNAUT
+    tier: 1
+    connections:
+    - juggernaut_entry
+    - juggernaut_conquest_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  juggernaut_conquest_2:
+    name: Conquest II
+    description: +5% Max Health
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_conquest_1
+    - juggernaut_conquest_branch
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  juggernaut_conquest_branch:
+    name: Conquest Focus
+    description: +3.3% Physical Damage, +3.3% Max Health
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_conquest_2
+    - juggernaut_conquest_3
+    - juggernaut_conquest_4
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: MAX_HEALTH_PERCENT
+      value: 3.3
+      type: PERCENT
+  juggernaut_conquest_3:
+    name: Conquest III
+    description: +12 Armor
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_conquest_branch
+    - juggernaut_conquest_notable
+    modifiers:
+    - stat: ARMOR
+      value: 12.0
+      type: FLAT
+  juggernaut_conquest_4:
+    name: Conquest IV
+    description: +6% Physical Damage
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_conquest_branch
+    - juggernaut_conquest_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  juggernaut_conquest_notable:
+    name: Iron Reaver
+    description: +15% Physical Damage, +12.5% Max Health, +5 Armor
+    region: JUGGERNAUT
+    tier: 4
+    notable: true
+    connections:
+    - juggernaut_conquest_3
+    - juggernaut_conquest_4
+    - juggernaut_synergy_1
+    - juggernaut_bloodforge_1
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: MAX_HEALTH_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+  juggernaut_dominion_1:
+    name: Dominion I
+    description: +3.9% Block Chance
+    region: JUGGERNAUT
+    tier: 1
+    connections:
+    - juggernaut_entry
+    - juggernaut_dominion_2
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  juggernaut_dominion_2:
+    name: Dominion II
+    description: +4% Health Regen
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_dominion_1
+    - juggernaut_dominion_branch
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 4.0
+      type: PERCENT
+  juggernaut_dominion_branch:
+    name: Dominion Focus
+    description: +2.8% Block Chance, +3% Health Regen
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_dominion_2
+    - juggernaut_dominion_3
+    - juggernaut_dominion_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+    - stat: HEALTH_REGEN_PERCENT
+      value: 3.0
+      type: PERCENT
+  juggernaut_dominion_3:
+    name: Dominion III
+    description: +2 KB Resistance
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_dominion_branch
+    - juggernaut_dominion_notable
+    modifiers:
+    - stat: KNOCKBACK_RESISTANCE
+      value: 2.0
+      type: FLAT
+  juggernaut_dominion_4:
+    name: Dominion IV
+    description: +5.2% Block Chance
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_dominion_branch
+    - juggernaut_dominion_notable
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 5.2
+      type: FLAT
+  juggernaut_dominion_notable:
+    name: Blood Guard
+    description: +8% Block Chance, +3 Life Steal, +7.5% Health Regen
+    region: JUGGERNAUT
+    tier: 4
+    notable: true
+    connections:
+    - juggernaut_dominion_3
+    - juggernaut_dominion_4
+    - juggernaut_synergy_2
+    - juggernaut_tyrant_1
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: LIFE_STEAL
+      value: 0.6
+      type: FLAT
+    - stat: HEALTH_REGEN_PERCENT
+      value: 7.5
+      type: PERCENT
+  juggernaut_bloodforge_1:
+    name: Bloodforge I
+    description: +4% Burn Damage
+    region: JUGGERNAUT
+    tier: 1
+    connections:
+    - juggernaut_conquest_notable
+    - juggernaut_bloodforge_2
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  juggernaut_bloodforge_2:
+    name: Bloodforge II
+    description: +0.6 Life Steal
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_bloodforge_1
+    - juggernaut_bloodforge_branch
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.1
+      type: FLAT
+  juggernaut_bloodforge_branch:
+    name: Bloodforge Focus
+    description: +3% Burn Damage, +0.4 Life Steal
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_bloodforge_2
+    - juggernaut_bloodforge_3
+    - juggernaut_bloodforge_4
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIFE_STEAL
+      value: 0.1
+      type: FLAT
+  juggernaut_bloodforge_3:
+    name: Bloodforge III
+    description: +4.8 Crit Multiplier
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_bloodforge_branch
+    - juggernaut_bloodforge_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 4.8
+      type: FLAT
+  juggernaut_bloodforge_4:
+    name: Bloodforge IV
+    description: +6% Burn Damage
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_bloodforge_branch
+    - juggernaut_bloodforge_notable
+    modifiers:
+    - stat: BURN_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  juggernaut_bloodforge_notable:
+    name: Relentless
+    description: +15% Charged Attack Damage, +5% True Damage
+    region: JUGGERNAUT
+    tier: 4
+    notable: true
+    connections:
+    - juggernaut_bloodforge_3
+    - juggernaut_bloodforge_4
+    - juggernaut_synergy_3
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 5.0
+      type: PERCENT
+  juggernaut_tyrant_1:
+    name: Tyrant I
+    description: +5% Charged Attack Damage
+    region: JUGGERNAUT
+    tier: 1
+    connections:
+    - juggernaut_dominion_notable
+    - juggernaut_tyrant_2
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  juggernaut_tyrant_2:
+    name: Tyrant II
+    description: +0.5% True Damage
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_tyrant_1
+    - juggernaut_tyrant_branch
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.5
+      type: PERCENT
+  juggernaut_tyrant_branch:
+    name: Tyrant Focus
+    description: +3% Charged Attack Damage, +0.3% True Damage
+    region: JUGGERNAUT
+    tier: 2
+    connections:
+    - juggernaut_tyrant_2
+    - juggernaut_tyrant_3
+    - juggernaut_tyrant_4
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.3
+      type: PERCENT
+  juggernaut_tyrant_3:
+    name: Tyrant III
+    description: +6% Max Health
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_tyrant_branch
+    - juggernaut_tyrant_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 6.0
+      type: PERCENT
+  juggernaut_tyrant_4:
+    name: Tyrant IV
+    description: +6.8% Charged Attack Damage
+    region: JUGGERNAUT
+    tier: 3
+    connections:
+    - juggernaut_tyrant_branch
+    - juggernaut_tyrant_notable
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  juggernaut_tyrant_notable:
+    name: Indomitable
+    description: +14% Max Health, +5 Armor, +12.5% Burn Damage
+    region: JUGGERNAUT
+    tier: 4
+    notable: true
+    connections:
+    - juggernaut_tyrant_3
+    - juggernaut_tyrant_4
+    - juggernaut_synergy_4
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+    - stat: BURN_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  juggernaut_synergy_1:
+    name: Unbreakable Wall
+    description: Per 3 Juggernaut nodes, +2.0% Max Health (max +20.0%)
+    region: JUGGERNAUT
+    tier: 5
+    notable: true
+    connections:
+    - juggernaut_conquest_notable
+    - juggernaut_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MAX_HEALTH_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  juggernaut_synergy_2:
+    name: Blood Pact
+    description: Per 3 Juggernaut nodes, +1.0% Life Steal (max +10.0%)
+    region: JUGGERNAUT
+    tier: 5
+    notable: true
+    connections:
+    - juggernaut_dominion_notable
+    - juggernaut_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: LIFE_STEAL
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  juggernaut_synergy_3:
+    name: Iron Thorns
+    description: Per 3 Juggernaut nodes, +2.0% Thorns Damage (max +20.0%)
+    region: JUGGERNAUT
+    tier: 5
+    notable: true
+    connections:
+    - juggernaut_bloodforge_notable
+    - juggernaut_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: THORNS_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  juggernaut_synergy_4:
+    name: Battle Recovery
+    description: Per 3 Juggernaut nodes, +0.2 Health Regen (max +2.0)
+    region: JUGGERNAUT
+    tier: 5
+    notable: true
+    connections:
+    - juggernaut_tyrant_notable
+    - juggernaut_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: HEALTH_REGEN
+        value: 0.2
+        modifierType: FLAT
+      cap: 2.0
+    modifiers: []
+  juggernaut_synergy_hub:
+    name: Nexus of Juggernaut
+    description: +3.0% Fire Damage, +3.0% Void Damage, +3.0% Earth Damage
+    region: JUGGERNAUT
+    tier: 5
+    notable: true
+    connections:
+    - juggernaut_synergy_1
+    - juggernaut_synergy_2
+    - juggernaut_synergy_3
+    - juggernaut_synergy_4
+    - juggernaut_keystone_1
+    - juggernaut_keystone_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EARTH_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  juggernaut_keystone_1:
+    name: Blood Fortress
+    description: +10.0 Block Chance, +10.0 Life Steal. -25.0% Attack Speed
+    region: JUGGERNAUT
+    tier: 6
+    keystone: true
+    connections:
+    - juggernaut_synergy_hub
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 10.0
+      type: FLAT
+    - stat: LIFE_STEAL
+      value: 1.0
+      type: FLAT
+    drawbacks:
+    - stat: ATTACK_SPEED_PERCENT
+      value: -25.0
+      type: PERCENT
+  juggernaut_keystone_2:
+    name: Colossus
+    description: +0.5 HP Scaling Damage, +10.0% Max Health. -25.0% Movement Speed, -50.0 Evasion
+    region: JUGGERNAUT
+    tier: 6
+    keystone: true
+    connections:
+    - juggernaut_synergy_hub
+    modifiers:
+    - stat: HP_SCALING_DAMAGE
+      value: 0.5
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: 10.0
+      type: PERCENT
+    drawbacks:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: -25.0
+      type: PERCENT
+    - stat: EVASION
+      value: -50.0
+      type: FLAT
+  striker_entry:
+    name: Path of Striker
+    description: +3% Attack Speed
+    region: STRIKER
+    tier: 1
+    connections:
+    - bridge_fire_lightning_2
+    - bridge_fire_wind_2
+    - bridge_lightning_wind_2
+    - striker_quicksilver_1
+    - striker_precision_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  striker_quicksilver_1:
+    name: Quicksilver I
+    description: +5% Attack Speed
+    region: STRIKER
+    tier: 1
+    connections:
+    - striker_entry
+    - striker_quicksilver_2
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.0
+      type: PERCENT
+  striker_quicksilver_2:
+    name: Quicksilver II
+    description: +3% Crit Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_quicksilver_1
+    - striker_quicksilver_branch
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  striker_quicksilver_branch:
+    name: Quicksilver Focus
+    description: +3% Attack Speed, +1.5% Crit Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_quicksilver_2
+    - striker_quicksilver_3
+    - striker_quicksilver_4
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 1.5
+      type: FLAT
+  striker_quicksilver_3:
+    name: Quicksilver III
+    description: +3 Max Stamina
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_quicksilver_branch
+    - striker_quicksilver_notable
+    modifiers:
+    - stat: MAX_STAMINA
+      value: 3.0
+      type: FLAT
+  striker_quicksilver_4:
+    name: Quicksilver IV
+    description: +6.8% Attack Speed
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_quicksilver_branch
+    - striker_quicksilver_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 6.8
+      type: PERCENT
+  striker_quicksilver_notable:
+    name: Quick Draw
+    description: +14% Attack Speed, +12.5% Projectile Damage, +12.5% Move Speed
+    region: STRIKER
+    tier: 4
+    notable: true
+    connections:
+    - striker_quicksilver_3
+    - striker_quicksilver_4
+    - striker_synergy_1
+    - striker_ambush_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  striker_precision_1:
+    name: Precision I
+    description: +8 Accuracy
+    region: STRIKER
+    tier: 1
+    connections:
+    - striker_entry
+    - striker_precision_2
+    modifiers:
+    - stat: ACCURACY
+      value: 8.0
+      type: FLAT
+  striker_precision_2:
+    name: Precision II
+    description: +10 Evasion
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_precision_1
+    - striker_precision_branch
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  striker_precision_branch:
+    name: Precision Focus
+    description: +6 Accuracy, +8 Evasion
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_precision_2
+    - striker_precision_3
+    - striker_precision_4
+    modifiers:
+    - stat: ACCURACY
+      value: 6.0
+      type: FLAT
+    - stat: EVASION
+      value: 8.0
+      type: FLAT
+  striker_precision_3:
+    name: Precision III
+    description: +5.2 Crit Multiplier
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_precision_branch
+    - striker_precision_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 5.2
+      type: FLAT
+  striker_precision_4:
+    name: Precision IV
+    description: +8 Accuracy
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_precision_branch
+    - striker_precision_notable
+    modifiers:
+    - stat: ACCURACY
+      value: 8.0
+      type: FLAT
+  striker_precision_notable:
+    name: Vital Strike
+    description: +12 Crit Multiplier, +8% Crit Chance, +5 Accuracy
+    region: STRIKER
+    tier: 4
+    notable: true
+    connections:
+    - striker_precision_3
+    - striker_precision_4
+    - striker_synergy_2
+    - striker_flurry_1
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 12.0
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: ACCURACY
+      value: 5.0
+      type: FLAT
+  striker_ambush_1:
+    name: Ambush I
+    description: +6% Physical Damage
+    region: STRIKER
+    tier: 1
+    connections:
+    - striker_quicksilver_notable
+    - striker_ambush_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  striker_ambush_2:
+    name: Ambush II
+    description: +3.9% Ignite Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_ambush_1
+    - striker_ambush_branch
+    modifiers:
+    - stat: IGNITE_CHANCE
+      value: 3.9
+      type: FLAT
+  striker_ambush_branch:
+    name: Ambush Focus
+    description: +3.3% Physical Damage, +2.8% Ignite Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_ambush_2
+    - striker_ambush_3
+    - striker_ambush_4
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: IGNITE_CHANCE
+      value: 2.8
+      type: FLAT
+  striker_ambush_3:
+    name: Ambush III
+    description: +4% Attack Speed
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_ambush_branch
+    - striker_ambush_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  striker_ambush_4:
+    name: Ambush IV
+    description: +6% Physical Damage
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_ambush_branch
+    - striker_ambush_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  striker_ambush_notable:
+    name: Relentless Assault
+    description: +12.5% Attack Speed, +12.5% Physical Damage, +12.5% Charged Attack Damage
+    region: STRIKER
+    tier: 4
+    notable: true
+    connections:
+    - striker_ambush_3
+    - striker_ambush_4
+    - striker_synergy_3
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+  striker_flurry_1:
+    name: Flurry I
+    description: +5% Projectile Damage
+    region: STRIKER
+    tier: 1
+    connections:
+    - striker_precision_notable
+    - striker_flurry_2
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  striker_flurry_2:
+    name: Flurry II
+    description: +3% Crit Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_flurry_1
+    - striker_flurry_branch
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  striker_flurry_branch:
+    name: Flurry Focus
+    description: +3% Projectile Damage, +1.5% Crit Chance
+    region: STRIKER
+    tier: 2
+    connections:
+    - striker_flurry_2
+    - striker_flurry_3
+    - striker_flurry_4
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 1.5
+      type: FLAT
+  striker_flurry_3:
+    name: Flurry III
+    description: +10 Evasion
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_flurry_branch
+    - striker_flurry_notable
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  striker_flurry_4:
+    name: Flurry IV
+    description: +6.8% Projectile Damage
+    region: STRIKER
+    tier: 3
+    connections:
+    - striker_flurry_branch
+    - striker_flurry_notable
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  striker_flurry_notable:
+    name: Feint
+    description: +10.0 Evasion, +15.0 Crit Chance
+    region: STRIKER
+    tier: 4
+    notable: true
+    connections:
+    - striker_flurry_3
+    - striker_flurry_4
+    - striker_synergy_4
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 15.0
+      type: FLAT
+  striker_synergy_1:
+    name: Quicksilver Reflexes
+    description: Per 3 Striker nodes, +1.0% Attack Speed (max +10.0%)
+    region: STRIKER
+    tier: 5
+    notable: true
+    connections:
+    - striker_quicksilver_notable
+    - striker_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ATTACK_SPEED_PERCENT
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  striker_synergy_2:
+    name: Precision Training
+    description: Per 3 Striker nodes, +0.5% Crit Chance (max +5.0%)
+    region: STRIKER
+    tier: 5
+    notable: true
+    connections:
+    - striker_precision_notable
+    - striker_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: CRITICAL_CHANCE
+        value: 0.5
+        modifierType: FLAT
+      cap: 5.0
+    modifiers: []
+  striker_synergy_3:
+    name: Blitz Protocol
+    description: Per 3 Striker nodes, +2.0% Movement Speed (max +20.0%)
+    region: STRIKER
+    tier: 5
+    notable: true
+    connections:
+    - striker_ambush_notable
+    - striker_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MOVEMENT_SPEED_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  striker_synergy_4:
+    name: Shadow Step
+    description: Per 3 Striker nodes, +1.0% Dodge Chance (max +10.0%)
+    region: STRIKER
+    tier: 5
+    notable: true
+    connections:
+    - striker_flurry_notable
+    - striker_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: DODGE_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  striker_synergy_hub:
+    name: Nexus of Striker
+    description: +3.0% Fire Damage, +3.0% Wind Damage, +3.0% Lightning Damage
+    region: STRIKER
+    tier: 5
+    notable: true
+    connections:
+    - striker_synergy_1
+    - striker_synergy_2
+    - striker_synergy_3
+    - striker_synergy_4
+    - striker_keystone_1
+    - striker_keystone_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: WIND_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  striker_keystone_1:
+    name: Blade Dance
+    description: +5.0 Evasion, +20.0 Crit Chance, +20.0 Crit Multiplier. -25.0 Armor, -15.0% Max Health
+    region: STRIKER
+    tier: 6
+    keystone: true
+    connections:
+    - striker_synergy_hub
+    modifiers:
+    - stat: EVASION
+      value: 5.0
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 20.0
+      type: FLAT
+    - stat: CRITICAL_MULTIPLIER
+      value: 20.0
+      type: FLAT
+    drawbacks:
+    - stat: ARMOR
+      value: -25.0
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: -15.0
+      type: PERCENT
+  striker_keystone_2:
+    name: Momentum
+    description: +3.0 Consecutive Hit Bonus, +5.0% Attack Speed. -20.0% Max Health
+    region: STRIKER
+    tier: 6
+    keystone: true
+    connections:
+    - striker_synergy_hub
+    modifiers:
+    - stat: CONSECUTIVE_HIT_BONUS
+      value: 3.0
+      type: FLAT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 5.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -20.0
+      type: PERCENT
+  warden_entry:
+    name: Path of Warden
+    description: +12 Armor
+    region: WARDEN
+    tier: 1
+    connections:
+    - bridge_earth_fire_2
+    - bridge_fire_wind_2
+    - bridge_earth_wind_2
+    - warden_garrison_1
+    - warden_outrider_1
+    modifiers:
+    - stat: ARMOR
+      value: 12.0
+      type: FLAT
+  warden_garrison_1:
+    name: Garrison I
+    description: +12 Armor
+    region: WARDEN
+    tier: 1
+    connections:
+    - warden_entry
+    - warden_garrison_2
+    modifiers:
+    - stat: ARMOR
+      value: 12.0
+      type: FLAT
+  warden_garrison_2:
+    name: Garrison II
+    description: +3.9% Block Chance
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_garrison_1
+    - warden_garrison_branch
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  warden_garrison_branch:
+    name: Garrison Focus
+    description: +9 Armor, +2.8% Block Chance
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_garrison_2
+    - warden_garrison_3
+    - warden_garrison_4
+    modifiers:
+    - stat: ARMOR
+      value: 9.0
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+  warden_garrison_3:
+    name: Garrison III
+    description: +6% Max Health
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_garrison_branch
+    - warden_garrison_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 6.0
+      type: PERCENT
+  warden_garrison_4:
+    name: Garrison IV
+    description: +18 Armor
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_garrison_branch
+    - warden_garrison_notable
+    modifiers:
+    - stat: ARMOR
+      value: 18.0
+      type: FLAT
+  warden_garrison_notable:
+    name: Shield Wall
+    description: +9.6% Block Chance, +12.5% Max Health, +5 KB Resistance
+    region: WARDEN
+    tier: 4
+    notable: true
+    connections:
+    - warden_garrison_3
+    - warden_garrison_4
+    - warden_synergy_1
+    - warden_ironclad_1
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 9.6
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: KNOCKBACK_RESISTANCE
+      value: 5.0
+      type: FLAT
+  warden_outrider_1:
+    name: Outrider I
+    description: +5% Projectile Damage
+    region: WARDEN
+    tier: 1
+    connections:
+    - warden_entry
+    - warden_outrider_2
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  warden_outrider_2:
+    name: Outrider II
+    description: +8 Accuracy
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_outrider_1
+    - warden_outrider_branch
+    modifiers:
+    - stat: ACCURACY
+      value: 8.0
+      type: FLAT
+  warden_outrider_branch:
+    name: Outrider Focus
+    description: +3% Projectile Damage, +6 Accuracy
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_outrider_2
+    - warden_outrider_3
+    - warden_outrider_4
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: ACCURACY
+      value: 6.0
+      type: FLAT
+  warden_outrider_3:
+    name: Outrider III
+    description: +4% Projectile Speed
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_outrider_branch
+    - warden_outrider_notable
+    modifiers:
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  warden_outrider_4:
+    name: Outrider IV
+    description: +6.8% Projectile Damage
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_outrider_branch
+    - warden_outrider_notable
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  warden_outrider_notable:
+    name: Iron Rain
+    description: +15% Projectile Damage, +5 Armor, +12.5% Projectile Speed
+    region: WARDEN
+    tier: 4
+    notable: true
+    connections:
+    - warden_outrider_3
+    - warden_outrider_4
+    - warden_synergy_2
+    - warden_palisade_1
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  warden_ironclad_1:
+    name: Ironclad I
+    description: +6% Physical Damage
+    region: WARDEN
+    tier: 1
+    connections:
+    - warden_garrison_notable
+    - warden_ironclad_2
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  warden_ironclad_2:
+    name: Ironclad II
+    description: +10 Armor
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_ironclad_1
+    - warden_ironclad_branch
+    modifiers:
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+  warden_ironclad_branch:
+    name: Ironclad Focus
+    description: +3.3% Physical Damage, +8 Armor
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_ironclad_2
+    - warden_ironclad_3
+    - warden_ironclad_4
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: ARMOR
+      value: 8.0
+      type: FLAT
+  warden_ironclad_3:
+    name: Ironclad III
+    description: +4.8 Crit Multiplier
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_ironclad_branch
+    - warden_ironclad_notable
+    modifiers:
+    - stat: CRITICAL_MULTIPLIER
+      value: 4.8
+      type: FLAT
+  warden_ironclad_4:
+    name: Ironclad IV
+    description: +6% Physical Damage
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_ironclad_branch
+    - warden_ironclad_notable
+    modifiers:
+    - stat: PHYSICAL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  warden_ironclad_notable:
+    name: Power Shot
+    description: +15% Charged Attack Damage, +9 Crit Multiplier, +5 Accuracy
+    region: WARDEN
+    tier: 4
+    notable: true
+    connections:
+    - warden_ironclad_3
+    - warden_ironclad_4
+    - warden_synergy_3
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: CRITICAL_MULTIPLIER
+      value: 9.0
+      type: FLAT
+    - stat: ACCURACY
+      value: 5.0
+      type: FLAT
+  warden_palisade_1:
+    name: Palisade I
+    description: +3.9% Block Chance
+    region: WARDEN
+    tier: 1
+    connections:
+    - warden_outrider_notable
+    - warden_palisade_2
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  warden_palisade_2:
+    name: Palisade II
+    description: +4% Projectile Damage
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_palisade_1
+    - warden_palisade_branch
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  warden_palisade_branch:
+    name: Palisade Focus
+    description: +2.8% Block Chance, +3% Projectile Damage
+    region: WARDEN
+    tier: 2
+    connections:
+    - warden_palisade_2
+    - warden_palisade_3
+    - warden_palisade_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  warden_palisade_3:
+    name: Palisade III
+    description: +4% Charged Attack Damage
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_palisade_branch
+    - warden_palisade_notable
+    modifiers:
+    - stat: CHARGED_ATTACK_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  warden_palisade_4:
+    name: Palisade IV
+    description: +5.2% Block Chance
+    region: WARDEN
+    tier: 3
+    connections:
+    - warden_palisade_branch
+    - warden_palisade_notable
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 5.2
+      type: FLAT
+  warden_palisade_notable:
+    name: Fortified Position
+    description: +8% Block Chance, +15% Projectile Damage
+    region: WARDEN
+    tier: 4
+    notable: true
+    connections:
+    - warden_palisade_3
+    - warden_palisade_4
+    - warden_synergy_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+  warden_synergy_1:
+    name: Fortified Range
+    description: Per 3 Warden nodes, +2.0% Projectile Damage (max +20.0%)
+    region: WARDEN
+    tier: 5
+    notable: true
+    connections:
+    - warden_garrison_notable
+    - warden_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: PROJECTILE_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  warden_synergy_2:
+    name: Power Draw
+    description: Per 3 Warden nodes, +2.0% Charged Attack Damage (max +20.0%)
+    region: WARDEN
+    tier: 5
+    notable: true
+    connections:
+    - warden_outrider_notable
+    - warden_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: CHARGED_ATTACK_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  warden_synergy_3:
+    name: Eagle Eye
+    description: Per 3 Warden nodes, +5.0 Accuracy (max +50.0)
+    region: WARDEN
+    tier: 5
+    notable: true
+    connections:
+    - warden_ironclad_notable
+    - warden_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ACCURACY
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  warden_synergy_4:
+    name: Immovable Stance
+    description: Per 3 Warden nodes, +1.0% Knockback Resistance (max +10.0%)
+    region: WARDEN
+    tier: 5
+    notable: true
+    connections:
+    - warden_palisade_notable
+    - warden_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: KNOCKBACK_RESISTANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  warden_synergy_hub:
+    name: Nexus of Warden
+    description: +3.0% Fire Damage, +3.0% Wind Damage, +3.0% Earth Damage
+    region: WARDEN
+    tier: 5
+    notable: true
+    connections:
+    - warden_synergy_1
+    - warden_synergy_2
+    - warden_synergy_3
+    - warden_synergy_4
+    - warden_keystone_1
+    - warden_keystone_2
+    modifiers:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: WIND_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EARTH_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  warden_keystone_1:
+    name: Earthen Volley
+    description: +15.0% Projectile Damage, +20.0 Armor. -20.0% Spell Damage, -15.0% Movement Speed
+    region: WARDEN
+    tier: 6
+    keystone: true
+    connections:
+    - warden_synergy_hub
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: ARMOR
+      value: 20.0
+      type: FLAT
+    drawbacks:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: -15.0
+      type: PERCENT
+  warden_keystone_2:
+    name: Stalwart Counter
+    description: +150.0 Block Counter Damage, +10.0 Block Chance. -20.0% Spell Damage, -20.0% Attack Speed
+    region: WARDEN
+    tier: 6
+    keystone: true
+    connections:
+    - warden_synergy_hub
+    modifiers:
+    - stat: BLOCK_COUNTER_DAMAGE
+      value: 150.0
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: 10.0
+      type: FLAT
+    drawbacks:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: -20.0
+      type: PERCENT
+  warlock_entry:
+    name: Path of Warlock
+    description: +4% Spell Damage
+    region: WARLOCK
+    tier: 1
+    connections:
+    - bridge_lightning_water_2
+    - bridge_lightning_void_2
+    - bridge_water_void_2
+    - warlock_hex_1
+    - warlock_ritual_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  warlock_hex_1:
+    name: Hex I
+    description: +6% Spell Damage
+    region: WARLOCK
+    tier: 1
+    connections:
+    - warlock_entry
+    - warlock_hex_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  warlock_hex_2:
+    name: Hex II
+    description: +5% DoT Damage
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_hex_1
+    - warlock_hex_branch
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  warlock_hex_branch:
+    name: Hex Focus
+    description: +3.3% Spell Damage, +3% DoT Damage
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_hex_2
+    - warlock_hex_3
+    - warlock_hex_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.3
+      type: PERCENT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  warlock_hex_3:
+    name: Hex III
+    description: +2 Mana on Kill
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_hex_branch
+    - warlock_hex_notable
+    modifiers:
+    - stat: MANA_ON_KILL
+      value: 2.0
+      type: FLAT
+  warlock_hex_4:
+    name: Hex IV
+    description: +6% Spell Damage
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_hex_branch
+    - warlock_hex_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.0
+      type: PERCENT
+  warlock_hex_notable:
+    name: Dark Arcana
+    description: +15% Spell Damage, +12.5% DoT Damage, +2 Mana on Kill
+    region: WARLOCK
+    tier: 4
+    notable: true
+    connections:
+    - warlock_hex_3
+    - warlock_hex_4
+    - warlock_synergy_1
+    - warlock_malice_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 15.0
+      type: PERCENT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: MANA_ON_KILL
+      value: 2.0
+      type: FLAT
+  warlock_ritual_1:
+    name: Ritual I
+    description: +6.6 Max Mana
+    region: WARLOCK
+    tier: 1
+    connections:
+    - warlock_entry
+    - warlock_ritual_2
+    modifiers:
+    - stat: MAX_MANA
+      value: 6.6
+      type: FLAT
+  warlock_ritual_2:
+    name: Ritual II
+    description: +2 Mana Regen/s
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_ritual_1
+    - warlock_ritual_branch
+    modifiers:
+    - stat: MANA_REGEN
+      value: 2.0
+      type: FLAT
+  warlock_ritual_branch:
+    name: Ritual Focus
+    description: +4.4 Max Mana, +1.2 Mana Regen/s
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_ritual_2
+    - warlock_ritual_3
+    - warlock_ritual_4
+    modifiers:
+    - stat: MAX_MANA
+      value: 4.4
+      type: FLAT
+    - stat: MANA_REGEN
+      value: 1.2
+      type: FLAT
+  warlock_ritual_3:
+    name: Ritual III
+    description: +8 Energy Shield
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_ritual_branch
+    - warlock_ritual_notable
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 8.0
+      type: FLAT
+  warlock_ritual_4:
+    name: Ritual IV
+    description: +9.9 Max Mana
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_ritual_branch
+    - warlock_ritual_notable
+    modifiers:
+    - stat: MAX_MANA
+      value: 9.9
+      type: FLAT
+  warlock_ritual_notable:
+    name: Mind Drain
+    description: +5.0 Mana Regen, +3.0 Life Steal, +5.0 Energy Shield
+    region: WARLOCK
+    tier: 4
+    notable: true
+    connections:
+    - warlock_ritual_3
+    - warlock_ritual_4
+    - warlock_synergy_2
+    - warlock_damnation_1
+    modifiers:
+    - stat: MANA_REGEN
+      value: 5.0
+      type: FLAT
+    - stat: LIFE_STEAL
+      value: 1.1
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 5.0
+      type: FLAT
+  warlock_malice_1:
+    name: Malice I
+    description: +0.5% True Damage
+    region: WARLOCK
+    tier: 1
+    connections:
+    - warlock_hex_notable
+    - warlock_malice_2
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.5
+      type: PERCENT
+  warlock_malice_2:
+    name: Malice II
+    description: +3% Crit Chance
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_malice_1
+    - warlock_malice_branch
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  warlock_malice_branch:
+    name: Malice Focus
+    description: +0.4% True Damage, +1.5% Crit Chance
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_malice_2
+    - warlock_malice_3
+    - warlock_malice_4
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.4
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 1.5
+      type: FLAT
+  warlock_malice_3:
+    name: Malice III
+    description: +3.9% Shock Chance
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_malice_branch
+    - warlock_malice_notable
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  warlock_malice_4:
+    name: Malice IV
+    description: +0.8% True Damage
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_malice_branch
+    - warlock_malice_notable
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 0.8
+      type: PERCENT
+  warlock_malice_notable:
+    name: Eldritch Blast
+    description: +5% True Damage, +8% Crit Chance, +8% Shock Chance
+    region: WARLOCK
+    tier: 4
+    notable: true
+    connections:
+    - warlock_malice_3
+    - warlock_malice_4
+    - warlock_synergy_3
+    modifiers:
+    - stat: PERCENT_HIT_AS_TRUE_DAMAGE
+      value: 5.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: SHOCK_CHANCE
+      value: 8.0
+      type: FLAT
+  warlock_damnation_1:
+    name: Damnation I
+    description: +5% Spell Damage
+    region: WARLOCK
+    tier: 1
+    connections:
+    - warlock_ritual_notable
+    - warlock_damnation_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  warlock_damnation_2:
+    name: Damnation II
+    description: +0.5% Status Duration
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_damnation_1
+    - warlock_damnation_branch
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.5
+      type: PERCENT
+  warlock_damnation_branch:
+    name: Damnation Focus
+    description: +3% Spell Damage, +0.3% Status Effect Duration
+    region: WARLOCK
+    tier: 2
+    connections:
+    - warlock_damnation_2
+    - warlock_damnation_3
+    - warlock_damnation_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.3
+      type: PERCENT
+  warlock_damnation_3:
+    name: Damnation III
+    description: +3% Crit Chance
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_damnation_branch
+    - warlock_damnation_notable
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  warlock_damnation_4:
+    name: Damnation IV
+    description: +6.8% Spell Damage
+    region: WARLOCK
+    tier: 3
+    connections:
+    - warlock_damnation_branch
+    - warlock_damnation_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  warlock_damnation_notable:
+    name: Cursed Knowledge
+    description: +14% Spell Damage, +5% Status Effect Duration, +5 Max Mana
+    region: WARLOCK
+    tier: 4
+    notable: true
+    connections:
+    - warlock_damnation_3
+    - warlock_damnation_4
+    - warlock_synergy_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: STATUS_EFFECT_DURATION
+      value: 5.0
+      type: PERCENT
+    - stat: MAX_MANA
+      value: 5.0
+      type: FLAT
+  warlock_synergy_1:
+    name: Arcane Corruption
+    description: Per 3 Warlock nodes, +2.0% Spell Damage (max +20.0%)
+    region: WARLOCK
+    tier: 5
+    notable: true
+    connections:
+    - warlock_hex_notable
+    - warlock_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: SPELL_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  warlock_synergy_2:
+    name: Eldritch Power
+    description: Per 3 Warlock nodes, +3.0 Max Mana (max +30.0)
+    region: WARLOCK
+    tier: 5
+    notable: true
+    connections:
+    - warlock_ritual_notable
+    - warlock_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MAX_MANA
+        value: 3.0
+        modifierType: FLAT
+      cap: 30.0
+    modifiers: []
+  warlock_synergy_3:
+    name: Hex Mastery
+    description: Per 3 Warlock nodes, +1.0% Status Effect Chance (max +10.0%)
+    region: WARLOCK
+    tier: 5
+    notable: true
+    connections:
+    - warlock_malice_notable
+    - warlock_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: STATUS_EFFECT_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  warlock_synergy_4:
+    name: Mind Siphon
+    description: Per 3 Warlock nodes, +1.0% Mana Leech (max +10.0%)
+    region: WARLOCK
+    tier: 5
+    notable: true
+    connections:
+    - warlock_damnation_notable
+    - warlock_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MANA_LEECH
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  warlock_synergy_hub:
+    name: Nexus of Warlock
+    description: +3.0% Water Damage, +3.0% Void Damage, +3.0% Lightning Damage
+    region: WARLOCK
+    tier: 5
+    notable: true
+    connections:
+    - warlock_synergy_1
+    - warlock_synergy_2
+    - warlock_synergy_3
+    - warlock_synergy_4
+    - warlock_keystone_1
+    - warlock_keystone_2
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  warlock_keystone_1:
+    name: Soul Siphon
+    description: +5.0 Life Steal, +10.0 Crit Chance, +5.0% Spell Damage. -20.0% Max Health, -15.0 Armor
+    region: WARLOCK
+    tier: 6
+    keystone: true
+    connections:
+    - warlock_synergy_hub
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 1.9
+      type: FLAT
+    - stat: CRITICAL_CHANCE
+      value: 10.0
+      type: FLAT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: ARMOR
+      value: -15.0
+      type: FLAT
+  warlock_keystone_2:
+    name: Arcane Overload
+    description: +50.0% Spell Echo Chance, +10.0% Spell Damage. -15.0 Max Mana
+    region: WARLOCK
+    tier: 6
+    keystone: true
+    connections:
+    - warlock_synergy_hub
+    modifiers:
+    - stat: SPELL_ECHO_CHANCE
+      value: 50.0
+      type: FLAT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 10.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_MANA
+      value: -15.0
+      type: FLAT
+  lich_entry:
+    name: Path of Lich
+    description: +3% Spell Damage
+    region: LICH
+    tier: 1
+    connections:
+    - bridge_water_earth_2
+    - bridge_water_void_2
+    - bridge_earth_void_2
+    - lich_grasp_1
+    - lich_crypt_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  lich_grasp_1:
+    name: Grasp I
+    description: +5% Spell Damage
+    region: LICH
+    tier: 1
+    connections:
+    - lich_entry
+    - lich_grasp_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  lich_grasp_2:
+    name: Grasp II
+    description: +5% DoT Damage
+    region: LICH
+    tier: 2
+    connections:
+    - lich_grasp_1
+    - lich_grasp_branch
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  lich_grasp_branch:
+    name: Grasp Focus
+    description: +3% Spell Damage, +3% DoT Damage
+    region: LICH
+    tier: 2
+    connections:
+    - lich_grasp_2
+    - lich_grasp_3
+    - lich_grasp_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  lich_grasp_3:
+    name: Grasp III
+    description: +8 Energy Shield
+    region: LICH
+    tier: 3
+    connections:
+    - lich_grasp_branch
+    - lich_grasp_notable
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 8.0
+      type: FLAT
+  lich_grasp_4:
+    name: Grasp IV
+    description: +6.8% Spell Damage
+    region: LICH
+    tier: 3
+    connections:
+    - lich_grasp_branch
+    - lich_grasp_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  lich_grasp_notable:
+    name: Death's Embrace
+    description: +14% DoT Damage, +12.5% Spell Damage, +5 Energy Shield
+    region: LICH
+    tier: 4
+    notable: true
+    connections:
+    - lich_grasp_3
+    - lich_grasp_4
+    - lich_synergy_1
+    - lich_requiem_1
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: ENERGY_SHIELD
+      value: 5.0
+      type: FLAT
+  lich_crypt_1:
+    name: Crypt I
+    description: +5% Max Health
+    region: LICH
+    tier: 1
+    connections:
+    - lich_entry
+    - lich_crypt_2
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 5.0
+      type: PERCENT
+  lich_crypt_2:
+    name: Crypt II
+    description: +10 Armor
+    region: LICH
+    tier: 2
+    connections:
+    - lich_crypt_1
+    - lich_crypt_branch
+    modifiers:
+    - stat: ARMOR
+      value: 10.0
+      type: FLAT
+  lich_crypt_branch:
+    name: Crypt Focus
+    description: +4.4% Max Health, +8 Armor
+    region: LICH
+    tier: 2
+    connections:
+    - lich_crypt_2
+    - lich_crypt_3
+    - lich_crypt_4
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 4.4
+      type: PERCENT
+    - stat: ARMOR
+      value: 8.0
+      type: FLAT
+  lich_crypt_3:
+    name: Crypt III
+    description: +4% Health Regen
+    region: LICH
+    tier: 3
+    connections:
+    - lich_crypt_branch
+    - lich_crypt_notable
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 4.0
+      type: PERCENT
+  lich_crypt_4:
+    name: Crypt IV
+    description: +7.5% Max Health
+    region: LICH
+    tier: 3
+    connections:
+    - lich_crypt_branch
+    - lich_crypt_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 7.5
+      type: PERCENT
+  lich_crypt_notable:
+    name: Necrotic Armor
+    description: +12.5% Max Health, +5 Armor, +7.5% Health Regen
+    region: LICH
+    tier: 4
+    notable: true
+    connections:
+    - lich_crypt_3
+    - lich_crypt_4
+    - lich_synergy_2
+    - lich_decay_1
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+    - stat: HEALTH_REGEN_PERCENT
+      value: 7.5
+      type: PERCENT
+  lich_requiem_1:
+    name: Requiem I
+    description: +0.6 Life Steal
+    region: LICH
+    tier: 1
+    connections:
+    - lich_grasp_notable
+    - lich_requiem_2
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.4
+      type: FLAT
+  lich_requiem_2:
+    name: Requiem II
+    description: +3.9% Block Chance
+    region: LICH
+    tier: 2
+    connections:
+    - lich_requiem_1
+    - lich_requiem_branch
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  lich_requiem_branch:
+    name: Requiem Focus
+    description: +0.6 Life Steal, +2.8% Block Chance
+    region: LICH
+    tier: 2
+    connections:
+    - lich_requiem_2
+    - lich_requiem_3
+    - lich_requiem_4
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.4
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+  lich_requiem_3:
+    name: Requiem III
+    description: +0.5% Status Duration
+    region: LICH
+    tier: 3
+    connections:
+    - lich_requiem_branch
+    - lich_requiem_notable
+    modifiers:
+    - stat: STATUS_EFFECT_DURATION
+      value: 0.5
+      type: PERCENT
+  lich_requiem_4:
+    name: Requiem IV
+    description: +0.9 Life Steal
+    region: LICH
+    tier: 3
+    connections:
+    - lich_requiem_branch
+    - lich_requiem_notable
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 0.5
+      type: FLAT
+  lich_requiem_notable:
+    name: Soul Anchor
+    description: +3 Life Steal, +8% Block Chance, +5% Status Effect Duration
+    region: LICH
+    tier: 4
+    notable: true
+    connections:
+    - lich_requiem_3
+    - lich_requiem_4
+    - lich_synergy_3
+    modifiers:
+    - stat: LIFE_STEAL
+      value: 1.8
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: STATUS_EFFECT_DURATION
+      value: 5.0
+      type: PERCENT
+  lich_decay_1:
+    name: Decay I
+    description: +5% DoT Damage
+    region: LICH
+    tier: 1
+    connections:
+    - lich_crypt_notable
+    - lich_decay_2
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  lich_decay_2:
+    name: Decay II
+    description: +6% Max Health
+    region: LICH
+    tier: 2
+    connections:
+    - lich_decay_1
+    - lich_decay_branch
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 6.0
+      type: PERCENT
+  lich_decay_branch:
+    name: Decay Focus
+    description: +3% DoT Damage, +3% Max Health
+    region: LICH
+    tier: 2
+    connections:
+    - lich_decay_2
+    - lich_decay_3
+    - lich_decay_4
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: MAX_HEALTH_PERCENT
+      value: 3.0
+      type: PERCENT
+  lich_decay_3:
+    name: Decay III
+    description: +2 Mana Regen/s
+    region: LICH
+    tier: 3
+    connections:
+    - lich_decay_branch
+    - lich_decay_notable
+    modifiers:
+    - stat: MANA_REGEN
+      value: 2.0
+      type: FLAT
+  lich_decay_4:
+    name: Decay IV
+    description: +6.8% DoT Damage
+    region: LICH
+    tier: 3
+    connections:
+    - lich_decay_branch
+    - lich_decay_notable
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  lich_decay_notable:
+    name: Withering Presence
+    description: +14% DoT Damage, +12.5% Max Health, +2 Mana on Kill
+    region: LICH
+    tier: 4
+    notable: true
+    connections:
+    - lich_decay_3
+    - lich_decay_4
+    - lich_synergy_4
+    modifiers:
+    - stat: DOT_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: MAX_HEALTH_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: MANA_ON_KILL
+      value: 2.0
+      type: FLAT
+  lich_synergy_1:
+    name: Necrotic Bond
+    description: Per 3 Lich nodes, +5.0 Energy Shield (max +50.0)
+    region: LICH
+    tier: 5
+    notable: true
+    connections:
+    - lich_grasp_notable
+    - lich_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ENERGY_SHIELD
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  lich_synergy_2:
+    name: Plague Growth
+    description: Per 3 Lich nodes, +2.0% DoT Damage (max +20.0%)
+    region: LICH
+    tier: 5
+    notable: true
+    connections:
+    - lich_crypt_notable
+    - lich_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: DOT_DAMAGE_PERCENT
+        value: 2.0
+        modifierType: PERCENT
+      cap: 20.0
+    modifiers: []
+  lich_synergy_3:
+    name: Soul Barrier
+    description: Per 3 Lich nodes, +1.0% Mana as Damage Buffer (max +10.0%)
+    region: LICH
+    tier: 5
+    notable: true
+    connections:
+    - lich_requiem_notable
+    - lich_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MANA_AS_DAMAGE_BUFFER
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  lich_synergy_4:
+    name: Lingering Torment
+    description: Per 3 Lich nodes, +1.0% Status Effect Duration (max +10.0%)
+    region: LICH
+    tier: 5
+    notable: true
+    connections:
+    - lich_decay_notable
+    - lich_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: STATUS_EFFECT_DURATION
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  lich_synergy_hub:
+    name: Nexus of Lich
+    description: +3.0% Water Damage, +3.0% Void Damage, +3.0% Earth Damage
+    region: LICH
+    tier: 5
+    notable: true
+    connections:
+    - lich_synergy_1
+    - lich_synergy_2
+    - lich_synergy_3
+    - lich_synergy_4
+    - lich_keystone_1
+    - lich_keystone_2
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: VOID_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EARTH_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  lich_keystone_1:
+    name: Plague Resilience
+    description: +3.0 Elemental Resistance, +15.0% Max Health. -20.0% Attack Speed, -10.0 Crit Chance
+    region: LICH
+    tier: 6
+    keystone: true
+    connections:
+    - lich_synergy_hub
+    modifiers:
+    - stat: ELEMENTAL_RESISTANCE
+      value: 3.0
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: 15.0
+      type: PERCENT
+    drawbacks:
+    - stat: ATTACK_SPEED_PERCENT
+      value: -20.0
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: -10.0
+      type: FLAT
+  lich_keystone_2:
+    name: Undying Shell
+    description: +5.0 Shield Regen on DoT, +20.0 Energy Shield. -20.0 Evasion, -15.0% Movement Speed
+    region: LICH
+    tier: 6
+    keystone: true
+    connections:
+    - lich_synergy_hub
+    modifiers:
+    - stat: SHIELD_REGEN_ON_DOT
+      value: 5.0
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 20.0
+      type: FLAT
+    drawbacks:
+    - stat: EVASION
+      value: -20.0
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: -15.0
+      type: PERCENT
+  tempest_entry:
+    name: Path of Tempest
+    description: +3% Spell Damage
+    region: TEMPEST
+    tier: 1
+    connections:
+    - bridge_lightning_water_2
+    - bridge_lightning_wind_2
+    - bridge_water_wind_2
+    - tempest_squall_1
+    - tempest_tailwind_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  tempest_squall_1:
+    name: Squall I
+    description: +5% Spell Damage
+    region: TEMPEST
+    tier: 1
+    connections:
+    - tempest_entry
+    - tempest_squall_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  tempest_squall_2:
+    name: Squall II
+    description: +4% Attack Speed
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_squall_1
+    - tempest_squall_branch
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_squall_branch:
+    name: Squall Focus
+    description: +3% Spell Damage, +3% Attack Speed
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_squall_2
+    - tempest_squall_3
+    - tempest_squall_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  tempest_squall_3:
+    name: Squall III
+    description: +3% Crit Chance
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_squall_branch
+    - tempest_squall_notable
+    modifiers:
+    - stat: CRITICAL_CHANCE
+      value: 3.0
+      type: FLAT
+  tempest_squall_4:
+    name: Squall IV
+    description: +6.8% Spell Damage
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_squall_branch
+    - tempest_squall_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  tempest_squall_notable:
+    name: Swift Cast
+    description: +12.5% Attack Speed, +8% Crit Chance, +12.5% Move Speed
+    region: TEMPEST
+    tier: 4
+    notable: true
+    connections:
+    - tempest_squall_3
+    - tempest_squall_4
+    - tempest_synergy_1
+    - tempest_cyclone_1
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: CRITICAL_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  tempest_tailwind_1:
+    name: Tailwind I
+    description: +5% Projectile Damage
+    region: TEMPEST
+    tier: 1
+    connections:
+    - tempest_entry
+    - tempest_tailwind_2
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  tempest_tailwind_2:
+    name: Tailwind II
+    description: +4% Projectile Speed
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_tailwind_1
+    - tempest_tailwind_branch
+    modifiers:
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_tailwind_branch:
+    name: Tailwind Focus
+    description: +3% Projectile Damage, +3% Projectile Speed
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_tailwind_2
+    - tempest_tailwind_3
+    - tempest_tailwind_4
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+  tempest_tailwind_3:
+    name: Tailwind III
+    description: +4% Move Speed
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_tailwind_branch
+    - tempest_tailwind_notable
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_tailwind_4:
+    name: Tailwind IV
+    description: +6.8% Projectile Damage
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_tailwind_branch
+    - tempest_tailwind_notable
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  tempest_tailwind_notable:
+    name: Arcane Gust
+    description: +14% Spell Damage, +12.5% Projectile Damage, +12.5% Projectile Speed
+    region: TEMPEST
+    tier: 4
+    notable: true
+    connections:
+    - tempest_tailwind_3
+    - tempest_tailwind_4
+    - tempest_synergy_2
+    - tempest_maelstrom_1
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  tempest_cyclone_1:
+    name: Cyclone I
+    description: +4% Move Speed
+    region: TEMPEST
+    tier: 1
+    connections:
+    - tempest_squall_notable
+    - tempest_cyclone_2
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_cyclone_2:
+    name: Cyclone II
+    description: +10 Evasion
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_cyclone_1
+    - tempest_cyclone_branch
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  tempest_cyclone_branch:
+    name: Cyclone Focus
+    description: +3% Move Speed, +8 Evasion
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_cyclone_2
+    - tempest_cyclone_3
+    - tempest_cyclone_4
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EVASION
+      value: 8.0
+      type: FLAT
+  tempest_cyclone_3:
+    name: Cyclone III
+    description: +3.9% Shock Chance
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_cyclone_branch
+    - tempest_cyclone_notable
+    modifiers:
+    - stat: SHOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  tempest_cyclone_4:
+    name: Cyclone IV
+    description: +6% Move Speed
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_cyclone_branch
+    - tempest_cyclone_notable
+    modifiers:
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 6.0
+      type: PERCENT
+  tempest_cyclone_notable:
+    name: Windborne
+    description: +10 Evasion, +12.5% Move Speed, +8% Shock Chance
+    region: TEMPEST
+    tier: 4
+    notable: true
+    connections:
+    - tempest_cyclone_3
+    - tempest_cyclone_4
+    - tempest_synergy_3
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: SHOCK_CHANCE
+      value: 8.0
+      type: FLAT
+  tempest_maelstrom_1:
+    name: Maelstrom I
+    description: +5% Spell Damage
+    region: TEMPEST
+    tier: 1
+    connections:
+    - tempest_tailwind_notable
+    - tempest_maelstrom_2
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 5.0
+      type: PERCENT
+  tempest_maelstrom_2:
+    name: Maelstrom II
+    description: +4% Projectile Damage
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_maelstrom_1
+    - tempest_maelstrom_branch
+    modifiers:
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_maelstrom_branch:
+    name: Maelstrom Focus
+    description: +3% Spell Damage, +3% Projectile Damage
+    region: TEMPEST
+    tier: 2
+    connections:
+    - tempest_maelstrom_2
+    - tempest_maelstrom_3
+    - tempest_maelstrom_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: PROJECTILE_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  tempest_maelstrom_3:
+    name: Maelstrom III
+    description: +4% Attack Speed
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_maelstrom_branch
+    - tempest_maelstrom_notable
+    modifiers:
+    - stat: ATTACK_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  tempest_maelstrom_4:
+    name: Maelstrom IV
+    description: +6.8% Spell Damage
+    region: TEMPEST
+    tier: 3
+    connections:
+    - tempest_maelstrom_branch
+    - tempest_maelstrom_notable
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 6.8
+      type: PERCENT
+  tempest_maelstrom_notable:
+    name: Eye of the Storm
+    description: +14% Spell Damage, +12.5% Attack Speed, +5 Accuracy
+    region: TEMPEST
+    tier: 4
+    notable: true
+    connections:
+    - tempest_maelstrom_3
+    - tempest_maelstrom_4
+    - tempest_synergy_4
+    modifiers:
+    - stat: SPELL_DAMAGE_PERCENT
+      value: 14.0
+      type: PERCENT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+    - stat: ACCURACY
+      value: 5.0
+      type: FLAT
+  tempest_synergy_1:
+    name: Storm Surge
+    description: Per 3 Tempest nodes, +1.0% All Damage (max +10.0%)
+    region: TEMPEST
+    tier: 5
+    notable: true
+    connections:
+    - tempest_squall_notable
+    - tempest_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ALL_DAMAGE_PERCENT
+        value: 1.0
+        modifierType: PERCENT
+      cap: 10.0
+    modifiers: []
+  tempest_synergy_2:
+    name: Static Buildup
+    description: Per 3 Tempest nodes, +1.0% Shock Chance (max +10.0%)
+    region: TEMPEST
+    tier: 5
+    notable: true
+    connections:
+    - tempest_tailwind_notable
+    - tempest_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: SHOCK_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  tempest_synergy_3:
+    name: Arcane Flow
+    description: Per 3 Tempest nodes, +2.0 Mana Regen (max +20.0)
+    region: TEMPEST
+    tier: 5
+    notable: true
+    connections:
+    - tempest_cyclone_notable
+    - tempest_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: MANA_REGEN
+        value: 2.0
+        modifierType: FLAT
+      cap: 20.0
+    modifiers: []
+  tempest_synergy_4:
+    name: Wind Runner
+    description: Per 3 Tempest nodes, +5.0 Stamina Regen (max +50.0)
+    region: TEMPEST
+    tier: 5
+    notable: true
+    connections:
+    - tempest_maelstrom_notable
+    - tempest_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: STAMINA_REGEN
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  tempest_synergy_hub:
+    name: Nexus of Tempest
+    description: +3.0% Water Damage, +3.0% Wind Damage, +3.0% Lightning Damage
+    region: TEMPEST
+    tier: 5
+    notable: true
+    connections:
+    - tempest_synergy_1
+    - tempest_synergy_2
+    - tempest_synergy_3
+    - tempest_synergy_4
+    - tempest_keystone_1
+    - tempest_keystone_2
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: WIND_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  tempest_keystone_1:
+    name: Arcane Velocity
+    description: +1.0 Atk Speed to Spell Power, +10.0% Attack Speed. -20.0 Armor, -10.0 Block Chance
+    region: TEMPEST
+    tier: 6
+    keystone: true
+    connections:
+    - tempest_synergy_hub
+    modifiers:
+    - stat: ATK_SPEED_TO_SPELL_POWER
+      value: 1.0
+      type: FLAT
+    - stat: ATTACK_SPEED_PERCENT
+      value: 10.0
+      type: PERCENT
+    drawbacks:
+    - stat: ARMOR
+      value: -20.0
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: -10.0
+      type: FLAT
+  tempest_keystone_2:
+    name: Storm Runner
+    description: +30.0 Speed to Spell Power, +10.0% Movement Speed. -25.0% Max Health
+    region: TEMPEST
+    tier: 6
+    keystone: true
+    connections:
+    - tempest_synergy_hub
+    modifiers:
+    - stat: SPEED_TO_SPELL_POWER
+      value: 30.0
+      type: FLAT
+    - stat: MOVEMENT_SPEED_PERCENT
+      value: 10.0
+      type: PERCENT
+    drawbacks:
+    - stat: MAX_HEALTH_PERCENT
+      value: -25.0
+      type: PERCENT
+  sentinel_entry:
+    name: Path of Sentinel
+    description: +3.6% Block Chance
+    region: SENTINEL
+    tier: 1
+    connections:
+    - bridge_water_earth_2
+    - bridge_water_wind_2
+    - bridge_earth_wind_2
+    - sentinel_aegis_1
+    - sentinel_vigilance_1
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.6
+      type: FLAT
+  sentinel_aegis_1:
+    name: Aegis I
+    description: +3.9% Block Chance
+    region: SENTINEL
+    tier: 1
+    connections:
+    - sentinel_entry
+    - sentinel_aegis_2
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  sentinel_aegis_2:
+    name: Aegis II
+    description: +8 Energy Shield
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_aegis_1
+    - sentinel_aegis_branch
+    modifiers:
+    - stat: ENERGY_SHIELD
+      value: 8.0
+      type: FLAT
+  sentinel_aegis_branch:
+    name: Aegis Focus
+    description: +2.8% Block Chance, +6 Energy Shield
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_aegis_2
+    - sentinel_aegis_3
+    - sentinel_aegis_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 6.0
+      type: FLAT
+  sentinel_aegis_3:
+    name: Aegis III
+    description: +6% Max Health
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_aegis_branch
+    - sentinel_aegis_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 6.0
+      type: PERCENT
+  sentinel_aegis_4:
+    name: Aegis IV
+    description: +5.2% Block Chance
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_aegis_branch
+    - sentinel_aegis_notable
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 5.2
+      type: FLAT
+  sentinel_aegis_notable:
+    name: Guardian's Ward
+    description: +8% Block Chance, +10 Energy Shield, +12.5% Max Health
+    region: SENTINEL
+    tier: 4
+    notable: true
+    connections:
+    - sentinel_aegis_3
+    - sentinel_aegis_4
+    - sentinel_synergy_1
+    - sentinel_restoration_1
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: ENERGY_SHIELD
+      value: 10.0
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: 12.5
+      type: PERCENT
+  sentinel_vigilance_1:
+    name: Vigilance I
+    description: +10 Evasion
+    region: SENTINEL
+    tier: 1
+    connections:
+    - sentinel_entry
+    - sentinel_vigilance_2
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  sentinel_vigilance_2:
+    name: Vigilance II
+    description: +8 Accuracy
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_vigilance_1
+    - sentinel_vigilance_branch
+    modifiers:
+    - stat: ACCURACY
+      value: 8.0
+      type: FLAT
+  sentinel_vigilance_branch:
+    name: Vigilance Focus
+    description: +8 Evasion, +6 Accuracy
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_vigilance_2
+    - sentinel_vigilance_3
+    - sentinel_vigilance_4
+    modifiers:
+    - stat: EVASION
+      value: 8.0
+      type: FLAT
+    - stat: ACCURACY
+      value: 6.0
+      type: FLAT
+  sentinel_vigilance_3:
+    name: Vigilance III
+    description: +4% Projectile Speed
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_vigilance_branch
+    - sentinel_vigilance_notable
+    modifiers:
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 4.0
+      type: PERCENT
+  sentinel_vigilance_4:
+    name: Vigilance IV
+    description: +10 Evasion
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_vigilance_branch
+    - sentinel_vigilance_notable
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  sentinel_vigilance_notable:
+    name: Keen Senses
+    description: +10 Evasion, +10 Accuracy, +12.5% Projectile Speed
+    region: SENTINEL
+    tier: 4
+    notable: true
+    connections:
+    - sentinel_vigilance_3
+    - sentinel_vigilance_4
+    - sentinel_synergy_2
+    - sentinel_haven_1
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+    - stat: ACCURACY
+      value: 10.0
+      type: FLAT
+    - stat: PROJECTILE_SPEED_PERCENT
+      value: 12.5
+      type: PERCENT
+  sentinel_restoration_1:
+    name: Restoration I
+    description: +4% Health Regen
+    region: SENTINEL
+    tier: 1
+    connections:
+    - sentinel_aegis_notable
+    - sentinel_restoration_2
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 4.0
+      type: PERCENT
+  sentinel_restoration_2:
+    name: Restoration II
+    description: +2 Mana Regen/s
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_restoration_1
+    - sentinel_restoration_branch
+    modifiers:
+    - stat: MANA_REGEN
+      value: 2.0
+      type: FLAT
+  sentinel_restoration_branch:
+    name: Restoration Focus
+    description: +3% Health Regen, +1.2 Mana Regen/s
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_restoration_2
+    - sentinel_restoration_3
+    - sentinel_restoration_4
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: MANA_REGEN
+      value: 1.2
+      type: FLAT
+  sentinel_restoration_3:
+    name: Restoration III
+    description: +8% Stamina Regen Delay Reduction
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_restoration_branch
+    - sentinel_restoration_notable
+    modifiers:
+    - stat: STAMINA_REGEN_START_DELAY
+      value: 8.0
+      type: FLAT
+  sentinel_restoration_4:
+    name: Restoration IV
+    description: +6% Health Regen
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_restoration_branch
+    - sentinel_restoration_notable
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 6.0
+      type: PERCENT
+  sentinel_restoration_notable:
+    name: Restorative Aura
+    description: +7.5% Health Regen, +3 Mana Regen/s, +5 Armor
+    region: SENTINEL
+    tier: 4
+    notable: true
+    connections:
+    - sentinel_restoration_3
+    - sentinel_restoration_4
+    - sentinel_synergy_3
+    modifiers:
+    - stat: HEALTH_REGEN_PERCENT
+      value: 7.5
+      type: PERCENT
+    - stat: MANA_REGEN
+      value: 3.0
+      type: FLAT
+    - stat: ARMOR
+      value: 5.0
+      type: FLAT
+  sentinel_haven_1:
+    name: Haven I
+    description: +3.9% Block Chance
+    region: SENTINEL
+    tier: 1
+    connections:
+    - sentinel_vigilance_notable
+    - sentinel_haven_2
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 3.9
+      type: FLAT
+  sentinel_haven_2:
+    name: Haven II
+    description: +10 Evasion
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_haven_1
+    - sentinel_haven_branch
+    modifiers:
+    - stat: EVASION
+      value: 10.0
+      type: FLAT
+  sentinel_haven_branch:
+    name: Haven Focus
+    description: +2.8% Block Chance, +8 Evasion
+    region: SENTINEL
+    tier: 2
+    connections:
+    - sentinel_haven_2
+    - sentinel_haven_3
+    - sentinel_haven_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 2.8
+      type: FLAT
+    - stat: EVASION
+      value: 8.0
+      type: FLAT
+  sentinel_haven_3:
+    name: Haven III
+    description: +6% Max Health
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_haven_branch
+    - sentinel_haven_notable
+    modifiers:
+    - stat: MAX_HEALTH_PERCENT
+      value: 6.0
+      type: PERCENT
+  sentinel_haven_4:
+    name: Haven IV
+    description: +5.2% Block Chance
+    region: SENTINEL
+    tier: 3
+    connections:
+    - sentinel_haven_branch
+    - sentinel_haven_notable
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 5.2
+      type: FLAT
+  sentinel_haven_notable:
+    name: Stalwart Defense
+    description: +8% Block Chance, +8 Evasion, +7.5% Max Health
+    region: SENTINEL
+    tier: 4
+    notable: true
+    connections:
+    - sentinel_haven_3
+    - sentinel_haven_4
+    - sentinel_synergy_4
+    modifiers:
+    - stat: BLOCK_CHANCE
+      value: 8.0
+      type: FLAT
+    - stat: EVASION
+      value: 8.0
+      type: FLAT
+    - stat: MAX_HEALTH_PERCENT
+      value: 7.5
+      type: PERCENT
+  sentinel_synergy_1:
+    name: Guardian's Resolve
+    description: Per 3 Sentinel nodes, +1.0% Block Chance (max +10.0%)
+    region: SENTINEL
+    tier: 5
+    notable: true
+    connections:
+    - sentinel_aegis_notable
+    - sentinel_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: BLOCK_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  sentinel_synergy_2:
+    name: Watchful Eye
+    description: Per 3 Sentinel nodes, +5.0 Evasion (max +50.0)
+    region: SENTINEL
+    tier: 5
+    notable: true
+    connections:
+    - sentinel_vigilance_notable
+    - sentinel_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: EVASION
+        value: 5.0
+        modifierType: FLAT
+      cap: 50.0
+    modifiers: []
+  sentinel_synergy_3:
+    name: Warding Aura
+    description: Per 3 Sentinel nodes, +1.0% Elemental Resistance (max +10.0%)
+    region: SENTINEL
+    tier: 5
+    notable: true
+    connections:
+    - sentinel_restoration_notable
+    - sentinel_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: ELEMENTAL_RESISTANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  sentinel_synergy_4:
+    name: Stalwart Focus
+    description: Per 3 Sentinel nodes, +1.0% Crit Nullify Chance (max +10.0%)
+    region: SENTINEL
+    tier: 5
+    notable: true
+    connections:
+    - sentinel_haven_notable
+    - sentinel_synergy_hub
+    synergy:
+      type: BRANCH_COUNT
+      per_count: 3
+      bonus:
+        stat: CRIT_NULLIFY_CHANCE
+        value: 1.0
+        modifierType: FLAT
+      cap: 10.0
+    modifiers: []
+  sentinel_synergy_hub:
+    name: Nexus of Sentinel
+    description: +3.0% Water Damage, +3.0% Wind Damage, +3.0% Earth Damage
+    region: SENTINEL
+    tier: 5
+    notable: true
+    connections:
+    - sentinel_synergy_1
+    - sentinel_synergy_2
+    - sentinel_synergy_3
+    - sentinel_synergy_4
+    - sentinel_keystone_1
+    - sentinel_keystone_2
+    modifiers:
+    - stat: WATER_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: WIND_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+    - stat: EARTH_DAMAGE_PERCENT
+      value: 3.0
+      type: PERCENT
+  sentinel_keystone_1:
+    name: Fortress Aura
+    description: +20.0% Evasion to Armor, +15.0 Block Chance. -20.0% Damage Multiplier
+    region: SENTINEL
+    tier: 6
+    keystone: true
+    connections:
+    - sentinel_synergy_hub
+    modifiers:
+    - stat: EVASION_TO_ARMOR
+      value: 20.0
+      type: FLAT
+    - stat: BLOCK_CHANCE
+      value: 15.0
+      type: FLAT
+    drawbacks:
+    - stat: DAMAGE_MULTIPLIER
+      value: -20.0
+      type: MULTIPLIER
+  sentinel_keystone_2:
+    name: Adaptive Guard
+    description: +80.0 Immunity on Ailment, +10.0% HP Regen. -15.0% Fire Damage, -15.0% Water Damage, -15.0% Lightning Damage
+    region: SENTINEL
+    tier: 6
+    keystone: true
+    connections:
+    - sentinel_synergy_hub
+    modifiers:
+    - stat: IMMUNITY_ON_AILMENT
+      value: 80.0
+      type: FLAT
+    - stat: HEALTH_REGEN_PERCENT
+      value: 10.0
+      type: PERCENT
+    drawbacks:
+    - stat: FIRE_DAMAGE_PERCENT
+      value: -15.0
+      type: PERCENT
+    - stat: WATER_DAMAGE_PERCENT
+      value: -15.0
+      type: PERCENT
+    - stat: LIGHTNING_DAMAGE_PERCENT
+      value: -15.0
+      type: PERCENT

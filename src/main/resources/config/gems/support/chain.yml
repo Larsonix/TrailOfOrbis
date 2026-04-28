@@ -1,0 +1,19 @@
+# Chain — Support gem, makes projectiles bounce to additional targets
+id: chain
+name: "Chain"
+description: "Projectile abilities bounce to 2 additional targets at reduced damage."
+
+requires_tags: [Projectile]
+
+modifications:
+  - type: add_behavior
+    behavior: chain
+    chain_count: 2
+    damage_falloff: 0.7
+  - type: multiply
+    stat: damage.base_percent
+    multiplier: 0.85
+
+quality_bonuses:
+  chain_count: 0.01
+  damage_falloff: 0.001

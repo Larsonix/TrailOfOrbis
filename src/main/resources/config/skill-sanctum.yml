@@ -1,0 +1,99 @@
+# Skill Sanctum Configuration
+# The Skill Sanctum is a 3D realm where players explore their skill tree physically.
+
+# Whether the Skill Sanctum system is enabled
+enabled: true
+
+# Layout mapping settings
+layout:
+  # Scale factor: 1 UI layout unit = X world blocks
+  # NOTE: ProceduralLayoutConfig uses this as layoutScale
+  scale: 0.07
+
+  # Y height of the skill tree plane (eye-level)
+  plane_height: 65.0
+
+# Player spawn settings
+spawn:
+  # Distance from origin (negative Z = looking at origin)
+  offset_z: -20.0
+
+  # Height above the plane
+  y_offset: 1.0
+
+  # Initial pitch (negative = looking down)
+  pitch: -15.0
+
+# Node orb settings
+nodes:
+  # Sizes in world blocks
+  basic_size: 0.5
+  notable_size: 0.7
+  keystone_size: 1.0
+  origin_size: 1.2
+
+  # Light radii in blocks
+  basic_light_radius: 3.0
+  notable_light_radius: 5.0
+  keystone_light_radius: 8.0
+  origin_light_radius: 10.0
+
+# Visual state settings
+states:
+  # Light intensity multipliers (0.0 to 1.0)
+  locked_intensity: 0.2
+  available_intensity: 0.6
+  allocated_intensity: 1.0
+
+  # Pulse animation for available nodes (seconds per cycle)
+  available_pulse_rate: 2.0
+
+# Connection rendering (two-phase DebugUtils lines, zero-duplicate design)
+# Phase 1 (fill): send all connections at initial_fill_rate, takes ~N/rate ticks
+# Phase 2 (maintain): auto-calculated rate = N / ((duration - margin) / 50ms)
+# Exactly N shapes on client at steady state — scales to any connection count
+connections:
+  # How long each shape lives on the client (ms)
+  beam_duration_ms: 5000
+
+  # Shapes per tick during initial fill phase (higher = faster startup)
+  initial_fill_rate: 30
+
+  # Refresh shapes this many ms before they expire (safety margin)
+  refresh_margin_ms: 500
+
+# Particle settings (allocation burst effect only)
+beams:
+  # Particle type for allocation burst
+  particle_type: "Explosion_Medium"
+
+  # Burst interval in milliseconds
+  burst_interval_ms: 500
+
+  # Particles per burst
+  particles_per_burst: 3
+
+# Performance settings
+performance:
+  # Whether to use lazy loading (only spawn nodes within radius)
+  lazy_loading: false
+
+  # If lazy loading enabled, radius around player to spawn nodes
+  lazy_load_radius: 50.0
+
+  # Maximum nodes to spawn per tick (prevents lag spikes)
+  max_spawns_per_tick: 15
+
+  # Delay between spawn batches in ticks
+  spawn_batch_delay_ticks: 1
+
+# Exit settings
+exit:
+  # Whether to auto-close sanctum after period of inactivity
+  auto_close_on_inactivity: true
+
+  # Inactivity timeout in seconds
+  inactivity_timeout_seconds: 300
+
+  # Whether players can use /rpg sanctum exit command
+  allow_exit_command: true

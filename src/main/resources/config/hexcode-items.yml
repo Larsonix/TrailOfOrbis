@@ -1,0 +1,53 @@
+# ============================================================================
+# Hexcode Item Integration — Level Range Mappings
+# ============================================================================
+# When the Hexcode spell-crafting mod is detected, its staff and book items
+# are added to TrailOfOrbis's loot pools. This config controls:
+#   - Whether Hexcode item integration is active
+#   - What player/mob level range each Hexcode item can drop at
+#
+# Items not listed here are still discovered but have no level restriction.
+# To add new Hexcode items (from future updates), just add an entry below.
+# ============================================================================
+
+# Master toggle — set to false to exclude all Hexcode items from loot pools
+# even when the Hexcode plugin is loaded.
+enabled: true
+
+# ============================================================================
+# Staff Level Ranges
+# ============================================================================
+# Each staff tier maps to a player level range. When loot generates a STAFF
+# weapon at a given level, only staffs whose range includes that level are
+# eligible. Ranges overlap to create smooth tier transitions.
+#
+# Staff tiers are ordered by Hexcode's material progression:
+#   Crude → Copper → Bronze → Iron → Thorium → Cobalt → Adamantite → Mithril → Onyxium
+#   Special variants (endgame): Arcane, Astral, Fire, Ice
+staff_level_map:
+  Hexstaff_Basic_Crude:       { min: 1,  max: 10 }
+  Hexstaff_Basic_Copper:      { min: 5,  max: 15 }
+  Hexstaff_Basic_Bronze:      { min: 10, max: 20 }
+  Hexstaff_Basic_Iron:        { min: 15, max: 30 }
+  Hexstaff_Basic_Thorium:     { min: 25, max: 40 }
+  Hexstaff_Basic_Cobalt:      { min: 35, max: 50 }
+  Hexstaff_Basic_Adamantite:  { min: 45, max: 60 }
+  Hexstaff_Basic_Mithril:     { min: 55, max: 70 }
+  Hexstaff_Basic_Onyxium:     { min: 65, max: 80 }
+  Hexstaff_Special_Arcane:    { min: 70, max: 100 }
+  Hexstaff_Special_Astral:    { min: 70, max: 100 }
+  Hexstaff_Special_Fire:      { min: 70, max: 100 }
+  Hexstaff_Special_Ice:       { min: 70, max: 100 }
+
+# ============================================================================
+# Book Level Ranges
+# ============================================================================
+# Hexcode spellbooks (off-hand spell storage). The basic Hex_Book covers a
+# wide range; elemental variants drop mid-game; Arcane is endgame.
+book_level_map:
+  Hex_Book:          { min: 1,  max: 50 }
+  Fire_Hexbook:      { min: 15, max: 60 }
+  Ice_Hexbook:       { min: 15, max: 60 }
+  Life_Hexbook:      { min: 15, max: 60 }
+  Void_Hexbook:      { min: 30, max: 80 }
+  Arcane_Hexbook:    { min: 50, max: 100 }

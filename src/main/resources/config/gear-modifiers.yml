@@ -1,0 +1,1375 @@
+# =============================================================================
+# GEAR MODIFIERS CONFIGURATION
+# =============================================================================
+# Defines all modifiers that can roll on gear.
+# Each modifier has: type, stat, scaling, weight, and restrictions.
+#
+# DESIGN: "Action vs Sustain" Classification
+# - PREFIXES = Action (what you DO): damage, speed, movement, ailments
+# - SUFFIXES = Sustain (what you HAVE): resources, defenses, recovery
+#
+# SLOT IDENTITY (Feb 2026 refactor):
+# - Weapons + Gloves = OFFENSIVE (damage, crit, speed)
+# - Armor + Shield = DEFENSIVE (resources, resistances, regen)
+# - Gloves (hands) are hybrid: offensive prefixes + material-based suffixes
+# - Shields are hybrid: thorns/accuracy prefixes + defensive suffixes
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PREFIX MODIFIERS (Action - What You DO)
+# -----------------------------------------------------------------------------
+
+prefixes:
+
+  # ===========================================================================
+  # CORE DAMAGE (×0.55 - power shifted to implicit base damage)
+  # ===========================================================================
+
+  sharp:
+    display_name: "Sharp"
+    stat: physical_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.65
+    scale_per_level: 0.11
+    weight: 100
+    allowed_slots: [weapon, hands]
+
+  heavy:
+    display_name: "Heavy"
+    stat: physical_damage_percent
+    stat_type: percent
+    base_min: 0.55
+    base_max: 1.65
+    scale_per_level: 0.08
+    weight: 100
+    allowed_slots: [weapon, hands]
+
+  brutal:
+    display_name: "Brutal"
+    stat: melee_damage_percent
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: FIRE
+
+  keen:
+    display_name: "Keen"
+    stat: projectile_damage_percent
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: WIND  # Projectile damage → Ghost archetype
+
+  # ===========================================================================
+  # SPELL DAMAGE (×0.55)
+  # ===========================================================================
+
+  arcane:
+    display_name: "Arcane"
+    stat: spell_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  empowered:
+    display_name: "Empowered"
+    stat: spell_damage_percent
+    stat_type: percent
+    base_min: 0.55
+    base_max: 1.65
+    scale_per_level: 0.07
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # ELEMENTAL DAMAGE (×0.55)
+  # ===========================================================================
+
+  blazing:
+    display_name: "Blazing"
+    stat: fire_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: FIRE  # Fire damage → Fire element
+
+  frozen:
+    display_name: "Frozen"
+    stat: water_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: WATER  # Water damage → Water element
+
+  shocking:
+    display_name: "Shocking"
+    stat: lightning_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: LIGHTNING  # Lightning damage → Lightning element
+
+  chaotic:
+    display_name: "Chaotic"
+    stat: void_damage
+    stat_type: flat
+    base_min: 0.28
+    base_max: 1.1
+    scale_per_level: 0.07
+    weight: 25
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # EARTH DAMAGE (Gaia's Element)
+  # ===========================================================================
+
+  earthen:
+    display_name: "Earthen"
+    stat: earth_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: EARTH  # Earth damage → Earth element
+
+  grounded:
+    display_name: "Grounded"
+    stat: earth_damage_percent
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 25
+    allowed_slots: [weapon, hands]
+    required_attribute: EARTH  # Earth damage → Earth element
+
+  # ===========================================================================
+  # WIND DAMAGE (Gaia's Element)
+  # ===========================================================================
+
+  gusting:
+    display_name: "Gusting"
+    stat: wind_damage
+    stat_type: flat
+    base_min: 0.55
+    base_max: 1.38
+    scale_per_level: 0.08
+    weight: 50
+    allowed_slots: [weapon, hands]
+    required_attribute: WIND  # Wind damage → Wind element
+
+  tempestuous:
+    display_name: "Tempestuous"
+    stat: wind_damage_percent
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 25
+    allowed_slots: [weapon, hands]
+    required_attribute: WIND  # Wind damage → Wind element
+
+  elemental:
+    display_name: "Elemental"
+    stat: all_elemental_damage_percent
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 15
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # CRITICAL (×0.55)
+  # ===========================================================================
+
+  precise:
+    display_name: "Precise"
+    stat: crit_chance
+    stat_type: percent
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.03
+    weight: 25
+    allowed_slots: [weapon, hands]
+    required_attribute: WIND
+
+  deadly:
+    display_name: "Deadly"
+    stat: crit_multiplier
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.11
+    weight: 10
+    allowed_slots: [weapon, hands]
+    required_attribute: LIGHTNING  # Crit multiplier → Storm archetype
+
+  # ===========================================================================
+  # PENETRATION (×0.55)
+  # ===========================================================================
+
+  piercing:
+    display_name: "Piercing"
+    stat: armor_penetration
+    stat_type: flat
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.165
+    weight: 5
+    allowed_slots: [weapon, hands]
+    required_attribute: FIRE
+
+  searing:
+    display_name: "Searing"
+    stat: fire_penetration
+    stat_type: percent
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.08
+    weight: 5
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  nullifying:
+    display_name: "Nullifying"
+    stat: spell_penetration
+    stat_type: flat
+    base_min: 1.1
+    base_max: 2.75
+    scale_per_level: 0.165
+    weight: 5
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # SPEED (Action - Doing Things Faster) (×0.55)
+  # ===========================================================================
+
+  swift:
+    display_name: "Swift"
+    stat: attack_speed_percent
+    stat_type: percent
+    base_min: 0.55
+    base_max: 1.65
+    scale_per_level: 0.055
+    weight: 25
+    allowed_slots: [weapon, hands]
+    required_attribute: LIGHTNING  # Attack speed → Storm archetype
+
+  # ===========================================================================
+  # MOVEMENT (Action - Moving Faster, Legs/Hands Only)
+  # ===========================================================================
+
+  fleet:
+    display_name: "Fleet"
+    stat: movement_speed_percent
+    stat_type: percent
+    base_min: 2.0
+    base_max: 5.0
+    scale_per_level: 0.1
+    weight: 25
+    allowed_slots: [legs]
+    required_attribute: LIGHTNING  # Movement speed → Storm archetype
+
+  striding:
+    display_name: "Striding"
+    stat: walk_speed_percent
+    stat_type: percent
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.1
+    weight: 20
+    allowed_slots: [legs]
+    required_attribute: LIGHTNING  # Walk speed → Storm archetype
+
+  sprinting:
+    display_name: "Sprinting"
+    stat: sprint_speed_bonus
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.15
+    weight: 25
+    allowed_slots: [legs]
+    required_attribute: LIGHTNING  # Sprint speed → Storm archetype
+
+  leaping:
+    display_name: "Leaping"
+    stat: jump_force_bonus
+    stat_type: flat
+    base_min: 0.5
+    base_max: 1.5
+    scale_per_level: 0.05
+    weight: 25
+    allowed_slots: [legs]
+    required_attribute: WIND  # Jump force → Ghost archetype (jumpForcePercent)
+
+  climbing:
+    display_name: "Climbing"
+    stat: climb_speed_bonus
+    stat_type: flat
+    base_min: 0.3
+    base_max: 0.8
+    scale_per_level: 0.03
+    weight: 25
+    allowed_slots: [hands, legs]
+    required_attribute: LIGHTNING  # Climb speed → Storm archetype (movement)
+
+  sneaking:
+    display_name: "Sneaking"
+    stat: crouch_speed_percent
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.2
+    weight: 15
+    allowed_slots: [legs]
+    required_attribute: WIND  # Sneaking → Ghost archetype (stealth/evasion)
+
+  # ===========================================================================
+  # THORNS / REFLECT (Shield-only offensive options)
+  # ===========================================================================
+
+  thorned:
+    display_name: "Thorned"
+    stat: thorns_damage
+    stat_type: flat
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.15
+    weight: 50
+    allowed_slots: [shield]
+    required_attribute: FIRE
+
+  barbed:
+    display_name: "Barbed"
+    stat: thorns_damage_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 25
+    allowed_slots: [shield]
+    required_attribute: FIRE
+
+  reflecting:
+    display_name: "Reflecting"
+    stat: reflect_damage_percent
+    stat_type: percent
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.15
+    weight: 25
+    allowed_slots: [shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # BLOCK MECHANICS (Action - Active damage mitigation when blocking)
+  # ===========================================================================
+
+  blocking:
+    display_name: "Blocking"
+    stat: passive_block_chance
+    stat_type: percent
+    base_min: 2.0
+    base_max: 3.0
+    scale_per_level: 0.1
+    weight: 50
+    allowed_slots: [shield]
+    required_attribute: WATER
+
+  bulwark:
+    display_name: "Bulwark"
+    stat: block_heal_percent
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.05
+    weight: 15
+    allowed_slots: [shield]
+    required_attribute: WATER
+
+  guardian:
+    display_name: "Guardian's"
+    stat: shield_effectiveness_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 20
+    allowed_slots: [shield]
+    required_attribute: WATER
+
+  ironclad:
+    display_name: "Ironclad"
+    stat: block_damage_reduction
+    stat_type: percent
+    base_min: 3.0
+    base_max: 10.0
+    scale_per_level: 0.3
+    weight: 25
+    allowed_slots: [head, chest, legs, shield]
+    required_attribute: FIRE
+
+  enduring:
+    display_name: "Enduring"
+    stat: stamina_drain_reduction
+    stat_type: percent
+    base_min: 3.0
+    base_max: 10.0
+    scale_per_level: 0.25
+    weight: 25
+    allowed_slots: [head, chest, legs, shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # CRITICAL DEFENSE (Action - Nullifying/reducing incoming critical hits)
+  # ===========================================================================
+
+  immortal:
+    display_name: "Immortal"
+    stat: crit_nullify_chance
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.3
+    weight: 3
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  resilient:
+    display_name: "Resilient"
+    stat: critical_reduction
+    stat_type: percent
+    base_min: 3.0
+    base_max: 10.0
+    scale_per_level: 0.25
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # ELEMENTAL RESISTANCE (Action - Active elemental damage mitigation)
+  # ===========================================================================
+
+  fireproof:
+    display_name: "Fireproof"
+    stat: fire_resistance
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  frostward:
+    display_name: "Frostward"
+    stat: water_resistance
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  insulated:
+    display_name: "Insulated"
+    stat: lightning_resistance
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  voidward:
+    display_name: "Voidward"
+    stat: void_resistance
+    stat_type: percent
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.15
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  stoneward:
+    display_name: "Stoneward"
+    stat: earth_resistance
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  windward:
+    display_name: "Windward"
+    stat: wind_resistance
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # AILMENT APPLICATION (×0.55)
+  # ===========================================================================
+
+  igniting:
+    display_name: "Igniting"
+    stat: ignite_chance
+    stat_type: percent
+    base_min: 1.65
+    base_max: 4.4
+    scale_per_level: 0.08
+    weight: 20
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  chilling:
+    display_name: "Chilling"
+    stat: freeze_chance
+    stat_type: percent
+    base_min: 1.65
+    base_max: 4.4
+    scale_per_level: 0.08
+    weight: 20
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  electrifying:
+    display_name: "Electrifying"
+    stat: shock_chance
+    stat_type: percent
+    base_min: 1.65
+    base_max: 4.4
+    scale_per_level: 0.08
+    weight: 20
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # PROJECTILE (×0.55)
+  # ===========================================================================
+
+  velocity:
+    display_name: "Velocity"
+    stat: projectile_speed_percent
+    stat_type: percent
+    base_min: 2.75
+    base_max: 8.25
+    scale_per_level: 0.165
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: WIND  # Projectile speed → Ghost archetype
+
+  # Trajectory modifier reduces projectile gravity (negative values = floats longer/arcs higher)
+  trajectory:
+    display_name: "Trajectory"
+    stat: projectile_gravity_percent
+    stat_type: percent
+    base_min: -5.0
+    base_max: -15.0
+    scale_per_level: -0.5
+    weight: 10
+    allowed_slots: [weapon, hands]
+    required_attribute: WIND  # Projectile trajectory → Ghost archetype
+
+  # ===========================================================================
+  # HEXCODE MAGIC — Spell-specific prefixes for magic weapon identity
+  # ===========================================================================
+
+  hex_spell_damage:
+    display_name: "Hexweaver's"
+    stat: spell_damage_percent
+    stat_type: percent
+    base_min: 2.75
+    base_max: 6.88
+    scale_per_level: 0.14
+    weight: 40
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  hex_spell_crit:
+    display_name: "Spellstrike"
+    stat: spell_crit_chance
+    stat_type: percent
+    base_min: 1.65
+    base_max: 5.5
+    scale_per_level: 0.08
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  hex_status_effect:
+    display_name: "Volatile"
+    stat: status_effect_chance
+    stat_type: percent
+    base_min: 2.75
+    base_max: 8.25
+    scale_per_level: 0.1
+    weight: 20
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+# -----------------------------------------------------------------------------
+# SUFFIX MODIFIERS (Sustain - What You HAVE)
+# -----------------------------------------------------------------------------
+
+suffixes:
+
+  # ===========================================================================
+  # RESOURCES
+  # ===========================================================================
+
+  of_the_whale:
+    display_name: "of the Whale"
+    stat: max_health
+    stat_type: flat
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 1.0
+    weight: 100
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_vitality:
+    display_name: "of Vitality"
+    stat: max_health_percent
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.1
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_the_sage:
+    display_name: "of the Sage"
+    stat: max_mana
+    stat_type: flat
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.5
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield, weapon]
+    required_attribute: VOID
+
+  of_wisdom:
+    display_name: "of Wisdom"
+    stat: max_mana_percent
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.1
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield, weapon]
+    required_attribute: VOID
+
+  of_endurance:
+    display_name: "of Endurance"
+    stat: max_stamina
+    stat_type: flat
+    base_min: 0.65
+    base_max: 1.65
+    scale_per_level: 0.018
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: FIRE
+
+  of_the_barrier:
+    display_name: "of the Barrier"
+    stat: energy_shield
+    stat_type: flat
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 1.0
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # REGENERATION
+  # ===========================================================================
+
+  of_regeneration:
+    display_name: "of Regeneration"
+    stat: health_regen
+    stat_type: flat
+    base_min: 0.2
+    base_max: 0.5
+    scale_per_level: 0.02
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_restoration:
+    display_name: "of Restoration"
+    stat: health_regen_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_recovery:
+    display_name: "of Recovery"
+    stat: health_recovery_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_the_arcane:
+    display_name: "of the Arcane"
+    stat: mana_regen
+    stat_type: flat
+    base_min: 0.1
+    base_max: 0.3
+    scale_per_level: 0.015
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield, weapon]
+    required_attribute: VOID
+
+  of_vigor:
+    display_name: "of Vigor"
+    stat: stamina_regen
+    stat_type: flat
+    base_min: 0.1
+    base_max: 0.25
+    scale_per_level: 0.01
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: LIGHTNING  # Stamina regen → Storm archetype
+
+  of_stamina:
+    display_name: "of Stamina"
+    stat: max_stamina_percent
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.1
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: FIRE
+
+  of_alacrity:
+    display_name: "of Alacrity"
+    stat: stamina_regen_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: LIGHTNING
+
+  of_second_wind:
+    display_name: "of Second Wind"
+    stat: stamina_regen_start_delay
+    stat_type: percent
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.2
+    weight: 15
+    allowed_slots: [head, chest, legs, hands, shield, weapon]
+
+  # ===========================================================================
+  # ARMOR / DEFENSE
+  # ===========================================================================
+
+  of_the_fortress:
+    display_name: "of the Fortress"
+    stat: armor
+    stat_type: flat
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 1.0
+    weight: 100
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_iron_skin:
+    display_name: "of Iron Skin"
+    stat: armor_percent
+    stat_type: percent
+    base_min: 2.0
+    base_max: 5.0
+    scale_per_level: 0.15
+    weight: 50
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_stone:
+    display_name: "of Stone"
+    stat: physical_resistance
+    stat_type: percent
+    base_min: 2.0
+    base_max: 5.0
+    scale_per_level: 0.1
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # EVASION
+  # ===========================================================================
+
+  of_evasion:
+    display_name: "of Evasion"
+    stat: evasion
+    stat_type: flat
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.4
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WIND
+
+  of_the_shadow:
+    display_name: "of the Shadow"
+    stat: dodge_chance
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.05
+    weight: 15
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WIND  # Dodge chance → Ghost archetype (evasion)
+
+  # ===========================================================================
+  # AILMENT DEFENSE
+  # ===========================================================================
+
+  of_the_hearth:
+    display_name: "of the Hearth"
+    stat: burn_threshold
+    stat_type: flat
+    base_min: 10.0
+    base_max: 25.0
+    scale_per_level: 1.0
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_warmth:
+    display_name: "of Warmth"
+    stat: freeze_threshold
+    stat_type: flat
+    base_min: 10.0
+    base_max: 25.0
+    scale_per_level: 1.0
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_insulation:
+    display_name: "of Insulation"
+    stat: shock_threshold
+    stat_type: flat
+    base_min: 10.0
+    base_max: 25.0
+    scale_per_level: 1.0
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # ACTIVE DEFENSE
+  # ===========================================================================
+
+  of_parrying:
+    display_name: "of Parrying"
+    stat: parry_chance
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.08
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: WIND  # Parry chance → Ghost archetype (evasion)
+
+  # ===========================================================================
+  # UTILITY DEFENSE
+  # ===========================================================================
+
+  of_stability:
+    display_name: "of Stability"
+    stat: knockback_resistance
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.3
+    weight: 25
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  of_the_cat:
+    display_name: "of the Cat"
+    stat: fall_damage_reduction
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.3
+    weight: 25
+    allowed_slots: [legs]
+    required_attribute: WATER
+
+  of_fortitude:
+    display_name: "of Fortitude"
+    stat: physical_resistance
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.05
+    weight: 3
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
+
+  # ===========================================================================
+  # LEECH (gain resources from YOUR damage dealt - always works)
+  # ===========================================================================
+
+  vampiric:
+    display_name: "Vampiric"
+    stat: life_leech
+    stat_type: percent
+    base_min: 0.1
+    base_max: 0.4
+    scale_per_level: 0.008
+    weight: 25
+    allowed_slots: [weapon]
+
+  siphoning:
+    display_name: "Siphoning"
+    stat: mana_leech
+    stat_type: percent
+    base_min: 0.5
+    base_max: 2.0
+    scale_per_level: 0.08
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # STEAL (take resources FROM enemy - enemy loses what you gain)
+  # ===========================================================================
+
+  of_the_vampire:
+    display_name: "of the Vampire"
+    stat: life_steal
+    stat_type: percent
+    base_min: 0.1
+    base_max: 0.4
+    scale_per_level: 0.015
+    weight: 15
+    allowed_slots: [weapon]
+
+  of_the_mana_thief:
+    display_name: "of the Mana Thief"
+    stat: mana_steal
+    stat_type: percent
+    base_min: 0.3
+    base_max: 1.5
+    scale_per_level: 0.06
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # COST REDUCTION
+  # ===========================================================================
+
+  of_efficiency:
+    display_name: "of Efficiency"
+    stat: mana_cost_reduction
+    stat_type: percent
+    base_min: 2.0
+    base_max: 5.0
+    scale_per_level: 0.1
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield, weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # SIGNATURE ENERGY
+  # ===========================================================================
+
+  of_signature_mastery:
+    display_name: "of Signature Mastery"
+    stat: signature_energy_max_percent
+    stat_type: percent
+    base_min: 3.0
+    base_max: 10.0
+    scale_per_level: 0.3
+    weight: 20
+    allowed_slots: [weapon, hands]
+    required_attribute: VOID
+
+  of_momentum:
+    display_name: "of Momentum"
+    stat: signature_energy_per_hit
+    stat_type: flat
+    base_min: 0.2
+    base_max: 0.8
+    scale_per_level: 0.03
+    weight: 15
+    allowed_slots: [weapon]
+
+  # ===========================================================================
+  # ACCURACY (Sustain - Having good aim)
+  # ===========================================================================
+
+  of_accuracy:
+    display_name: "of Accuracy"
+    stat: accuracy
+    stat_type: flat
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.8
+    weight: 25
+    allowed_slots: [weapon, hands, shield]
+    required_attribute: WIND
+
+  of_focus:
+    display_name: "of Focus"
+    stat: accuracy_percent
+    stat_type: percent
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.15
+    weight: 50
+    allowed_slots: [weapon, hands, shield]
+    required_attribute: WIND
+
+  # ===========================================================================
+  # AILMENT DAMAGE (Sustain - Passive DoT amplification)
+  # ===========================================================================
+
+  of_scorching:
+    display_name: "of Scorching"
+    stat: burn_damage
+    stat_type: flat
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.055
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_frostbite:
+    display_name: "of Frostbite"
+    stat: freeze_damage
+    stat_type: flat
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.055
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_voltage:
+    display_name: "of Voltage"
+    stat: shock_damage
+    stat_type: flat
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.055
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_venom:
+    display_name: "of Venom"
+    stat: poison_damage
+    stat_type: flat
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.055
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_toxicity:
+    display_name: "of Toxicity"
+    stat: dot_damage_percent
+    stat_type: percent
+    base_min: 1.65
+    base_max: 4.4
+    scale_per_level: 0.11
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_incineration:
+    display_name: "of Incineration"
+    stat: burn_damage_percent
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_frostburn:
+    display_name: "of Frostburn"
+    stat: frost_damage_percent
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_amplification:
+    display_name: "of Amplification"
+    stat: shock_damage_percent
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 25
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # CONDITIONAL DAMAGE (Sustain - Passive situational bonuses)
+  # ===========================================================================
+
+  of_the_berserker:
+    display_name: "of the Berserker"
+    stat: damage_at_low_life
+    stat_type: percent
+    base_min: 5.5
+    base_max: 13.75
+    scale_per_level: 0.275
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: FIRE
+
+  of_execution:
+    display_name: "of Execution"
+    stat: execute_damage_percent
+    stat_type: percent
+    base_min: 5.5
+    base_max: 13.75
+    scale_per_level: 0.275
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: FIRE
+
+  of_hypothermia:
+    display_name: "of Hypothermia"
+    stat: damage_vs_frozen_percent
+    stat_type: percent
+    base_min: 5.5
+    base_max: 13.75
+    scale_per_level: 0.275
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_galvanization:
+    display_name: "of Galvanization"
+    stat: damage_vs_shocked_percent
+    stat_type: percent
+    base_min: 5.5
+    base_max: 13.75
+    scale_per_level: 0.275
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # ELEMENTAL CONVERSION (Sustain - Passive damage transformation)
+  # ===========================================================================
+
+  of_flame_infusion:
+    display_name: "of Flame Infusion"
+    stat: fire_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_frost_infusion:
+    display_name: "of Frost Infusion"
+    stat: water_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_storm_infusion:
+    display_name: "of Storm Infusion"
+    stat: lightning_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_earth_infusion:
+    display_name: "of Earth Infusion"
+    stat: earth_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_gale_infusion:
+    display_name: "of Gale Infusion"
+    stat: wind_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 15
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  of_void_infusion:
+    display_name: "of Void Infusion"
+    stat: void_conversion
+    stat_type: percent
+    base_min: 5.0
+    base_max: 15.0
+    scale_per_level: 0.5
+    weight: 10
+    allowed_slots: [weapon]
+    required_attribute: VOID
+
+  # ===========================================================================
+  # HEXCODE MAGIC — Spell-specific suffixes for magic weapon identity
+  # ===========================================================================
+
+  hex_max_mana:
+    display_name: "of the Hexmage"
+    stat: max_mana
+    stat_type: flat
+    base_min: 5.5
+    base_max: 13.75
+    scale_per_level: 0.55
+    weight: 40
+    allowed_slots: [weapon]
+    required_attribute: WATER
+
+  hex_mana_regen:
+    display_name: "of Channeling"
+    stat: mana_regen
+    stat_type: flat
+    base_min: 0.28
+    base_max: 0.83
+    scale_per_level: 0.03
+    weight: 30
+    allowed_slots: [weapon]
+    required_attribute: WATER
+
+  hex_mana_cost_reduction:
+    display_name: "of Hex Efficiency"
+    stat: mana_cost_reduction
+    stat_type: percent
+    base_min: 1.65
+    base_max: 8.25
+    scale_per_level: 0.13
+    weight: 20
+    allowed_slots: [weapon]
+    required_attribute: WATER
+
+  # ──────────────────────────────────────────────────
+  # Magic Stats (Hexcode Integration)
+  # ──────────────────────────────────────────────────
+
+  hex_volatility:
+    display_name: "Volatile"
+    stat: volatility_max
+    stat_type: flat
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.3
+    weight: 25
+    allowed_slots: [weapon, head]
+    required_attribute: WATER
+
+  hex_magic_power:
+    display_name: "of Arcane Might"
+    stat: magic_power
+    stat_type: percent
+    base_min: 1.0
+    base_max: 4.0
+    scale_per_level: 0.1
+    weight: 25
+    allowed_slots: [weapon, head, chest]
+    required_attribute: WATER
+
+  hex_draw_accuracy:
+    display_name: "of Precision"
+    stat: draw_accuracy
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.5
+    scale_per_level: 0.08
+    weight: 20
+    allowed_slots: [weapon, hands]
+
+  hex_cast_speed:
+    display_name: "of Quickening"
+    stat: cast_speed
+    stat_type: percent
+    base_min: 1.0
+    base_max: 3.0
+    scale_per_level: 0.08
+    weight: 20
+    allowed_slots: [weapon, hands]
+    required_attribute: LIGHTNING

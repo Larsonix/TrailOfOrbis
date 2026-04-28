@@ -1,0 +1,131 @@
+# =============================================================================
+# Death Recap Configuration
+# =============================================================================
+# Controls the death recap system that shows players detailed information
+# about how they died, including damage breakdown and attacker info.
+#
+# OVERVIEW:
+# ---------
+# When a player dies, they receive a message in chat showing:
+#   - What killed them (mob name, player name, or environment)
+#   - Full damage breakdown from base to final damage
+#   - Their defensive stats that could have helped
+#
+# This helps players understand what killed them and how to improve
+# their defenses for future encounters.
+#
+# =============================================================================
+
+# Master switch for the death recap system
+enabled: true
+
+# -----------------------------------------------------------------------------
+# DISPLAY MODE
+# -----------------------------------------------------------------------------
+# Controls how the death recap is displayed.
+#
+# Options:
+#   "full"    - Multi-line detailed breakdown with all calculations
+#   "compact" - Single-line summary (good for fast-paced gameplay)
+#
+# Full mode example:
+#   ======= DEATH RECAP =======
+#   Killed by: [Elite] Trork Warrior (Lv27)
+#
+#   -- Damage Breakdown --
+#   Base Damage:      15.0
+#   + Flat Bonus:     +8.2
+#   + % Bonus:        +24% (+21.5)
+#   * CRITICAL:       x2.5 (107.5)
+#   - Armor (45):     -38% (-41.0)
+#   + Fire:           +12.5 (25% resisted)
+#   --------------------
+#   Final:            79.0 / 55.0 HP
+#
+#   -- Your Defenses --
+#   Armor: 45 (blocked 38%)
+#   Evasion: 8% (didn't proc)
+#   ===========================
+#
+# Compact mode example:
+#   [Death] Killed by [Elite] Trork Warrior (Lv27) - 79 dmg (CRIT! 15 base +8 flat +24% -38% armor +12 fire)
+#
+# Default: full
+display_mode: full
+
+# -----------------------------------------------------------------------------
+# FULL MODE OPTIONS
+# -----------------------------------------------------------------------------
+# These settings only apply when display_mode is "full".
+# They control which sections appear in the death recap.
+
+# Show the full damage breakdown section
+# Displays: base damage -> flat bonus -> % bonus -> crit -> armor -> final
+# Default: true
+show_damage_breakdown: true
+
+# Show the defensive stats section
+# Displays: your armor, evasion chance, and how effective they were
+# Default: true
+show_defensive_stats: true
+
+# Show elemental damage breakdown
+# Displays: fire/water/lightning/void damage and your resistances
+# Default: true
+show_elemental_damage: true
+
+# -----------------------------------------------------------------------------
+# DAMAGE CHAIN
+# -----------------------------------------------------------------------------
+# Track recent hits to show a timeline of what happened before death.
+#
+# Example (in full mode):
+#   -- Damage Timeline (last 5 hits) --
+#   1. Physical: 23 dmg from Trork Warrior      [3.2s ago]
+#   2. Fire: 15 dmg from Burn (DOT)              [1.5s ago]
+#   3. Physical: 45 dmg from Trork Warrior CRIT!  [KILLING BLOW]
+
+# How many recent hits to track per player (1-20)
+# Default: 5
+damage_chain_length: 5
+
+# Show damage chain timeline in full mode
+# Default: true
+show_damage_chain: true
+
+# -----------------------------------------------------------------------------
+# KILL FEED
+# -----------------------------------------------------------------------------
+# Customize the kill feed messages broadcast to all players when someone dies.
+
+# Enable contextual kill feed messages
+# Default: true
+kill_feed_enabled: true
+
+# Use element-aware contextual verbs in kill feed messages
+# When true: "burned to death by Fire Trork"
+# When false: "killed by Fire Trork"
+# Default: true
+kill_feed_contextual: true
+
+# -----------------------------------------------------------------------------
+# BALANCE PRESETS
+# -----------------------------------------------------------------------------
+#
+# MINIMAL (Clean, non-intrusive):
+#   display_mode: compact
+#
+# DETAILED (Learn from every death):
+#   display_mode: full
+#   show_damage_breakdown: true
+#   show_defensive_stats: true
+#   show_elemental_damage: true
+#
+# FOCUSED (Just damage, no stats):
+#   display_mode: full
+#   show_damage_breakdown: true
+#   show_defensive_stats: false
+#   show_elemental_damage: false
+#
+# DISABLED (No death recaps):
+#   enabled: false

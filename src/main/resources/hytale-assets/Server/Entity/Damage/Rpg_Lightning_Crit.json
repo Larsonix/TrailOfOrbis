@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG lightning critical hit - bright yellow text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#FFFFAA"
+}

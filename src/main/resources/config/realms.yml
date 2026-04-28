@@ -1,0 +1,355 @@
+# ═══════════════════════════════════════════════════════════════════
+# Realms Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Main configuration for the Realms system.
+# Realm Maps are consumable items that open portals to instanced dungeons.
+
+# Enable/disable the entire realms system
+enabled: true
+
+# Enable debug logging for development
+debug-mode: false
+
+# Maximum realm level (affects monster scaling and rewards)
+max-level: 1000000
+
+# Starting level for new map drops
+starting-level: 1
+
+# ═══════════════════════════════════════════════════════════════════
+# Item Settings
+# ═══════════════════════════════════════════════════════════════════
+
+items:
+  # Base Hytale item used for realm maps (must be a valid Hytale item ID)
+  # Maps are registered as custom items derived from this base item
+  # Default: Realm_Map (custom item with no built-in interactions)
+  map-base-item: "Realm_Map"
+
+# ═══════════════════════════════════════════════════════════════════
+# Instance Settings
+# ═══════════════════════════════════════════════════════════════════
+
+instance:
+  # Maximum concurrent realm instances server-wide
+  max-concurrent: 100
+
+  # Time limit for realm completion (seconds)
+  timeout-seconds: 600
+
+  # Grace period after completion for looting (seconds)
+  grace-period-seconds: 60
+
+  # Time before empty instance closes (seconds)
+  # Note: Currently unused - main timer handles timeout even when empty
+  empty-timeout-seconds: 30
+
+  # Allow players to re-enter after death
+  allow-reentry: true
+
+  # Death policy: how to handle player deaths in realms
+  # RESPAWN_IN_REALM - Player respawns at realm spawn (default vanilla behavior)
+  # KICK_ON_DEATH - Player is teleported back to portal origin (recommended)
+  # LIMITED_LIVES - Player has X lives before being kicked (see max-deaths)
+  # SOFTCORE - No penalty, respawn in realm
+  death-policy: KICK_ON_DEATH
+
+  # Maximum deaths before being kicked (only used with LIMITED_LIVES policy)
+  max-deaths: 3
+
+# ═══════════════════════════════════════════════════════════════════
+# Portal Settings
+# ═══════════════════════════════════════════════════════════════════
+# When a player uses a realm map, a portal is created at their feet.
+# The player must walk into the portal to enter the realm.
+
+portal:
+  # Time in seconds before unused portal disappears
+  entry-timeout-seconds: 120
+
+  # Block type for the portal (must be a valid portal-enabled block)
+  # Note: Hytale uses Pascal_Snake_Case for asset names
+  block-type: "Portal_Device"
+
+  # Offset from player position for portal placement
+  placement-offset:
+    x: 0
+    y: 0
+    z: 2
+
+# ═══════════════════════════════════════════════════════════════════
+# Drop Settings
+# ═══════════════════════════════════════════════════════════════════
+
+drops:
+  maps:
+    # Base chance for a map to drop from any mob (0.12 = 12%)
+    # This rate applies inside realms. Overworld rate = base-chance * overworld-multiplier.
+    base-chance: 0.12
+
+    # Additional chance per mob level (0.0001 = 0.01%)
+    per-level: 0.0001
+
+    # Drop chance multiplier for boss kills
+    boss-multiplier: 5.0
+
+    # Drop chance multiplier for elite kills
+    elite-multiplier: 2.0
+
+    # Overworld drop rate multiplier (applied on top of base-chance outside realms)
+    # 0.15 = overworld mobs drop maps at 15% of the realm rate (~1.8% effective)
+    # This makes maps rare exploration finds in the overworld while self-sustaining in realms.
+    overworld-multiplier: 0.15
+
+  stones:
+    # Base chance for stones to drop (0.15 = 15%)
+    base-chance: 0.15
+
+    # Additional chance per mob level
+    per-level: 0.00005
+
+    # Boss drop multiplier
+    boss-multiplier: 10.0
+
+    # Elite drop multiplier
+    elite-multiplier: 3.0
+
+# ═══════════════════════════════════════════════════════════════════
+# Reward Settings
+# ═══════════════════════════════════════════════════════════════════
+
+rewards:
+  # Base XP multiplier for realm kills (1.5 = +50%)
+  base-xp-multiplier: 1.5
+
+  # Base loot quantity multiplier
+  base-loot-multiplier: 1.2
+
+  # Additional reward bonus per difficulty point (0.1 = +10%)
+  difficulty-scaling: 0.1
+
+  # XP bonus per difficulty rating point (0.002 = +0.2% per point)
+  difficulty-xp-scaling: 0.002
+
+  # Base IIQ bonus for ALL realm mobs (100 = +100% = double drop rate)
+  # This stacks with map modifier IIQ bonuses
+  # Applied to gear drops from mobs killed inside realms
+  base-realm-iiq-bonus: 100
+
+# ═══════════════════════════════════════════════════════════════════
+# Multiplier Clamps (0 = no limit)
+# ═══════════════════════════════════════════════════════════════════
+# Configure minimum and maximum values for bonus multipliers.
+# Set to 0 to disable clamping (no limit).
+
+multiplier-clamps:
+  xp:
+    # Minimum XP multiplier (0 = no minimum)
+    min: 0
+    # Maximum XP multiplier (0 = no maximum)
+    max: 0
+
+  iiq:
+    # Minimum Increased Item Quantity multiplier (0 = no minimum)
+    min: 0
+    # Maximum Increased Item Quantity multiplier (0 = no maximum)
+    max: 0
+
+  iir:
+    # Minimum Increased Item Rarity multiplier (0 = no minimum)
+    min: 0
+    # Maximum Increased Item Rarity multiplier (0 = no maximum)
+    max: 0
+
+# ═══════════════════════════════════════════════════════════════════
+# Enabled Biomes
+# ═══════════════════════════════════════════════════════════════════
+# List of biomes that can appear on maps.
+# Remove biomes to disable them from the drop pool.
+
+enabled-biomes:
+  - FOREST
+  - DESERT
+  - VOLCANO
+  - TUNDRA
+  - SWAMP
+  # - MOUNTAINS  # Temporarily disabled — WIP for Modjam
+  - BEACH
+  - JUNGLE
+  - CAVERNS
+  - FROZEN_CRYPTS
+  - SAND_TOMBS
+  - VOID
+  - CORRUPTED
+
+# ═══════════════════════════════════════════════════════════════════
+# Enabled Sizes
+# ═══════════════════════════════════════════════════════════════════
+
+enabled-sizes:
+  - SMALL
+  - MEDIUM
+  - LARGE
+  - MASSIVE
+
+# ═══════════════════════════════════════════════════════════════════
+# Size Scaling (level-gated map sizes)
+# ═══════════════════════════════════════════════════════════════════
+# Controls which map sizes can drop at each player level.
+# Higher-level players progressively unlock larger maps with increasing drop weight.
+
+size-scaling:
+  # Minimum level required for each size to appear in map drops
+  min-levels:
+    small: 1
+    medium: 10
+    large: 25
+    massive: 50
+
+  # Base weight for each size (before level scaling)
+  base-weights:
+    small: 40
+    medium: 35
+    large: 20
+    massive: 5
+
+  # Number of levels after min-level before the size reaches full weight.
+  # At min-level, weight starts at 10% of base; at min-level + ramp-levels, it reaches 100%.
+  ramp-levels: 10
+
+# ═══════════════════════════════════════════════════════════════════
+# Biome Overrides
+# ═══════════════════════════════════════════════════════════════════
+# Per-biome settings. Only specify biomes you want to override.
+
+biome-overrides:
+  # Volcano is harder but gives more rewards
+  volcano:
+    difficulty-multiplier: 1.5
+    xp-multiplier: 1.3
+    loot-multiplier: 1.2
+    min-level: 50
+
+  # Void is endgame content
+  void:
+    difficulty-multiplier: 2.0
+    xp-multiplier: 1.5
+    loot-multiplier: 1.5
+    min-level: 500
+
+  # Corrupted is the hardest
+  corrupted:
+    difficulty-multiplier: 3.0
+    xp-multiplier: 2.0
+    loot-multiplier: 2.0
+    min-level: 1000
+
+# ═══════════════════════════════════════════════════════════════════
+# Size Overrides
+# ═══════════════════════════════════════════════════════════════════
+
+size-overrides:
+  massive:
+    reward-multiplier: 4.0
+    min-player-count: 2
+    max-player-count: 6
+
+# ═══════════════════════════════════════════════════════════════════
+# Victory Settings
+# ═══════════════════════════════════════════════════════════════════
+# Celebration effects when a realm is completed.
+
+victory:
+  # Emote animation played by all players on realm completion.
+  # Set to a valid emote ID to enable. Leave empty to disable.
+  # Use /emote in-game to see available IDs.
+  emote-id: ""
+
+# ═══════════════════════════════════════════════════════════════════
+# Victory Rewards
+# ═══════════════════════════════════════════════════════════════════
+# Items granted directly to player inventory on realm completion.
+# Rewards scale by size, with IIQ providing bonus roll chances.
+
+victory-rewards:
+  # Base rewards per size tier
+  # Each item is randomly chosen from: map, stone, or gear (equal weight)
+  # IIQ gives % chance for +1 bonus random item
+  size-rewards:
+    small:
+      total-items: 2
+    medium:
+      total-items: 3
+    large:
+      total-items: 3
+      bonus-iir: 25   # +25% IIR for large tier
+    massive:
+      total-items: 3
+      bonus-iir: 50   # +50% IIR for massive tier
+      bonus-iiq: 10   # +10% IIQ for massive tier
+
+  # Level variance for map drops (±value from completed level)
+  # e.g., variance=1 with level 50 → maps drop at 49-51
+  map-level-variance: 1
+
+  # Gear level offset range (relative to completed map level)
+  # e.g., min=-3, max=0 with level 50 → gear drops at 47-50
+  gear-level-min-offset: -3
+  gear-level-max-offset: 0
+
+  # Max bonus items per type from IIQ rolls
+  # Limits how many extra items IIQ can grant (prevents excessive rewards)
+  max-bonus-per-type: 2
+
+# ═══════════════════════════════════════════════════════════════════
+# Spawn Gateway
+# ═══════════════════════════════════════════════════════════════════
+# Places a ring of portals around world spawn to help new players
+# discover and use the realm map system. Portals only activate when
+# a player holds a realm map and interacts with them.
+
+spawn-gateway:
+  # Enable/disable spawn gateway placement
+  # When enabled, places a ring of Portal_Device blocks around world spawn.
+  # These gateways are upgradable (Copper → Adamantite) via the gateway upgrade system.
+  enabled: true
+
+  # Radius of the portal ring from spawn center (in blocks)
+  ring-radius: 40
+
+  # Number of portals in the ring (evenly spaced around the ring)
+  portal-count: 8
+
+  # Block type for the portal (must be a portal-enabled block)
+  portal-block-type: "Portal_Device"
+
+# ═══════════════════════════════════════════════════════════════════
+# Arena Scaling
+# ═══════════════════════════════════════════════════════════════════
+# Dynamic arena radius and degressive timer based on mob count.
+#
+# Arena radius: computed from base mob count (level-scaled, NO modifier bonuses)
+#   to maintain a target density. Modifier bonus mobs increase density intentionally.
+#   Formula: radius = sqrt(baseMobCount * target-blocks-per-mob / PI)
+#   Clamped to per-size min/max range.
+#
+# Timer: degressive formula giving diminishing returns per additional mob.
+#   Formula: base + (finalMobCount * per-mob) / (1 + finalMobCount / soft-cap)
+#   REDUCED_TIME modifier applies on top as percentage reduction.
+
+arena-scaling:
+  # Density target: square blocks per mob. Higher = more spread out.
+  # 100 = comfortable combat distance (~10 blocks between mobs)
+  target-blocks-per-mob: 100
+
+  # Timer base: guaranteed minimum time before mob-count scaling (seconds)
+  timer-base-seconds: 120
+
+  # Timer per-mob: seconds added per mob at low counts (diminishes at high counts)
+  timer-seconds-per-mob: 8
+
+  # Timer soft-cap: mob count at which each additional mob adds half the per-mob time
+  timer-soft-cap: 50
+
+  # Timer minimum: absolute floor even with REDUCED_TIME modifier (seconds)
+  timer-minimum-seconds: 60

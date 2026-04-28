@@ -1,0 +1,35 @@
+{
+  "Type": "NoiseRange",
+  "Biomes": [],
+  "DefaultBiome": "Realm_Frozen_Crypts_R50",
+  "DefaultTransitionDistance": 32,
+  "MaxBiomeEdgeDistance": 32,
+  "Framework": [
+    {
+      "Type": "DecimalConstants",
+      "Entries": [
+        {
+          "Name": "Base",
+          "Value": 64
+        },
+        {
+          "Name": "Water",
+          "Value": 64
+        },
+        {
+          "Name": "Bedrock",
+          "Value": 0
+        },
+        {
+          "Name": "Ceiling",
+          "Value": 100
+        }
+      ]
+    }
+  ],
+  "Density": {
+    "Type": "Constant",
+    "Skip": false,
+    "Value": 0
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Realm_Map.name",
+    "Description": "server.items.Realm_Map.description"
+  },
+  "Quality": "Common",
+  "Model": "Items/RealmMaps/Realm_Map.blockymodel",
+  "Texture": "Items/RealmMaps/Textures/Blank.png",
+  "PlayerAnimationsId": "Block",
+  "MaxStack": 1,
+  "ItemSoundSetId": "ISS_Blocks_Wood",
+  "IconProperties": {
+    "Scale": 0.8,
+    "Rotation": [
+      109,
+      75,
+      99
+    ],
+    "Translation": [
+      1,
+      -6
+    ]
+  },
+  "Scale": 3,
+  "Icon": "Icons/ItemsGenerated/Realm_Map.png"
+}

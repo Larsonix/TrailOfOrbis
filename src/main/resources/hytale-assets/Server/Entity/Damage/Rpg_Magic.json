@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG magic damage type - blue damage text",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": true,
+  "StaminaLoss": true,
+  "DamageTextColor": "#44AAFF"
+}

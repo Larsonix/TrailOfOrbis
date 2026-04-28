@@ -1,0 +1,50 @@
+{
+  "TranslationProperties": {
+    "Name": "Spark of Potential",
+    "Description": "rpg.stone.spark_of_potential.desc"
+  },
+  "Quality": "Uncommon",
+  "Model": "Resources/Stones/Rune.blockymodel",
+  "Texture": "Resources/Stones/Textures/Spark_Of_Potential.png",
+  "PlayerAnimationsId": "Item",
+  "MaxStack": 100,
+  "Tags": {
+    "Type": [
+      "Stone"
+    ],
+    "Family": [
+      "Currency"
+    ]
+  },
+  "Interactions": {
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "OpenCustomUI",
+          "Page": {
+            "Id": "RPG_StonePicker"
+          }
+        }
+      ]
+    }
+  },
+  "IconProperties": {
+    "Scale": 0.7,
+    "Rotation": [
+      14,
+      205,
+      344
+    ],
+    "Translation": [
+      5,
+      -16
+    ]
+  },
+  "Scale": 1.2,
+  "ItemSoundSetId": "ISS_Items_Gems",
+  "DropOnDeath": false,
+  "Categories": [
+    "TrailOfOrbis.Stones"
+  ],
+  "Icon": "Icons/ItemsGenerated/RPG_Stone_Spark_Of_Potential.png"
+}

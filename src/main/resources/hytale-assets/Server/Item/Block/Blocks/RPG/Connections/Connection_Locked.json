@@ -1,0 +1,16 @@
+{
+  "Material": "Empty",
+  "Opacity": "Cutout",
+  "CubeShadingMode": "Fullbright",
+  "Textures": [
+    {
+      "All": "BlockTextures/RPG/Connections/Locked.png"
+    }
+  ],
+  "Light": {
+    "Color": "#444444",
+    "Radius": 1
+  },
+  "BlockSoundSetId": "Empty",
+  "Group": "@Tech"
+}

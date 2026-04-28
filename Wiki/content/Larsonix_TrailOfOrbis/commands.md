@@ -46,7 +46,7 @@ All player commands use `/too` as the root. Aliases : `/trailoforbis`, `/orbis`.
 
 | Command | Description |
 |---------|-------------|
-| `/too stats` | Opens your complete character stats page with all 153 computed stat fields, Gear bonuses, and Attribute breakdown |
+| `/too stats` | Opens your complete character stats page with all 246 computed stat fields, Gear bonuses, and Attribute breakdown |
 
 ---
 

@@ -1,0 +1,29 @@
+{
+  "Group": "trailoforbis",
+  "Name": "TrailOfOrbis",
+  "Version": "1.0.0",
+  "Description": "Deep RPG overhaul: 6 elements, 485-node skill tree, procedural Realm dungeons, gear crafting with 101 modifiers, 11-stage damage pipeline",
+  "Authors": [
+    {
+      "Name": "Larsonix"
+    },
+    {
+      "Name": "LadyPaladra"
+    }
+  ],
+  "ServerVersion": "@HYTALE_VERSION@",
+  "Dependencies": {
+    "Hytale:EntityModule": "*",
+    "Hytale:DamageModule": "*",
+    "Hytale:ItemModule": "*",
+    "Hytale:EntityUIModule": "*",
+    "Hytale:InteractionModule": "*"
+  },
+  "OptionalDependencies": {
+    "MimStar:Loot4Everyone": "*",
+    "me.tsumori:partypro": "*"
+  },
+  "DisabledByDefault": false,
+  "Main": "io.github.larsonix.trailoforbis.TrailOfOrbis",
+  "IncludesAssetPack": true
+}
