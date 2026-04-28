@@ -19,9 +19,7 @@ XP per kill scales with mob level, stat pool, and tier. The leveling curve is ef
 Every mob kill awards XP calculated as :
 
 ```
-
 xp = ceil((mobLevel x 5.0 + statPool x 0.1) x tierMult x 1.2 x (1 + distanceLevel x 0.028))
-
 ```
 
 ### Breaking It Down
@@ -80,10 +78,8 @@ Trail of Orbis doesn't use a static XP table. Instead, it calculates XP requirem
 ### The Formula
 
 ```
-
 exponent = ln(targetMobs / baseMobs) / ln(targetLevel)
 mobsPerLevel(L) = baseMobs x max(1, L)^exponent
-
 ```
 
 ### Default Configuration
@@ -97,12 +93,10 @@ mobsPerLevel(L) = baseMobs x max(1, L)^exponent
 ### Calculated Exponent
 
 ```
-
 exponent = ln(150 / 3) / ln(100)
          = ln(50) / ln(100)
          = 3.912 / 4.605
          ≈ 0.849
-
 ```
 
 This exponent (~0.849) creates a sub-linear power curve. Effort grows steadily but never exponentially.
@@ -130,9 +124,7 @@ With a static XP table, doubling mob XP would halve the grind, potentially break
 An older exponential formula also exists in the codebase :
 
 ```
-
 cumulative_XP = baseXp x (level - 1)^exponent
-
 ```
 
 | Parameter | Value |

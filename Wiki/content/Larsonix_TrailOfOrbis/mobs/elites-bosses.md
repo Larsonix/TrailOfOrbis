@@ -47,24 +47,20 @@ Elites get 50% more total stats than a standard Hostile of the same level. Combi
 Using the mob XP formula with an Elite at level 50 with a 600 stat pool at spawn :
 
 ```
-
 xp = ceil((50 x 5.0 + 600 x 0.1) x 1.5 x 1.2 x (1 + 0 x 0.028))
    = ceil((250 + 60) x 1.5 x 1.2)
    = ceil(310 x 1.8)
    = ceil(558.0)
    = 558 XP
-
 ```
 
 Compare to a standard Hostile at the same level and pool :
 
 ```
-
 xp = ceil((250 + 60) x 1.0 x 1.2)
    = ceil(310 x 1.2)
    = ceil(372.0)
    = 372 XP
-
 ```
 
 > [!TIP]
@@ -90,24 +86,20 @@ With a 3.0x stat multiplier, a Boss has 3x the health, 3x the damage, and 3x eve
 Using the mob XP formula with a Boss at level 100 with a 2000 stat pool at spawn :
 
 ```
-
 xp = ceil((100 x 5.0 + 2000 x 0.1) x 5.0 x 1.2 x (1 + 0 x 0.028))
    = ceil((500 + 200) x 5.0 x 1.2)
    = ceil(700 x 6.0)
    = ceil(4200.0)
    = 4,200 XP
-
 ```
 
 Compare to a standard Hostile at the same level and pool :
 
 ```
-
 xp = ceil((500 + 200) x 1.0 x 1.2)
    = ceil(700 x 1.2)
    = ceil(840.0)
    = 840 XP
-
 ```
 
 The Boss gives **3x the XP** of a standard Hostile (via the tier multiplier in the XP formula), on top of its 5.0x classification XP multiplier applied elsewhere.

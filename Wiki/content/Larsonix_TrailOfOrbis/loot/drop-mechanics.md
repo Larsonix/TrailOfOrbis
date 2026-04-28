@@ -19,10 +19,8 @@ published: true
 Every mob kill triggers an independent gear drop check :
 
 ```
-
 dropChance = 0.08 (8%)
 if random(0-1) < dropChance → gear drops
-
 ```
 
 The 8% base chance is flat. What changes with level and bonuses is the *rarity* and *quality* of what drops, not whether something drops at all.
@@ -32,10 +30,8 @@ The 8% base chance is flat. What changes with level and bonuses is the *rarity* 
 ## Stone Drop Roll
 
 ```
-
 stoneDropChance = 0.05 (5%)
 if random(0-1) < stoneDropChance → stone drops
-
 ```
 
 The 5% base chance is also flat. Stones and gear are rolled independently, so a single kill can produce both.
@@ -45,10 +41,8 @@ The 5% base chance is also flat. Stones and gear are rolled independently, so a 
 ## Realm Map Drop Roll
 
 ```
-
 mapDropChance = 0.12 (12%) + (mobLevel × 0.0001)
 if random(0-1) < mapDropChance → map drops
-
 ```
 
 Maps have the highest base drop chance of any loot type. The chance increases slightly with mob level. Elite mobs have a 2x multiplier, bosses have a 5x multiplier. Maps drop from **level 1 with no gate** - this is the entry point to the core Realm loop.

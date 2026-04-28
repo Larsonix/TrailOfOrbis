@@ -74,9 +74,7 @@ The recap shows your armor reduction percentage. If armor only reduced 5% of the
 For live combat analysis (not just deaths), toggle detailed breakdowns in chat :
 
 ```
-
 /too combat detail
-
 ```
 
 This shows per-hit calculation details as they happen :

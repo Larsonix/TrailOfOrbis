@@ -41,14 +41,12 @@ At Mythic tier, every modifier is **7.67x stronger** than the same modifier on C
 Weights follow a clean **4x geometric sequence**. Each tier is exactly 4x rarer than the previous one.
 
 ```
-
 Common -> Uncommon:    64.0  / 16.0   = 4x rarer
 Uncommon -> Rare:      16.0  / 4.0    = 4x rarer
 Rare -> Epic:           4.0  / 1.0    = 4x rarer
 Epic -> Legendary:      1.0  / 0.25   = 4x rarer
 Legendary -> Mythic:    0.25 / 0.0625 = 4x rarer
 Mythic -> Unique:     0.0625 / 0.016  = ~3.9x rarer
-
 ```
 
 Total spread : **4,000x from Common to Unique**. For every ~4,000 Common drops, you'll see roughly 1 Unique.

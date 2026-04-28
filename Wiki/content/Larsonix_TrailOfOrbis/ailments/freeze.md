@@ -19,9 +19,7 @@ Freeze is [Water](attributes#water)'s Ailment. Instead of dealing damage, it slo
 ## The Formula
 
 ```
-
 slowPercent = clamp(hitDamage / targetMaxHealth x 100, 5%, 30%)
-
 ```
 
 | Parameter | Value |
@@ -71,9 +69,7 @@ The slow percentage depends on the ratio of your hit to the target's health :
 Freeze duration is extended by [Void](attributes#void)'s Status Effect Duration (+0.3% per point) :
 
 ```
-
 finalDuration = 3.0 x (1 + statusEffectDuration / 100)
-
 ```
 
 | Void Points | Duration Bonus | Freeze Duration |
@@ -89,9 +85,7 @@ Longer Freeze = more time for you to attack, reposition, or heal while the enemy
 ## Application Chance
 
 ```
-
 finalChance = 10% (base) + freezeChance (from Water attribute + gear)
-
 ```
 
 | Water Points | Freeze Chance Bonus | Total Freeze Chance |

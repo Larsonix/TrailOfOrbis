@@ -19,9 +19,7 @@ Shock is [Lightning](attributes#lightning)'s Ailment. It makes the target take *
 ## The Formula
 
 ```
-
 damageIncrease = clamp(hitDamage / targetMaxHealth x 100, 5%, 50%)
-
 ```
 
 | Parameter | Value |
@@ -81,9 +79,7 @@ Shock amplifies damage from **all sources**, not just yours. In a group :
 Shock has the **shortest base duration** of all Ailments (2 seconds), making [Void](attributes#void)'s Status Effect Duration especially valuable :
 
 ```
-
 finalDuration = 2.0 x (1 + statusEffectDuration / 100)
-
 ```
 
 | Void Points | Duration Bonus | Shock Duration |
@@ -100,9 +96,7 @@ finalDuration = 2.0 x (1 + statusEffectDuration / 100)
 ## Application Chance
 
 ```
-
 finalChance = 10% (base) + shockChance (from Lightning attribute + gear)
-
 ```
 
 | Lightning Points | Shock Chance Bonus | Total Shock Chance |

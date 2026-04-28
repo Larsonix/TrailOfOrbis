@@ -53,16 +53,12 @@ Shows your item's quality value and its tier. Quality is displayed with tier-spe
 
 For weapons :
 ```
-
 [153-198] Physical Damage
-
 ```
 
 For armor :
 ```
-
 [72-98] Armor
-
 ```
 
 The implicit is the guaranteed base stat, scaled by item level. NOT affected by quality.
@@ -71,12 +67,10 @@ The implicit is the guaranteed base stat, scaled by item level. NOT affected by 
 
 Each modifier appears on its own line :
 ```
-
 +35 Physical Damage          (Prefix - offense)
 +12% Physical Damage         (Prefix - offense)
 +180 Armor                   (Suffix - defense)
 +45 Max Health               (Suffix - defense)
-
 ```
 
 Modifier values shown on tooltips are the final values AFTER quality multiplication. Color coding :

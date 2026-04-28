@@ -99,9 +99,7 @@ Active gems are your combat abilities. Each one defines what happens when you us
 All gem damage is expressed as a **percentage of weapon damage** :
 
 ```
-
 abilityDamage = weaponDamage x (basePercent / 100)
-
 ```
 
 Your weapon's implicit and modifier stats directly power your gem abilities. A stronger weapon makes ALL your active gems proportionally stronger.
@@ -162,12 +160,10 @@ When socketed alongside a compatible active gem, the support gem's modifications
 ### Socket Layout
 
 ```
-
 Slot 0: [Active Gem]     <- Your ability
 Slot 1: [Support Gem]    <- Modifies the active gem
 Slot 2: [Support Gem]    <- Additional modification
 Slot 3: [Support Gem]    <- And so on...
-
 ```
 
 The number of available support slots (`supportSlotCount`) is tracked per item.

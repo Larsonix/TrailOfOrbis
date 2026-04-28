@@ -223,9 +223,7 @@ Per-element stats across 6 elements. Each element has :
 Your stats are computed by adding 4 layers :
 
 ```
-
 finalStat = baseStat + attributeGrants + gearModifiers + skillTreeBonuses
-
 ```
 
 | Layer | Description | Example |

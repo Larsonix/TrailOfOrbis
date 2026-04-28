@@ -19,12 +19,10 @@ Blocking is your last line of defense in the [avoidance chain](evasion-dodge). U
 Active blocking triggers when you're holding a shield and an attack connects :
 
 ```
-
 if holdingShield AND random(0-100) < blockChance:
   damageMultiplier = 1 - min(damageReduction, 100) / 100
   blockedDamage = incomingDamage × damageMultiplier
   staminaCost = baseCost × (1 - min(staminaDrainReduction, 75) / 100)
-
 ```
 
 | Component | Range | Source |
@@ -44,10 +42,8 @@ if holdingShield AND random(0-100) < blockChance:
 Passive blocking is a random proc that doesn't require holding a shield :
 
 ```
-
 if random(0-100) < passiveBlockChance:
   partial damage reduction applied
-
 ```
 
 Passive block doesn't consume stamina and doesn't require any specific weapon or stance. It's a free defensive bonus for [Earth](attributes#earth)-invested builds.
@@ -59,9 +55,7 @@ Passive block doesn't consume stamina and doesn't require any specific weapon or
 Blocking drains your stamina. The stamina drain reduction stat reduces how much each block costs :
 
 ```
-
 effectiveCost = baseCost × (1 - min(staminaDrainReduction, 75) / 100)
-
 ```
 
 | Stamina Reduction | Effective Cost |

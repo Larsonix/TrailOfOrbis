@@ -91,16 +91,12 @@ You also start with 1 Skill Point. The Skill Tree is a 485-node web across 15 re
 
 **Enter the Skill Sanctum** - a 3D world where the Skill Tree is laid out physically :
 ```
-
 /skilltree
-
 ```
 
 **Or allocate directly via command :**
 ```
-
 /too skilltree allocate <node_id>
-
 ```
 
 At Level 1 you can only reach the entry nodes of each arm. Pick the arm matching your chosen Element.
@@ -160,9 +156,11 @@ Realm Maps drop at **12% per kill** from the very first mob you fight. You don't
 | Large | 40 mobs | 15 min |
 | Massive | 70 mobs | 20 min |
 
-Realms come in 14 biome types (13 combat biomes plus the Skill Sanctum utility biome) and can have up to 13 Map Modifiers - 7 prefix modifiers that increase difficulty and 6 suffix modifiers that increase rewards.
+To open a Realm, you need a Portal Device. A ring of **8 portals** is placed at world spawn - you don't need to craft one. Every Portal Device is an [Ancient Gateway](ancient-gateways) with a tier that limits which map levels it can channel. All portals start at **Copper** (Tier 0, max level 10) - enough for your first maps.
 
-Hold a Realm Map and activate it to open a portal. Walk through to enter. Kill all mobs before the timer runs out to earn victory rewards.
+Hold a Realm Map and press F on a portal. If the map's level is within the gateway's cap, the Realm opens. Walk through and kill all mobs before the timer runs out to earn victory rewards.
+
+As you level up and push deeper into the overworld, you'll find harder ores : Iron, Gold, Cobalt, and beyond. Bring them to any portal empty-handed and press F to upgrade its tier - unlocking higher-level Realm Maps. See [Ancient Gateways](ancient-gateways) for the full tier table and upgrade costs.
 
 > [!TIP]
 > Start with Small Realms. 15 mobs in 5 minutes is very manageable with crafted gear. Realm mobs drop gear, stones, and more maps - the loop feeds itself.

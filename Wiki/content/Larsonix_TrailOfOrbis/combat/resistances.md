@@ -17,7 +17,6 @@ Each element has an independent resistance stat that reduces incoming elemental 
 ## The Formula
 
 ```
-
 cappedResist = min(resistance, 75)
 
 if cappedResist > 0 and penetration > 0:
@@ -26,7 +25,6 @@ else:
     effectiveResist = max(-100, cappedResist)                 // debuffs can go to -100%
 
 finalDamage = elementalDamage × (1 - effectiveResist / 100)
-
 ```
 
 ---
@@ -55,9 +53,7 @@ finalDamage = elementalDamage × (1 - effectiveResist / 100)
 Penetration reduces your effective resistance, but **can't push it below 0%** (PoE2-style). Excess penetration is wasted.
 
 ```
-
 effectiveResist = max(0, cappedResist - penetration)
-
 ```
 
 | Your Resistance | Enemy Penetration | Effective Resistance | Damage You Take |

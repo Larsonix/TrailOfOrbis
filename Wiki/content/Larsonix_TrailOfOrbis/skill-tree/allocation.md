@@ -19,10 +19,8 @@ You earn Skill Points as you level. Allocation is free, respec is free, and ther
 ### In the Skill Sanctum (Recommended)
 
 ```
-
 /skilltree       - Toggle enter/exit
 /sanctum         - Toggle enter/exit
-
 ```
 
 Walk to the node you want, press **F** to interact. The Skill Sanctum gives you spatial understanding of the tree. You can see where bridges connect, how far keystones are, and plan your route visually.
@@ -30,13 +28,11 @@ Walk to the node you want, press **F** to interact. The Skill Sanctum gives you 
 ### Via Commands
 
 ```
-
 /too skilltree allocate <node_id>       - Allocate a point to a node
 /too skilltree deallocate <node_id>     - Remove a point from a node
 /too skilltree respec                   - Reset ALL allocations
 /too skilltree list                     - Show all allocated nodes
 /too skilltree info <node_id>           - View details of a node
-
 ```
 
 ---
@@ -56,9 +52,7 @@ Walk to the node you want, press **F** to interact. The Skill Sanctum gives you 
 ## Respec
 
 ```
-
 /too skilltree respec
-
 ```
 
 Full reset. Clears **all** nodes except the Origin. Refunds ALL `totalPointsEarned` as `skillPoints`. No cost, no cooldown, no limit.

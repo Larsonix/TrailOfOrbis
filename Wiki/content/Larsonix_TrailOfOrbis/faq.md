@@ -158,6 +158,28 @@ Yes, all sizes. Massive Realms are designed for groups (70 mobs, 20 min timer) b
 
 ---
 
+## Ancient Gateways
+
+**Q : What is an Ancient Gateway ?**
+Every Portal Device in the world is an Ancient Gateway with a tier that caps which Realm Map levels it can channel. Walk up empty-handed and press F to see the upgrade UI. See [Ancient Gateways](ancient-gateways).
+
+**Q : How do I upgrade a gateway ?**
+Bring metal bars and essences. Walk to any Portal Device empty-handed, press F, and click Upgrade when you have the materials. Materials are consumed from your entire inventory (hotbar, storage, backpack).
+
+**Q : My map says the gateway can't channel it. What do I do ?**
+The map's level exceeds the gateway's tier cap. Upgrade the gateway with harder ores from deeper in the overworld, or find a lower-level map.
+
+**Q : Do I need to upgrade every portal ?**
+No. Each Portal Device has its own tier, but you only need upgraded gateways where you activate maps. The 8 spawn ring portals are shared - if someone upgrades them, everyone benefits.
+
+**Q : Are Fragment Keys affected ?**
+No. Fragment Keys work exactly as in vanilla Hytale. The gateway upgrade UI only appears when you interact empty-handed with an idle portal.
+
+**Q : What's the highest tier ?**
+Adamantite Gateway (Tier 6). It removes the level cap entirely - any map level works. Requires Adamantite Bars and Voidheart from Zone 4 (Volcanic, 3,000+ blocks from spawn).
+
+---
+
 ## Technical
 
 **Q : How do I see detailed stats ?**

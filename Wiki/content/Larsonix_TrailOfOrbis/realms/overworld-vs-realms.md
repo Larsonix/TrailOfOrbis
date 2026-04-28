@@ -100,19 +100,22 @@ There is no equivalent mechanic in the overworld. You only get per-kill drops th
 
 ## Why This Design
 
-The overworld is your base. Mobs scale with distance from spawn (0.5 bonus stat pool per block), so the area around spawn stays safe while the outer world becomes progressively harder. You need to level and gear up to push farther outward. Realms are the core game loop from almost level 1 : harder, more dangerous, but proportionally more rewarding. This creates a natural progression :
+The overworld is your base. Mobs scale with distance from spawn (0.5 bonus stat pool per block), so the area around spawn stays safe while the outer world becomes progressively harder. You need to level and gear up to push farther outward. Realms are the core game loop from almost level 1 : harder, more dangerous, but proportionally more rewarding.
 
-1. **Early game** : Craft starter gear, kill mobs near spawn, enter first Realms from your very first map drops
-2. **Mid game** : Push deeper into the overworld, run harder and larger Realm maps, build your character
-3. **Late game** : Optimize gear with Stones, stack map modifiers, push Large and Massive Realms
-4. **Deep game** : Farm specific biomes, craft perfect gear, push harder modifiers for better rewards
+[Ancient Gateways](ancient-gateways) are the bridge. Every Portal Device has a tier that caps which map levels it can channel. Mining harder ores from deeper overworld zones upgrades your gateways, which unlocks harder Realms, which gives better gear, which lets you push deeper. The overworld and Realms feed each other.
 
-The incentive gap is intentional. Realms drop more loot, give more XP, and offer completion bonuses the overworld doesn't have. The overworld rewards exploration and gives you the maps to fuel the Realm loop.
+1. **Early game** : Craft starter gear, kill mobs near spawn, enter first Realms through Copper Gateways (max level 10)
+2. **Mid game** : Mine Iron/Gold/Cobalt, upgrade gateways, run harder and larger Realm maps
+3. **Late game** : Push to Mithril/Adamantite, optimize gear with Stones, stack map modifiers
+4. **Deep game** : Adamantite Gateway (unlimited), farm specific biomes, craft perfect gear
+
+The incentive gap is intentional. Realms drop more loot, give more XP, and offer completion bonuses the overworld doesn't have. The overworld rewards exploration, provides gateway upgrade materials, and gives you the maps to fuel the Realm loop.
 
 ---
 
 ## Related Pages
 
+- [Ancient Gateways](ancient-gateways) - Tiered Portal Devices bridging overworld ores to Realm access
 - [Procedural Dungeons](procedural-dungeons) - Full Realm system overview
 - [Realm Rewards](realm-rewards) - Victory rewards and timeout penalties
 - [Map Crafting](map-crafting) - Preparing maps for maximum efficiency

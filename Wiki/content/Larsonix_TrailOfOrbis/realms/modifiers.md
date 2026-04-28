@@ -71,9 +71,7 @@ Suffixes increase your rewards. All suffix modifiers have a weight of 0.
 Modifier values are scaled by map quality through the quality multiplier :
 
 ```
-
 qualityMultiplier = 0.5 + quality / 100.0
-
 ```
 
 | Quality | Multiplier | Effect on Modifiers |
@@ -98,7 +96,6 @@ The difficulty rating of a map comes from **prefix modifiers only**. Suffix modi
 A Realm Map's tooltip displays all its properties :
 
 ```
-
 Realm Map - Volcano (Large)
 Level 75 | Epic Quality 82
 ===============================
@@ -107,7 +104,6 @@ Level 75 | Epic Quality 82
 [SUFFIX] Item Quantity +5-50%
 [SUFFIX] Elite Chance +5-30%
 ===============================
-
 ```
 
 This example shows an [Epic](gear-rarities#epic) map (4 max modifiers) with 2 prefixes and 2 suffixes. The quality of 82 means a 1.32x multiplier on all modifier values.

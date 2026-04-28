@@ -17,11 +17,9 @@ Armor reduces physical damage with a formula that has natural diminishing return
 ## The Formula
 
 ```
-
 armorReduction = armor / (armor + 10 × incomingDamage)
 armorReduction = min(armorReduction, 0.90)    // capped at 90%
 finalPhysDamage = physDamage × (1 - armorReduction)
-
 ```
 
 Your reduction depends on BOTH your armor AND the size of the incoming hit. A fixed armor value performs differently depending on what's hitting you.
@@ -46,9 +44,7 @@ Your reduction depends on BOTH your armor AND the size of the incoming hit. A fi
 After armor reduces the hit, a second independent layer applies : Physical Resistance.
 
 ```
-
 physDamage = postArmorDamage × (1 - min(physicalResistance, 75) / 100)
-
 ```
 
 Physical Resistance is a flat percentage reduction, **capped at 75%**. It comes from gear modifiers and works independently from armor.

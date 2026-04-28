@@ -36,9 +36,7 @@ Realm Maps are items you can modify with [Stones](consumable-currency) before ac
 Fortune's Compass adds +5% Item Quantity per use, stacking up to a maximum of **+20%** (4 uses). This bonus is stored directly on the map as `fortunesCompassBonus` (range 0-20) and stacks with Item Quantity suffix modifiers.
 
 ```
-
 Total IIQ = fortunesCompassBonus + itemQuantitySuffixValue
-
 ```
 
 > [!TIP]
@@ -51,9 +49,7 @@ Total IIQ = fortunesCompassBonus + itemQuantitySuffixValue
 Map quality affects the quality multiplier :
 
 ```
-
 qualityMultiplier = 0.5 + quality / 100.0
-
 ```
 
 Two stones affect quality :
@@ -91,32 +87,24 @@ Each rarity upgrade adds one additional modifier slot. More modifier slots means
 ## Recommended Map Prep Workflows
 
 ### Basic Prep (Cheap)
-```
 
-1. Fortune's Compass x4 → +20% Item Quantity
-   Cost: 4 stones
+1. **Fortune's Compass** x4 → +20% Item Quantity
 
-```
+*Cost : 4 stones. Best bang for your buck.*
 
 ### Standard Prep (Moderate)
-```
 
-1. Fortune's Compass x4 → +20% IIQ
-2. Upgrade rarity if Common/Uncommon → more modifier slots
-3. Orbisian Blessing or Cartographer's Polish → improve quality
-
-```
+1. **Fortune's Compass** x4 → +20% IIQ
+2. Upgrade rarity if [Common](gear-rarities#common) or [Uncommon](gear-rarities#uncommon) → more modifier slots
+3. **Orbisian Blessing** or **Cartographer's Polish** → improve quality
 
 ### Full Prep (Expensive)
-```
 
-1. Fortune's Compass x4 → +20% IIQ
-2. Upgrade rarity to Legendary (if lower)
-3. Alterverse Key → target desired biome
-4. Gaia's Calibration → optimize modifier values
-5. Cartographer's Polish → push quality high
-
-```
+1. **Fortune's Compass** x4 → +20% IIQ
+2. Upgrade rarity to [Legendary](gear-rarities#legendary) (if lower)
+3. **Alterverse Key** → target desired biome
+4. **Gaia's Calibration** → optimize modifier values
+5. **Cartographer's Polish** → push quality high
 
 ---
 

@@ -33,9 +33,7 @@ All weapons have an implicit that defines their base damage output. The implicit
 Weapon implicits show as a damage range on your tooltip :
 
 ```
-
 [153-198] Physical Damage
-
 ```
 
 The rolled value falls within the item's min-max range, scaled by level. Higher-level weapons have proportionally larger ranges.
@@ -82,9 +80,7 @@ This matches what you would expect. A chestplate provides more protection than g
 Armor implicits show as a flat value on your tooltip :
 
 ```
-
 [72-98] Armor
-
 ```
 
 ---

@@ -19,9 +19,7 @@ Death in Trail of Orbis has consequences. But only once you're past the learning
 When you die, you lose **50% of your progress XP within the current level**.
 
 ```
-
 xp_lost = current_progress_xp x 0.50
-
 ```
 
 This is the XP you've accumulated *toward* the next level, not your total lifetime XP. You can never drop below the XP threshold of your current level.

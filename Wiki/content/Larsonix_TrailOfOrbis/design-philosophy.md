@@ -83,11 +83,7 @@ A build that trivializes damage-heavy Realms might struggle with no-regeneration
 
 Combat isn't a black box. The damage pipeline processes every hit through clearly defined stages :
 
-```
-
-Base → Flat → Elemental → Conversion → % Physical → % Elemental → % More → Conditionals → Crit → Defenses → True Damage
-
-```
+> **Base → Flat → Elemental → Conversion → % Physical → % Elemental → % More → Conditionals → Crit → Defenses → True Damage**
 
 Every stage is inspectable. `/too combat detail` shows the full breakdown per hit. The [Damage Pipeline](the-11-step-damage-pipeline) page documents every stage. If you understand the pipeline, you can optimize your build far beyond what intuition suggests.
 

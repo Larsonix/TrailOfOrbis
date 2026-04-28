@@ -19,17 +19,13 @@ As you level up, lower-rarity drops become clutter. The loot filter lets you con
 The fastest way to set up filtering :
 
 ```
-
 /lf quick rare
-
 ```
 
 This hides all [Common](gear-rarities#common) and Uncommon drops. Only [Rare](gear-rarities#rare) and above appear. To see everything again :
 
 ```
-
 /lf quick off
-
 ```
 
 ---

@@ -42,10 +42,8 @@ Your Skill Tree has **485 nodes** spread across **15 regions** in 3D space, all 
 ## Entering the Skill Sanctum
 
 ```
-
 /skilltree       - Toggle enter/exit
 /sanctum         - Toggle enter/exit
-
 ```
 
 When you enter, a personal instance is created and all 485 nodes spawn as physical glowing orbs. Walk to a node, press **F** to allocate. Respec anytime with `/too skilltree respec` - free, no cost.

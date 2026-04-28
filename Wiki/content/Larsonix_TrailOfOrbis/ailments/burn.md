@@ -19,10 +19,8 @@ Burn is [Fire](attributes#fire)'s Ailment. It deals a percentage of your fire hi
 ## The Formula
 
 ```
-
 magnitude (DPS) = (hitDamage x 0.5 + flatBurnDamage) / duration
 totalBurnDamage = magnitude x duration
-
 ```
 
 | Parameter | Value |
@@ -55,18 +53,14 @@ totalBurnDamage = magnitude x duration
 Burn ticks every 250ms (0.25 seconds). Over a 4-second duration, that's 16 ticks total.
 
 ```
-
 damagePerTick = magnitude (DPS) x 0.25
-
 ```
 
 **Example** - 200 fire damage hit, no bonus stats :
 ```
-
 magnitude = (200 x 0.5) / 4.0 = 25 DPS
 damagePerTick = 25 x 0.25 = 6.25 damage per tick
 totalBurnDamage = 25 x 4.0 = 100 damage over 16 ticks
-
 ```
 
 ---
@@ -83,7 +77,6 @@ Two stats directly increase your Burn damage :
 ### Worked Example - 50 Fire + 50 Void, hitting for 200 fire damage
 
 ```
-
 baseBurn = 200 x 0.5 = 100 total burn damage
 burnDamageBonus = 50 x 0.4% = +20% burn damage
 dotDamageBonus = 50 x 0.3% = +15% *DoT* damage
@@ -91,13 +84,11 @@ dotDamageBonus = 50 x 0.3% = +15% *DoT* damage
 With Burn Damage: 100 x 1.20 = 120
 With *DoT* Damage: 120 x 1.15 = 138 total burn damage
 DPS = 138 / 4.0 = 34.5 DPS
-
 ```
 
 ### Worked Example - 100 Fire + 100 Void, hitting for 200 fire damage
 
 ```
-
 baseBurn = 200 x 0.5 = 100 total burn damage
 burnDamageBonus = 100 x 0.4% = +40%
 dotDamageBonus = 100 x 0.3% = +30%
@@ -105,7 +96,6 @@ dotDamageBonus = 100 x 0.3% = +30%
 With Burn Damage: 100 x 1.40 = 140
 With *DoT* Damage: 140 x 1.30 = 182 total burn damage
 DPS = 182 / 4.0 = 45.5 DPS
-
 ```
 
 ---
@@ -115,9 +105,7 @@ DPS = 182 / 4.0 = 45.5 DPS
 Burn duration is extended by [Void](attributes#void)'s Status Effect Duration (+0.3% per point) :
 
 ```
-
 finalDuration = 4.0 x (1 + statusEffectDuration / 100)
-
 ```
 
 | Void Points | Duration Bonus | Burn Duration | Total Ticks |
@@ -146,9 +134,7 @@ Burn does not stack. When you apply a new Burn to a target that already has one 
 ## Application Chance
 
 ```
-
 finalChance = 10% (base) + igniteChance (from Fire attribute + gear)
-
 ```
 
 | Fire Points | Ignite Chance Bonus | Total Burn Chance |

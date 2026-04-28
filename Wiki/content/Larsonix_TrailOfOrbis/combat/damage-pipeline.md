@@ -25,9 +25,7 @@ Your weapon's raw damage value. For weapons, this is the implicit base damage sc
 ## Step 2 : Flat Physical Damage
 
 ```
-
 damage = baseDamage + physicalDamage + meleeDamage (if melee attack)
-
 ```
 
 Your flat physical damage from gear modifiers (e.g., "+25 Physical Damage") gets added here. For melee attacks, melee-specific flat damage is also included.
@@ -42,10 +40,8 @@ This step is **skipped for mobs** (their damage is already factored into base) a
 ## Step 3 : Flat Elemental Damage
 
 ```
-
 For each element:
   elementalDamage[element] += flatElementalDamage[element]
-
 ```
 
 Flat elemental damage from your gear (e.g., "+15 Fire Damage") gets added per element. Like flat physical, these values benefit from all percentage scaling that follows.
@@ -55,22 +51,18 @@ Flat elemental damage from your gear (e.g., "+15 Fire Damage") gets added per el
 ## Step 4 : Damage Conversion
 
 ```
-
 For each element with conversion:
   converted = physicalDamage × (conversionPercent / 100)
   elementalDamage[element] += converted
   physicalDamage -= converted
-
 ```
 
 You can convert physical damage to elemental types. Total conversion is capped at 100%. If your conversions add up to more than 100%, each is scaled proportionally :
 
 ```
-
 If totalConversion > 100%:
   scale = 100 / totalConversion
   effectiveConversion = conversionPercent × scale
-
 ```
 
 **Example** : 40% Fire + 40% Lightning + 40% Water = 120% total, so each becomes 33.3%.
@@ -83,10 +75,8 @@ If totalConversion > 100%:
 ## Step 5 : % Increased Physical
 
 ```
-
 percentBonus = physDmgPercent + attackTypeBonus + damagePercent
 physicalDamage = physicalDamage × (1 + percentBonus / 100)
-
 ```
 
 Here's what feeds in : `physDmgPercent` is your physical damage percent, `attackTypeBonus` is melee damage percent (for melee) or projectile damage percent (for ranged), and `damagePercent` is your general damage percent stat. All 3 are **added together** first, then applied as one multiplier. This is the "increased" layer - additive within itself.
@@ -96,10 +86,8 @@ Here's what feeds in : `physDmgPercent` is your physical damage percent, `attack
 ## Step 6 : % Elemental Modifiers
 
 ```
-
 For each element:
   damage = damage × (1 + percentIncrease / 100) × (1 + multiplierMore / 100)
-
 ```
 
 Each element has its own percentage scaling. Both "increased" (additive) and "more" (multiplicative) modifiers get applied per element.
@@ -109,9 +97,7 @@ Each element has its own percentage scaling. Both "increased" (additive) and "mo
 ## Step 7 : % More Multipliers (Global)
 
 ```
-
 damage = damage × (1 + allDamagePercent / 100) × (1 + damageMultiplier / 100)
-
 ```
 
 Global "more" multipliers form a separate multiplicative layer after all percentage increases. These are rare but powerful - they multiply everything that came before.
@@ -137,10 +123,8 @@ These are multiplicative with each other and with all previous steps.
 ## Step 9 : Critical Strike
 
 ```
-
 if random(0-100) < critChance:
   finalDamage = damage × (critMultiplier / 100)
-
 ```
 
 One roll per attack - if it crits, ALL damage types (physical AND elemental) get multiplied equally.
@@ -162,26 +146,20 @@ After all your offensive scaling is done, defenses kick in :
 
 **Physical Damage :**
 ```
-
 armorReduction = armor / (armor + 10 × damage)
 armorReduction = min(armorReduction, 0.90)           // 90% cap
 physDamage = physDamage × (1 - armorReduction)
-
 ```
 
 Then Physical Resistance :
 ```
-
 physDamage = physDamage × (1 - min(physicalResistance, 75) / 100)
-
 ```
 
 **Elemental Damage (per element) :**
 ```
-
 effectiveResist = max(0, min(resistance, 75) - penetration)    // pen floors at 0%
 elemDamage = elemDamage × (1 - effectiveResist / 100)
-
 ```
 
 See [Armor](armor-physical-defense) and [Resistances](elemental-resistances) for full details.
@@ -191,9 +169,7 @@ See [Armor](armor-physical-defense) and [Resistances](elemental-resistances) for
 ## Step 11 : True Damage
 
 ```
-
 finalDamage = postDefenseDamage + trueDamage
-
 ```
 
 True damage gets added **after** all defense calculations. It bypasses armor, resistances, and all other reduction entirely. The Void attribute grants +0.05% of each hit as true damage per point.
@@ -219,11 +195,9 @@ After your damage lands, recovery effects trigger automatically :
 
 **Thorns formula :**
 ```
-
 flatThorns = thornsDamageFlat × (1 + thornsDamagePercent / 100)
 reflectedDamage = damageTaken × (reflectPercent / 100)
 totalThorns = flatThorns + reflectedDamage
-
 ```
 
 Thorns damage is non-lethal - the attacker is kept at a minimum of 1 HP.

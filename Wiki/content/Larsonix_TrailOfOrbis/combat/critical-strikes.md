@@ -17,10 +17,8 @@ Critical strikes multiply your fully-scaled damage at step 9 of the [Damage Pipe
 ## How Crits Work
 
 ```
-
 if random(0-100) < critChance:
   allDamage = allDamage × (critMultiplier / 100)
-
 ```
 
 | Property | Value |
@@ -82,10 +80,8 @@ At 100 Fire, your crit multiplier is 150% + 60% = **210% (2.1x damage)**. Combin
 Crits happen at step 9 - after ALL your percentage scaling, conversion, and conditional multipliers. That means :
 
 ```
-
 NonCrit: 100 base → +50% increased → 150 damage → defenses
 Crit:    100 base → +50% increased → 150 damage → ×2.1 = 315 damage → defenses
-
 ```
 
 The crit multiplier applies to your ALREADY-SCALED number. This is why [Fire](attributes#fire) + [Lightning](attributes#lightning) is such a powerful combo :

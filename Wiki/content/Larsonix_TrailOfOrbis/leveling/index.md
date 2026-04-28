@@ -45,9 +45,7 @@ Your current level and XP progress are always visible in the **XP bar HUD** belo
 The XP you earn from a kill depends on several factors :
 
 ```
-
 xp = ceil((mobLevel x 5.0 + statPool x 0.1) x tierMult x 1.2 x (1 + distanceLevel x 0.028))
-
 ```
 
 | Factor | What It Means | Value |

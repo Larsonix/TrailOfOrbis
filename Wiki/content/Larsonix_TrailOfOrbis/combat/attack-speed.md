@@ -17,9 +17,7 @@ Attack speed reduces the cooldown between your attacks. Faster attacks mean more
 ## The Formula
 
 ```
-
 scaledCooldown = baseCooldown / (1 + attackSpeedPercent / 100)
-
 ```
 
 | Parameter | Value |
@@ -80,9 +78,7 @@ Attack speed is a **multiplier on everything that procs per hit** :
 No matter how much attack speed you stack, your attacks can never happen faster than every 50 milliseconds (20 attacks per second). This prevents input-speed exploits and keeps combat visually readable.
 
 ```
-
 finalCooldown = max(scaledCooldown, 0.05)
-
 ```
 
 In practice, only very fast base weapons with extreme attack speed bonuses will hit this floor. For most builds, the +500% cap is the limiting factor, not the 50ms floor.
@@ -94,9 +90,7 @@ In practice, only very fast base weapons with extreme attack speed bonuses will 
 Your attack speed can go negative (minimum -75%), making your attacks 4x slower than base :
 
 ```
-
 At -75%: cooldown = baseCooldown / (1 + (-75) / 100) = baseCooldown / 0.25 = 4x slower
-
 ```
 
 Negative attack speed can come from debuffs, realm modifiers, or certain ailment effects. A 1.0 second weapon at -75% attack speed has a 4.0 second cooldown between attacks.

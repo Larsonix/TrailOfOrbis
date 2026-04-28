@@ -65,11 +65,9 @@ Manage your 6 elemental Attribute points.
 
 **Examples :**
 ```
-
 /too attr allocate fire          → Spend 1 point on Fire
 /too attr unallocate wind 5      → Refund 5 points from Wind
 /too attr reset                  → Full respec, all points returned
-
 ```
 
 > [!TIP]
@@ -92,11 +90,9 @@ Manage your passive Skill Tree nodes (485 nodes across 15 regions).
 
 **Examples :**
 ```
-
 /too skilltree allocate fire_entry     → Allocate the Fire arm entry node
 /too skilltree info fire_notable_1     → View details of a notable node
 /too skilltree respec                  → Reset entire tree
-
 ```
 
 ---
@@ -187,11 +183,9 @@ Root command : `/tooadmin` (alias : `/tooa`).
 
 **Examples :**
 ```
-
 /tooadmin give gear 50 legendary 90     → Lv50 Legendary Gear, Q90
 /tooadmin give map 100 epic             → Lv100 Epic Realm Map
 /tooadmin give stone WARDENS_SEAL       → Give a Warden's Seal
-
 ```
 
 ---

@@ -30,9 +30,7 @@ published: true
 The base monster count scales with the Realm's level :
 
 ```
-
 actualMonsters = baseCount * (1 + level * 0.02)
-
 ```
 
 | Size | Base | Level 25 | Level 50 | Level 100 |
@@ -51,9 +49,7 @@ Higher-level Realms have significantly more mobs. This scales both the challenge
 The arena radius scales dynamically based on mob count :
 
 ```
-
 radius = 25 + 101 * sqrt((mobs - 15) / 485)
-
 ```
 
 This ensures the arena grows proportionally with the number of mobs, preventing overcrowding in high-level Realms while keeping density consistent.

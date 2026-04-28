@@ -38,9 +38,7 @@ sub-topics:
 Every time you deal elemental damage, you have a chance to apply the corresponding Ailment :
 
 ```
-
 finalChance = baseChance (10%) + statusEffectChance (from stats)
-
 ```
 
 **Bonus chance sources :**
@@ -67,9 +65,7 @@ At 100 attribute points, your bonus chance is +10%, for a total of 20% applicati
 Ailment duration is modified by the **Status Effect Duration** stat, which comes from [Void](attributes#void) attribute (+0.3% per point) :
 
 ```
-
 finalDuration = baseDuration x (1 + statusEffectDuration / 100)
-
 ```
 
 At 100 Void points (+30% duration) :

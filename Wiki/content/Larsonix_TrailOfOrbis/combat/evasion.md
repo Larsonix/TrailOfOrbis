@@ -33,10 +33,8 @@ When an attack targets you, 4 avoidance checks run in order. If any succeeds, th
 ## Dodge (Flat Chance)
 
 ```
-
 if random(0-100) < dodgeChance:
   attack fully avoided
-
 ```
 
 Dodge is a simple percentage roll from gear modifiers. It's checked first and gives you guaranteed avoidance independent of attacker stats.
@@ -46,11 +44,9 @@ Dodge is a simple percentage roll from gear modifiers. It's checked first and gi
 ## Evasion vs Accuracy (PoE-Inspired Formula)
 
 ```
-
 scaledEvasion = (evasion × evasionScalingFactor) ^ evasionExponent
 hitChance = hitChanceConstant × accuracy / (accuracy + scaledEvasion)
 hitChance = clamp(hitChance, minHitChance, maxHitChance)
-
 ```
 
 The attacker's accuracy competes against your evasion :

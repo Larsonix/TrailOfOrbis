@@ -30,9 +30,7 @@ Quality 50 is your baseline where modifiers work at their listed values. Everyth
 ## The Quality Multiplier
 
 ```
-
 qualityMultiplier = 0.5 + quality / 100.0
-
 ```
 
 | Quality | Multiplier | Example : +20% modifier |

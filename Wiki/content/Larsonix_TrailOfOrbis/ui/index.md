@@ -21,9 +21,7 @@ Your complete character profile. All computed stats from every source, organized
 ### How to Open
 
 ```
-
 /stats
-
 ```
 
 You can also navigate here from other UI pages using the built-in navigation buttons.
@@ -33,9 +31,7 @@ You can also navigate here from other UI pages using the built-in navigation but
 The stats page is **800px wide** with scrollable content that resizes to fit all stat categories. It shows your **computed** values - the final numbers after attributes, gear modifiers, quality scaling, and skill tree bonuses are all combined.
 
 ```
-
 Final Stat = Base + Attribute Grants + Gear Modifiers + Skill Tree Bonuses
-
 ```
 
 Stats update in real-time. Allocating an attribute point, equipping new gear, or changing skill nodes reflects here immediately.
@@ -67,9 +63,7 @@ Spend your unallocated attribute points across the 6 elements. Every allocation 
 ### How to Open
 
 ```
-
 /attr
-
 ```
 
 You can also click the **Attributes** button from the stats page.
@@ -108,11 +102,9 @@ This prevents accidental misclicks. Allocate points across multiple elements, pr
 For precise allocation without the UI :
 
 ```
-
 /too attr allocate fire         - +1 Fire
 /too attr unallocate wind 5     - -5 Wind
 /too attr reset                 - Full respec
-
 ```
 
 > [!TIP]
@@ -159,9 +151,7 @@ Shows how many mobs you've killed versus the total required. When the counter hi
 The total mob count scales with Realm level :
 
 ```
-
 actualMonsters = baseCount * (1 + level * 0.02)
-
 ```
 
 ### Completion Tracking

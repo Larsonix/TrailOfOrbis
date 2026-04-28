@@ -44,10 +44,8 @@ See [Armor](armor-physical-defense) for the full formula and worked examples.
 
 **Elemental resistance formula :**
 ```
-
 effectiveResist = max(0, min(resistance, 75) - penetration)    // pen floors at 0%
 elemDamage = elemDamage × (1 - effectiveResist / 100)
-
 ```
 
 Each element's resistance is capped at 75% reduction. Your penetration reduces their effective resistance but can't push it below 0% - excess penetration is wasted.
@@ -72,11 +70,9 @@ True damage bypasses ALL defenses. Armor, resistances, nothing reduces it. True 
 You can **convert** physical damage to any elemental type through gear modifiers or abilities :
 
 ```
-
 converted = physicalDamage × (conversionPercent / 100)
 elementalDamage[element] += converted
 physicalDamage -= converted
-
 ```
 
 Key rules :

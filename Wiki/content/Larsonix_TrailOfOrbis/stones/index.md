@@ -76,9 +76,7 @@ Stones are consumable items that modify your Gear and Realm Maps. There are **25
 Stone effects on Modifier values are influenced by the item's Quality :
 
 ```
-
 Modifier multiplier = 0.5 + (quality / 100)
-
 ```
 
 | Quality | Multiplier | Effect |
@@ -105,15 +103,7 @@ Only two Stones work on corrupted items : **Varyn's Touch** itself (for re-corru
 
 ## Upgrade Path
 
-```
-
-Common (white)      --> Uncommon (green)    [Spark of Potential]
-Uncommon (green)    --> Rare (blue)         [Core of Ascension]
-Rare (blue)         --> Epic (purple)       [Heart of Legends]
-Epic (purple)       --> Legendary (gold)    [Crown of Transcendence]
-Legendary (gold)    --> ???                 [No Stone exists - must drop naturally]
-
-```
+> **[Common](gear-rarities#common)** → [Uncommon](gear-rarities#uncommon) *(Spark of Potential)* → [Rare](gear-rarities#rare) *(Core of Ascension)* → [Epic](gear-rarities#epic) *(Heart of Legends)* → [Legendary](gear-rarities#legendary) *(Crown of Transcendence)* → ??? *(must drop naturally)*
 
 > [!CAUTION]
 > The upgrade stops at Legendary. Mythic and Unique must drop naturally.
@@ -124,16 +114,12 @@ Legendary (gold)    --> ???                 [No Stone exists - must drop natural
 
 The most powerful crafting sequence uses locks and removal together :
 
-```
-
 1. Find an item with at least one excellent Modifier
-2. Warden's Seal  --> lock the excellent Modifier
-3. Purging Ember  --> remove all OTHER Modifiers
-4. Gaia's Gift x N --> add new Modifiers one at a time
-5. If a bad mod appears --> Erosion Shard to remove it
+2. **Warden's Seal** → lock the excellent Modifier
+3. **Purging Ember** → remove all OTHER Modifiers
+4. **Gaia's Gift** x N → add new Modifiers one at a time
+5. Bad mod appears ? **Erosion Shard** to remove it
 6. Repeat until satisfied
-
-```
 
 Your locked Modifier survives the entire process.
 

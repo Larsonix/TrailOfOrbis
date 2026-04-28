@@ -19,9 +19,7 @@ Poison is [Void](attributes#void)'s Ailment and the most mechanically complex st
 ## The Formula
 
 ```
-
 DPS per stack = (hitDamage x 0.3 + flatPoisonDamage) / duration
-
 ```
 
 | Parameter | Value |
@@ -53,7 +51,6 @@ DPS per stack = (hitDamage x 0.3 + flatPoisonDamage) / duration
 You attack 5 times over 3 seconds, applying Poison on hits 1, 3, and 5 :
 
 ```
-
 t=0.0s  Hit 1 (200 dmg) -> Stack 1 starts: 12 DPS for 5s
 t=1.5s  Hit 3 (180 dmg) -> Stack 2 starts: 10.8 DPS for 5s
 t=3.0s  Hit 5 (220 dmg) -> Stack 3 starts: 13.2 DPS for 5s
@@ -61,7 +58,6 @@ t=3.0s  All 3 stacks active: 36 combined DPS
 t=5.0s  Stack 1 expires (dealt 60 total damage)
 t=6.5s  Stack 2 expires (dealt 54 total damage)
 t=8.0s  Stack 3 expires (dealt 66 total damage)
-
 ```
 
 During the overlap period (t=3.0s to t=5.0s), all 3 stacks deal damage simultaneously - tripling your effective *DoT* DPS.
@@ -81,27 +77,23 @@ Void is Poison's natural home - both *DoT* Damage and Status Effect Duration com
 ### Worked Example - 100 Void, hitting for 300 void damage
 
 ```
-
 Base DPS per stack = (300 x 0.3) / 5.0 = 18 DPS
 DoT bonus = 100 x 0.3% = +30% -> 18 x 1.30 = 23.4 DPS per stack
 Duration bonus = 100 x 0.3% = +30% -> 5.0 x 1.30 = 6.5s per stack
 
 At 10 stacks: 23.4 x 10 = 234 combined DPS
 Per stack total: 23.4 x 6.5 = 152.1 damage per stack
-
 ```
 
 ### Worked Example - 50 Void + 50 Lightning, hitting for 200 void damage
 
 ```
-
 Base DPS per stack = (200 x 0.3) / 5.0 = 12 DPS
 DoT bonus = 50 x 0.3% = +15% -> 12 x 1.15 = 13.8 DPS per stack
 Duration bonus = 50 x 0.3% = +15% -> 5.0 x 1.15 = 5.75s per stack
 Attack Speed bonus = 50 x 0.3% = +15% -> more hits = faster stack building
 
 At 10 stacks: 13.8 x 10 = 138 combined DPS
-
 ```
 
 The [Lightning](attributes#lightning) hybrid trades per-stack damage for faster stack accumulation via Attack Speed.
@@ -113,9 +105,7 @@ The [Lightning](attributes#lightning) hybrid trades per-stack damage for faster 
 Each Poison stack's duration is extended independently :
 
 ```
-
 finalDuration = 5.0 x (1 + statusEffectDuration / 100)
-
 ```
 
 | Void Points | Duration Bonus | Stack Duration |

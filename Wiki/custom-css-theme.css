@@ -154,6 +154,9 @@ html.dark {
   background: oklch(0.13 0.008 50) !important;
   border: 1px solid oklch(0.25 0.01 55) !important;
   border-left: 3px solid oklch(0.45 0.06 72) !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  padding: 1em 1.2em !important;
 }
 
 /* Inline code */

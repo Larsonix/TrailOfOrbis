@@ -29,13 +29,9 @@ There are no classes. Your build is the sum of everything : the Gear Modifiers y
 
 ## The Core Loop
 
-```
+> **Craft Gear → Kill Mobs → Get Loot, Stones & Maps → Upgrade Gateways → Enter Realms → Get Better Loot → Push Deeper → Repeat**
 
-Craft Gear → Kill Mobs → Get Loot, Stones & Maps → Enter Realms → Get Better Loot → Improve Your Gear → Run Harder Maps → Repeat
-
-```
-
-You craft starter gear, kill mobs near spawn, and maps start dropping almost immediately (12% per kill). Realms are where the real action is : instanced arenas with timed objectives, scaled mobs, and stacked rewards. Every run feeds the next. The overworld is your base - mobs scale with distance from spawn, so pushing outward requires leveling and gearing up. But Realms are the main event.
+You craft starter gear, kill mobs near spawn, and maps start dropping almost immediately (12% per kill). Every Portal Device is an [Ancient Gateway](ancient-gateways) with a tier that limits which map levels it can channel. Mine ores in the overworld, upgrade your gateways, and unlock harder Realms. The overworld feeds the Realms. Realms are where the real action is : instanced arenas with timed objectives, scaled mobs, and stacked rewards. Every run feeds the next.
 
 ---
 
@@ -54,6 +50,7 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 | Mob stat types | 52 (Dirichlet distribution) |
 | Realm biomes | 14 (13 combat + utility) |
 | Realm Modifiers | 13 (7 prefix/difficulty + 6 suffix/reward) |
+| Gateway tiers | 7 (Copper to Adamantite) |
 | Max level | 1,000,000 |
 
 ---
@@ -65,6 +62,7 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 - **[The 6 Elements](attributes)** - Fire, Water, Lightning, Earth, Wind, and Void. Each grants 5 unique stats per point. 30 attribute-derived stats, **153 computed stat fields** total, zero overlap.
 - **[Skill Tree](skill-tree)** - 485 nodes across 15 regions you explore physically in a 3D instance. Walk up to glowing orbs, press F to allocate. 6 elemental arms, 8 octant hybrid arms, 12 bridge paths. Free respec anytime.
 - **[Realms](procedural-dungeons)** - The core game loop. Consumable maps open portals to procedural instanced dungeons. Maps drop at **12% per kill from level 1**. 14 biome types, 4 sizes, 13 Map Modifiers. Difficulty and rewards scale together.
+- **[Ancient Gateways](ancient-gateways)** - Every Portal Device is a tiered gateway that limits which map levels it can channel. Mine overworld ores to upgrade through 7 tiers : Copper (max level 10) to Adamantite (unlimited). The bridge between vanilla exploration and Realm progression.
 
 ### Combat
 - **[Damage Pipeline](combat-system)** - 11-stage processing from Base Damage to final hit : Base, Flat, Elemental, Conversion, % Physical, % Elemental, % More, Conditionals, Crit, Defenses, and True Damage.
@@ -117,10 +115,10 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 
 | Phase | Level | Focus | Key Systems |
 |:------|:-----:|:------|:------------|
-| **Discovery** | 1-10 | Craft starter gear, kill nearby mobs, enter first Realms | [Getting Started](getting-started), [Leveling](leveling-experience), [Attributes](attributes) |
-| **Building** | 10-50 | Choose your build, push farther in the overworld, run harder maps | [Skill Tree](skill-tree), [Gear Quality](quality-system), [Realm Sizes](realm-sizes) |
-| **Optimizing** | 50-100 | Craft gear with Stones, stack map modifiers, push larger Realms | [Stones](consumable-currency), [Realm Modifiers](realm-modifiers) |
-| **Mastery** | 100+ | Hunt rare drops, perfect builds, push limits | [Map Crafting](map-crafting), [Overworld vs Realms](overworld-vs-realms) |
+| **Discovery** | 1-10 | Craft starter gear, kill nearby mobs, enter first Realms through Copper Gateways | [Getting Started](getting-started), [Leveling](leveling-experience), [Ancient Gateways](ancient-gateways) |
+| **Building** | 10-50 | Push into the overworld, mine Iron/Gold/Cobalt, upgrade gateways, run harder maps | [Skill Tree](skill-tree), [Ancient Gateways](ancient-gateways), [Realm Sizes](realm-sizes) |
+| **Optimizing** | 50-100 | Upgrade to Thorium/Mithril gateways, craft gear with Stones, push larger Realms | [Stones](consumable-currency), [Realm Modifiers](realm-modifiers) |
+| **Mastery** | 100+ | Adamantite Gateway (unlimited), hunt rare drops, perfect builds | [Map Crafting](map-crafting), [Overworld vs Realms](overworld-vs-realms) |
 
 ---
 
@@ -131,7 +129,7 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 | **Learn the basics** | [Getting Started](getting-started) → [The 6 Elements](attributes) → [Leveling](leveling-experience) |
 | **Understand combat** | [Damage Pipeline](the-11-step-damage-pipeline) → [Critical Strikes](critical-strikes) → [Ailments](status-effects) |
 | **Optimize my gear** | [Equipment System](equipment-system) → [Quality](quality-system) → [Stones](consumable-currency) |
-| **Push harder content** | [Overworld vs Realms](overworld-vs-realms) → [Realm Modifiers](realm-modifiers) → [Map Crafting](map-crafting) |
+| **Push harder content** | [Ancient Gateways](ancient-gateways) → [Overworld vs Realms](overworld-vs-realms) → [Realm Modifiers](realm-modifiers) → [Map Crafting](map-crafting) |
 
 ---
 

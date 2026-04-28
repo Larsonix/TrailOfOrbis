@@ -7,6 +7,7 @@ sort-index: 0
 order: 100
 published: true
 sub-topics:
+  - ancient-gateways
   - overworld-vs-realms
   - biomes
   - sizes
@@ -101,9 +102,7 @@ Mob count scales with level : `baseCount * (1 + level * 0.02)`
 Map quality ranges from 1 to 101 and affects modifier value scaling through the quality multiplier :
 
 ```
-
 qualityMultiplier = 0.5 + quality / 100.0
-
 ```
 
 | Quality | Multiplier | Effect |
@@ -118,12 +117,12 @@ High quality amplifies both prefix (difficulty) and suffix (reward) modifiers eq
 
 ## Entering a Realm
 
-1. Hold a Realm Map in your hand
-2. Activate the map to open a portal
-3. Walk through the portal
-4. You're teleported to a new instance with the Realm's properties
+1. Find a Portal Device - 8 [Spawn Gateways](ancient-gateways) are placed around world spawn
+2. Hold a Realm Map in your hand and press F on the portal
+3. If the map's level is within the gateway's tier cap, the Realm opens
+4. Walk through the portal into a fresh instance
 5. Kill all mobs before the timer runs out
 
-The map is consumed on activation. It cannot be reused.
+The map is consumed on activation. It cannot be reused. Every Portal Device is an [Ancient Gateway](ancient-gateways) with a tier that limits which map levels it can channel. Copper Gateways (default) cap at level 10. Upgrade with overworld ores to unlock harder maps.
 
-For details on each property, see the individual pages : [Biomes](realm-biomes), [Sizes](realm-sizes), [Modifiers](realm-modifiers), [Rewards](realm-rewards), [Map Crafting](map-crafting).
+For details on each property, see the individual pages : [Ancient Gateways](ancient-gateways), [Biomes](realm-biomes), [Sizes](realm-sizes), [Modifiers](realm-modifiers), [Rewards](realm-rewards), [Map Crafting](map-crafting).
