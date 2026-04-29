@@ -33,6 +33,45 @@ jobs:
       - name: Extract version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
+      - name: Validate asset pack in JAR
+        run: |
+          # Verify the built JAR contains assets at root level (not nested under hytale-assets/)
+          JAR=$(find build/libs -name "TrailOfOrbis-*.jar" -type f | head -1)
+          ERRORS=0
+
+          # Check Server/ exists at JAR root (not under hytale-assets/)
+          if ! unzip -l "$JAR" | grep -q "^.*Server/Instances/"; then
+            echo "ERROR: Server/Instances/ not found at JAR root — assets are nested wrong"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check critical instance templates
+          for template in realm_skill_sanctum realm_arena_basic_r50; do
+            if ! unzip -l "$JAR" | grep -q "Server/Instances/$template/"; then
+              echo "ERROR: Missing instance template in JAR: $template"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          # Check critical asset directories
+          for dir in Server/Environments Server/Entity/Damage Server/HytaleGenerator/Biomes; do
+            if ! unzip -l "$JAR" | grep -q "^.*${dir}/"; then
+              echo "ERROR: Missing asset directory in JAR: $dir"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          # Verify no stale nested hytale-assets/ directory
+          if unzip -l "$JAR" | grep -q "^.*hytale-assets/Server/"; then
+            echo "WARNING: Stale hytale-assets/ nesting found in JAR — assets may be duplicated"
+          fi
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "Asset pack validation failed with $ERRORS error(s)"
+            exit 1
+          fi
+          echo "Asset pack validation passed — Server/ and Common/ at JAR root"
+
       - name: Extract changelog for this version
         id: changelog
         run: |

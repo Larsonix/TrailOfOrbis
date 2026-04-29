@@ -101,11 +101,12 @@ reports/
 AllLogs/
 
 # ===== Obsidian vault structure =====
-00-Inbox/
-Common/
-Daily/
-Guides/
-Templates/
+# Root-level only (/) to avoid catching Java packages like maps/templates/
+/00-Inbox/
+/Common/
+/Daily/
+/Guides/
+/Templates/
 
 # ===== Vendor mods (development reference, not redistributable) =====
 vendor/

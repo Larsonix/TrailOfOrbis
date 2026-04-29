@@ -156,6 +156,21 @@ tasks {
             )
         }
 
+        // Include asset pack at JAR root level.
+        // Hytale's asset loader expects Server/ and Common/ at the JAR root
+        // when IncludesAssetPack is true in manifest.json.
+        // Without this, assets end up nested under hytale-assets/ which Hytale ignores.
+        // Exclude the asset pack's own manifest.json — our plugin manifest at root already
+        // declares IncludesAssetPack:true, and the asset pack manifest would overwrite it
+        // (replacing the Main class entry, causing a classloader NPE on startup).
+        from("src/main/resources/hytale-assets") {
+            exclude("manifest.json")
+        }
+
+        // Remove the nested hytale-assets/ copy from the JAR (assets are at root now).
+        // The nested copy still exists in build/resources/main/ for deploy.sh compatibility.
+        exclude("hytale-assets/**")
+
         // Exclude signature files (cause issues)
         exclude("META-INF/*.SF")
         exclude("META-INF/*.DSA")

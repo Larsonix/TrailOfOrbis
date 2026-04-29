@@ -29,6 +29,37 @@ jobs:
           chmod +x gradlew
           ./gradlew clean build
 
+      - name: Validate asset pack in JAR
+        run: |
+          JAR=$(find build/libs -name "TrailOfOrbis-*.jar" -type f | head -1)
+          ERRORS=0
+
+          # Verify assets are at JAR root (not nested under hytale-assets/)
+          if ! unzip -l "$JAR" | grep -q "^.*Server/Instances/"; then
+            echo "ERROR: Server/Instances/ not found at JAR root"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          for template in realm_skill_sanctum realm_arena_basic_r50; do
+            if ! unzip -l "$JAR" | grep -q "Server/Instances/$template/"; then
+              echo "ERROR: Missing instance template in JAR: $template"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          for dir in Server/Environments Server/Entity/Damage Server/HytaleGenerator/Biomes; do
+            if ! unzip -l "$JAR" | grep -q "^.*${dir}/"; then
+              echo "ERROR: Missing asset directory in JAR: $dir"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "Asset validation failed with $ERRORS error(s)"
+            exit 1
+          fi
+          echo "Asset validation passed — JAR contains assets at root level"
+
       - name: Upload JAR artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4

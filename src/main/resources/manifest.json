@@ -1,7 +1,7 @@
 {
   "Group": "trailoforbis",
   "Name": "TrailOfOrbis",
-  "Version": "1.0.0",
+  "Version": "1.0.1",
   "Description": "Deep RPG overhaul: 6 elements, 485-node skill tree, procedural Realm dungeons, gear crafting with 101 modifiers, 11-stage damage pipeline",
   "Authors": [
     {

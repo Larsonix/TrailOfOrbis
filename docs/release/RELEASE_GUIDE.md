@@ -93,21 +93,35 @@ git push
 Before tagging a release:
 
 - [ ] All tests pass: `./gradlew clean build`
+- [ ] Asset pack validation passes (CI runs this automatically)
 - [ ] Changelog updated in `Wiki/content/Larsonix_TrailOfOrbis/changelog.md`
 - [ ] Version bumped in `gradle.properties` and `manifest.json`
 - [ ] `manifest.json` description is accurate
 - [ ] Wiki documentation reflects current features
 - [ ] No `SNAPSHOT` in version strings
 - [ ] Asset pack builds correctly (items don't show "Invalid Item")
+- [ ] All instance templates exist in `src/main/resources/hytale-assets/Server/Instances/`
 - [ ] Tested on a local server with `./scripts/deploy.sh`
 
 After CI completes:
 
-- [ ] GitHub Release created with JAR attached
+- [ ] GitHub Release created with JAR attached (assets bundled inside)
 - [ ] CurseForge upload successful (check Author Console)
 - [ ] ModTale upload successful (check Creator Dashboard)
 - [ ] Manual uploads done (Modifold, BuiltByBit, Thunderstore)
 - [ ] Post-release version bump committed
+
+### What Gets Released
+
+A single JAR file — code and assets are bundled together:
+
+| Artifact | Contents | Install Location |
+|----------|----------|-----------------|
+| `TrailOfOrbis-{version}.jar` | Java code + configs + asset pack (instances, environments, biomes, damage types, icons) | `mods/` |
+
+The JAR's `manifest.json` declares `"IncludesAssetPack": true`, which tells Hytale to read `Server/` and `Common/` assets directly from inside the JAR. This is the standard Hytale mod distribution pattern (same as RogueTale, Hylamity, etc.).
+
+**For local development**, `deploy.sh` additionally extracts assets to a separate `TrailOfOrbis_Realms/` folder for rapid iteration without rebuilding the JAR.
 
 ---
 
@@ -115,11 +129,11 @@ After CI completes:
 
 | Platform | Automation | Upload Format | Monetization | Audience |
 |----------|-----------|---------------|-------------|----------|
-| **CurseForge** | Full (API + GitHub Action) | JAR | Ad revenue sharing | Largest - official Hytale platform |
-| **ModTale** | Full (API + GitHub Action) | JAR | Free only | Community-focused |
-| **GitHub Releases** | Full (GitHub Action) | JAR | N/A | Developers, source viewers |
-| **Modifold** | Manual | JAR | Free only | Growing, has wiki integration |
-| **BuiltByBit** | Manual | JAR | Paid + Free | Premium marketplace |
+| **CurseForge** | Full (API + GitHub Action) | JAR (assets bundled) | Ad revenue sharing | Largest - official Hytale platform |
+| **ModTale** | Full (API + GitHub Action) | JAR (assets bundled) | Free only | Community-focused |
+| **GitHub Releases** | Full (GitHub Action) | JAR (assets bundled) | N/A | Developers, source viewers |
+| **Modifold** | Manual | JAR (assets bundled) | Free only | Growing, has wiki integration |
+| **BuiltByBit** | Manual | JAR (assets bundled) | Paid + Free | Premium marketplace |
 | **Thunderstore** | Semi (CLI available) | ZIP package | Free only | Mod manager users |
 | **Modrinth** | N/A | N/A | N/A | **Does NOT support Hytale** |
 
@@ -372,9 +386,11 @@ Thunderstore has `tcli` (Thunderstore CLI) but it requires Go setup. Semi-automa
 ## GitHub Releases
 
 Fully automated via `.github/workflows/release.yml`. On tag push `v*`:
-1. Builds shadowJar
-2. Creates GitHub Release with auto-generated release notes
-3. Attaches the JAR as a release asset
+1. Builds shadowJar (assets bundled at JAR root via `from("src/main/resources/hytale-assets")`)
+2. Validates asset pack in JAR (fails the release if critical assets are missing)
+3. Creates GitHub Release with changelog
+4. Attaches the JAR as a release asset
+5. Uploads to CurseForge and ModTale
 
 No setup needed beyond pushing a tag.
 

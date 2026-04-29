@@ -242,27 +242,77 @@ public class SkillTreeLayout {
      */
     @SuppressWarnings("unchecked")
     private boolean loadExportedPositions() {
-        if (configDirectory == null) {
-            return false;
-        }
+        // Try disk first (external config directory)
+        if (configDirectory != null) {
+            // Try simple flat format first (skill-tree-positions.yml)
+            Path positionsPath = configDirectory.resolve(POSITIONS_FILENAME);
+            if (Files.exists(positionsPath)) {
+                if (loadFlatPositions(positionsPath)) {
+                    return true;
+                }
+            }
 
-        // Try simple flat format first (skill-tree-positions.yml)
-        Path positionsPath = configDirectory.resolve(POSITIONS_FILENAME);
-        if (Files.exists(positionsPath)) {
-            if (loadFlatPositions(positionsPath)) {
-                return true;
+            // Fall back to legacy grouped format (exported-node-positions.yml)
+            Path exportPath = configDirectory.resolve(EXPORTED_FILENAME);
+            if (Files.exists(exportPath)) {
+                if (loadGroupedPositions(exportPath)) {
+                    return true;
+                }
             }
         }
 
-        // Fall back to legacy grouped format (exported-node-positions.yml)
-        Path exportPath = configDirectory.resolve(EXPORTED_FILENAME);
-        if (Files.exists(exportPath)) {
-            if (loadGroupedPositions(exportPath)) {
-                return true;
-            }
+        // Fall back to bundled JAR resource (first install — no disk config yet)
+        if (loadBundledPositions()) {
+            return true;
         }
 
         LOGGER.at(Level.FINE).log("No custom positions file found, using procedural layout");
+        return false;
+    }
+
+    /**
+     * Loads positions from the bundled JAR resource (config/skill-tree-positions.yml).
+     * Used on first install when no external config directory exists yet.
+     */
+    @SuppressWarnings("unchecked")
+    private boolean loadBundledPositions() {
+        try (InputStream input = getClass().getClassLoader()
+                .getResourceAsStream("config/" + POSITIONS_FILENAME)) {
+            if (input == null) {
+                return false;
+            }
+
+            Yaml yaml = new Yaml();
+            Map<String, Object> data = yaml.load(input);
+            if (data == null || !data.containsKey("nodes")) {
+                return false;
+            }
+
+            Map<String, Object> nodesSection = (Map<String, Object>) data.get("nodes");
+            int loadedCount = 0;
+
+            for (Map.Entry<String, Object> entry : nodesSection.entrySet()) {
+                String nodeId = entry.getKey();
+                if (nodeId.startsWith("_")) continue;
+                if (!(entry.getValue() instanceof Map)) continue;
+
+                Map<String, Object> coords = (Map<String, Object>) entry.getValue();
+                if (coords.containsKey("x") && coords.containsKey("y") && coords.containsKey("z")) {
+                    double x = getDouble(coords, "x", 0.0);
+                    double y = getDouble(coords, "y", 65.0);
+                    double z = getDouble(coords, "z", 0.0);
+                    exportedWorldPositions.put(nodeId, new Vector3d(x, y, z));
+                    loadedCount++;
+                }
+            }
+
+            if (loadedCount > 0) {
+                LOGGER.at(Level.INFO).log("Loaded %d exported positions from bundled JAR resource", loadedCount);
+                return true;
+            }
+        } catch (Exception e) {
+            LOGGER.at(Level.WARNING).withCause(e).log("Failed to load bundled positions resource");
+        }
         return false;
     }
 

@@ -190,17 +190,17 @@ html.dark {
 
 
 /* ----------------------------------------------------------------
-   7. SIDEBAR — Gold active indicator + scroll fix
+   7. SIDEBAR — Gold active indicator + sticky follow
    ---------------------------------------------------------------- */
 
-/* Sidebar scroll fix — own scrollable container, anchored to top */
-aside .sticky {
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  scrollbar-width: none;
+/* Let aside stretch to full grid row height so inner sticky div can follow scroll */
+aside.lg\:col-span-4 {
+  align-self: stretch !important;
 }
-aside .sticky::-webkit-scrollbar {
-  display: none;
+
+/* Sidebar nav icons — warm gold to match theme */
+aside svg {
+  color: oklch(0.65 0.10 75) !important;
 }
 
 /* Active page — gold left border */
