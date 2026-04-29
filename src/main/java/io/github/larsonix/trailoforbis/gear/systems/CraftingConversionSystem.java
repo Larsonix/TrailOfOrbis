@@ -11,7 +11,9 @@ import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import com.hypixel.hytale.protocol.packets.window.WindowType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.windows.Window;
 import com.hypixel.hytale.server.core.event.events.ecs.CraftRecipeEvent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -20,9 +22,14 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.gear.conversion.MaterialTierMapper;
+import io.github.larsonix.trailoforbis.gear.conversion.VanillaConversionConfig;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaItemConverter;
+import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
+import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
+import io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -38,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -68,6 +76,9 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
 
     private final VanillaItemConverter converter;
     private final LevelingService levelingService;
+    @Nullable private final DistanceBonusCalculator distanceCalculator;
+    @Nullable private final ItemSyncService itemSyncService;
+    private final double craftingLevelMultiplier;
     private final RetryScheduler retryScheduler;
     private final int maxRetries;
     private final long retryDelayMs;
@@ -83,13 +94,32 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
      *
      * @param converter The vanilla item converter
      * @param levelingService The leveling service to get player levels
+     * @param distanceCalculator Distance calculator for material-based level computation (nullable for tests)
+     * @param craftingLevelMultiplier Global multiplier for crafted gear level (1.0 = match zone mobs)
      */
     public CraftingConversionSystem(
             @Nonnull VanillaItemConverter converter,
-            @Nonnull LevelingService levelingService) {
+            @Nonnull LevelingService levelingService,
+            @Nullable DistanceBonusCalculator distanceCalculator,
+            double craftingLevelMultiplier) {
+        this(converter, levelingService, distanceCalculator, craftingLevelMultiplier, null);
+    }
+
+    /**
+     * Creates a new CraftingConversionSystem with item sync support.
+     */
+    public CraftingConversionSystem(
+            @Nonnull VanillaItemConverter converter,
+            @Nonnull LevelingService levelingService,
+            @Nullable DistanceBonusCalculator distanceCalculator,
+            double craftingLevelMultiplier,
+            @Nullable ItemSyncService itemSyncService) {
         this(
             converter,
             levelingService,
+            distanceCalculator,
+            craftingLevelMultiplier,
+            itemSyncService,
             CraftingConversionSystem::scheduleOnWorldThread,
             DEFAULT_MAX_RETRIES,
             DEFAULT_RETRY_DELAY_MS,
@@ -103,6 +133,9 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
     CraftingConversionSystem(
             @Nonnull VanillaItemConverter converter,
             @Nonnull LevelingService levelingService,
+            @Nullable DistanceBonusCalculator distanceCalculator,
+            double craftingLevelMultiplier,
+            @Nullable ItemSyncService itemSyncService,
             @Nonnull RetryScheduler retryScheduler,
             int maxRetries,
             long retryDelayMs,
@@ -113,6 +146,9 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
         super(CraftRecipeEvent.Post.class);
         this.converter = Objects.requireNonNull(converter, "converter cannot be null");
         this.levelingService = Objects.requireNonNull(levelingService, "levelingService cannot be null");
+        this.distanceCalculator = distanceCalculator;
+        this.itemSyncService = itemSyncService;
+        this.craftingLevelMultiplier = craftingLevelMultiplier;
         this.retryScheduler = Objects.requireNonNull(retryScheduler, "retryScheduler cannot be null");
         this.maxRetries = Math.max(1, maxRetries);
         this.retryDelayMs = Math.max(0L, retryDelayMs);
@@ -161,6 +197,11 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
             return;
         }
 
+        // Get player components from ECS
+        PlayerRef playerRef = archetypeChunk.getComponent(index, playerRefType);
+        Player player = archetypeChunk.getComponent(index, playerType);
+        UUIDComponent uuidComponent = archetypeChunk.getComponent(index, uuidType);
+
         // Get the primary output item
         MaterialQuantity primaryOutput = recipe.getPrimaryOutput();
         if (primaryOutput == null) {
@@ -177,19 +218,16 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
             return;
         }
 
-        // Get player components from ECS (instead of event)
-        PlayerRef playerRef = archetypeChunk.getComponent(index, playerRefType);
-        Player player = archetypeChunk.getComponent(index, playerType);
-        UUIDComponent uuidComponent = archetypeChunk.getComponent(index, uuidType);
-
         if (playerRef == null || player == null || uuidComponent == null) {
             return;
         }
 
         UUID playerUuid = uuidComponent.getUuid();
 
-        // Get player's level for item generation
-        int playerLevel = levelingService.getLevel(playerUuid);
+        // Compute gear level from MATERIAL distance range using shared mob scaling formula.
+        // This ensures crafted gear level matches the zone where the material is found,
+        // and automatically stays in sync if mob scaling parameters change.
+        int gearLevel = computeMaterialBasedLevel(outputItemId);
 
         // Guide milestone: first Portal_Device (Ancient Gateway) crafted
         if ("Portal_Device".equals(outputItemId)) {
@@ -199,7 +237,7 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
             }
         }
 
-        queueCraftConversionForItem(player, playerUuid, outputItemId, event.getQuantity(), playerLevel);
+        queueCraftConversionForItem(player, playerUuid, outputItemId, event.getQuantity(), gearLevel);
     }
 
     /**
@@ -323,6 +361,15 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
             return 0;
         }
 
+        // Resolve PlayerRef once for pre-sync (runs on world thread, safe for ECS access)
+        PlayerRef playerRef = null;
+        if (itemSyncService != null) {
+            com.hypixel.hytale.component.Ref<EntityStore> ref = player.getReference();
+            if (ref != null && ref.isValid()) {
+                playerRef = ref.getStore().getComponent(ref, playerRefType);
+            }
+        }
+
         int totalConverted = 0;
 
         while (true) {
@@ -339,7 +386,7 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
                 continue;
             }
 
-            int convertedNow = convertProducedDelta(inventory, request);
+            int convertedNow = convertProducedDelta(inventory, request, playerRef);
             totalConverted += convertedNow;
             request.attempts++;
 
@@ -382,7 +429,8 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
 
     private int convertProducedDelta(
             @Nonnull Inventory inventory,
-            @Nonnull PendingCraftConversion request) {
+            @Nonnull PendingCraftConversion request,
+            @Nullable PlayerRef playerRef) {
 
         int convertedNow = 0;
         ItemContainer overflowContainer = inventory.getCombinedArmorHotbarUtilityStorage();
@@ -445,6 +493,16 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
                     convertedStack = adjusted;
                 }
 
+                // Pre-sync: send item definition BEFORE placing in inventory.
+                // Hytale sends UpdatePlayerInventory on the next tick after
+                // setItemStackForSlot(). The client must have the definition first.
+                if (itemSyncService != null && playerRef != null) {
+                    Optional<GearData> gd = GearUtils.readGearData(convertedStack);
+                    if (gd.isPresent() && gd.get().hasInstanceId()) {
+                        itemSyncService.syncItem(playerRef, convertedStack, gd.get());
+                    }
+                }
+
                 if (!splitRequired) {
                     view.container.setItemStackForSlot(slot, convertedStack);
                 } else {
@@ -480,12 +538,47 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
         return convertedNow;
     }
 
+    /**
+     * Computes gear level from material distance range using the shared mob scaling formula.
+     * Ensures crafted gear level matches the zone where the material is found,
+     * and automatically stays in sync if mob scaling parameters change.
+     */
+    private int computeMaterialBasedLevel(@Nonnull String outputItemId) {
+        if (distanceCalculator == null) {
+            return 1;
+        }
+
+        MaterialTierMapper materialMapper = converter.getMaterialMapper();
+        VanillaConversionConfig.DistanceRange distRange = materialMapper.getDistanceRange(outputItemId);
+
+        int minLevel = distanceCalculator.estimateLevelFromDistance(distRange.getMin());
+        int maxLevel = distanceCalculator.estimateLevelFromDistance(distRange.getMax());
+
+        minLevel = Math.max(1, minLevel);
+        maxLevel = Math.max(minLevel, maxLevel);
+
+        int gearLevel = (minLevel == maxLevel)
+                ? minLevel
+                : ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
+
+        gearLevel = Math.max(1, (int)(gearLevel * craftingLevelMultiplier));
+
+        LOGGER.atFine().log("Material level for %s: distance=%d-%d, level=%d (range %d-%d)",
+                outputItemId, distRange.getMin(), distRange.getMax(), gearLevel, minLevel, maxLevel);
+
+        return gearLevel;
+    }
+
     private boolean isConvertibleOutputItem(@Nullable String itemId) {
         if (itemId == null || itemId.isEmpty()) {
             return false;
         }
         Item itemAsset = Item.getAssetMap().getAsset(itemId);
         if (itemAsset == null) {
+            return false;
+        }
+        // Stackable weapons are ammunition (arrows, bombs, darts) — not gear
+        if (itemAsset.getMaxStack() > 1) {
             return false;
         }
         return itemAsset.getWeapon() != null || itemAsset.getArmor() != null;
@@ -601,4 +694,5 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
             return System.currentTimeMillis() - createdAtMs > ttlMs;
         }
     }
+
 }

@@ -660,7 +660,7 @@ public class AttributePage {
                 var g = attrs.getEarthGrants();
                 yield String.format("+%.1f%% Max HP | +%.0f Armor | +%.1f HP/s | +%.1f%% Block | +%.1f%% KB Resist",
                     g.getMaxHealthPercent(), g.getArmor(), g.getHealthRegen(),
-                    g.getPassiveBlockChance(), g.getKnockbackResistance());
+                    g.getBlockChance(), g.getKnockbackResistance());
             }
             case WIND -> {
                 var g = attrs.getWindGrants();

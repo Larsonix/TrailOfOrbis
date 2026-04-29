@@ -143,8 +143,16 @@ public final class StatMapping {
         registerFlat("evasion",
             (s, v) -> s.setEvasion(s.getEvasion() + v));
 
+        // Legacy: passive_block_chance now feeds blockChance (perfect block when actively blocking)
         registerPercent("passive_block_chance",
-            (s, v) -> s.setPassiveBlockChance(s.getPassiveBlockChance() + v));
+            (s, v) -> s.setBlockChance(s.getBlockChance() + v.floatValue()));
+
+        // Shield implicit (flat) + gear mods (percent) both feed perfect block chance.
+        // "Percent" here means display format (+X%), not multiplicative — both are additive.
+        registerFlat("block_chance",
+            (s, v) -> s.setBlockChance(s.getBlockChance() + v.floatValue()));
+        registerPercent("block_chance",
+            (s, v) -> s.setBlockChance(s.getBlockChance() + v.floatValue()));
 
         registerPercent("parry_chance",
             (s, v) -> s.setParryChance(s.getParryChance() + v));

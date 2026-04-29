@@ -230,10 +230,10 @@ public final class CombatLogFormatter {
         m = appendTracedAvoidanceContext(m, trace);
         m = appendTracedAilments(m, trace);
 
-        // Total
+        // Total (uses effectiveFinalDamage which accounts for active blocking)
         m = m.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
         m = m.insert(Message.raw(String.format("Total:     %.1f\n",
-            trace.breakdown().totalDamage())).color(MessageColors.SUCCESS));
+            trace.effectiveFinalDamage())).color(MessageColors.SUCCESS));
 
         // Recovery & Thorns
         m = appendTracedRecovery(m, trace);
@@ -361,7 +361,8 @@ public final class CombatLogFormatter {
         // Post-calc modifications
         boolean hasPostCalc = trace.shieldAbsorbed() > 0 || trace.wasParried()
             || trace.defenderCritNullifyChance() > 0 || trace.manaAbsorbed() > 0
-            || trace.shockBonusPercent() > 0 || trace.unarmedMultiplier() != 0;
+            || trace.shockBonusPercent() > 0 || trace.unarmedMultiplier() != 0
+            || trace.wasActiveBlocking();
         if (hasPostCalc) {
             m = m.insert(Message.raw("\n-- Post-Calc Modifications --\n").color(MessageColors.WARNING));
 
@@ -406,6 +407,14 @@ public final class CombatLogFormatter {
                     trace.unarmedMultiplier(), trace.damageBeforeUnarmed(),
                     trace.damageBeforeUnarmed() * trace.unarmedMultiplier())).color(MessageColors.GRAY));
             }
+
+            // Active blocking reduction
+            if (trace.wasActiveBlocking()) {
+                String blockType = trace.isShieldBlock() ? "Shield Block" : "Weapon Block";
+                m = m.insert(Message.raw(String.format("%s: -%.0f%% (%.1f -> %.1f)\n",
+                    blockType, trace.blockReductionPercent(),
+                    trace.damageBeforeBlock(), trace.damageAfterBlock())).color(MessageColors.INFO));
+            }
         }
 
         // Your avoidance stats that FAILED (why the hit connected)
@@ -421,11 +430,9 @@ public final class CombatLogFormatter {
                 m = m.insert(Message.raw(String.format("Evasion: %.0f vs %.0f acc -> %.1f%% hit -> they hit\n",
                     av.evasion(), av.accuracy(), av.hitChance())).color(MessageColors.GRAY));
             }
-            if (av.passiveBlockChance() > 0 || av.activeBlockChance() > 0) {
-                float blockPct = av.wasActiveBlock() ? av.activeBlockChance() : av.passiveBlockChance();
-                String blockType = av.wasActiveBlock() ? "active" : "passive";
-                m = m.insert(Message.raw(String.format("Block: %.0f%% (%s) -> failed\n",
-                    blockPct, blockType)).color(MessageColors.GRAY));
+            if (av.wasActiveBlock() && av.activeBlockChance() > 0) {
+                m = m.insert(Message.raw(String.format("Perfect Block: %.0f%% -> failed\n",
+                    av.activeBlockChance())).color(MessageColors.GRAY));
             }
             if (av.parryChance() > 0) {
                 m = m.insert(Message.raw(String.format("Parry: %.0f%% -> failed\n",
@@ -433,9 +440,9 @@ public final class CombatLogFormatter {
             }
         }
 
-        // Total
+        // Total (uses effectiveFinalDamage which accounts for active blocking)
         m = m.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
-        float totalTaken = trace.breakdown().totalDamage();
+        float totalTaken = trace.effectiveFinalDamage();
         float defMaxHp = trace.defenderMaxHealth() > 0 ? trace.defenderMaxHealth() : snapshot.defenderMaxHealth();
         if (defMaxHp > 0) {
             float pctOfHp = (totalTaken / defMaxHp) * 100f;
@@ -865,7 +872,7 @@ public final class CombatLogFormatter {
         boolean hasAny = t.shieldAbsorbed() > 0 || t.wasParried()
             || t.defenderCritNullifyChance() > 0 || t.manaAbsorbed() > 0
             || t.shockBonusPercent() > 0 || t.damageTakenModifier() != 0
-            || t.unarmedMultiplier() != 0;
+            || t.unarmedMultiplier() != 0 || t.wasActiveBlocking();
         if (!hasAny) return m;
 
         m = m.insert(Message.raw("\n-- Post-Calc Modifications --\n").color(MessageColors.WARNING));
@@ -923,6 +930,14 @@ public final class CombatLogFormatter {
             m = m.insert(Message.raw(String.format("Unarmed: x%.2f (%.1f -> %.1f)\n",
                 t.unarmedMultiplier(), t.damageBeforeUnarmed(),
                 t.damageBeforeUnarmed() * t.unarmedMultiplier())).color(MessageColors.GRAY));
+        }
+
+        // Active blocking reduction
+        if (t.wasActiveBlocking()) {
+            String blockType = t.isShieldBlock() ? "Shield Block" : "Weapon Block";
+            m = m.insert(Message.raw(String.format("%s: -%.0f%% (%.1f -> %.1f)\n",
+                blockType, t.blockReductionPercent(),
+                t.damageBeforeBlock(), t.damageAfterBlock())).color(MessageColors.INFO));
         }
 
         return m;
@@ -993,8 +1008,8 @@ public final class CombatLogFormatter {
         }
         m = m.insert(Message.raw("\n").color(MessageColors.GRAY));
 
-        // Total and % of HP
-        float total = t.breakdown().totalDamage();
+        // Total and % of HP (uses effectiveFinalDamage to account for blocking)
+        float total = t.effectiveFinalDamage();
         if (t.defenderMaxHealth() > 0) {
             float pctOfHp = (total / t.defenderMaxHealth()) * 100f;
             m = m.insert(Message.raw(String.format("Total: %.1f | %.1f%% of target HP (%.0f)\n",
@@ -1049,14 +1064,9 @@ public final class CombatLogFormatter {
             m = m.insert(Message.raw(String.format("Evasion: %.0f vs your %.0f acc -> %.1f%% hit -> hit\n",
                 av.evasion(), av.accuracy(), av.hitChance())).color(MessageColors.GRAY));
         }
-        if (av.passiveBlockChance() > 0 || av.activeBlockChance() > 0) {
-            if (av.wasActiveBlock()) {
-                m = m.insert(Message.raw(String.format("Block: %.0f%% (active) -> passed\n",
-                    av.activeBlockChance())).color(MessageColors.GRAY));
-            } else if (av.passiveBlockChance() > 0) {
-                m = m.insert(Message.raw(String.format("Block: %.0f%% (passive) -> passed\n",
-                    av.passiveBlockChance())).color(MessageColors.GRAY));
-            }
+        if (av.wasActiveBlock() && av.activeBlockChance() > 0) {
+            m = m.insert(Message.raw(String.format("Perfect Block: %.0f%% -> passed\n",
+                av.activeBlockChance())).color(MessageColors.GRAY));
         }
         if (av.parryChance() > 0) {
             m = m.insert(Message.raw(String.format("Parry: %.0f%% -> passed\n",

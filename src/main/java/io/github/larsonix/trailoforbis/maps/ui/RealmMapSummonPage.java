@@ -286,7 +286,7 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
                 .exceptionally(ex -> {
                     LOGGER.atSevere().withCause(ex).log(
                             "Failed to open realm for player %s — map was already consumed", playerId);
-                    sendError("Failed to open realm. Your map was consumed — please contact an admin.");
+                    sendError("Failed to open realm. Your map was consumed - please contact an admin.");
                     return null;
                 });
     }

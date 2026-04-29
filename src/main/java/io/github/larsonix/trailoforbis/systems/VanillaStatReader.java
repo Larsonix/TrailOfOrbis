@@ -4,8 +4,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.MovementSettings;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
@@ -539,47 +537,26 @@ public final class VanillaStatReader {
 
     // ==================== Private Helper Methods ====================
 
+    /**
+     * Returns the known vanilla base value for a resource stat.
+     *
+     * <p>Always returns the hardcoded default — never reads from EntityStatMap.
+     * Reading getMax() from the stat map creates a feedback loop because it
+     * includes ALL modifiers (vanilla equipment + RPG + effects). Since tick
+     * system ordering is non-deterministic, the read can happen before or after
+     * vanilla equipment modifiers are applied, producing inconsistent "base"
+     * values that cause health to oscillate between correct and incorrect.
+     *
+     * <p>The defaults are Hytale's vanilla player base values. Our RPG system
+     * is the sole authority on player stats — the true base is always known.
+     */
     private static float getResourceBaseValue(
             @Nonnull Store<EntityStore> store,
             @Nonnull Ref<EntityStore> entityRef,
             int statIndex,
             float defaultValue
     ) {
-        try {
-            EntityStatMap statMap = store.getComponent(entityRef, EntityStatMap.getComponentType());
-            if (statMap == null) {
-                return defaultValue;
-            }
-
-            EntityStatValue statValue = statMap.get(statIndex);
-            if (statValue == null) {
-                return defaultValue;
-            }
-
-            // getMax() returns the current max (base + modifiers)
-            // get() returns current value
-            // For base value, we use the initial value from the stat type
-            float maxValue = statValue.getMax();
-
-            // Subtract any RPG modifier to get the true vanilla base
-            float rpgBonus = getRpgModifierAmount(statMap, statIndex);
-            float baseValue = maxValue - rpgBonus;
-
-            return baseValue >= 0 ? baseValue : defaultValue;
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private static float getRpgModifierAmount(EntityStatMap statMap, int statIndex) {
-        try {
-            var modifier = statMap.getModifier(statIndex, "rpg_attribute_bonus");
-            if (modifier instanceof com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier) {
-                return ((com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier) modifier).getAmount();
-            }
-        } catch (Exception ignored) {
-        }
-        return 0;
+        return defaultValue;
     }
 
     private static MovementSettings createDefaultMovementSettings() {

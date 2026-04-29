@@ -325,20 +325,19 @@ public class BuildSummaryCalculatorTest {
         @Test
         @DisplayName("Combined avoidance capped at 95%")
         void combinedAvoidanceCapped() {
-            // Dodge 75% + Block 75% + Parry 50% → needs all three to exceed 95%
-            // 1 - (1-0.75)(1-0.75)(1-0.5) = 1 - 0.03125 = 0.96875 → clamped to 0.95
+            // Dodge 75% + Parry 50% (passive block removed — feeds perfect block now)
+            // 1 - (1-0.75)(1-0.5) = 1 - 0.125 = 0.875 = 87.5%
             ComputedStats stats = ComputedStats.builder()
                     .maxHealth(1000f)
                     .dodgeChance(75f) // clamped to 75%
-                    .passiveBlockChance(75f) // clamped to 75%
                     .parryChance(50f) // clamped to 50%
                     .build();
 
             BuildSummary summary = BuildSummaryCalculator.compute(stats, 10, null, null);
 
-            assertEquals(95f, summary.ehpDetail().combinedAvoidPct(), 0.1f);
-            // EHP = 1000 / (1 - 0.95) = 20000
-            assertEquals(20000f, summary.effectiveHP(), 100f);
+            assertEquals(87.5f, summary.ehpDetail().combinedAvoidPct(), 0.5f);
+            // EHP = 1000 / (1 - 0.875) = 8000
+            assertEquals(8000f, summary.effectiveHP(), 200f);
         }
 
         @Test

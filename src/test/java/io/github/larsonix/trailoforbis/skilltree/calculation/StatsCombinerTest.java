@@ -732,20 +732,20 @@ public class StatsCombinerTest {
             ComputedStats base = ComputedStats.builder()
                 .armor(100f)
                 .evasion(50f)
-                .passiveBlockChance(10f)
+                .blockChance(10f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
                 .addModifier(new StatModifier(StatType.ARMOR, 50f, ModifierType.PERCENT))
                 .addModifier(new StatModifier(StatType.EVASION, 100f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.PASSIVE_BLOCK_CHANCE, 5f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.BLOCK_CHANCE, 5f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
 
             assertEquals(150f, result.getArmor(), 0.1f);
             assertEquals(150f, result.getEvasion(), 0.1f);
-            assertEquals(15f, result.getPassiveBlockChance(), 0.1f);
+            assertEquals(15f, result.getBlockChance(), 0.1f);
         }
 
         @Test
@@ -796,7 +796,9 @@ public class StatsCombinerTest {
             "DAMAGE_TO_MANA_CONVERSION", "DAMAGE_TO_VOID_CONVERSION",
             "ENEMY_ELEMENTAL_VULNERABILITY", "ENEMY_RESISTANCE_REDUCTION",
             // Not wired in combine() — has setStatInBuilder case but no applyModifier call
-            "EXPERIENCE_GAIN"
+            "EXPERIENCE_GAIN",
+            // Dead stat — passive_block_chance redirected to BLOCK_CHANCE
+            "PASSIVE_BLOCK_CHANCE"
         })
         @DisplayName("StatType flows through pipeline")
         void everyStatType_flatModifier_producesNonZeroOutput(StatType stat) throws Exception {

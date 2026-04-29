@@ -194,7 +194,8 @@ public final class BuildSummaryCalculator {
             evasionAvoid = 1f - hitChance;
         }
 
-        float blockAvoid = Math.min(stats.getPassiveBlockChance() / 100f, 0.75f);
+        // Perfect block requires active blocking — not factored into passive EHP
+        float blockAvoid = 0f;
         blockAvoid = Math.max(blockAvoid, 0f);
 
         float parryAvoid = Math.min(stats.getParryChance() / 100f, 0.5f);

@@ -102,6 +102,9 @@ class CraftingConversionSystemTest {
         system = new CraftingConversionSystem(
             converter,
             levelingService,
+            null, // no distance calculator in tests — level passed directly
+            1.0,  // crafting level multiplier
+            null, // no item sync service in unit tests
             (p, delayMs, runnable) -> {
                 // Intentionally no-op: tests invoke processing explicitly.
             },

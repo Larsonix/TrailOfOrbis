@@ -99,41 +99,23 @@ class BlockingProcessorTest {
     }
 
     @Test
-    @DisplayName("Block success reduces damage by efficiency stat")
-    void testBlockSuccess_reducesDamageByEfficiency() {
+    @DisplayName("Perfect block always returns 100% damage reduction (full avoidance)")
+    void testPerfectBlock_alwaysFullAvoidance() {
         when(store.getComponent(defenderRef, componentType)).thenReturn(damageDataComponent);
         when(damageDataComponent.getCurrentWielding()).thenReturn(wieldingInteraction);
         when(wieldingInteraction.getStaminaCost()).thenReturn(null);
 
-        // 100% block chance, 70% damage reduction
+        // 100% block chance, 70% damage reduction stat (ignored for perfect block)
         ComputedStats stats = createBlockingStats(100f, 70f, 0f);
 
         Optional<BlockResult> result = processor.checkActiveBlock(store, defenderRef, stats, 100f);
 
         assertTrue(result.isPresent(), "Should return a result when blocking");
         BlockResult blockResult = result.get();
-        assertTrue(blockResult.blocked(), "Block should succeed");
-        assertEquals(0.7f, blockResult.damageReduction(), 0.001f, "Damage reduction should be 70%");
-        assertFalse(blockResult.fullBlock(), "Should not be a full block at 70% reduction");
-    }
-
-    @Test
-    @DisplayName("Full block (100% reduction) sets fullBlock flag")
-    void testBlockSuccess_fullBlock() {
-        when(store.getComponent(defenderRef, componentType)).thenReturn(damageDataComponent);
-        when(damageDataComponent.getCurrentWielding()).thenReturn(wieldingInteraction);
-        when(wieldingInteraction.getStaminaCost()).thenReturn(null);
-
-        // 100% block chance, 100% damage reduction
-        ComputedStats stats = createBlockingStats(100f, 100f, 0f);
-
-        Optional<BlockResult> result = processor.checkActiveBlock(store, defenderRef, stats, 100f);
-
-        assertTrue(result.isPresent());
-        BlockResult blockResult = result.get();
-        assertTrue(blockResult.blocked());
-        assertEquals(1.0f, blockResult.damageReduction(), 0.001f);
-        assertTrue(blockResult.fullBlock(), "Should be a full block at 100% reduction");
+        assertTrue(blockResult.blocked(), "Perfect block should succeed");
+        assertEquals(1.0f, blockResult.damageReduction(), 0.001f,
+            "Perfect block is always 100% reduction (full avoidance)");
+        assertTrue(blockResult.fullBlock(), "Perfect block is always a full block");
     }
 
     @Test

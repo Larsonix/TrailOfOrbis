@@ -1,0 +1,136 @@
+<p><em>Trail of Orbis is in pre-release. This is the ModJam build. Things may change.</em></p>
+<p><em>AI has been and is my main and sole tool for creating projects. If you're not fine with it, I apologise.</em></p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Recommended Mods</h2>
+<p>Trail of Orbis works standalone. These mods are fully compatible and tested :</p>
+<ul>
+<li><strong><a href="https://www.curseforge.com/hytale/mods/hexcode">Hexcode</a></strong> - Replaces base Hytale magic with a full spell-crafting system. When installed, Trail of Orbis detects it automatically : RPG damage pipeline, gear tooltips, and magic nodes in the Skill Tree all adapt. If you want magic builds, this is it. <em>Incompatible with PartyPro (HUD conflict).</em></li>
+<li><strong><a href="https://www.curseforge.com/hytale/mods/the-armory">The Armory</a></strong> - Over 1000 new cosmetic weapons and armors. Trail of Orbis includes built-in transmogrification at the Builder's Workbench - change the look of your RPG gear to any skin while keeping all stats.</li>
+<li><strong><a href="https://www.curseforge.com/hytale/mods/loot4everyone">Loot4Everyone</a></strong> - Better shared container loot for multiplayer. Trail of Orbis already includes distance-based shared loot for containers, but Loot4Everyone is a better implementation.</li>
+<li><strong><a href="https://www.curseforge.com/hytale/mods/partypro">PartyPro</a></strong> - Proper party system with group features. Trail of Orbis includes distance-based shared XP, but PartyPro adds invites, UI, and more. <em>Incompatible with Hexcode (HUD conflict).</em></li>
+</ul>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">What is Trail of Orbis ?</h2>
+<p>You may know that moment in RPGs where you finally understand how your build works - how the damage conversion feeds the ailments, how the tree connects to the gear, how the map modifiers change what drops ? That moment where the systems click and you realize you're not just playing a game, you're solving a build ?</p>
+<p>That's what Trail of Orbis brings to Hytale.</p>
+<p>There are no classes. Your build is the sum of everything : the Gear Modifiers you roll and craft, the 485 Skill Tree nodes you allocate by walking through a 3D sanctum, the weapon type you wield, the Stones you invest into your equipment, and the Attribute points you spread across 6 Elements. Every system feeds every other.</p>
+<p>And the core loop starts immediately.</p>
+<blockquote style="border-left: 4px solid #D4A84B; padding: 12px 16px; background: rgba(212, 168, 75, 0.08);">
+<strong>Craft Gear -> Kill Mobs -> Get Loot, Stones &amp; Maps -> Upgrade Gateways -> Enter Realms -> Get Better Loot -> Push Deeper -> Repeat</strong>
+</blockquote>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Realms</h2>
+<p>You pick up a Realm Map from a mob drop. It has a biome, a size, maybe some modifiers rolled on it. You walk up to a Portal Device in the overworld - every single one is an Ancient Gateway with a tier from Copper to Adamantite. Activate it with the map, a portal opens, step through.</p>
+<p>You're in. Timer starts. Mobs are already there. Kill everything before the timer runs out and you get completion rewards on top of whatever dropped during the fight. Die, and you lose the map. Harder modifiers on the map mean harder mobs, but also better loot. Always.</p>
+<ul>
+<li><strong>16 biomes</strong> - Forest, Desert, Beach, Tundra, Volcano, Jungle, Caverns, and more. Each with its own terrain, mobs, and feel.</li>
+<li><strong>4 sizes</strong> - Small (15 mobs, 5 min) to Massive (70 mobs, 20 min). Bigger = more loot.</li>
+<li><strong>13 Map Modifiers</strong> - 7 difficulty Prefixes make Realms harder. 6 reward Suffixes make loot better.</li>
+<li><strong>7 Gateway tiers</strong> - Copper (max level 10) to Adamantite (unlimited). Mine overworld ores to upgrade. The overworld feeds the Realms.</li>
+</ul>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">The 6 Elements</h2>
+<p>Fire, Water, Lightning, Earth, Wind, and Void. Each grants 5 unique stats per point. 30 total, zero overlap.</p>
+<ul>
+<li><strong style="color: #FF7755;">Fire</strong> - Physical Damage, Charged Attack Damage, Crit Multiplier, Burn Damage, Ignite Chance</li>
+<li><strong style="color: #55CCEE;">Water</strong> - Spell Damage, Max Mana, Energy Shield, Mana Regen, Freeze Chance</li>
+<li><strong style="color: #FFEE55;">Lightning</strong> - Attack Speed, Move Speed, Crit Chance, Stamina Regen, Shock Chance</li>
+<li><strong style="color: #DDAA55;">Earth</strong> - Max Health, Armor, Health Regen, Passive Block Chance, Knockback Resistance</li>
+<li><strong style="color: #77DD77;">Wind</strong> - Evasion, Accuracy, Projectile Damage, Jump Force, Projectile Speed</li>
+<li><strong style="color: #BB77DD;">Void</strong> - Life Steal, True Damage, DoT Damage, Mana on Kill, Effect Duration</li>
+</ul>
+<p><span style="color: #FF7755;">Fire</span> has zero defense. <span style="color: #DDAA55;">Earth</span> has zero offense. <span style="color: #BB77DD;">Void</span> can only survive by dealing damage. Every allocation is a tradeoff, and you get one point per level.</p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Skill Tree</h2>
+<p>485 nodes across 15 regions. You don't browse a menu - you enter the Skill Sanctum, a 3D instance with glowing orbs floating in space connected by beams of colored light. Walk up to a node, press F to allocate. Free respec, anytime, no cost.</p>
+<p>6 elemental arms, 8 hybrid arms connecting adjacent elements, 12 bridge paths, and build-defining keystones at the edges.</p>
+<p>If you install Hexcode, the magic nodes in the tree are fully replaced with Hexcode-integrated versions automatically.</p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Combat</h2>
+<p>Every hit passes through an 11-stage damage pipeline :</p>
+<blockquote style="border-left: 4px solid #D4A84B; padding: 12px 16px; background: rgba(212, 168, 75, 0.08);">
+<strong>Base -> Flat -> Elemental -> Conversion -> % Physical -> % Elemental -> % More -> Conditionals -> Crit -> Defenses -> True Damage</strong>
+</blockquote>
+<p>Nothing is hidden. <code>/too combat detail</code> shows the full breakdown per hit. If you understand the pipeline, you can optimize your build way beyond what intuition suggests.</p>
+<p><strong>4 Ailments</strong> - <em style="color: #FF7755;">Burn</em> (Fire DoT), <em style="color: #55CCEE;">Freeze</em> (Water slow), <em style="color: #FFEE55;">Shock</em> (Lightning damage amp), <em style="color: #BB77DD;">Poison</em> (Void stacking DoT). Each scales with your stats.</p>
+<p><strong>Avoidance</strong> - Dodge Chance, Evasion vs Accuracy formula, active Shield Blocking, passive Block procs. Getting hit is optional if you build for it.</p>
+<p><strong>Death Recap</strong> - Every death shows exactly what killed you, how much damage, what type, from where. You learn what to fix.</p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Gear</h2>
+<p>47 equipment types across 7 rarities (<span style="color: #C9D2DD;">Common</span> through <span style="color: #AF6025;">Unique</span>). Each piece rolls random Modifiers from a pool of 111 definitions, Prefixes and Suffixes. Quality ranges from 1 to 101, multiplying every stat on the item.</p>
+<p>You don't find perfect gear. You <strong>craft</strong> it. 25 Stones across 7 categories let you reroll, enhance, remove, lock, and corrupt Gear Modifiers. A <span style="color: #C9D2DD;">Common</span> sword with the right Stone investment can outperform a <span style="color: #BB8A2C;">Legendary</span> drop with bad rolls.</p>
+<p><strong>Loot Filter</strong> - Configure exactly which items you see. Filter by Rarity, Type, Quality. Turn off what you don't need.</p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Mob Scaling</h2>
+<p>5 mob classes : Passive, Minor, Hostile, <strong style="color: #FFEE55;">Elite</strong>, <strong style="color: #FFEE55;">Boss</strong>. Elites spawn dynamically in Realms. Each mob's stats are generated via Dirichlet distribution across 52 stat types, no two mobs feel the same. One Elite might be a tank that barely moves. Another might be a glass cannon that kills you in two hits. You learn to read them.</p>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Getting Started</h2>
+<ol>
+<li>Grab a weapon. Kill things near spawn. You'll get XP, gear drops, stone drops, and Realm Maps.</li>
+<li>Open your stats page to allocate Attribute Points across the 6 Elements.</li>
+<li>Find a Portal Device in the overworld - every one is an Ancient Gateway.</li>
+<li>Use a Realm Map on it. Portal opens. Step through.</li>
+<li>Kill everything before the timer runs out. Collect your loot.</li>
+<li>Use Stones to improve your gear. Push harder maps.</li>
+</ol>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Bug Reports - Feature asking</h2>
+<ul>
+<li>If it's related to a crash, please send Server logs &amp; Client logs</li>
+<li>If it's a feature request or an optimisation idea I'm open to talking about anything and everything</li>
+<li>I know it doesn't feel proper yet, but I wanted all the core mechanics in and fully working without bugs before building anything around it</li>
+<li>Keep in mind this project is created with the goal of sticking to vanilla Hytale's Lore &amp; Story</li>
+</ul>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">TODO</h2>
+<p>A lot of things are still to come :</p>
+<ul>
+<li>Skills once we have Inventory access</li>
+<li>Progression system</li>
+<li>Dungeons</li>
+<li>Bosses</li>
+<li>Enhancing the Skill Tree</li>
+<li>Adding stats</li>
+<li>Balance fully done up to level 100 000 (1 000 currently)</li>
+<li>QOL and UX upgrades</li>
+<li>And a lot more...</li>
+</ul>
+
+<hr style="border-color: #8B7340;">
+
+<h2 style="color: #D4A84B;">Installation</h2>
+<p>Place the JAR in your server's <code>mods/</code> directory. The asset pack is bundled.</p>
+<p>Players just join - Hytale mods are server-side. No client setup.</p>
+
+<h2 style="color: #D4A84B;">Documentation</h2>
+<p>Full wiki : <a href="https://wiki.hytalemodding.dev/en/docs/Larsonix_TrailOfOrbis">wiki.hytalemodding.dev</a></p>
+<p>Also accessible in-game via the Voile documentation system.</p>
+
+<h2 style="color: #D4A84B;">Credits</h2>
+<ul>
+<li><strong>LadyPaladra</strong> - All visual assets : textures, models. Also creator of <a href="https://www.curseforge.com/hytale/mods/the-armory">The Armory</a></li>
+<li><strong>tiptox</strong> - Logo</li>
+</ul>
+<p><strong>Code</strong> : LGPL-3.0 | <strong>Assets</strong> : CC-BY-NC-SA-4.0</p>

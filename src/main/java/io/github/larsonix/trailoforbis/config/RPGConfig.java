@@ -618,7 +618,7 @@ public class RPGConfig {
             private float maxHealthPercent = 0.5f;       // +0.5% max HP
             private float armor = 5.0f;                  // +5.0 armor
             private float healthRegen = 0.2f;            // +0.2 HP/s regen
-            private float passiveBlockChance = 0.2f;     // +0.2% block chance
+            private float blockChance = 0.2f;              // +0.2% perfect block chance per point
             private float knockbackResistance = 0.3f;    // +0.3% stability
 
             public float getMaxHealthPercent() {
@@ -645,12 +645,12 @@ public class RPGConfig {
                 this.healthRegen = healthRegen;
             }
 
-            public float getPassiveBlockChance() {
-                return passiveBlockChance;
+            public float getBlockChance() {
+                return blockChance;
             }
 
-            public void setPassiveBlockChance(float passiveBlockChance) {
-                this.passiveBlockChance = passiveBlockChance;
+            public void setBlockChance(float blockChance) {
+                this.blockChance = blockChance;
             }
 
             public float getKnockbackResistance() {

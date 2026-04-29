@@ -1829,7 +1829,7 @@ nodes:
     - earth_fortitude_1
     - earth_fortitude_branch
     modifiers:
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 4.0
       type: FLAT
   earth_fortitude_branch:
@@ -1845,7 +1845,7 @@ nodes:
     - stat: ARMOR
       value: 9.0
       type: FLAT
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 3.0
       type: FLAT
   earth_fortitude_3:
@@ -1869,7 +1869,7 @@ nodes:
     - earth_fortitude_branch
     - earth_fortitude_notable
     modifiers:
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 5.0
       type: FLAT
   earth_fortitude_notable:
@@ -1884,7 +1884,7 @@ nodes:
     - earth_synergy_3
     - bridge_water_earth_3
     modifiers:
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 5.0
       type: FLAT
     - stat: ARMOR
@@ -2032,7 +2032,7 @@ nodes:
       element: EARTH
       per_count: 3
       bonus:
-        stat: PASSIVE_BLOCK_CHANCE
+        stat: BLOCK_CHANCE
         value: 1.0
         modifierType: FLAT
       cap: 10.0
@@ -2088,7 +2088,7 @@ nodes:
     - stat: ARMOR_PERCENT
       value: 15.0
       type: PERCENT
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 7.0
       type: FLAT
     - stat: BLOCK_HEAL_PERCENT
@@ -3209,7 +3209,7 @@ nodes:
     - stat: MELEE_DAMAGE_PERCENT
       value: -25.0
       type: PERCENT
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: -15.0
       type: FLAT
   bridge_lightning_wind_1:
@@ -3332,7 +3332,7 @@ nodes:
     - juggernaut_entry
     - warden_entry
     modifiers:
-    - stat: PASSIVE_BLOCK_CHANCE
+    - stat: BLOCK_CHANCE
       value: 5.0
       type: PERCENT
     - stat: LIFE_STEAL

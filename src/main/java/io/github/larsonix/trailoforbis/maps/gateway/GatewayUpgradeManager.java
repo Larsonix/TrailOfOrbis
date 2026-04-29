@@ -212,7 +212,7 @@ public class GatewayUpgradeManager {
                 // This shouldn't happen after the check, but be safe
                 LOGGER.atWarning().log("Failed to consume %dx %s from player %s during gateway upgrade",
                     material.count(), material.itemId(), playerRef.getUuid());
-                sendError(playerRef, "Failed to consume materials — upgrade aborted !");
+                sendError(playerRef, "Failed to consume materials - upgrade aborted!");
                 return false;
             }
         }
@@ -228,6 +228,13 @@ public class GatewayUpgradeManager {
 
         LOGGER.atInfo().log("Player %s upgraded gateway at (%d,%d,%d) to tier %d (%s)",
             playerRef.getUuid(), x, y, z, newTier, nextTierConfig.name());
+
+        // Guide milestone trigger
+        var rpg = io.github.larsonix.trailoforbis.TrailOfOrbis.getInstanceOrNull();
+        if (rpg != null && rpg.getGuideManager() != null) {
+            rpg.getGuideManager().tryShow(playerRef.getUuid(),
+                io.github.larsonix.trailoforbis.guide.GuideMilestone.GATEWAY_UPGRADE);
+        }
 
         return true;
     }

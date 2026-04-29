@@ -180,12 +180,12 @@ class GearStatsIntegrationTest {
         ComputedStats stats = ComputedStats.builder()
             .armor(50)
             .evasion(10)
-            .passiveBlockChance(5)
+            .blockChance(5)
             .build();
 
         GearBonuses bonuses = new GearBonuses(
             Map.of("armor", 100.0, "evasion", 20.0),
-            Map.of("passive_block_chance", 10.0),
+            Map.of("block_chance", 10.0),
             0.0,
             null,
             false
@@ -195,7 +195,7 @@ class GearStatsIntegrationTest {
 
         assertEquals(150, stats.getArmor(), 0.01);
         assertEquals(30, stats.getEvasion(), 0.01);
-        assertEquals(15, stats.getPassiveBlockChance(), 0.01);
+        assertEquals(15, stats.getBlockChance(), 0.01);
     }
 
     @Test

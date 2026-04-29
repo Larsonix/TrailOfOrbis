@@ -200,8 +200,8 @@ public class AttributeCalculatorTest {
         // Health Regen: 40 * 0.2 = 8
         assertEquals(8f, stats.getHealthRegen(), 0.01f);
 
-        // Block Chance: 40 * 0.2 = 8%
-        assertEquals(8f, stats.getPassiveBlockChance(), 0.01f);
+        // Block Chance: 40 * 0.2 = 8% (perfect block, requires active blocking)
+        assertEquals(8f, stats.getBlockChance(), 0.01f);
 
         // Knockback Resistance: 40 * 0.3 = 12%
         assertEquals(12f, stats.getKnockbackResistance(), 0.01f);

@@ -1,5 +1,5 @@
 # Trail of Orbis Main Configuration
-# Version: 1.0.0-SNAPSHOT
+# Version: 1.0.2
 
 # General Settings
 debugMode: false
@@ -107,8 +107,8 @@ attributes:
     # +HP/s regen per point
     healthRegen: 0.2
 
-    # +% passive block chance per point
-    passiveBlockChance: 0.2
+    # +% perfect block chance per point (requires active blocking)
+    blockChance: 0.2
 
     # +% knockback resistance per point
     knockbackResistance: 0.3

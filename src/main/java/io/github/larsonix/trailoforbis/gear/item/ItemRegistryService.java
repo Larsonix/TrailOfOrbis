@@ -146,6 +146,47 @@ public final class ItemRegistryService {
     }
 
     /**
+     * Retroactively injects reskin ResourceTypes into all already-registered items.
+     *
+     * <p>Items loaded from the database cache during {@link #initialize(DataManager)}
+     * are created before the reskin system initializes, so they miss the ResourceType
+     * injection in {@link #createCustomItem}. This method patches them after the fact.
+     *
+     * @return Number of items successfully patched
+     */
+    public int retroInjectReskinResourceTypes() {
+        if (reskinRegistry == null) {
+            return 0;
+        }
+        int patched = 0;
+        for (Map.Entry<String, ItemRegistryEntry> entry : registeredItems.entrySet()) {
+            String customId = entry.getKey();
+            String baseItemId = entry.getValue().baseItemId();
+
+            long stamp = assetMapLock.readLock();
+            Item customItem;
+            try {
+                customItem = internalAssetMap.get(customId);
+            } finally {
+                assetMapLock.unlockRead(stamp);
+            }
+            if (customItem == null) {
+                continue;
+            }
+
+            Item baseItem = Item.getAssetMap().getAsset(baseItemId);
+            if (baseItem == null || baseItem == Item.UNKNOWN) {
+                continue;
+            }
+
+            // Always re-inject — replaces any stale ResourceTypes from previous builds
+            injectReskinResourceType(customItem, baseItem);
+            patched++;
+        }
+        return patched;
+    }
+
+    /**
      * Initializes the registry service without database persistence.
      *
      * <p>This method is provided for backward compatibility and testing.
@@ -407,9 +448,17 @@ public final class ItemRegistryService {
             LOGGER.atFine().log("Could not clear cachedPacket: %s", e.getMessage());
         }
 
-        // Verify weapon is present after copy (diagnostic logging)
+        // Verify weapon is present after copy (diagnostic logging).
+        // Exception: Hexcode spellbooks intentionally have weapon set to null
+        // (they're off-hand items, not main-hand weapons).
         if (baseItem.getWeapon() != null && customItem.getWeapon() == null) {
-            LOGGER.atSevere().log("CRITICAL: Weapon lost during Item copy for %s", customId);
+            String baseId = baseItem.getId();
+            WeaponType wt = baseId != null ? WeaponType.fromItemIdOrUnknown(baseId) : WeaponType.UNKNOWN;
+            if (wt != WeaponType.SPELLBOOK) {
+                LOGGER.atSevere().log("CRITICAL: Weapon lost during Item copy for %s (base: %s)", customId, baseId);
+            } else {
+                LOGGER.atFine().log("Weapon removed from spellbook %s (intentional - off-hand item)", customId);
+            }
         }
 
         LOGGER.atFine().log("Created custom item %s: weapon=%s, interactions=%d, translationKey=%s",
@@ -514,35 +563,30 @@ public final class ItemRegistryService {
      * Injects the reskin ResourceType onto a custom item so it matches
      * StructuralCrafting reskin recipes at the Builder's Workbench.
      *
-     * <p>Determines the item's equipment slot, vanilla quality, and category,
-     * looks up the corresponding reskin ResourceType ID from the registry,
-     * and appends it to the item's existing ResourceTypes array.
-     *
-     * <p>The original ResourceTypes are preserved for compatibility with
-     * other mods' recipes (e.g., Armory color variants).
+     * <p>Determines the item's equipment slot and vanilla quality, then REPLACES
+     * all ResourceTypes with our single reskin ResourceType. This ensures only
+     * our reskin recipes match at the workbench — other mods' recipes (Armory
+     * color variants, salvage recipes) are suppressed for RPG items.
      *
      * @param customItem The cloned custom item to modify
-     * @param baseItem   The original base item (for slot/quality/category lookup)
+     * @param baseItem   The original base item (for slot/quality lookup)
      */
     private void injectReskinResourceType(@Nonnull Item customItem, @Nonnull Item baseItem) {
         ReskinResourceTypeRegistry registry = this.reskinRegistry;
         if (registry == null) {
-            return; // Reskin system not initialized yet
+            return;
         }
 
         try {
-            // Determine equipment slot (mirrors DynamicLootRegistry.determineSlot logic)
             EquipmentSlot slot;
-            String category;
+            boolean isWeapon = false;
             String baseItemId = baseItem.getId();
             if (baseItem.getWeapon() != null) {
-                // Shields are weapons in Hytale but go in OFF_HAND (detected by name)
+                isWeapon = true;
                 if (baseItemId != null && baseItemId.toLowerCase().contains("shield")) {
                     slot = EquipmentSlot.OFF_HAND;
-                    category = WeaponType.SHIELD.name();
                 } else {
                     slot = EquipmentSlot.WEAPON;
-                    category = WeaponType.fromItemIdOrUnknown(baseItemId).name();
                 }
             } else if (baseItem.getArmor() != null) {
                 var armorSlot = baseItem.getArmor().getArmorSlot();
@@ -555,12 +599,10 @@ public final class ItemRegistryService {
                     case Legs -> EquipmentSlot.LEGS;
                     case Hands -> EquipmentSlot.HANDS;
                 };
-                category = ArmorMaterial.fromItemIdOrSpecial(baseItemId).name();
             } else {
-                return; // Not a weapon or armor
+                return;
             }
 
-            // Determine vanilla quality
             int qualityIndex = baseItem.getQualityIndex();
             ItemQuality quality = ItemQuality.getAssetMap().getAsset(qualityIndex);
             if (quality == null) {
@@ -568,33 +610,43 @@ public final class ItemRegistryService {
             }
             String qualityId = quality.getId();
 
-            // Look up the reskin ResourceType for this group
-            String reskinTypeId = registry.getResourceTypeId(slot, qualityId, category);
+            // Weapons: lookup by (slot, quality, weapon type)
+            // Armor: lookup by (slot, quality)
+            String reskinTypeId;
+            if (isWeapon) {
+                String category = WeaponType.fromItemIdOrUnknown(baseItemId).name();
+                reskinTypeId = registry.getResourceTypeId(slot, qualityId, category);
+            } else {
+                reskinTypeId = registry.getResourceTypeId(slot, qualityId);
+            }
             if (reskinTypeId == null) {
-                return; // No reskin group for this item (fewer than 2 items in group)
+                return;
             }
 
-            // Build new ResourceTypes array: original types + reskin type
-            // CRITICAL: Must create NEW array — copy constructor shares reference
-            ItemResourceType[] existingTypes = baseItem.getResourceTypes();
-            int existingLength = existingTypes != null ? existingTypes.length : 0;
-
+            // REPLACE all ResourceTypes with ONLY our reskin type.
+            // This stops other mods' recipes (Armory color variants, salvage)
+            // from matching RPG items at the workbench.
             ItemResourceType reskinType = new ItemResourceType();
             reskinType.id = reskinTypeId;
             reskinType.quantity = 1;
+            ItemResourceType[] newTypes = new ItemResourceType[]{ reskinType };
 
-            ItemResourceType[] newTypes = new ItemResourceType[existingLength + 1];
-            if (existingTypes != null) {
-                System.arraycopy(existingTypes, 0, newTypes, 0, existingLength);
-            }
-            newTypes[existingLength] = reskinType;
-
-            // Set via reflection
             Field resourceTypesField = Item.class.getDeclaredField("resourceTypes");
             resourceTypesField.setAccessible(true);
             resourceTypesField.set(customItem, newTypes);
 
-            LOGGER.atFine().log("Injected reskin ResourceType %s for %s",
+            // Clear the cached toPacket() result so the client gets the updated ResourceTypes.
+            // Without this, retro-injected items send stale packets missing the ResourceType,
+            // causing the client to grey out workbench options.
+            try {
+                Field cachedPacketField = Item.class.getDeclaredField("cachedPacket");
+                cachedPacketField.setAccessible(true);
+                cachedPacketField.set(customItem, null);
+            } catch (Exception ignored) {
+                // Not critical — field may not exist in all versions
+            }
+
+            LOGGER.atFine().log("Set reskin ResourceType %s for %s (replaced originals)",
                     reskinTypeId, baseItem.getId());
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
@@ -1256,11 +1308,14 @@ public final class ItemRegistryService {
                     customId, secondaryInteractionId);
             }
 
-            // Verify weapon wasn't lost
+            // Verify weapon wasn't lost (spellbooks intentionally have weapon removed)
             if (baseItemId != null) {
                 Item baseItem = Item.getAssetMap().getAsset(baseItemId);
                 if (baseItem != null && baseItem.getWeapon() != null && !hasWeapon) {
-                    LOGGER.atSevere().log("[VERIFY] CRITICAL: Item %s lost weapon after registration!", customId);
+                    WeaponType baseWt = WeaponType.fromItemIdOrUnknown(baseItemId);
+                    if (baseWt != WeaponType.SPELLBOOK) {
+                        LOGGER.atSevere().log("[VERIFY] CRITICAL: Item %s lost weapon after registration!", customId);
+                    }
                 }
             }
 

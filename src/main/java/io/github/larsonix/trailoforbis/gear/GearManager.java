@@ -9,7 +9,9 @@ import io.github.larsonix.trailoforbis.gear.config.GearConfigLoader;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.gear.conversion.ChestLootConversionListener;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaConversionConfig;
+import io.github.larsonix.trailoforbis.gear.systems.CraftGuidePreSystem;
 import io.github.larsonix.trailoforbis.gear.systems.CraftingConversionSystem;
+import com.hypixel.hytale.server.core.event.events.ecs.CraftRecipeEvent;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaItemConverter;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentFeedback;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentListener;
@@ -27,6 +29,7 @@ import io.github.larsonix.trailoforbis.gear.loot.LootSettings;
 import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.gear.reskin.ReskinCraftInterceptor;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinDataPreserver;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinRecipeGenerator;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinResourceTypeRegistry;
@@ -160,9 +163,16 @@ public final class GearManager implements GearService {
     // Vanilla weapon attack profiles (for attack effectiveness calculation)
     private VanillaWeaponDiscovery vanillaWeaponDiscovery;
 
+    // Crafting preview tooltips (RPG info on vanilla weapon/armor tooltips)
+    @Nullable private io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService craftingPreviewService;
+
+    // Timed craft conversion handler (InventoryChangeEvent fallback for queueCraft benches)
+    @Nullable private io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler timedCraftHandler;
+
     // Reskin system (Builder's Workbench skin changing with RPG data preservation)
     private ReskinResourceTypeRegistry reskinResourceTypeRegistry;
     private ReskinDataPreserver reskinDataPreserver;
+    private ReskinCraftInterceptor reskinCraftInterceptor;
 
     // Requirement bypass (Creative mode)
     private final Set<UUID> requirementBypassPlayers = ConcurrentHashMap.newKeySet();
@@ -260,9 +270,20 @@ public final class GearManager implements GearService {
                 levelingService -> {
                     craftingConversionSystem = new CraftingConversionSystem(
                         vanillaItemConverter,
-                        levelingService
+                        levelingService,
+                        createDistanceCalculator(),
+                        getConversionConfig().getCraftingLevelMultiplier(),
+                        itemSyncService
                     );
+                    // Register reskin interceptor BEFORE crafting conversion — it handles
+                    // CraftRecipeEvent.Pre and cancels reskin crafts before they reach the queue
+                    if (reskinCraftInterceptor != null) {
+                        plugin.getEntityStoreRegistry().registerSystem(reskinCraftInterceptor);
+                        LOGGER.at(Level.INFO).log("Registered ReskinCraftInterceptor ECS system");
+                    }
                     plugin.getEntityStoreRegistry().registerSystem(craftingConversionSystem);
+                    // Guide trigger: fire FIRST_CRAFT on CraftRecipeEvent.Pre (before craft completes)
+                    plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
                     craftingConversionPending = false;
                     LOGGER.at(Level.INFO).log("Registered deferred crafting conversion ECS system");
                 },
@@ -580,8 +601,16 @@ public final class GearManager implements GearService {
         // Loot listener
         lootListener = new LootListener(plugin, lootCalculator, lootGenerator);
 
-        // Initialize vanilla item conversion system
+        // Initialize vanilla item conversion system (creates vanillaItemConverter)
         initializeVanillaConversion();
+
+        // Timed craft conversion handler — catches queueCraft() output via InventoryChangeEvent.
+        // MUST be after initializeVanillaConversion() since it needs the converter.
+        initializeTimedCraftHandler();
+
+        // Crafting preview tooltips — appends RPG info to vanilla weapon/armor descriptions.
+        // MUST be after initializeVanillaConversion() for ItemClassifier and MaterialTierMapper.
+        initializeCraftingPreview();
     }
 
     /**
@@ -614,10 +643,15 @@ public final class GearManager implements GearService {
                         // Create and register ECS event system for crafting conversion
                         craftingConversionSystem = new CraftingConversionSystem(
                             vanillaItemConverter,
-                            levelingService
+                            levelingService,
+                            createDistanceCalculator(),
+                            getConversionConfig().getCraftingLevelMultiplier(),
+                            itemSyncService
                         );
                         plugin.getEntityStoreRegistry().registerSystem(craftingConversionSystem);
-                        LOGGER.at(Level.INFO).log("Registered crafting conversion ECS system");
+                        // Guide trigger: fire FIRST_CRAFT on CraftRecipeEvent.Pre (before craft completes)
+                        plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
+                        LOGGER.at(Level.INFO).log("Registered crafting conversion ECS system (material-based levels)");
                     },
                     () -> {
                         // LevelingService not yet available - mark for deferred registration
@@ -653,6 +687,67 @@ public final class GearManager implements GearService {
      * with 2+ items, and creates a {@link ReskinDataPreserver} for RPG data preservation
      * during workbench crafting.
      */
+    private void initializeTimedCraftHandler() {
+        io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator distCalc = createDistanceCalculator();
+        VanillaConversionConfig convConfig = getConversionConfig();
+        if (distCalc == null || vanillaItemConverter == null) {
+            LOGGER.at(Level.WARNING).log("Cannot initialize timed craft handler: missing distance calculator or converter");
+            return;
+        }
+        timedCraftHandler = new io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler(
+                vanillaItemConverter, distCalc, convConfig, itemSyncService);
+        LOGGER.at(Level.INFO).log("Initialized timed craft conversion handler (BasicCrafting, DiagramCrafting, Processing)");
+    }
+
+    @Nullable
+    public io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler getTimedCraftHandler() {
+        return timedCraftHandler;
+    }
+
+    private void initializeCraftingPreview() {
+        io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator distCalc = createDistanceCalculator();
+        VanillaConversionConfig convConfig = getConversionConfig();
+        if (distCalc == null || vanillaItemConverter == null) {
+            LOGGER.at(Level.WARNING).log("Cannot initialize crafting preview: missing distance calculator or converter");
+            return;
+        }
+
+        craftingPreviewService = new io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService(
+                vanillaItemConverter.getMaterialMapper(),
+                distCalc,
+                convConfig,
+                vanillaItemConverter.getItemClassifier(),
+                balanceConfig
+        );
+        craftingPreviewService.initialize();
+
+        // Wire into the sync coordinator so crafting preview is sent right before
+        // RPG item flush — guarantees RPG tooltips override the crafting preview.
+        if (syncCoordinator != null) {
+            syncCoordinator.setCraftingPreviewService(craftingPreviewService);
+        }
+    }
+
+    @Nullable
+    public io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService getCraftingPreviewService() {
+        return craftingPreviewService;
+    }
+
+    @Nullable
+    private io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator createDistanceCalculator() {
+        if (plugin.getConfigManager() == null || plugin.getConfigManager().getMobScalingConfig() == null) {
+            return null;
+        }
+        return new io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator(
+                plugin.getConfigManager().getMobScalingConfig());
+    }
+
+    @Nonnull
+    private VanillaConversionConfig getConversionConfig() {
+        VanillaConversionConfig config = plugin.getConfigManager().getVanillaConversionConfig();
+        return config != null ? config : new VanillaConversionConfig();
+    }
+
     private void initializeReskinSystem() {
         reskinResourceTypeRegistry = new ReskinResourceTypeRegistry();
 
@@ -663,11 +758,19 @@ public final class GearManager implements GearService {
         // Wire the registry into ItemRegistryService so new RPG items get reskin ResourceTypes
         itemRegistryService.setReskinRegistry(reskinResourceTypeRegistry);
 
-        // Create the data preserver (handler registered later in TrailOfOrbis.registerEcsSystems)
-        reskinDataPreserver = new ReskinDataPreserver(itemRegistryService, itemSyncService);
+        // Retroactively inject reskin ResourceTypes into items already loaded from cache.
+        // These were created before the reskin system initialized, so they missed injection.
+        int retroInjected = itemRegistryService.retroInjectReskinResourceTypes();
 
-        LOGGER.at(Level.INFO).log("Reskin system initialized: %d recipes, %d groups",
-                recipeCount, reskinResourceTypeRegistry.size());
+        // Cache-only data preserver (registered later via InventoryChangeEventSystem)
+        reskinDataPreserver = new ReskinDataPreserver();
+
+        // Craft interceptor (registered as ECS system in TrailOfOrbis.registerEcsSystems)
+        reskinCraftInterceptor = new ReskinCraftInterceptor(
+                reskinDataPreserver, itemRegistryService, itemSyncService);
+
+        LOGGER.at(Level.INFO).log("Reskin system initialized: %d recipes, %d groups, %d cached items patched",
+                recipeCount, reskinResourceTypeRegistry.size(), retroInjected);
     }
 
     /**
@@ -677,6 +780,14 @@ public final class GearManager implements GearService {
      */
     public ReskinDataPreserver getReskinDataPreserver() {
         return reskinDataPreserver;
+    }
+
+    /**
+     * Gets the reskin craft interceptor for ECS system registration.
+     */
+    @Nullable
+    public ReskinCraftInterceptor getReskinCraftInterceptor() {
+        return reskinCraftInterceptor;
     }
 
     /**

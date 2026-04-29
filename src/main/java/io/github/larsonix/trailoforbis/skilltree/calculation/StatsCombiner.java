@@ -186,7 +186,7 @@ public class StatsCombiner {
 
         // Fall Damage Reduction and Block Chance
         applyModifier(builder, modifiers, StatType.FALL_DAMAGE_REDUCTION, baseStats.getFallDamageReduction());
-        applyModifier(builder, modifiers, StatType.PASSIVE_BLOCK_CHANCE, baseStats.getPassiveBlockChance());
+        applyModifier(builder, modifiers, StatType.BLOCK_CHANCE, baseStats.getBlockChance());
 
         // ═══════════════════════════════════════════════════════════════════
         // NEW STATS - Offensive

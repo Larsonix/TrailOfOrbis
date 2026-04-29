@@ -326,7 +326,7 @@ public final class LfCommand extends OpenPlayerCommand {
                 .insert(Message.raw(itemDesc).color(MessageColors.WHITE)));
 
         if (!state.isFilteringEnabled()) {
-            player.sendMessage(Message.raw("  Filtering is disabled — item would be ALLOWED")
+            player.sendMessage(Message.raw("  Filtering is disabled - item would be ALLOWED")
                     .color(MessageColors.GRAY));
             return;
         }
@@ -349,7 +349,7 @@ public final class LfCommand extends OpenPlayerCommand {
         // Profile-based test with trace
         Optional<FilterProfile> profileOpt = state.getActiveProfile();
         if (profileOpt.isEmpty()) {
-            player.sendMessage(Message.raw("  No active profile — item would be ALLOWED")
+            player.sendMessage(Message.raw("  No active profile - item would be ALLOWED")
                     .color(MessageColors.GRAY));
             return;
         }
@@ -426,14 +426,14 @@ public final class LfCommand extends OpenPlayerCommand {
 
     private void sendUsage(@Nonnull PlayerRef player) {
         sendPrefixed(player, Message.raw("Commands:").color(MessageColors.INFO));
-        player.sendMessage(Message.raw("  /lf toggle         — Toggle filter on/off").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf on | off       — Enable/disable filtering").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf quick <rarity> — Quick rarity filter").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf switch <name>  — Switch to a profile").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf list           — List your profiles").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf status         — Show filter status").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf test           — Test against held item").color(MessageColors.GRAY));
-        player.sendMessage(Message.raw("  /lf preset [name]  — List or copy presets").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf toggle         - Toggle filter on/off").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf on | off       - Enable/disable filtering").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf quick <rarity> - Quick rarity filter").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf switch <name>  - Switch to a profile").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf list           - List your profiles").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf status         - Show filter status").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf test           - Test against held item").color(MessageColors.GRAY));
+        player.sendMessage(Message.raw("  /lf preset [name]  - List or copy presets").color(MessageColors.GRAY));
     }
 
     // ═══════════════════════════════════════════════════════════════════

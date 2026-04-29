@@ -1,0 +1,17 @@
+{
+  "documentations": [
+    {
+      "group": "trailoforbis",
+      "id": "TrailOfOrbis",
+      "name": "Trail of Orbis",
+      "enabled": true,
+      "sortIndex": 0,
+      "requiredPermissions": [],
+      "compatibility": {
+        "mod": {
+          "universalDocumentationLoader": true
+        }
+      }
+    }
+  ]
+}

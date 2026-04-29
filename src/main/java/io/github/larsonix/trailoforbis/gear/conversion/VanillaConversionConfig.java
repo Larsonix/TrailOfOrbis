@@ -26,6 +26,9 @@ public class VanillaConversionConfig {
     private String defaultMaxRarity = "RARE";
     private LevelCalculationConfig levelCalculation = new LevelCalculationConfig();
     private RarityBonusConfig rarityBonus = new RarityBonusConfig();
+    private Map<String, DistanceRange> materialDistances = new HashMap<>();
+    private DistanceRange defaultDistance = new DistanceRange(500, 1500);
+    private double craftingLevelMultiplier = 1.0;
 
     // ==================== Getters and Setters ====================
 
@@ -141,6 +144,53 @@ public class VanillaConversionConfig {
     // YAML snake_case setter
     public void setRarity_bonus(RarityBonusConfig rarityBonus) {
         setRarityBonus(rarityBonus);
+    }
+
+    // ==================== Material Distances ====================
+
+    public Map<String, DistanceRange> getMaterialDistances() {
+        return materialDistances;
+    }
+
+    public void setMaterialDistances(Map<String, DistanceRange> materialDistances) {
+        this.materialDistances = materialDistances != null ? materialDistances : new HashMap<>();
+    }
+
+    public void setMaterial_distances(Map<String, DistanceRange> materialDistances) {
+        setMaterialDistances(materialDistances);
+    }
+
+    public DistanceRange getDefaultDistance() {
+        return defaultDistance;
+    }
+
+    public void setDefaultDistance(DistanceRange defaultDistance) {
+        this.defaultDistance = defaultDistance != null ? defaultDistance : new DistanceRange(500, 1500);
+    }
+
+    public void setDefault_distance(DistanceRange defaultDistance) {
+        setDefaultDistance(defaultDistance);
+    }
+
+    public double getCraftingLevelMultiplier() {
+        return craftingLevelMultiplier;
+    }
+
+    public void setCraftingLevelMultiplier(double craftingLevelMultiplier) {
+        this.craftingLevelMultiplier = craftingLevelMultiplier;
+    }
+
+    public void setCrafting_level_multiplier(double craftingLevelMultiplier) {
+        setCraftingLevelMultiplier(craftingLevelMultiplier);
+    }
+
+    /**
+     * Gets the distance range for a material. Falls back to default if not configured.
+     */
+    @Nonnull
+    public DistanceRange getDistanceForMaterial(@Nonnull String material) {
+        DistanceRange range = materialDistances.get(material.toLowerCase());
+        return range != null ? range : defaultDistance;
     }
 
     // ==================== Validation ====================
@@ -343,5 +393,26 @@ public class VanillaConversionConfig {
         public void setCrafting(double crafting) {
             this.crafting = crafting;
         }
+    }
+
+    /**
+     * Distance range (blocks from spawn) where a material is found.
+     * Used to compute gear level via the shared mob scaling formula.
+     */
+    public static class DistanceRange {
+        private int min = 500;
+        private int max = 1500;
+
+        public DistanceRange() {}
+
+        public DistanceRange(int min, int max) {
+            this.min = min;
+            this.max = max;
+        }
+
+        public int getMin() { return min; }
+        public void setMin(int min) { this.min = min; }
+        public int getMax() { return max; }
+        public void setMax(int max) { this.max = max; }
     }
 }

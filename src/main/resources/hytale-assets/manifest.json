@@ -1,7 +1,7 @@
 {
   "Group": "trailoforbis",
   "Name": "TrailOfOrbis_Realms",
-  "Version": "1.0.0",
+  "Version": "1.0.2",
   "Description": "Realm templates for Trail of Orbis",
   "ServerVersion": "@HYTALE_VERSION@",
   "IncludesAssetPack": true

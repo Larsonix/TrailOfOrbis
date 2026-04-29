@@ -4,7 +4,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.DamageBreakdown;
 import io.github.larsonix.trailoforbis.combat.blocking.BlockResult;
@@ -246,29 +248,34 @@ public class AvoidanceProcessor {
                 BlockResult result = activeBlock.get();
                 wasActiveBlock = true;
                 activeBlockChance = defenderStats.getBlockChance();
+
+                // Guide: first time player blocks an attack
+                PlayerRef defenderPlayer = store.getComponent(defenderRef, PlayerRef.getComponentType());
+                if (defenderPlayer != null) {
+                    TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+                    if (rpg != null && rpg.getGuideManager() != null) {
+                        rpg.getGuideManager().tryShow(defenderPlayer.getUuid(),
+                            io.github.larsonix.trailoforbis.guide.GuideMilestone.FIRST_BLOCK);
+                    }
+                }
                 if (result.blocked()) {
                     blockDamageReduction = result.damageReduction();
                     blockStaminaCost = result.staminaCost();
+                    // Perfect block — full avoidance. Pass the FULL estimated damage
+                    // (not reduced) so heal/counter calculations use the full hit value.
                     float estimatedDamage = estimateBlockedDamage(baseDamage, attackerStats, conditionalMultiplier);
-                    float reducedDamage = estimatedDamage * (1.0f - result.damageReduction());
-                    LOGGER.at(Level.FINE).log("Active blocked: %.1f%% damage reduced, stamina cost: %.1f",
-                        result.damageReduction() * 100, result.staminaCost());
+                    LOGGER.at(Level.FINE).log("Perfect block: full avoidance, stamina cost: %.1f",
+                        result.staminaCost());
                     AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,
                         passiveBlockChance, true, activeBlockChance, blockDamageReduction, blockStaminaCost, parryChance);
-                    return new AvoidanceCheckResult(Optional.of(AvoidanceResult.blocked(reducedDamage)), stats);
+                    return new AvoidanceCheckResult(Optional.of(AvoidanceResult.blocked(estimatedDamage)), stats);
                 }
                 // Block roll failed - continue to passive block check
             }
         }
 
-        // 3b. Passive block check (random proc, no shield needed)
-        if (checkPassiveBlock(defenderStats)) {
-            float estimatedDamage = estimateBlockedDamage(baseDamage, attackerStats, conditionalMultiplier);
-            LOGGER.at(Level.FINE).log("Passive blocked: %.1f%% chance", passiveBlockChance);
-            AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,
-                passiveBlockChance, wasActiveBlock, activeBlockChance, blockDamageReduction, blockStaminaCost, parryChance);
-            return new AvoidanceCheckResult(Optional.of(AvoidanceResult.blocked(estimatedDamage)), stats);
-        }
+        // 3b. Passive block removed — passive_block_chance now feeds block_chance
+        // (perfect block when actively blocking). No passive avoidance from blocking.
 
         // Hit connected — still return full stats
         AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,

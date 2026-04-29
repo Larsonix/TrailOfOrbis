@@ -314,6 +314,13 @@ public class CombatIndicatorService {
             return;
         }
 
+        // Guide: first time player sees colored combat text
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (rpg != null && rpg.getGuideManager() != null) {
+            rpg.getGuideManager().tryShow(attacker.getUuid(),
+                io.github.larsonix.trailoforbis.guide.GuideMilestone.FIRST_COMBAT);
+        }
+
         // Apply colored template swap before queuing combat text
         if (colorManager != null && colorManager.isEnabled()) {
             colorManager.applyAndResolve(store, defenderRef, entityViewer, attacker, breakdown, params);

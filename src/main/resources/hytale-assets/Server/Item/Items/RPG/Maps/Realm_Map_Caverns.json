@@ -22,5 +22,6 @@
     ]
   },
   "Scale": 3,
-  "Icon": "Icons/ItemsGenerated/Realm_Map_Caverns.png"
+  "Icon": "Icons/ItemsGenerated/Realm_Map_Caverns.png",
+  "Variant": true
 }

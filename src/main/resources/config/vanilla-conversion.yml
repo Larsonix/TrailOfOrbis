@@ -83,11 +83,12 @@ material_tiers:
   iron: RARE
   steel: EPIC
 
-  # Advanced/magical materials
-  cobalt: LEGENDARY
-  mithril: LEGENDARY
-  adamantite: MYTHIC
-  obsidian: MYTHIC
+  # Advanced/magical materials — capped at EPIC for crafting.
+  # Legendary and Mythic are realm-exclusive rewards.
+  cobalt: EPIC
+  mithril: EPIC
+  adamantite: EPIC
+  obsidian: EPIC
 
   # Special materials (if they exist)
   gold: RARE         # Fragile but magical
@@ -100,25 +101,63 @@ material_tiers:
 default_max_rarity: RARE
 
 # -----------------------------------------------------------------------------
-# LEVEL CALCULATION
+# MATERIAL DISTANCES (Crafting Level System)
 # -----------------------------------------------------------------------------
-# How item levels are determined for different acquisition sources.
+# Where materials are found in the overworld (distance from spawn in blocks).
+# Crafted gear level is computed using the SAME formula as mob scaling:
+#   level = 1 + (distance - scalingStart) / blocksPerLevel
+#
+# Change mob scaling parameters in mob-scaling.yml -> crafting levels
+# automatically stay in sync. Only change these if you want to adjust
+# WHERE materials are considered to spawn.
+
+material_distances:
+  # Primitive (near spawn)
+  wood:       { min: 0,    max: 400  }
+  bone:       { min: 0,    max: 400  }
+  crude:      { min: 0,    max: 300  }
+  hide:       { min: 0,    max: 400  }
+  cloth:      { min: 0,    max: 500  }
+  stone:      { min: 0,    max: 400  }
+
+  # Early metals
+  copper:     { min: 200,  max: 700  }
+  leather:    { min: 200,  max: 700  }
+
+  # Mid metals
+  bronze:     { min: 500,  max: 1200 }
+  iron:       { min: 700,  max: 1500 }
+  gold:       { min: 700,  max: 1500 }
+  silver:     { min: 700,  max: 1500 }
+  steel:      { min: 1000, max: 2000 }
+
+  # Advanced metals
+  thorium:    { min: 1500, max: 2500 }
+  cobalt:     { min: 2000, max: 3000 }
+
+  # Endgame metals
+  mithril:    { min: 2500, max: 4000 }
+  adamantite: { min: 3500, max: 5000 }
+  obsidian:   { min: 3500, max: 5000 }
+
+# Fallback for unknown materials (from other mods)
+default_distance: { min: 500, max: 1500 }
+
+# Global multiplier for crafted gear level.
+# 1.0 = gear matches zone mobs exactly.
+# 0.9 = crafted gear is ~10% weaker (rewards drops over crafting).
+# Only change if you want to shift the core feeling of crafting vs drops.
+crafting_level_multiplier: 1.0
+
+# -----------------------------------------------------------------------------
+# LEVEL CALCULATION (Legacy)
+# -----------------------------------------------------------------------------
+# Used for mob drops and chest loot level clamping.
 
 level_calculation:
-  # Minimum possible item level
   min_level: 1
-
-  # Maximum possible item level
   max_level: 1000000
-
-  # Level offset for crafted items (added to player's level)
-  # Negative values make crafted items slightly weaker
-  # Positive values make crafted items slightly stronger
   crafting_level_offset: 0
-
-  # For chest loot, use DistanceBonusCalculator formula:
-  # level = 1 + (distance_from_spawn - 100) / 75
-  # This is already configured in mob-scaling.yml
 
 # -----------------------------------------------------------------------------
 # RARITY BONUSES

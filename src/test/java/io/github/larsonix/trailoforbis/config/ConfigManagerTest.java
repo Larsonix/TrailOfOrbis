@@ -98,7 +98,7 @@ public class ConfigManagerTest {
         assertEquals(0.5f, earthGrants.getMaxHealthPercent(), 0.001f);
         assertEquals(5.0f, earthGrants.getArmor(), 0.001f);
         assertEquals(0.2f, earthGrants.getHealthRegen(), 0.001f);
-        assertEquals(0.2f, earthGrants.getPassiveBlockChance(), 0.001f);
+        assertEquals(0.2f, earthGrants.getBlockChance(), 0.001f);
         assertEquals(0.3f, earthGrants.getKnockbackResistance(), 0.001f);
 
         // Test WIND grants (ghost ranger)

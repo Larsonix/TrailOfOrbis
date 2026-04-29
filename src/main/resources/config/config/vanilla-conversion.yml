@@ -83,11 +83,12 @@ material_tiers:
   iron: RARE
   steel: EPIC
 
-  # Advanced/magical materials
-  cobalt: LEGENDARY
-  mithril: LEGENDARY
-  adamantite: MYTHIC
-  obsidian: MYTHIC
+  # Advanced/magical materials — capped at EPIC for crafting.
+  # Legendary and Mythic are realm-exclusive rewards.
+  cobalt: EPIC
+  mithril: EPIC
+  adamantite: EPIC
+  obsidian: EPIC
 
   # Special materials (if they exist)
   gold: RARE         # Fragile but magical

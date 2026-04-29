@@ -55,6 +55,12 @@ public final class ItemClassifier {
         // Check for weapon
         ItemWeapon weapon = item.getWeapon();
         if (weapon != null) {
+            // Stackable "weapons" are ammunition/consumables (arrows, bombs, darts).
+            // They have Weapon:{} in their JSON for projectile damage but MaxStack > 1.
+            // Real weapons always have MaxStack = 1. Don't give RPG stats to ammo.
+            if (item.getMaxStack() > 1) {
+                return Classification.OTHER;
+            }
             return new Classification(ItemType.WEAPON, "weapon");
         }
 

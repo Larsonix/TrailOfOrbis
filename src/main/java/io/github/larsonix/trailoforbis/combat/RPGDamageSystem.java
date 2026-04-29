@@ -9,7 +9,9 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage.ProjectileSource;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
@@ -136,6 +138,19 @@ public class RPGDamageSystem extends DamageEventSystem {
 
     /** MetaKey for marking that damage indicators have been sent. */
     public static final MetaKey<Boolean> INDICATORS_SENT = Damage.META_REGISTRY.registerMetaObject(d -> Boolean.FALSE);
+
+    // ── Active Blocking Reduction ──
+    // Deterministic damage reduction when holding block (right-click).
+    // Separate from BLOCK_CHANCE (perfect block = full avoidance in avoidance pipeline).
+
+    /** Base damage reduction when weapon-blocking (right-click with weapon). */
+    private static final float WEAPON_BLOCK_REDUCTION = 0.33f;
+    /** Base damage reduction when shield-blocking (shield in utility slot). */
+    private static final float SHIELD_BLOCK_REDUCTION = 0.66f;
+    /** Maximum total reduction for weapon blocking (base + BLOCK_DAMAGE_REDUCTION stat). */
+    private static final float WEAPON_BLOCK_CAP = 0.80f;
+    /** Maximum total reduction for shield blocking (base + BLOCK_DAMAGE_REDUCTION stat). */
+    private static final float SHIELD_BLOCK_CAP = 0.95f;
 
     // ==================== Dependencies ====================
 
@@ -421,6 +436,10 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // ========== PHASE 5: POST-CALC ADJUSTMENTS ==========
         applyPostCalcModifications(store, damage, ctx);
+
+        // ========== PHASE 5.5: ACTIVE BLOCKING REDUCTION ==========
+        // Must run BEFORE Phase 6 (indicators) so damage numbers reflect the reduced amount.
+        applyActiveBlockingReduction(store, ctx);
 
         // ========== PHASE 6: METADATA & TRIGGERS ==========
         emitCombatFeedback(index, archetypeChunk, store, commandBuffer, damage, ctx);
@@ -805,6 +824,36 @@ public class RPGDamageSystem extends DamageEventSystem {
         indicatorService.sendDamageReceivedLog(store, ctx.defenderRef, snapshot, ctx.trace);
 
         durabilityHandler.handleDurability(index, archetypeChunk, store, commandBuffer, damage);
+
+        // Block heal/counter — uses PRE-reduction damage (rewards the block action).
+        // Runs in Phase 6 because applyBlockHeal needs index + archetypeChunk.
+        if (ctx.trace.wasActiveBlocking() && ctx.defenderStats != null) {
+            float preBlockDamage = ctx.trace.damageBeforeBlock();
+
+            float blockHealPct = ctx.defenderStats.getBlockHealPercent();
+            if (blockHealPct > 0 && preBlockDamage > 0) {
+                float healAmount = preBlockDamage * (blockHealPct / 100f);
+                float recoveryMult = ctx.defenderStats.getHealthRecoveryPercent();
+                if (recoveryMult != 0) {
+                    healAmount *= (1f + recoveryMult / 100f);
+                }
+                if (healAmount > 0) {
+                    recoveryProcessor.applyBlockHeal(index, archetypeChunk, store, healAmount);
+                }
+            }
+
+            float counterPct = ctx.defenderStats.getBlockCounterDamage();
+            if (counterPct > 0 && preBlockDamage > 0) {
+                float counterDamage = preBlockDamage * (counterPct / 100f);
+                applyBlockCounterDamage(store, damage, counterDamage);
+            }
+
+            // Fire block trigger for conditional effects
+            triggerHandler.fireOnBlockTrigger(index, archetypeChunk, store);
+
+            // Mark for death recap
+            damage.putMetaObject(WAS_BLOCKED, true);
+        }
     }
 
     /**
@@ -885,6 +934,8 @@ public class RPGDamageSystem extends DamageEventSystem {
                 ctx.trace.setThorns(thornsDamage, thornsPercent, reflectPercent, flatThorns + reflected);
                 recoveryProcessor.applyThornsDamage(store, damage, ctx.defenderStats, ctx.rpgDamage);
             }
+
+            // Block heal/counter handled in emitCombatFeedback (Phase 6) which has index/archetypeChunk
         }
     }
 
@@ -1125,22 +1176,17 @@ public class RPGDamageSystem extends DamageEventSystem {
         float rpgDamage = baseDamage;
 
         // ---- Find the spell caster ----
-        // Try three mechanisms in order:
-        // 1. ThreadLocal (same thread as HexCastEvent)
-        // 2. Volatile field (cross-thread safe, most recent cast from any thread)
-        // 3. RECENT_CASTERS map (UUID-keyed persistent map, 30s TTL)
-        Ref<EntityStore> casterRef = HexCastEventInterceptor.getLastCaster();
-        String casterSource = "threadlocal";
-        if (casterRef == null || !casterRef.isValid()) {
-            casterRef = HexCastEventInterceptor.getLastCasterGlobal();
-            casterSource = "volatile";
-        }
+        // Use fresh ThreadLocal (same synchronous invoke chain) or recent caster fallback.
+        // Note: HexDamageAttributionSystem (FilterDamageGroup) handles source rewriting
+        // for kill attribution. This caster lookup is for RPG stat scaling (magic power).
+        Ref<EntityStore> casterRef = HexCastEventInterceptor.getFreshCaster();
+        String casterSource = "fresh";
         if (casterRef == null || !casterRef.isValid()) {
             casterRef = HexCastEventInterceptor.findRecentCaster(store);
             casterSource = "recent_map";
         }
 
-        LOGGER.atInfo().log("[SpellDmg] %s: caster=%s (via %s), base=%.1f",
+        LOGGER.atFine().log("[SpellDmg] %s: caster=%s (via %s), base=%.1f",
             sourceType,
             casterRef != null ? "FOUND" : "NULL",
             casterSource,
@@ -1758,6 +1804,83 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         LOGGER.at(Level.FINE).log("Block counter: reflected %.1f damage to attacker (%.1f → %.1f HP)",
             counterDamage, healthBefore, newHealth);
+    }
+
+    /**
+     * Phase 5.5: Applies deterministic active blocking damage reduction.
+     *
+     * <p>When the defender is holding block (right-click) but didn't get a perfect
+     * block (handled earlier in the avoidance pipeline), they receive a base
+     * reduction that scales with gear:
+     * <ul>
+     *   <li>Weapon blocking: 33% base, capped at 80%</li>
+     *   <li>Shield blocking: 66% base, capped at 95%</li>
+     *   <li>BLOCK_DAMAGE_REDUCTION stat from gear adds to the base</li>
+     * </ul>
+     *
+     * <p>Runs BEFORE Phase 6 (indicators/combat log) so all feedback shows the
+     * correctly reduced damage amount. Tracks the reduction in DamageTrace for
+     * {@code /too combat detail}.
+     */
+    private void applyActiveBlockingReduction(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull DamageContext ctx
+    ) {
+        // Check if defender is actively blocking
+        DamageDataComponent damageData = store.getComponent(ctx.defenderRef, DamageDataComponent.getComponentType());
+        if (damageData == null || damageData.getCurrentWielding() == null) {
+            return;
+        }
+
+        // Only apply to players
+        PlayerRef playerRef = store.getComponent(ctx.defenderRef, PlayerRef.getComponentType());
+        if (playerRef == null) {
+            return;
+        }
+
+        // Determine shield vs weapon blocking.
+        // Shields are Weapon-type items equipped in the offhand (utility container).
+        // Must iterate the container directly — getUtilityItem() only returns the
+        // "active" utility and flickers to null when the player isn't using the offhand.
+        // Check the BASE item ID because RPG gear shields have custom IDs (rpg_gear_xxx).
+        Player player = store.getComponent(ctx.defenderRef, Player.getComponentType());
+        boolean hasShield = false;
+        if (player != null && player.getInventory() != null) {
+            var utility = player.getInventory().getUtility();
+            if (utility != null) {
+                for (short i = 0; i < utility.getCapacity(); i++) {
+                    ItemStack item = utility.getItemStack(i);
+                    if (!ItemStack.isEmpty(item)) {
+                        String baseId = io.github.larsonix.trailoforbis.gear.util.GearUtils.getBaseItemId(item);
+                        String checkId = (baseId != null) ? baseId : item.getItemId();
+                        if (checkId != null && checkId.toLowerCase().contains("shield")) {
+                            hasShield = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        float baseReduction = hasShield ? SHIELD_BLOCK_REDUCTION : WEAPON_BLOCK_REDUCTION;
+        float cap = hasShield ? SHIELD_BLOCK_CAP : WEAPON_BLOCK_CAP;
+
+        // Add BLOCK_DAMAGE_REDUCTION from gear, capped
+        float statBonus = (ctx.defenderStats != null)
+            ? ctx.defenderStats.getBlockDamageReduction() / 100f
+            : 0f;
+        float totalReduction = Math.min(baseReduction + statBonus, cap);
+
+        float preDamage = ctx.rpgDamage;
+        ctx.rpgDamage = preDamage * (1.0f - totalReduction);
+
+        // Track in DamageTrace for /too combat detail
+        ctx.trace.setActiveBlocking(hasShield, totalReduction * 100f, preDamage, ctx.rpgDamage);
+
+        LOGGER.atFine().log("Active block: %s %.0f%% (base %.0f%% + gear %.0f%%), damage: %.1f → %.1f",
+            hasShield ? "SHIELD" : "WEAPON",
+            totalReduction * 100, baseReduction * 100, statBonus * 100,
+            preDamage, ctx.rpgDamage);
     }
 
     private void applyFinalDamage(

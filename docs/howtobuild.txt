@@ -1,0 +1,21 @@
+# How to Build & Deploy TrailOfOrbis
+
+## Quick Build (PowerShell)
+```powershell
+cd "C:\Users\Larsonix\Documents\Trail of Orbis"
+.\gradlew.bat clean build --no-daemon
+```
+
+## Deploy to Server
+JAR is auto-copied to: `C:\Users\Larsonix\Documents\HytaleServeur\Server\mods\`
+
+## Manual Deploy (if needed)
+```powershell
+Copy-Item "build\libs\TrailOfOrbis-1.0.0-SNAPSHOT-all.jar" "C:\Users\Larsonix\Documents\HytaleServeur\Server\mods\"
+```
+
+## Notes
+- Java 25 required
+- 162 unit tests run automatically
+- Config auto-generated on first load
+- Database: H2 (embedded) by default

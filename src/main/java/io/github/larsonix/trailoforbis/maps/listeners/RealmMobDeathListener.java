@@ -189,48 +189,13 @@ public class RealmMobDeathListener extends DeathSystems.OnDeathSystem {
             return extractPlayerUuidFromRef(projectileSource.getRef(), store);
         }
 
-        // Direct entity damage (melee)
+        // Direct entity damage (melee, or hex spell rewritten to EntitySource by
+        // HexDamageAttributionSystem in FilterDamageGroup before death)
         if (source instanceof Damage.EntitySource entitySource) {
             return extractPlayerUuidFromRef(entitySource.getRef(), store);
         }
 
-        // Hex spell fallback: find nearest player in same world
-        if (source instanceof Damage.EnvironmentSource envSource
-                && io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig.isHexSpellSource(envSource.getType())) {
-            return findNearestPlayerUuidForHexKill(deadRef, store);
-        }
-
         return null;
-    }
-
-    @Nullable
-    private UUID findNearestPlayerUuidForHexKill(
-            @Nonnull Ref<EntityStore> deadRef,
-            @Nonnull Store<EntityStore> store) {
-        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent deadTc =
-            store.getComponent(deadRef, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
-        if (deadTc == null) return null;
-        com.hypixel.hytale.math.vector.Vector3d deadPos = deadTc.getPosition();
-
-        PlayerRef nearest = null;
-        double nearestDistSq = Double.MAX_VALUE;
-        for (PlayerRef pr : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
-            Ref<EntityStore> playerRef = store.getExternalData().getRefFromUUID(pr.getUuid());
-            if (playerRef == null || !playerRef.isValid()) continue;
-            com.hypixel.hytale.server.core.modules.entity.component.TransformComponent ptc =
-                store.getComponent(playerRef, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
-            if (ptc == null) continue;
-            com.hypixel.hytale.math.vector.Vector3d pp = ptc.getPosition();
-            double dx = pp.getX() - deadPos.getX();
-            double dy = pp.getY() - deadPos.getY();
-            double dz = pp.getZ() - deadPos.getZ();
-            double distSq = dx * dx + dy * dy + dz * dz;
-            if (distSq < nearestDistSq) {
-                nearestDistSq = distSq;
-                nearest = pr;
-            }
-        }
-        return nearest != null ? nearest.getUuid() : null;
     }
 
     /**

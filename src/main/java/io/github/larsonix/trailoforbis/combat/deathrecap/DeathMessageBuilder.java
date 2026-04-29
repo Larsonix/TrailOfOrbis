@@ -79,7 +79,7 @@ public final class DeathMessageBuilder {
         String verb = getKillerVerb(snapshot.damageType(), snapshot.wasCritical());
         String suffix = "";
         if (snapshot.wasCritical()) {
-            suffix = " — Critical Strike!";
+            suffix = " - Critical Strike!";
         }
 
         return Message.raw("You " + verb + " " + targetName + suffix).color(MessageColors.SUCCESS);

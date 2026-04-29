@@ -52,6 +52,17 @@ public final class HexcodeCompat {
     @Nullable private static Method hexBookGetAssetMapMethod;
     private static volatile boolean hexAssetMapsInitialized = false;
 
+    // Hex entity tracking reflection handles — for construct/projectile caster attribution
+    @Nullable private static ComponentType<EntityStore, ?> hexEffectsComponentType;
+    @Nullable private static ComponentType<EntityStore, ?> projectileStateComponentType;
+    @Nullable private static ComponentType<EntityStore, ?> shatterStateComponentType;
+    @Nullable private static Method hexEffectsGetEffectsMethod;
+    @Nullable private static Method hexStatusGetHexContextMethod;
+    @Nullable private static Method hexContextGetCasterRefMethod;
+    @Nullable private static Method projectileStateGetHexContextMethod;
+    @Nullable private static Method shatterStateGetHexContextMethod;
+    private static volatile boolean hexTrackingInitialized = false;
+
     private HexcodeCompat() {}
 
     /**
@@ -192,6 +203,213 @@ public final class HexcodeCompat {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    // =========================================================================
+    // HEX ENTITY TRACKING (construct/projectile caster attribution)
+    // =========================================================================
+
+    /**
+     * Initializes reflection handles for reading caster identity from Hexcode's
+     * construct and projectile entities. Call once during startup, after Hexcode
+     * has registered its components.
+     */
+    @SuppressWarnings("unchecked")
+    public static void initializeHexTracking() {
+        if (hexTrackingInitialized || !hexcodeLoaded) {
+            return;
+        }
+
+        try {
+            // HexEffectsComponent — on construct entities
+            Class<?> hexEffectsClass = Class.forName(
+                    "com.riprod.hexcode.core.common.construct.component.HexEffectsComponent");
+            Method getCtMethod = hexEffectsClass.getMethod("getComponentType");
+            hexEffectsComponentType = (ComponentType<EntityStore, ?>) getCtMethod.invoke(null);
+            hexEffectsGetEffectsMethod = hexEffectsClass.getMethod("getEffects");
+
+            // HexStatus — getHexContext()
+            Class<?> hexStatusClass = Class.forName(
+                    "com.riprod.hexcode.core.common.construct.component.HexStatus");
+            hexStatusGetHexContextMethod = hexStatusClass.getMethod("getHexContext");
+
+            // HexContext — getCasterRef()
+            Class<?> hexContextClass = Class.forName(
+                    "com.riprod.hexcode.core.state.execution.component.HexContext");
+            hexContextGetCasterRefMethod = hexContextClass.getMethod("getCasterRef");
+
+            LOGGER.atInfo().log("[HexcodeCompat] Hex construct tracking initialized (HexEffectsComponent)");
+        } catch (Exception e) {
+            LOGGER.atWarning().log("[HexcodeCompat] Failed to init construct tracking: %s", e.getMessage());
+        }
+
+        try {
+            // ProjectileState — on projectile entities
+            Class<?> projStateClass = Class.forName(
+                    "com.riprod.hexcode.builtin.glyphs.projectile.component.ProjectileState");
+            Method getCtMethod = projStateClass.getMethod("getComponentType");
+            projectileStateComponentType = (ComponentType<EntityStore, ?>) getCtMethod.invoke(null);
+            projectileStateGetHexContextMethod = projStateClass.getMethod("getHexContext");
+
+            LOGGER.atInfo().log("[HexcodeCompat] Hex projectile tracking initialized (ProjectileState)");
+        } catch (Exception e) {
+            LOGGER.atFine().log("[HexcodeCompat] ProjectileState not available: %s", e.getMessage());
+        }
+
+        try {
+            // ShatterState — on shatter shard entities
+            Class<?> shatterClass = Class.forName(
+                    "com.riprod.hexcode.builtin.glyphs.shatter.component.ShatterState");
+            Method getCtMethod = shatterClass.getMethod("getComponentType");
+            shatterStateComponentType = (ComponentType<EntityStore, ?>) getCtMethod.invoke(null);
+            shatterStateGetHexContextMethod = shatterClass.getMethod("getHexContext");
+
+            LOGGER.atInfo().log("[HexcodeCompat] Hex shatter tracking initialized (ShatterState)");
+        } catch (Exception e) {
+            LOGGER.atFine().log("[HexcodeCompat] ShatterState not available: %s", e.getMessage());
+        }
+
+        hexTrackingInitialized = true;
+    }
+
+    /**
+     * Extracts the caster's entity ref from a HexEffectsComponent on the given entity.
+     * Returns the first valid caster ref found in the component's active effects map.
+     *
+     * @param store The entity store
+     * @param entityRef The entity to check
+     * @return The caster's entity ref, or null
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public static Ref<EntityStore> extractConstructCasterRef(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> entityRef) {
+
+        if (hexEffectsComponentType == null || hexEffectsGetEffectsMethod == null) {
+            return null;
+        }
+
+        try {
+            Object hexEffects = store.getComponent(entityRef, hexEffectsComponentType);
+            if (hexEffects == null) {
+                return null;
+            }
+
+            java.util.Map<?, ?> effects = (java.util.Map<?, ?>) hexEffectsGetEffectsMethod.invoke(hexEffects);
+            if (effects == null || effects.isEmpty()) {
+                return null;
+            }
+
+            // Take the first effect's caster — all effects on the same construct
+            // entity come from the same caster
+            for (Object hexStatus : effects.values()) {
+                Ref<EntityStore> casterRef = extractCasterFromHexStatus(hexStatus);
+                if (casterRef != null) {
+                    return casterRef;
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.atFine().log("[HexcodeCompat] Failed to extract construct caster: %s", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Extracts the caster's entity ref from a ProjectileState or ShatterState component.
+     *
+     * @param store The entity store
+     * @param entityRef The projectile/shatter entity
+     * @return The caster's entity ref, or null
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public static Ref<EntityStore> extractProjectileCasterRef(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> entityRef) {
+
+        // Try ProjectileState first
+        if (projectileStateComponentType != null && projectileStateGetHexContextMethod != null) {
+            try {
+                Object projState = store.getComponent(entityRef, projectileStateComponentType);
+                if (projState != null) {
+                    Object hexContext = projectileStateGetHexContextMethod.invoke(projState);
+                    if (hexContext != null) {
+                        return extractCasterFromHexContext(hexContext);
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.atFine().log("[HexcodeCompat] ProjectileState read failed: %s", e.getMessage());
+            }
+        }
+
+        // Try ShatterState
+        if (shatterStateComponentType != null && shatterStateGetHexContextMethod != null) {
+            try {
+                Object shatterState = store.getComponent(entityRef, shatterStateComponentType);
+                if (shatterState != null) {
+                    Object hexContext = shatterStateGetHexContextMethod.invoke(shatterState);
+                    if (hexContext != null) {
+                        return extractCasterFromHexContext(hexContext);
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.atFine().log("[HexcodeCompat] ShatterState read failed: %s", e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static Ref<EntityStore> extractCasterFromHexStatus(@Nonnull Object hexStatus) {
+        try {
+            if (hexStatusGetHexContextMethod == null) return null;
+            Object hexContext = hexStatusGetHexContextMethod.invoke(hexStatus);
+            if (hexContext == null) return null;
+            return extractCasterFromHexContext(hexContext);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static Ref<EntityStore> extractCasterFromHexContext(@Nonnull Object hexContext) {
+        try {
+            if (hexContextGetCasterRefMethod == null) return null;
+            Object ref = hexContextGetCasterRefMethod.invoke(hexContext);
+            if (ref instanceof Ref<?> r && r.isValid()) {
+                return (Ref<EntityStore>) r;
+            }
+        } catch (Exception e) {
+            // Caster may have disconnected — ref is invalid
+        }
+        return null;
+    }
+
+    /** Whether hex entity tracking is initialized. */
+    public static boolean isTrackingInitialized() {
+        return hexTrackingInitialized;
+    }
+
+    /** Returns the HexEffectsComponent ComponentType, or null. */
+    @Nullable
+    public static ComponentType<EntityStore, ?> getHexEffectsComponentType() {
+        return hexEffectsComponentType;
+    }
+
+    /** Returns the ProjectileState ComponentType, or null. */
+    @Nullable
+    public static ComponentType<EntityStore, ?> getProjectileStateComponentType() {
+        return projectileStateComponentType;
+    }
+
+    /** Returns the ShatterState ComponentType, or null. */
+    @Nullable
+    public static ComponentType<EntityStore, ?> getShatterStateComponentType() {
+        return shatterStateComponentType;
     }
 
     // =========================================================================

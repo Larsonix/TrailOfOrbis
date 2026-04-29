@@ -20,12 +20,13 @@ import java.util.Objects;
 /**
  * Generates StructuralCrafting recipes for the Builder's Workbench at startup.
  *
- * <p>Scans all items from {@link DynamicLootRegistry} and creates reskin recipes
- * grouped by (equipment slot, vanilla quality, category). Each recipe takes an
- * item of matching ResourceType as input and produces a specific target item.
- *
- * <p>This enables players to change RPG gear skins at the Builder's Workbench
- * while the {@link ReskinDataPreserver} handles RPG data transfer.
+ * <p>Grouping strategy:
+ * <ul>
+ *   <li><b>Armor</b> (head, chest, legs, hands): grouped by (slot, quality).
+ *       A player with any Rare helmet sees ALL Rare helmets as options.</li>
+ *   <li><b>Weapons</b> (weapon, off_hand): grouped by (slot, quality, weapon type).
+ *       A player with Rare daggers sees only other Rare daggers, not swords.</li>
+ * </ul>
  *
  * <p>Recipes are registered via {@code CraftingRecipe.getAssetStore().loadAssets()},
  * which auto-triggers {@code BenchRecipeRegistry} registration through the engine's
@@ -43,6 +44,13 @@ public final class ReskinRecipeGenerator {
 
     /** The Builder's Workbench bench ID */
     private static final String BUILDERS_BENCH_ID = "Builders";
+
+    /** Category required for recipes to be selectable in the Builder's Workbench UI */
+    private static final String[] BENCH_CATEGORIES = new String[]{ "WoodPlanks" };
+
+    /** Cap per group — must stay well under 64 (the StructuralCrafting option slot limit)
+     *  to leave room for any other recipes that match the same input. */
+    private static final int MAX_RECIPES_PER_GROUP = 50;
 
     private static final Field RECIPE_ID_FIELD;
 
@@ -75,30 +83,48 @@ public final class ReskinRecipeGenerator {
         List<CraftingRecipe> allRecipes = new ArrayList<>();
         int groupCount = 0;
 
-        // All quality tiers that exist in the game
         String[] qualityTiers = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"};
 
         for (EquipmentSlot slot : EquipmentSlot.values()) {
+            boolean isWeaponSlot = (slot == EquipmentSlot.WEAPON || slot == EquipmentSlot.OFF_HAND);
+
             for (String qualityId : qualityTiers) {
                 Map<String, List<DiscoveredItem>> categories =
                         lootRegistry.getItemsByQualityAndCategory(slot, qualityId);
 
-                for (Map.Entry<String, List<DiscoveredItem>> entry : categories.entrySet()) {
-                    String category = entry.getKey();
-                    List<DiscoveredItem> items = entry.getValue();
-
-                    // Skip groups with fewer than 2 items (nothing to reskin to)
-                    if (items.size() < 2) {
+                if (isWeaponSlot) {
+                    // WEAPONS: group by (slot, quality, weapon type) — daggers stay with daggers
+                    for (Map.Entry<String, List<DiscoveredItem>> entry : categories.entrySet()) {
+                        String category = entry.getKey();
+                        List<DiscoveredItem> items = entry.getValue();
+                        if (items.size() < 2) {
+                            continue;
+                        }
+                        if (items.size() > MAX_RECIPES_PER_GROUP) {
+                            LOGGER.atWarning().log("Reskin group %s/%s/%s has %d items, capping at %d",
+                                    slot, qualityId, category, items.size(), MAX_RECIPES_PER_GROUP);
+                            items = items.subList(0, MAX_RECIPES_PER_GROUP);
+                        }
+                        String resourceTypeId = resourceTypeRegistry.register(slot, qualityId, category);
+                        allRecipes.addAll(createRecipesForGroup(resourceTypeId, items));
+                        groupCount++;
+                    }
+                } else {
+                    // ARMOR: group by (slot, quality) — all Rare helmets together
+                    List<DiscoveredItem> allItemsInGroup = new ArrayList<>();
+                    for (List<DiscoveredItem> categoryItems : categories.values()) {
+                        allItemsInGroup.addAll(categoryItems);
+                    }
+                    if (allItemsInGroup.size() < 2) {
                         continue;
                     }
-
-                    // Register the ResourceType for this group
-                    String resourceTypeId = resourceTypeRegistry.register(slot, qualityId, category);
-
-                    // Create one recipe per target item
-                    List<CraftingRecipe> groupRecipes = createRecipesForGroup(
-                            resourceTypeId, items);
-                    allRecipes.addAll(groupRecipes);
+                    if (allItemsInGroup.size() > MAX_RECIPES_PER_GROUP) {
+                        LOGGER.atWarning().log("Reskin group %s/%s has %d items, capping at %d",
+                                slot, qualityId, allItemsInGroup.size(), MAX_RECIPES_PER_GROUP);
+                        allItemsInGroup = allItemsInGroup.subList(0, MAX_RECIPES_PER_GROUP);
+                    }
+                    String resourceTypeId = resourceTypeRegistry.register(slot, qualityId);
+                    allRecipes.addAll(createRecipesForGroup(resourceTypeId, allItemsInGroup));
                     groupCount++;
                 }
             }
@@ -133,7 +159,7 @@ public final class ReskinRecipeGenerator {
         List<CraftingRecipe> recipes = new ArrayList<>(items.size());
 
         BenchRequirement benchReq = new BenchRequirement(
-                BenchType.StructuralCrafting, BUILDERS_BENCH_ID, null, 0);
+                BenchType.StructuralCrafting, BUILDERS_BENCH_ID, BENCH_CATEGORIES, 0);
         BenchRequirement[] benchReqs = new BenchRequirement[]{ benchReq };
 
         // Input: any item with the reskin ResourceType

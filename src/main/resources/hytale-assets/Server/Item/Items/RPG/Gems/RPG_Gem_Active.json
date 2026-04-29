@@ -31,5 +31,6 @@
   "Scale": 1.2,
   "ItemSoundSetId": "ISS_Items_Gems",
   "DropOnDeath": false,
-  "Icon": "Icons/ItemsGenerated/Ingredient_Crystal_Fragments_Red.png"
+  "Icon": "Icons/ItemsGenerated/Ingredient_Crystal_Fragments_Red.png",
+  "Variant": true
 }

@@ -32,34 +32,36 @@ public class GuidePopupPage {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    // Layout
-    private static final int CONTAINER_WIDTH = 560;
-    private static final int CONTENT_PADDING = 24;
-    private static final int CHARS_PER_LINE = 52;
+    // Layout — wider container reduces mid-word TextSpan wrapping (HyUI limitation)
+    private static final int CONTAINER_WIDTH = 700;
+    private static final int CONTENT_PADDING = 34;
+    private static final int CHARS_PER_LINE = 58;
     private static final int CONTAINER_CHROME = 65;
 
     // Text sizing
-    private static final int HOOK_FONT_SIZE = 15;
-    private static final int BODY_FONT_SIZE = 13;
-    private static final int CLOSER_FONT_SIZE = 12;
-    private static final int HOOK_LINE_HEIGHT = 22;
-    private static final int BODY_LINE_HEIGHT = 18;
-    private static final int CLOSER_LINE_HEIGHT = 17;
+    private static final int HOOK_FONT_SIZE = 16;
+    private static final int BODY_FONT_SIZE = 14;
+    private static final int CLOSER_FONT_SIZE = 13;
+    private static final int HOOK_LINE_HEIGHT = 24;
+    private static final int BODY_LINE_HEIGHT = 21;
+    private static final int CLOSER_LINE_HEIGHT = 19;
 
     // Paragraph spacing
-    private static final int DIVIDER_HEIGHT = 16;
-    private static final int PARA_SPACING = 14;
+    private static final int DIVIDER_HEIGHT = 20;
+    private static final int PARA_SPACING = 18;
 
     // Colors for paragraph types
     private static final String COLOR_HOOK = "#FFFFFF";
     private static final String COLOR_BODY = "#D0DCEA";
     private static final String COLOR_CLOSER = "#888899";
-    private static final String COLOR_DIVIDER = "#FFD70050";
+    private static final String COLOR_DIVIDER = "#FFD70070";
 
     private final PlayerRef player;
     private final GuideMilestone milestone;
     private final Runnable onLearnMore;
     private final Runnable onDismiss;
+    @javax.annotation.Nullable
+    private final Runnable onSkipAll;
 
     // Parsed paragraphs for height calculation and rendering
     private final String[] paragraphs;
@@ -68,11 +70,13 @@ public class GuidePopupPage {
             @Nonnull PlayerRef player,
             @Nonnull GuideMilestone milestone,
             @Nonnull Runnable onLearnMore,
-            @Nonnull Runnable onDismiss) {
+            @Nonnull Runnable onDismiss,
+            @javax.annotation.Nullable Runnable onSkipAll) {
         this.player = player;
         this.milestone = milestone;
         this.onLearnMore = onLearnMore;
         this.onDismiss = onDismiss;
+        this.onSkipAll = onSkipAll;
         this.paragraphs = parseParagraphs(milestone.getContent());
     }
 
@@ -105,6 +109,15 @@ public class GuidePopupPage {
                     ctx.getPage().ifPresent(page -> page.close());
                     onDismiss.run();
                 });
+
+            // "I know what I'm doing" skip button (WELCOME popup only)
+            if (onSkipAll != null) {
+                builder.addEventListener("skip-all-btn", CustomUIEventBindingType.Activating,
+                    (data, ctx) -> {
+                        ctx.getPage().ifPresent(page -> page.close());
+                        onSkipAll.run();
+                    });
+            }
 
             builder.open(store);
 
@@ -157,6 +170,15 @@ public class GuidePopupPage {
           .append("style=\"anchor-width: 210; anchor-height: 53;\">Got it</button>\n");
 
         sb.append("        </div>\n");
+
+        // "I know what I'm doing" skip button (WELCOME popup only, separate row below)
+        if (onSkipAll != null) {
+            sb.append("        <div style=\"layout-mode: Center; anchor-height: 40; anchor-top: 4;\">\n");
+            sb.append("          <button id=\"skip-all-btn\" class=\"small-tertiary-button\" ")
+              .append("style=\"anchor-width: 200; anchor-height: 32; color: #666677;\">I know what I'm doing</button>\n");
+            sb.append("        </div>\n");
+        }
+
         sb.append("      </div>\n");
 
         sb.append("    </div>\n");
@@ -174,7 +196,7 @@ public class GuidePopupPage {
         StringBuilder sb = new StringBuilder();
 
         // Top spacing
-        sb.append("          <div style=\"anchor-height: 6;\"></div>\n");
+        sb.append("          <div style=\"anchor-height: 10;\"></div>\n");
 
         for (int i = 0; i < paragraphs.length; i++) {
             ParaType type = classifyParagraph(i);
@@ -202,7 +224,7 @@ public class GuidePopupPage {
                 if (type == ParaType.HOOK) {
                     // Gold divider after hook
                     sb.append("          <div style=\"anchor-height: 8;\"></div>\n");
-                    sb.append("          <div style=\"anchor-height: 1; anchor-horizontal: 0; background-color: ")
+                    sb.append("          <div style=\"anchor-height: 2; anchor-horizontal: 0; background-color: ")
                       .append(COLOR_DIVIDER).append(";\" data-hyui-style=\"Padding: (Horizontal: ")
                       .append(CONTENT_PADDING).append(")\"></div>\n");
                     sb.append("          <div style=\"anchor-height: 8;\"></div>\n");
@@ -213,7 +235,7 @@ public class GuidePopupPage {
         }
 
         // Bottom spacing
-        sb.append("          <div style=\"anchor-height: 6;\"></div>\n");
+        sb.append("          <div style=\"anchor-height: 10;\"></div>\n");
 
         return sb.toString();
     }
@@ -284,7 +306,7 @@ public class GuidePopupPage {
     // ═══════════════════════════════════════════════════════════════════
 
     private int calculateContentHeight() {
-        int height = CONTAINER_CHROME + 12; // Chrome + top/bottom spacing
+        int height = CONTAINER_CHROME + 20; // Chrome + top/bottom spacing (10px each)
 
         for (int i = 0; i < paragraphs.length; i++) {
             ParaType type = classifyParagraph(i);
@@ -304,7 +326,7 @@ public class GuidePopupPage {
             // Spacing after paragraph
             if (i < paragraphs.length - 1) {
                 if (type == ParaType.HOOK) {
-                    height += DIVIDER_HEIGHT + 1; // divider line + spacing
+                    height += DIVIDER_HEIGHT + 2; // divider line (2px) + spacing
                 } else {
                     height += PARA_SPACING;
                 }

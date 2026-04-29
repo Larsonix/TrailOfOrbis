@@ -305,6 +305,13 @@ public class DamageModifierProcessor {
         if (absorbed > 0) {
             LOGGER.at(Level.FINE).log("Shield absorbed: %.1f (%.1f -> %.1f damage)",
                 absorbed, beforeShield, damage);
+
+            // Guide milestone: first time energy shield absorbs damage
+            var rpg = io.github.larsonix.trailoforbis.TrailOfOrbis.getInstanceOrNull();
+            if (rpg != null && rpg.getGuideManager() != null) {
+                rpg.getGuideManager().tryShow(defenderPlayer.getUuid(),
+                    io.github.larsonix.trailoforbis.guide.GuideMilestone.ENERGY_SHIELD);
+            }
         }
 
         return damage;

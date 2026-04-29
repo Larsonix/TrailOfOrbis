@@ -867,7 +867,7 @@ public class StatsPage {
             String.format("%+.1f%% Max Health", em * eg.getMaxHealthPercent()),
             String.format("%+.0f Armor", em * eg.getArmor()),
             String.format("%+.1f/s Health Regen", em * eg.getHealthRegen()),
-            String.format("%+.1f%% Block Chance", em * eg.getPassiveBlockChance()),
+            String.format("%+.1f%% Perfect Block", em * eg.getBlockChance()),
             String.format("%+.1f%% Knockback Resistance", em * eg.getKnockbackResistance()));
 
         // WIND - Ghost ranger
@@ -1244,7 +1244,7 @@ public class StatsPage {
         section = new ArrayList<>();
         addRowIfNonZero(section, new StatRow("Evasion", RPGStyles.formatFlat(stats.getEvasion()), formatEvasionChance(stats.getEvasion(), level), true, false), stats.getEvasion());
         addRowIfNonZero(section, new StatRow("Dodge Chance", RPGStyles.formatValue(stats.getDodgeChance(), true), null, stats.getDodgeChance() > 0, false), stats.getDodgeChance());
-        addRowIfNonZero(section, new StatRow("Passive Block Chance", RPGStyles.formatValue(stats.getPassiveBlockChance(), true), null, stats.getPassiveBlockChance() > 0, false), stats.getPassiveBlockChance());
+        // Passive block removed — block_chance feeds perfect block (shown in Block & Shield section)
         addRowIfNonZero(section, new StatRow("Parry Chance", RPGStyles.formatValue(stats.getParryChance(), true), null, stats.getParryChance() > 0, false), stats.getParryChance());
         addSection(rows, "AVOIDANCE", section, false);
 
@@ -1303,9 +1303,8 @@ public class StatsPage {
         putBreakdownTooltip(tooltips, "Armor", breakdown, ComputedStats::getArmor);
         putBreakdownTooltip(tooltips, "Evasion", breakdown, ComputedStats::getEvasion);
         putBreakdownTooltip(tooltips, "Dodge Chance", breakdown, ComputedStats::getDodgeChance);
-        putBreakdownTooltip(tooltips, "Passive Block Chance", breakdown, ComputedStats::getPassiveBlockChance);
         putBreakdownTooltip(tooltips, "Parry Chance", breakdown, ComputedStats::getParryChance);
-        putBreakdownTooltip(tooltips, "Block Chance", breakdown, ComputedStats::getBlockChance);
+        putBreakdownTooltip(tooltips, "Perfect Block Chance", breakdown, ComputedStats::getBlockChance);
         putBreakdownTooltip(tooltips, "Block Dmg Reduction", breakdown, ComputedStats::getBlockDamageReduction);
         putBreakdownTooltip(tooltips, "Block Heal", breakdown, ComputedStats::getBlockHealPercent);
         putBreakdownTooltip(tooltips, "Block Recovery", breakdown, ComputedStats::getBlockRecoveryPercent);

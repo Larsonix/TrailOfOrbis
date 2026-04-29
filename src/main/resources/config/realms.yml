@@ -97,9 +97,8 @@ drops:
     elite-multiplier: 2.0
 
     # Overworld drop rate multiplier (applied on top of base-chance outside realms)
-    # 0.15 = overworld mobs drop maps at 15% of the realm rate (~1.8% effective)
-    # This makes maps rare exploration finds in the overworld while self-sustaining in realms.
-    overworld-multiplier: 0.15
+    # 1.0 = same rate as realms (no penalty)
+    overworld-multiplier: 1.0
 
   stones:
     # Base chance for stones to drop (0.15 = 15%)

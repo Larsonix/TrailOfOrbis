@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 
 import io.github.larsonix.trailoforbis.gear.GearManager;
 import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
+import io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import javax.annotation.Nonnull;
@@ -66,6 +67,7 @@ public class ItemSyncCoordinator {
     // ═══════════════════════════════════════════════════════════════════
 
     private final ItemSyncService itemSyncService;
+    @Nullable private CraftingPreviewService craftingPreviewService;
 
     // ═══════════════════════════════════════════════════════════════════
     // STATE
@@ -126,6 +128,10 @@ public class ItemSyncCoordinator {
             return t;
         });
         LOGGER.atInfo().log("ItemSyncCoordinator initialized");
+    }
+
+    public void setCraftingPreviewService(@Nullable CraftingPreviewService service) {
+        this.craftingPreviewService = service;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -272,6 +278,14 @@ public class ItemSyncCoordinator {
         }
 
         ScheduledFuture<?> task = flushScheduler.schedule(() -> {
+            // Send crafting preview BEFORE RPG items — vanilla items get preview
+            // text, then the RPG flush immediately overrides for RPG gear items
+            // with their own correct tooltips.
+            if (craftingPreviewService != null && craftingPreviewService.isInitialized()
+                    && playerRef.isValid()) {
+                craftingPreviewService.syncToPlayer(playerRef);
+            }
+
             suppressedPlayers.remove(playerId);
             executeFlush(playerId);
             LOGGER.atFine().log("Player %s ready — unsuppressed + flushed after join delay",

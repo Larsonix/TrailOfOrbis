@@ -116,13 +116,13 @@ public final class TooAdminSanctumExportLayoutCommand extends AbstractPlayerComm
                         LOGGER.atInfo().log("Exported %d node positions to %s", exportedNodes.size(), exportPath);
                     } catch (IOException e) {
                         LOGGER.atSevere().withCause(e).log("Failed to save exported positions");
-                        sender.sendMessage(Message.raw("Failed to save — check server logs.").color(MessageColors.ERROR));
+                        sender.sendMessage(Message.raw("Failed to save - check server logs.").color(MessageColors.ERROR));
                     }
                 });
 
             } catch (Exception e) {
                 LOGGER.atSevere().withCause(e).log("Error collecting node positions");
-                sender.sendMessage(Message.raw("Export failed — check server logs.").color(MessageColors.ERROR));
+                sender.sendMessage(Message.raw("Export failed - check server logs.").color(MessageColors.ERROR));
             }
         });
     }

@@ -111,7 +111,7 @@ public class TooStatsCommand extends OpenPlayerCommand {
             String.format("+%.1f%% Max HP, +%.0f Armor, +%.1f%% Block",
                 data.getEarth() * attrs.getEarthGrants().getMaxHealthPercent(),
                 data.getEarth() * attrs.getEarthGrants().getArmor(),
-                data.getEarth() * attrs.getEarthGrants().getPassiveBlockChance()));
+                data.getEarth() * attrs.getEarthGrants().getBlockChance()));
 
         // Wind (Pale green theme) - Ghost ranger
         sendAttributeLine(player, "WIND", data.getWind(), "#AAFFAA",

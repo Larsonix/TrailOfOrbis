@@ -87,24 +87,22 @@ public class BlockingProcessor {
         // 2. Get blocking stats from ComputedStats
         BlockingStats blockingStats = BlockingStats.from(defenderStats);
 
-        // 3. Roll block chance
+        // 3. Roll BLOCK_CHANCE for perfect block (full damage avoidance).
+        // If the roll fails, the player still gets the deterministic base reduction
+        // (33% weapon / 66% shield) applied later in the damage pipeline.
         if (!blockingStats.rollBlock()) {
-            LOGGER.at(Level.FINE).log("Active block failed - roll unsuccessful (chance: %.1f%%)",
+            LOGGER.at(Level.FINE).log("Perfect block roll failed (chance: %.1f%%) — base reduction will apply",
                 blockingStats.blockChance());
             return Optional.of(BlockResult.FAILED_ROLL);
         }
 
-        // 4. Calculate damage reduction (from BLOCK_DAMAGE_REDUCTION stat)
-        float damageMultiplier = blockingStats.getDamageMultiplier();
-        float damageReduced = 1.0f - damageMultiplier;
-
-        // 5. Calculate stamina cost (base cost modified by our stat)
+        // 4. Perfect block — full avoidance (100% damage reduction)
         float staminaCost = calculateStaminaCost(store, defenderRef, wielding, incomingDamage, blockingStats);
 
-        LOGGER.at(Level.FINE).log("Active block successful - reduced %.1f%% damage, stamina cost: %.1f",
-            damageReduced * 100, staminaCost);
+        LOGGER.at(Level.FINE).log("PERFECT BLOCK — full avoidance, stamina cost: %.1f",
+            staminaCost);
 
-        return Optional.of(BlockResult.success(damageReduced, staminaCost));
+        return Optional.of(BlockResult.success(1.0f, staminaCost));
     }
 
     /**

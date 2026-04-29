@@ -75,7 +75,7 @@ public final class TooAdminSanctumGenerateTemplateCommand extends AbstractPlayer
 
         } catch (IOException e) {
             LOGGER.atSevere().withCause(e).log("Failed to generate template");
-            sender.sendMessage(Message.raw("Failed to generate — check server logs.").color(MessageColors.ERROR));
+            sender.sendMessage(Message.raw("Failed to generate - check server logs.").color(MessageColors.ERROR));
         }
     }
 

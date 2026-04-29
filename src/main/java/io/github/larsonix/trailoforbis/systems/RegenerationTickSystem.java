@@ -13,7 +13,14 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
+import com.hypixel.hytale.server.core.entity.InteractionManager;
+import com.hypixel.hytale.server.core.entity.LivingEntity;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
+import com.hypixel.hytale.server.core.modules.interaction.InteractionModule;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.client.ChargingInteraction;
+import com.hypixel.hytale.math.util.MathUtil;
+import com.hypixel.hytale.protocol.BlockMaterial;
 import com.hypixel.hytale.protocol.MovementStates;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
@@ -73,6 +80,9 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
 
     /** Cached service reference — resolved once on first tick, never changes */
     @Nullable private AttributeService cachedAttributeService;
+
+    /** Cached InteractionManager component type — resolved lazily */
+    @Nullable private ComponentType<EntityStore, InteractionManager> cachedInteractionManagerType;
 
     public RegenerationTickSystem() {
         this.playerRefType = PlayerRef.getComponentType();
@@ -193,8 +203,9 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
         }
 
         // Mana regeneration (INT-based bonus)
+        // Suppress while charging an attack (mirrors vanilla's ChargingCondition on mana regen)
         float manaRegen = stats.getManaRegen();
-        if (manaRegen > 0) {
+        if (manaRegen > 0 && !isCharging(store, entityRef)) {
             regenerateStat(statMap, DefaultEntityStatTypes.getMana(), manaRegen * dt);
         }
 
@@ -217,8 +228,9 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
         }
 
         // Oxygen regeneration (VIT-based bonus)
+        // Suppress while suffocating (mirrors vanilla's SuffocatingCondition on oxygen regen)
         float oxygenRegen = stats.getOxygenRegen();
-        if (oxygenRegen > 0) {
+        if (oxygenRegen > 0 && !isSuffocating(store, entityRef)) {
             regenerateStat(statMap, DefaultEntityStatTypes.getOxygen(), oxygenRegen * dt);
         }
 
@@ -373,6 +385,7 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
      *   <li>Rolling</li>
      *   <li>Mantling</li>
      *   <li>Gliding</li>
+     *   <li>Actively blocking/wielding (shield or weapon block)</li>
      * </ul>
      *
      * <p>When any of these states are active, we should NOT apply
@@ -387,6 +400,15 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
         @Nonnull Store<EntityStore> store,
         @Nonnull Ref<EntityStore> entityRef
     ) {
+        // Check if actively blocking/wielding (shield or weapon block)
+        // Vanilla suppresses its own base regen via WieldingCondition in asset config,
+        // but our bonus regen must also respect this state.
+        DamageDataComponent damageData = store.getComponent(
+            entityRef, DamageDataComponent.getComponentType());
+        if (damageData != null && damageData.getCurrentWielding() != null) {
+            return true;
+        }
+
         MovementStatesComponent movementComp = store.getComponent(
             entityRef, MovementStatesComponent.getComponentType());
         if (movementComp == null) {
@@ -406,5 +428,64 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
             || states.rolling
             || states.mantling
             || states.gliding;
+    }
+
+    /**
+     * Checks if the entity is currently charging an attack.
+     *
+     * <p>Mirrors vanilla's {@code ChargingCondition} which gates mana regeneration.
+     * Checks if any active interaction chain contains a {@code ChargingInteraction}.
+     *
+     * @param store The entity store
+     * @param entityRef Reference to the entity
+     * @return true if the entity is currently charging
+     */
+    private boolean isCharging(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> entityRef
+    ) {
+        if (cachedInteractionManagerType == null) {
+            cachedInteractionManagerType = InteractionModule.get().getInteractionManagerComponent();
+        }
+        InteractionManager manager = store.getComponent(entityRef, cachedInteractionManagerType);
+        if (manager == null) {
+            return false;
+        }
+        Boolean result = manager.forEachInteraction((chain, interaction, val) -> {
+            if (val.booleanValue()) {
+                return Boolean.TRUE;
+            }
+            return interaction instanceof ChargingInteraction;
+        }, Boolean.FALSE);
+        return result.booleanValue();
+    }
+
+    /**
+     * Checks if the entity is suffocating (head in fluid or solid block).
+     *
+     * <p>Mirrors vanilla's {@code SuffocatingCondition} which gates oxygen regeneration.
+     * Uses {@link LivingEntity#getPackedMaterialAndFluidAtBreathingHeight} to check
+     * the block material and fluid at the entity's eye level.
+     *
+     * <p>A player is suffocating when the block at breathing height is NOT empty
+     * OR there is fluid present (e.g., underwater).
+     *
+     * @param store The entity store
+     * @param entityRef Reference to the entity
+     * @return true if the entity is suffocating
+     */
+    private boolean isSuffocating(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> entityRef
+    ) {
+        try {
+            long packed = LivingEntity.getPackedMaterialAndFluidAtBreathingHeight(entityRef, store);
+            BlockMaterial material = BlockMaterial.VALUES[MathUtil.unpackLeft(packed)];
+            int fluidId = MathUtil.unpackRight(packed);
+            return material != BlockMaterial.Empty || fluidId != 0;
+        } catch (Exception e) {
+            // Safe fallback — if position/chunk lookup fails, allow regen
+            return false;
+        }
     }
 }

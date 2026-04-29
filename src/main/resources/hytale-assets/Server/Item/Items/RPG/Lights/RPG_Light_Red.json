@@ -19,5 +19,6 @@
       "Color": "#f00",
       "Radius": 1
     }
-  }
+  },
+  "Variant": true
 }

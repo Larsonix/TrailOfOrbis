@@ -18,7 +18,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -125,9 +124,10 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         }
 
         // Get the attacker (must be a player)
+        // Hex spell damage is rewritten to EntitySource(caster) by HexDamageAttributionSystem
+        // in FilterDamageGroup BEFORE death, so the standard EntitySource path handles it.
         PlayerRef attackerRef = getAttackerPlayerRef(ref, deathComponent, store);
         if (attackerRef == null) {
-            // Embed source diagnostic in this log since we KNOW it fires
             Damage deathDmg = deathComponent.getDeathInfo();
             String srcInfo = "deathInfo=null";
             if (deathDmg != null) {
@@ -135,20 +135,7 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
                 srcInfo = src != null ? src.getClass().getName() : "source=null";
             }
             LOGGER.at(Level.INFO).log("SKIP: No player attacker found (src=%s)", srcInfo);
-
-            // AGGRESSIVE FALLBACK: if Hexcode is loaded and no attacker found,
-            // try nearest player regardless of source type. This catches hex projectile
-            // kills where the source might be EntitySource from the projectile entity.
-            if (io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()) {
-                PlayerRef hexFallback = findNearestPlayerForHexKill(ref, store);
-                if (hexFallback != null) {
-                    LOGGER.at(Level.INFO).log("HEX-FALLBACK: Attributed to nearest player %s", hexFallback.getUuid());
-                    attackerRef = hexFallback;
-                }
-            }
-            if (attackerRef == null) {
-                return;
-            }
+            return;
         }
         UUID attackerUuid = attackerRef.getUuid();
         LOGGER.at(Level.INFO).log("Attacker UUID: %s", attackerUuid);
@@ -434,93 +421,22 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
 
         LOGGER.atInfo().log("[XpGain-SRC] Death source class=%s", source.getClass().getName());
 
-        // Standard path: EntitySource (melee, ranged, projectile, or already-rewritten hex)
+        // Standard path: EntitySource (melee, ranged, projectile, or hex rewritten by
+        // HexDamageAttributionSystem in FilterDamageGroup before death)
         if (source instanceof Damage.EntitySource entitySource) {
             Ref<EntityStore> sourceRef = entitySource.getRef();
             if (!sourceRef.isValid()) {
                 LOGGER.atInfo().log("[XpGain-SRC] EntitySource ref INVALID");
-                // Fall through to hex check instead of returning null
-            } else {
-                Player attackerPlayer = store.getComponent(sourceRef, Player.getComponentType());
-                if (attackerPlayer != null) {
-                    return store.getComponent(sourceRef, PlayerRef.getComponentType());
-                }
-                LOGGER.atInfo().log("[XpGain-SRC] EntitySource ref valid but NOT a player — checking hex fallback");
-                // Fall through to hex check
+                return null;
             }
-        }
-
-        // Hex spell fallback: EnvironmentSource("hex_xxx") — find nearest player
-        // Also handles EntitySource from hex projectile (non-player entity source)
-        if (source instanceof Damage.EnvironmentSource envSource
-                && io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig.isHexSpellSource(envSource.getType())) {
-            PlayerRef caster = findNearestPlayerForHexKill(deadRef, store);
-            if (caster != null) {
-                LOGGER.atInfo().log("[HexXP] Spell kill (%s) attributed to nearest player %s",
-                    envSource.getType(), caster.getUuid().toString().substring(0, 8));
+            Player attackerPlayer = store.getComponent(sourceRef, Player.getComponentType());
+            if (attackerPlayer != null) {
+                return store.getComponent(sourceRef, PlayerRef.getComponentType());
             }
-            return caster;
-        }
-
-        // Last resort: if source is non-player EntitySource, check DamageCause for hex pattern
-        String causeId = null;
-        try {
-            var cause = deathInfo.getCause();
-            if (cause != null) causeId = cause.getId();
-        } catch (Exception ignored) {}
-        if (causeId != null && causeId.equalsIgnoreCase("Environment")) {
-            LOGGER.atInfo().log("[XpGain-SRC] Non-player EntitySource with Environment cause — hex projectile kill, finding nearest player");
-            PlayerRef caster = findNearestPlayerForHexKill(deadRef, store);
-            if (caster != null) {
-                LOGGER.atInfo().log("[HexXP] Hex projectile kill attributed to nearest player %s",
-                    caster.getUuid().toString().substring(0, 8));
-            }
-            return caster;
+            LOGGER.atInfo().log("[XpGain-SRC] EntitySource ref valid but NOT a player entity");
         }
 
         return null;
-    }
-
-    /**
-     * Finds the nearest connected player to the dead entity in the same world/store.
-     * Used as fallback for hex spell kills where the damage source has no entity ref.
-     */
-    @Nullable
-    private PlayerRef findNearestPlayerForHexKill(
-        @Nonnull Ref<EntityStore> deadRef,
-        @Nonnull Store<EntityStore> store
-    ) {
-        TransformComponent deadTc = store.getComponent(deadRef, TransformComponent.getComponentType());
-        if (deadTc == null) {
-            return null;
-        }
-        Vector3d deadPos = deadTc.getPosition();
-
-        PlayerRef nearest = null;
-        double nearestDistSq = Double.MAX_VALUE;
-
-        for (PlayerRef playerRef : Universe.get().getPlayers()) {
-            // getRefFromUUID returns null if player isn't in this store/world
-            Ref<EntityStore> playerEntityRef = store.getExternalData().getRefFromUUID(playerRef.getUuid());
-            if (playerEntityRef == null || !playerEntityRef.isValid()) {
-                continue;
-            }
-            TransformComponent playerTc = store.getComponent(playerEntityRef, TransformComponent.getComponentType());
-            if (playerTc == null) {
-                continue;
-            }
-            Vector3d playerPos = playerTc.getPosition();
-            double dx = playerPos.getX() - deadPos.getX();
-            double dy = playerPos.getY() - deadPos.getY();
-            double dz = playerPos.getZ() - deadPos.getZ();
-            double distSq = dx * dx + dy * dy + dz * dz;
-
-            if (distSq < nearestDistSq) {
-                nearestDistSq = distSq;
-                nearest = playerRef;
-            }
-        }
-        return nearest;
     }
 
     /**

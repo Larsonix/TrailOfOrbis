@@ -341,12 +341,12 @@ public final class DeathRecapFormatter {
             String chanceDetail = computeEvasionChance(snapshot.defenderEvasion(), snapshot.attackerLevel());
             if (snapshot.wasDodged()) {
                 String dodgeText = (chanceDetail != null)
-                    ? String.format("Evasion : %.0f (%s — dodged !)\n", snapshot.defenderEvasion(), chanceDetail)
+                    ? String.format("Evasion : %.0f (%s - dodged!)\n", snapshot.defenderEvasion(), chanceDetail)
                     : String.format("Evasion : %.0f (dodged !)\n", snapshot.defenderEvasion());
                 message = message.insert(Message.raw(dodgeText).color(MessageColors.SUCCESS));
             } else {
                 String missText = (chanceDetail != null)
-                    ? String.format("Evasion : %.0f (%s — didn't proc)\n", snapshot.defenderEvasion(), chanceDetail)
+                    ? String.format("Evasion : %.0f (%s - didn't proc)\n", snapshot.defenderEvasion(), chanceDetail)
                     : String.format("Evasion : %.0f (didn't proc)\n", snapshot.defenderEvasion());
                 message = message.insert(Message.raw(missText).color(MessageColors.GRAY));
             }

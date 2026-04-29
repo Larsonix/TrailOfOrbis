@@ -151,6 +151,13 @@ public final class DamageTrace {
     private float shockBonusPercent;
     private float damageBeforeShock;
 
+    // === Active blocking reduction (set by RPGDamageSystem Phase 5.5) ===
+    private boolean wasActiveBlocking;
+    private boolean isShieldBlock;
+    private float blockReductionPercent;   // total reduction applied (base + gear, capped)
+    private float damageBeforeBlock;       // damage before blocking reduction
+    private float damageAfterBlock;        // damage after blocking reduction
+
     // === Unarmed penalty (set by RPGDamageSystem Phase 5) ===
     private float unarmedMultiplier;      // 0 means "not unarmed" / not applied
     private float damageBeforeUnarmed;
@@ -335,6 +342,24 @@ public final class DamageTrace {
     public float shockBonusPercent() { return shockBonusPercent; }
     public float damageBeforeShock() { return damageBeforeShock; }
 
+    // --- Active blocking getters ---
+    public boolean wasActiveBlocking() { return wasActiveBlocking; }
+    public boolean isShieldBlock() { return isShieldBlock; }
+    public float blockReductionPercent() { return blockReductionPercent; }
+    public float damageBeforeBlock() { return damageBeforeBlock; }
+    public float damageAfterBlock() { return damageAfterBlock; }
+
+    /**
+     * Returns the actual final damage after ALL post-calc modifications including blocking.
+     *
+     * <p>{@code breakdown.totalDamage()} includes parry, energy shield, MoM, unarmed
+     * but NOT active blocking (which happens after the breakdown is finalized).
+     * This method returns the true final value.
+     */
+    public float effectiveFinalDamage() {
+        return wasActiveBlocking ? damageAfterBlock : breakdown.totalDamage();
+    }
+
     // --- Unarmed penalty getters ---
     public float unarmedMultiplier() { return unarmedMultiplier; }
     public float damageBeforeUnarmed() { return damageBeforeUnarmed; }
@@ -429,6 +454,15 @@ public final class DamageTrace {
     public void setShockAmplification(float bonusPercent, float damBefore) {
         this.shockBonusPercent = bonusPercent;
         this.damageBeforeShock = damBefore;
+    }
+
+    // --- Active blocking setter ---
+    public void setActiveBlocking(boolean isShield, float reductionPercent, float damageBefore, float damageAfter) {
+        this.wasActiveBlocking = true;
+        this.isShieldBlock = isShield;
+        this.blockReductionPercent = reductionPercent;
+        this.damageBeforeBlock = damageBefore;
+        this.damageAfterBlock = damageAfter;
     }
 
     // --- Unarmed penalty setter ---

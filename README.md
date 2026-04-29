@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <b>Release 1.0.0 - ModJam</b>
+  <b>Release 1.0.2</b>
 </p>
 
 ---

@@ -341,11 +341,17 @@ public class GuideManager {
         repository.markCompleted(playerId, milestone.getId());
         state.markCompleted(milestone.getId());
 
+        // WELCOME popup gets a "skip all guides" button
+        Runnable skipCallback = (milestone == GuideMilestone.WELCOME)
+                ? () -> onSkipAllGuides(playerId, playerRef)
+                : null;
+
         GuidePopupPage page = new GuidePopupPage(
             playerRef,
             milestone,
             () -> onLearnMore(playerId, playerRef, milestone),
-            () -> onDismiss(playerId)
+            () -> onDismiss(playerId),
+            skipCallback
         );
 
         page.open(store);
@@ -400,6 +406,39 @@ public class GuideManager {
         if (state != null) {
             state.clearPopup();
         }
+    }
+
+    /**
+     * Called when the player presses "I know what I'm doing" on the WELCOME popup.
+     * Marks ALL milestones as completed so no future popups ever show.
+     */
+    private void onSkipAllGuides(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef) {
+        PlayerGuideState state = playerStates.get(playerId);
+        if (state != null) {
+            state.clearPopup();
+        }
+
+        // Mark every milestone as completed in both memory and DB
+        for (GuideMilestone milestone : GuideMilestone.values()) {
+            repository.markCompleted(playerId, milestone.getId());
+            if (state != null) {
+                state.markCompleted(milestone.getId());
+            }
+        }
+
+        playerRef.sendMessage(
+            com.hypixel.hytale.server.core.Message.empty()
+                .insert(com.hypixel.hytale.server.core.Message.raw("[Guide] ").color("#FFD700").bold(true))
+                .insert(com.hypixel.hytale.server.core.Message.raw(
+                    "Alright, no more popups. If you've never played this mod before, "
+                    + "you just made a terrible decision. But hey, ").color("#D0DCEA"))
+                .insert(com.hypixel.hytale.server.core.Message.raw("/voile").color("#55FFFF").bold(true))
+                .insert(com.hypixel.hytale.server.core.Message.raw(
+                    " is always there when you inevitably need it. Good luck.").color("#D0DCEA"))
+        );
+
+        LOGGER.atInfo().log("Player %s skipped all guide milestones",
+            playerId.toString().substring(0, 8));
     }
 
     // ═══════════════════════════════════════════════════════════════════

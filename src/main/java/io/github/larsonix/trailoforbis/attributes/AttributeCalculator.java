@@ -84,7 +84,7 @@ public class AttributeCalculator {
      *   <li>FIRE: physicalDamagePercent, chargedAttackDamagePercent, critMultiplier, burnDamagePercent, igniteChance, magicPower</li>
      *   <li>WATER: spellDamagePercent, maxMana, energyShield, manaRegen, freezeChance, magicPower, volatilityMax</li>
      *   <li>LIGHTNING: attackSpeedPercent, moveSpeedPercent, critChance, staminaRegen, shockChance, castSpeed</li>
-     *   <li>EARTH: maxHealthPercent, armor, healthRegen, passiveBlockChance, knockbackResistance</li>
+     *   <li>EARTH: maxHealthPercent, armor, healthRegen, blockChance, knockbackResistance</li>
      *   <li>WIND: evasion, accuracy, projectileDamagePercent, jumpForcePercent, projectileSpeedPercent</li>
      *   <li>VOID: lifeSteal, percentHitAsTrueDamage, dotDamagePercent, manaOnKill, statusEffectDuration</li>
      * </ul>
@@ -142,7 +142,7 @@ public class AttributeCalculator {
         float maxHealthPercent = earth * earthGrants.getMaxHealthPercent();
         float armor = equipmentArmor + (earth * earthGrants.getArmor());
         float healthRegen = earth * earthGrants.getHealthRegen();
-        float passiveBlockChance = earth * earthGrants.getPassiveBlockChance();
+        float blockChance = earth * earthGrants.getBlockChance();
         float knockbackResistance = earth * earthGrants.getKnockbackResistance();
 
         // WIND stats
@@ -187,7 +187,7 @@ public class AttributeCalculator {
             .armor(armor)
             .energyShield(energyShield)
             .evasion(evasion)
-            .passiveBlockChance(passiveBlockChance)
+            .blockChance(blockChance)
             .knockbackResistance(knockbackResistance)
 
             // ==================== Offense: FIRE ====================

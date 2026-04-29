@@ -63,7 +63,7 @@ class GearStatCalculatorTest {
         when(armorContainer.getCapacity()).thenReturn((short) 4);
         when(armorContainer.getItemStack(anyShort())).thenReturn(null);
         when(inventory.getItemInHand()).thenReturn(null);
-        when(inventory.getUtilityItem()).thenReturn(null);
+        when(inventory.getUtility()).thenReturn(null);
 
         GearBonuses bonuses = calculator.calculateBonuses(playerId, inventory);
 
@@ -75,7 +75,7 @@ class GearStatCalculatorTest {
     void calculateBonuses_NullArmorContainer_Handled() {
         when(inventory.getArmor()).thenReturn(null);
         when(inventory.getItemInHand()).thenReturn(null);
-        when(inventory.getUtilityItem()).thenReturn(null);
+        when(inventory.getUtility()).thenReturn(null);
 
         GearBonuses bonuses = calculator.calculateBonuses(playerId, inventory);
 

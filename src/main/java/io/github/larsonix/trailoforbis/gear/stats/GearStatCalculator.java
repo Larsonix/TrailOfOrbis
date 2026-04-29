@@ -79,9 +79,26 @@ public final class GearStatCalculator {
         weaponItemId = weaponResult.vanillaItemId;
         isHoldingRpgGear = weaponResult.isRpgGear;
 
-        // Process active utility
-        ItemStack utility = inventory.getUtilityItem();
-        processItem(playerId, utility, flatBonuses, percentBonuses);
+        // Process ALL utility items (offhand — shields, etc.)
+        // Must iterate the container directly, NOT use getUtilityItem().
+        // getUtilityItem() only returns the "active" utility — when the player
+        // isn't actively using the offhand, it returns null and stats vanish.
+        // Shields should always provide stats while equipped, like armor.
+        var utilContainer = inventory.getUtility();
+        if (utilContainer != null) {
+            short utilCap = utilContainer.getCapacity();
+            for (short i = 0; i < utilCap; i++) {
+                ItemStack utilItem = utilContainer.getItemStack(i);
+                if (utilItem != null && !utilItem.isEmpty()) {
+                    String uid = utilItem.getItemId();
+                    boolean isRpg = GearUtils.isRpgGear(utilItem);
+                    LOGGER.atInfo().log("[UTIL-DIAG] Slot %d: id=%s, isRpg=%s", i, uid, isRpg);
+                }
+            }
+            processContainer(playerId, utilContainer, flatBonuses, percentBonuses);
+        } else {
+            LOGGER.atInfo().log("[UTIL-DIAG] Utility container is null");
+        }
 
         return new GearBonuses(
                 Collections.unmodifiableMap(flatBonuses),
@@ -146,7 +163,7 @@ public final class GearStatCalculator {
         // Check if player still meets requirements
         // (items equipped before respec may no longer be valid)
         if (!validator.canEquip(playerId, gearData)) {
-            LOGGER.atFine().log("Skipping gear bonuses - requirements not met");
+            LOGGER.atInfo().log("[UTIL-DIAG] Skipping %s - requirements not met", gearData.getItemId());
             return;  // Skip bonuses for invalid equipment
         }
 
@@ -167,6 +184,17 @@ public final class GearStatCalculator {
         ArmorImplicit armorImplicit = gearData.armorImplicit();
         if (armorImplicit != null) {
             flatBonuses.merge(armorImplicit.defenseType().toLowerCase(), armorImplicit.rolledValue(), Double::sum);
+        }
+
+        // Process weapon implicit for non-weapon items (shields use this for block_chance).
+        // Weapons handle their implicit separately in processWeapon() — this covers
+        // utility/offhand items that have a weaponImplicit with a non-damage stat.
+        if (gearData.hasWeaponImplicit()) {
+            var implicit = gearData.implicit();
+            if (implicit != null && !implicit.isPhysicalDamage() && !implicit.isSpellDamage()) {
+                // Non-damage implicit (e.g., block_chance for shields) → apply as flat stat
+                flatBonuses.merge(implicit.damageType().toLowerCase(), implicit.rolledValue(), Double::sum);
+            }
         }
     }
 

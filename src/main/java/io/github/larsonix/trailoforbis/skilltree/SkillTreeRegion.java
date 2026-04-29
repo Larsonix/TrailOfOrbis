@@ -67,37 +67,37 @@ public enum SkillTreeRegion {
      * Fire arm - Glass Cannon: physical damage, charged attacks, crit multiplier.
      * Direction: +X (East)
      */
-    FIRE("Fire", "Glass Cannon — physical damage and burning", "#FF7881", "Ingredient_Fire_Essence", 1),
+    FIRE("Fire", "Glass Cannon - physical damage and burning", "#FF7881", "Ingredient_Fire_Essence", 1),
 
     /**
      * Water arm - Arcane Mage: spell damage, mana, energy shield.
      * Direction: -X (West)
      */
-    WATER("Water", "Arcane Mage — spell damage and mana", "#00CBFF", "Ingredient_Water_Essence", 2),
+    WATER("Water", "Arcane Mage - spell damage and mana", "#00CBFF", "Ingredient_Water_Essence", 2),
 
     /**
      * Lightning arm - Storm Blitz: attack speed, move speed, crit chance.
      * Direction: +Z (South)
      */
-    LIGHTNING("Lightning", "Storm Blitz — speed and chain effects", "#F1A900", "Ingredient_Lightning_Essence", 3),
+    LIGHTNING("Lightning", "Storm Blitz - speed and chain effects", "#F1A900", "Ingredient_Lightning_Essence", 3),
 
     /**
      * Earth arm - Iron Fortress: max health, armor, health regen, block.
      * Direction: -Z (North)
      */
-    EARTH("Earth", "Iron Fortress — health, armor, and defense", "#7BD23B", "Ingredient_Earth_Essence", 4),
+    EARTH("Earth", "Iron Fortress - health, armor, and defense", "#7BD23B", "Ingredient_Earth_Essence", 4),
 
     /**
      * Void arm - Life Devourer: life steal, true damage, DoT.
      * Direction: +Y (Up)
      */
-    VOID("Void", "Life Devourer — life steal and corruption", "#DE8DFF", "Ingredient_Void_Essence", 5),
+    VOID("Void", "Life Devourer - life steal and corruption", "#DE8DFF", "Ingredient_Void_Essence", 5),
 
     /**
      * Wind arm - Ghost Ranger: evasion, accuracy, projectile damage.
      * Direction: -Y (Down)
      */
-    WIND("Wind", "Ghost Ranger — evasion and projectiles", "#00DEBC", "Ingredient_Wind_Essence", 6),
+    WIND("Wind", "Ghost Ranger - evasion and projectiles", "#00DEBC", "Ingredient_Wind_Essence", 6),
 
     // ═══════════════════════════════════════════════════════════════════
     // OCTANT ARMS (diagonal 3D directions — cube corners)

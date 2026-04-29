@@ -12,5 +12,6 @@
     "Radius": 1
   },
   "BlockSoundSetId": "Empty",
-  "Group": "@Tech"
+  "Group": "@Tech",
+  "Variant": true
 }

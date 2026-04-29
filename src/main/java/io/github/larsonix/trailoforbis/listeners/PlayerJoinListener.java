@@ -324,6 +324,9 @@ public class PlayerJoinListener {
                 rpgInstance.getStoneTooltipSyncService().syncToPlayer(playerRef);
             }
 
+            // Crafting preview tooltips are sent by ItemSyncCoordinator during the
+            // join flush — right before RPG items, so RPG tooltips always win.
+
             // Install gem slot filters on player's inventory
             ServiceRegistry.get(GemManager.class).ifPresent(gm -> {
                 if (player.getInventory() != null) {

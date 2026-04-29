@@ -206,8 +206,8 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
      *   <li>Active realm destination → show realm info</li>
      *   <li>Active vanilla destination → vanilla PortalDeviceActivePage</li>
      *   <li>Invalid destination → reset portal</li>
-     *   <li>Idle + empty-handed → Gateway Upgrade UI (all portals are gateways)</li>
-     *   <li>Idle + holding item → vanilla PortalDeviceSummonPage (Fragment Keys work here)</li>
+     *   <li>Idle + holding Fragment Key → vanilla PortalDeviceSummonPage</li>
+     *   <li>Idle + anything else (empty hand, weapon, food, etc.) → Gateway Upgrade UI</li>
      * </ol>
      */
     @Nullable
@@ -285,32 +285,39 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
         }
 
         // Portal is idle (no active destination).
-        // Empty-handed → show Gateway Upgrade UI for ANY Portal_Device
-        // Holding an item → let vanilla handle (Fragment Keys, errors for wrong items)
-        if (inHand == null || inHand.isEmpty()) {
-            TrailOfOrbis plugin = TrailOfOrbis.getInstanceOrNull();
-            if (plugin != null && plugin.getRealmsManager() != null) {
-                GatewayUpgradeManager upgradeManager = plugin.getRealmsManager().getGatewayUpgradeManager();
-                if (upgradeManager != null) {
-                    UUID worldUuid = world.getWorldConfig().getUuid();
-                    int currentTier = upgradeManager.getGatewayTier(worldUuid,
-                        targetBlock.x, targetBlock.y, targetBlock.z);
-                    LOGGER.atFine().log("Empty-handed on idle portal — showing gateway upgrade UI at (%d,%d,%d) tier %d",
-                        targetBlock.x, targetBlock.y, targetBlock.z, currentTier);
+        // If holding a vanilla Fragment Key → delegate to vanilla PortalDeviceSummonPage.
+        // Everything else (empty hand, weapon, food, etc.) → show Gateway Upgrade UI.
+        // Realm maps are already handled before this method is called.
+        boolean isVanillaPortalKey = inHand != null && !inHand.isEmpty()
+            && inHand.getItem() != null
+            && inHand.getItem().getPortalKey() != null;
 
-                    Store<EntityStore> entityStore = ref.getStore();
-                    GatewayUpgradePage page = new GatewayUpgradePage(
-                        playerRef, worldUuid,
-                        targetBlock.x, targetBlock.y, targetBlock.z,
-                        currentTier);
-                    page.open(entityStore);
-                    return null;
-                }
+        if (isVanillaPortalKey) {
+            return new PortalDeviceSummonPage(playerRef, config, blockRef, inHand);
+        }
+
+        // Not a Fragment Key — show Gateway Upgrade UI
+        TrailOfOrbis plugin = TrailOfOrbis.getInstanceOrNull();
+        if (plugin != null && plugin.getRealmsManager() != null) {
+            GatewayUpgradeManager upgradeManager = plugin.getRealmsManager().getGatewayUpgradeManager();
+            if (upgradeManager != null) {
+                UUID worldUuid = world.getWorldConfig().getUuid();
+                int currentTier = upgradeManager.getGatewayTier(worldUuid,
+                    targetBlock.x, targetBlock.y, targetBlock.z);
+                LOGGER.atFine().log("Showing gateway upgrade UI at (%d,%d,%d) tier %d",
+                    targetBlock.x, targetBlock.y, targetBlock.z, currentTier);
+
+                Store<EntityStore> entityStore = ref.getStore();
+                GatewayUpgradePage page = new GatewayUpgradePage(
+                    playerRef, worldUuid,
+                    targetBlock.x, targetBlock.y, targetBlock.z,
+                    currentTier);
+                page.open(entityStore);
+                return null;
             }
         }
 
-        // Holding an item — vanilla summon page validates Fragment Keys
-        return new PortalDeviceSummonPage(playerRef, config, blockRef, inHand);
+        return null;
     }
 
     /**

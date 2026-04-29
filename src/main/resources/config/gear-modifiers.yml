@@ -395,7 +395,7 @@ prefixes:
 
   blocking:
     display_name: "Blocking"
-    stat: passive_block_chance
+    stat: block_chance
     stat_type: percent
     base_min: 2.0
     base_max: 3.0

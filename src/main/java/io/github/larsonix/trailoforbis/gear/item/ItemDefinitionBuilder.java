@@ -144,6 +144,20 @@ public final class ItemDefinitionBuilder {
             // Clone the definition source (preserves model, texture, icon)
             ItemBase definition = definitionSource.toPacket().clone();
 
+            // Override ResourceTypes with the REGISTERED custom item's types.
+            // The definition source is the BASE item whose ResourceTypes are the
+            // Armory's originals. The registered custom item has our RPG_Reskin_*
+            // type injected. The client needs the custom item's ResourceTypes to
+            // validate workbench recipe matching.
+            String customItemId = gearData.getItemId();
+            if (customItemId != null) {
+                Item registeredCustom = Item.getAssetMap().getAsset(customItemId);
+                if (registeredCustom != null && registeredCustom != Item.UNKNOWN) {
+                    com.hypixel.hytale.protocol.ItemResourceType[] customRTs = registeredCustom.getResourceTypes();
+                    definition.resourceTypes = customRTs;
+                }
+            }
+
             // Set playerAnimationsId. For hex magic weapons, use Hexcode's animation set;
             // for all other items, use the base item's animation.
             String animationsId = resolveAnimationsId(baseItem, gearData);

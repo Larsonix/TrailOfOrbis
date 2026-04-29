@@ -139,6 +139,7 @@ import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator;
 import io.github.larsonix.trailoforbis.gear.equipment.RequirementCalculator;
 import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
 import io.github.larsonix.trailoforbis.gear.listener.GearEquipmentListener;
+import io.github.larsonix.trailoforbis.gear.sync.ImmediateItemSyncHandler;
 import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 import io.github.larsonix.trailoforbis.gear.listener.UnifiedPickupListener;
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipConfig;
@@ -601,13 +602,27 @@ public class TrailOfOrbis extends JavaPlugin {
                 getLogger().atWarning().log("HexCastEvent class not found — spell caster tracking disabled");
             }
 
-            // Hex damage attribution — runs in FilterDamageGroup (same as Erode/Fortify)
-            // to catch hex spell damage that bypasses RPGDamageSystem. Rewrites
-            // EnvironmentSource to EntitySource(caster) for death-time attribution.
+            // Initialize hex entity tracking (construct/projectile caster attribution)
+            io.github.larsonix.trailoforbis.compat.HexcodeCompat.initializeHexTracking();
+
+            // Hex entity tracker — HolderSystem that watches for Hexcode construct and
+            // projectile entities, extracting caster identity via reflection and
+            // registering it in HexCasterRegistry for damage attribution.
+            try {
+                getEntityStoreRegistry().registerSystem(
+                        new io.github.larsonix.trailoforbis.compat.HexEntityTracker());
+                getLogger().atInfo().log("Registered HexEntityTracker (construct/projectile caster tracking)");
+            } catch (Exception e) {
+                getLogger().atSevere().log("FAILED to register HexEntityTracker: %s", e);
+            }
+
+            // Hex damage attribution — runs in FilterDamageGroup (same as Erode/Fortify).
+            // 3-tier attribution: ThreadLocal (direct spells) → Construct Registry →
+            // Projectile Registry. Rewrites EnvironmentSource to EntitySource(caster).
             try {
                 getEntityStoreRegistry().registerSystem(
                         new io.github.larsonix.trailoforbis.compat.HexDamageAttributionSystem());
-                getLogger().atInfo().log("Registered HexDamageAttributionSystem (FilterDamageGroup) for spell kill attribution");
+                getLogger().atInfo().log("Registered HexDamageAttributionSystem (3-tier FilterDamageGroup)");
             } catch (Exception e) {
                 getLogger().atSevere().log("FAILED to register HexDamageAttributionSystem: %s", e);
             }
@@ -629,6 +644,12 @@ public class TrailOfOrbis extends JavaPlugin {
         // CRITICAL: Runs BEFORE EntityUIEvents to zero damage for already-displayed indicators
         getEntityStoreRegistry().registerSystem(new RPGDamageIndicatorSuppressor());
         getLogger().atInfo().log("Registered RPGDamageIndicatorSuppressor");
+
+        // Vanilla equipment stat suppressor - removes vanilla item stat modifiers (health from
+        // armor, stats from weapons/utilities) that would stack on top of our RPG stats.
+        // Runs AFTER Hytale's EntityStatsSystems.Recalculate via @Dependency.
+        getEntityStoreRegistry().registerSystem(new io.github.larsonix.trailoforbis.systems.VanillaEquipmentStatSuppressor());
+        getLogger().atInfo().log("Registered VanillaEquipmentStatSuppressor");
 
         // Energy Shield Tracker - per-player shield state for damage absorption
         // 3-second delay before shield starts regenerating after being hit
@@ -679,8 +700,18 @@ public class TrailOfOrbis extends JavaPlugin {
         // Replaces the old LivingEntityInventoryChangeEvent registerGlobal() calls.
         // Handlers are added in order of priority: NORMAL first, then LATE.
         inventoryChangeEventSystem = new InventoryChangeEventSystem();
-        // NORMAL priority: base stat recalculation on equipment change
+        // FIRST: base stat recalculation on equipment change (so subsequent handlers see accurate stats)
         inventoryChangeEventSystem.addHandler(EquipmentChangeListener::onInventoryChange);
+        // SECOND: immediate item definition sync — runs AFTER stat recalc so definitions
+        // include correct requirement colors. All handlers run in the same event dispatch,
+        // so running second doesn't affect whether we beat Hytale's inventory packet.
+        if (gearManager != null && gearManager.getItemSyncService() != null) {
+            var immediateSync = new ImmediateItemSyncHandler(
+                    gearManager.getItemSyncService(),
+                    gearManager.getCustomItemSyncService(),
+                    gearManager.getSyncCoordinator());
+            inventoryChangeEventSystem.addHandler(immediateSync::onInventoryChange);
+        }
         // LATE priority: gear stat recalculation
         if (gearEquipmentListener != null) {
             inventoryChangeEventSystem.addHandler(gearEquipmentListener::onInventoryChange);
@@ -695,6 +726,12 @@ public class TrailOfOrbis extends JavaPlugin {
         // re-applies when crafted output appears in inventory
         if (gearManager != null && gearManager.getReskinDataPreserver() != null) {
             inventoryChangeEventSystem.addHandler(gearManager.getReskinDataPreserver()::onInventoryChange);
+        }
+        // Timed craft conversion: catches output from queueCraft() benches that bypass
+        // CraftRecipeEvent. Covers BasicCrafting (timed), DiagramCrafting, Processing.
+        // StructuralCrafting excluded (handled by ReskinDataPreserver above).
+        if (gearManager != null && gearManager.getTimedCraftHandler() != null) {
+            inventoryChangeEventSystem.addHandler(gearManager.getTimedCraftHandler()::onInventoryChange);
         }
         // LAST priority: sanctum visual refresh
         if (skillSanctumManager != null) {
@@ -1081,7 +1118,8 @@ public class TrailOfOrbis extends JavaPlugin {
                         m,
                         newLevel >= 10 ? io.github.larsonix.trailoforbis.guide.GuideMilestone.MOB_SCALING : m,
                         newLevel >= 20 ? io.github.larsonix.trailoforbis.guide.GuideMilestone.DEATH_PENALTY_ACTIVE : m,
-                        newLevel >= 25 ? io.github.larsonix.trailoforbis.guide.GuideMilestone.LARGER_REALMS : m
+                        newLevel >= 25 ? io.github.larsonix.trailoforbis.guide.GuideMilestone.LARGER_REALMS : m,
+                        newLevel >= 50 ? io.github.larsonix.trailoforbis.guide.GuideMilestone.FIRST_MASSIVE_REALM : m
                     );
                 });
             }
@@ -1239,8 +1277,9 @@ public class TrailOfOrbis extends JavaPlugin {
     protected void shutdown() {
         getLogger().atInfo().log("Shutting down TrailOfOrbis...");
 
-        // Phase 0: Clear ServiceRegistry first
+        // Phase 0: Clear ServiceRegistry and hex tracking
         ServiceRegistry.clear();
+        io.github.larsonix.trailoforbis.compat.HexCasterRegistry.clear();
 
         // Phase 1: Save all player data
         if (attributeManager != null) {
@@ -2439,12 +2478,10 @@ public class TrailOfOrbis extends JavaPlugin {
                 attributeManager.setConditionalTriggerSystem(conditionalTriggerSystem);
             }
 
-            // Create and register gear equipment listener
-            // This listener triggers stat recalculation on equipment changes
+            // Create gear equipment listener — marks equipment dirty in the sync coordinator.
+            // Stat recalculation is handled by EquipmentChangeListener (runs earlier).
+            // Item definition sync is handled by ImmediateItemSyncHandler (runs earliest).
             gearEquipmentListener = new GearEquipmentListener(
-                    gearManager.getStatCalculator(),
-                    gearManager.getStatApplier(),
-                    gearManager.getItemSyncService(),
                     gearManager.getSyncCoordinator());
             gearEquipmentListener.register(getEventRegistry());
 

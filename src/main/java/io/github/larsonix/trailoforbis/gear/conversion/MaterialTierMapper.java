@@ -144,6 +144,20 @@ public final class MaterialTierMapper {
     }
 
     /**
+     * Gets the distance range for the given item based on its material.
+     * Uses the shared mob scaling formula to derive gear level ranges.
+     */
+    @Nonnull
+    public VanillaConversionConfig.DistanceRange getDistanceRange(@Nonnull String itemId) {
+        Objects.requireNonNull(itemId, "itemId cannot be null");
+        Optional<String> material = extractMaterial(itemId);
+        if (material.isEmpty()) {
+            return config.getDefaultDistance();
+        }
+        return config.getDistanceForMaterial(material.get());
+    }
+
+    /**
      * Caps a rolled rarity at the material's maximum.
      *
      * @param rolledRarity The rarity that was randomly rolled

@@ -22,5 +22,6 @@
     ]
   },
   "Scale": 3,
-  "Icon": "Icons/ItemsGenerated/Realm_Map_Tundra.png"
+  "Icon": "Icons/ItemsGenerated/Realm_Map_Tundra.png",
+  "Variant": true
 }

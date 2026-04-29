@@ -15,10 +15,6 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
-import io.github.larsonix.trailoforbis.gear.instance.GearInstanceId;
-import io.github.larsonix.trailoforbis.gear.instance.GearInstanceIdGenerator;
-import io.github.larsonix.trailoforbis.gear.item.ItemRegistryService;
-import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
@@ -28,8 +24,8 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,22 +55,26 @@ public final class ReskinDataPreserver {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final long CACHE_TTL_MS = 60_000L;
 
-    private final ItemRegistryService itemRegistry;
-    private final ItemSyncService itemSyncService;
     private final ConcurrentHashMap<UUID, CachedReskinData> cache = new ConcurrentHashMap<>();
-    private final Set<UUID> processing = ConcurrentHashMap.newKeySet();
 
-    public ReskinDataPreserver(@Nonnull ItemRegistryService itemRegistry,
-                               @Nonnull ItemSyncService itemSyncService) {
-        this.itemRegistry = Objects.requireNonNull(itemRegistry);
-        this.itemSyncService = Objects.requireNonNull(itemSyncService);
+    public ReskinDataPreserver() {
     }
 
     /**
      * InventoryChangeEvent handler — registered via {@code InventoryChangeEventSystem.addHandler()}.
+     *
+     * <p>Separated into two phases that run in DIFFERENT event cycles:
+     * <ul>
+     *   <li>CACHE phase: When the workbench input has RPG gear, cache its data</li>
+     *   <li>APPLY phase: When a vanilla weapon/armor appears in inventory AND we have
+     *       a cache from a PREVIOUS event, apply the cached RPG data</li>
+     * </ul>
+     *
+     * <p>Running both in the same event caused premature matching — the apply phase
+     * would find vanilla items already in inventory before the workbench consumed
+     * the input.
      */
     public void onInventoryChange(@Nonnull Player player, @Nonnull InventoryChangeEvent event) {
-        // Get player UUID
         Ref<EntityStore> ref = player.getReference();
         if (ref == null || !ref.isValid()) {
             return;
@@ -86,14 +86,16 @@ public final class ReskinDataPreserver {
         }
         UUID playerId = playerRef.getUuid();
 
-        // Recursion guard — skip events caused by our own slot replacement
-        if (processing.contains(playerId)) {
-            return;
-        }
-
         // Check if player has a StructuralCrafting window open
         if (!hasStructuralCraftingWindow(player)) {
-            return;
+            return; // Not a workbench event — silent skip (very frequent)
+        }
+
+        // Guide milestone: first time opening Builder's Workbench
+        var rpg = io.github.larsonix.trailoforbis.TrailOfOrbis.getInstanceOrNull();
+        if (rpg != null && rpg.getGuideManager() != null) {
+            rpg.getGuideManager().tryShow(playerId,
+                io.github.larsonix.trailoforbis.guide.GuideMilestone.RESKIN_AVAILABLE);
         }
 
         Inventory inventory = player.getInventory();
@@ -101,11 +103,9 @@ public final class ReskinDataPreserver {
             return;
         }
 
-        // CACHE PHASE: Check the workbench input slot for RPG gear
+        // CACHE PHASE: Check the workbench input for RPG gear to cache.
+        // The APPLY phase is handled by ReskinCraftInterceptor via CraftRecipeEvent.Pre.
         cacheFromWorkbenchInput(player, playerId);
-
-        // APPLY PHASE: Check if a vanilla gear item appeared in inventory
-        applyToVanillaOutput(player, playerRef, playerId, inventory);
     }
 
     /**
@@ -113,6 +113,24 @@ public final class ReskinDataPreserver {
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
         cache.remove(playerId);
+    }
+
+    /**
+     * Consumes and returns the cached GearData for a player, removing it from the cache.
+     *
+     * <p>Used by {@link ReskinCraftInterceptor} to atomically retrieve and clear the
+     * cache during CraftRecipeEvent.Pre handling.
+     *
+     * @param playerId The player's UUID
+     * @return The cached GearData, or null if no cache exists or it expired
+     */
+    @Nullable
+    public GearData consumeCache(@Nonnull UUID playerId) {
+        CachedReskinData cached = cache.remove(playerId);
+        if (cached == null || cached.isExpired()) {
+            return null;
+        }
+        return cached.gearData();
     }
 
     /**
@@ -124,7 +142,6 @@ public final class ReskinDataPreserver {
             return;
         }
 
-        // Access the workbench's combined container (input is slot 0)
         if (!(structuralWindow instanceof ItemContainerWindow containerWindow)) {
             return;
         }
@@ -147,143 +164,12 @@ public final class ReskinDataPreserver {
         cache.put(playerId, new CachedReskinData(
                 gearData,
                 rarity,
-                rarity.getAllowedSkinQualities(),
                 System.currentTimeMillis()
         ));
 
-        LOGGER.atFine().log("Cached reskin data for player %s: %s rarity=%s",
+        LOGGER.atFine().log("Cached reskin data for %s: %s rarity=%s",
                 playerId.toString().substring(0, 8),
                 gearData.baseItemId(), rarity);
-    }
-
-    /**
-     * Scans the player's inventory for unclaimed vanilla gear and applies cached RPG data.
-     */
-    private void applyToVanillaOutput(@Nonnull Player player, @Nonnull PlayerRef playerRef,
-                                       @Nonnull UUID playerId, @Nonnull Inventory inventory) {
-        CachedReskinData cached = cache.get(playerId);
-        if (cached == null || cached.isExpired()) {
-            if (cached != null) {
-                cache.remove(playerId);
-            }
-            return;
-        }
-
-        // Scan inventory containers for a vanilla weapon/armor that matches
-        ItemContainer[] containers = {
-                inventory.getHotbar(),
-                inventory.getArmor(),
-                inventory.getStorage(),
-                inventory.getBackpack(),
-                inventory.getUtility()
-        };
-
-        for (ItemContainer container : containers) {
-            if (container == null) {
-                continue;
-            }
-            short capacity = container.getCapacity();
-            for (short slot = 0; slot < capacity; slot++) {
-                ItemStack itemStack = container.getItemStack(slot);
-                if (ItemStack.isEmpty(itemStack)) {
-                    continue;
-                }
-
-                // Skip RPG gear — we only want vanilla items
-                if (GearUtils.isRpgGear(itemStack)) {
-                    continue;
-                }
-
-                // Check if this vanilla item is a weapon or armor
-                Item item = Item.getAssetMap().getAsset(itemStack.getItemId());
-                if (item == null || item == Item.UNKNOWN) {
-                    continue;
-                }
-                if (item.getWeapon() == null && item.getArmor() == null) {
-                    continue;
-                }
-
-                // Check quality matches allowed skin qualities
-                String qualityId = resolveQualityId(item);
-                if (qualityId == null || !cached.allowedQualities.contains(qualityId)) {
-                    continue;
-                }
-
-                // Match found — apply RPG data to this item
-                applyReskinData(player, playerRef, playerId, container, slot, itemStack, cached);
-                return; // One match per event cycle
-            }
-        }
-    }
-
-    /**
-     * Applies the cached RPG data to a vanilla item, replacing it with a new RPG item.
-     */
-    private void applyReskinData(@Nonnull Player player, @Nonnull PlayerRef playerRef,
-                                  @Nonnull UUID playerId,
-                                  @Nonnull ItemContainer container, short slot,
-                                  @Nonnull ItemStack vanillaItem,
-                                  @Nonnull CachedReskinData cached) {
-        String newBaseItemId = vanillaItem.getItemId();
-
-        // Generate new instance ID for the reskinned item
-        GearInstanceId newInstanceId = GearInstanceIdGenerator.generate();
-
-        // Create updated GearData with new skin and instance ID
-        GearData newGearData = cached.gearData
-                .withBaseItemId(newBaseItemId)
-                .withInstanceId(newInstanceId);
-
-        // Get the new base item asset
-        Item newBaseItem = Item.getAssetMap().getAsset(newBaseItemId);
-        if (newBaseItem == null || newBaseItem == Item.UNKNOWN) {
-            LOGGER.atWarning().log("Base item not found for reskin: %s", newBaseItemId);
-            return;
-        }
-
-        // Register the custom item definition (clone new base item with custom ID)
-        String customItemId = newInstanceId.toItemId();
-        try {
-            itemRegistry.createAndRegisterSync(newBaseItem, customItemId);
-        } catch (Exception e) {
-            LOGGER.atWarning().withCause(e).log(
-                    "Failed to register custom item for reskin: %s", customItemId);
-            return;
-        }
-
-        // Create the RPG ItemStack
-        ItemStack rpgItemStack = new ItemStack(customItemId, 1);
-        rpgItemStack = GearUtils.setGearData(rpgItemStack, newGearData);
-
-        // Replace the vanilla item in the inventory slot (deferred to avoid recursion)
-        processing.add(playerId);
-        final ItemStack finalRpgItem = rpgItemStack;
-        final short finalSlot = slot;
-
-        if (player.getWorld() != null) {
-            player.getWorld().execute(() -> {
-                try {
-                    container.setItemStackForSlot(finalSlot, finalRpgItem);
-
-                    // Sync the new item definition to the player
-                    itemSyncService.syncItem(playerRef, finalRpgItem, newGearData);
-
-                    LOGGER.atInfo().log("Reskinned RPG gear for player %s: %s → %s (rarity=%s)",
-                            playerId.toString().substring(0, 8),
-                            cached.gearData.baseItemId(), newBaseItemId,
-                            cached.rarity);
-                } catch (Exception e) {
-                    LOGGER.atWarning().withCause(e).log(
-                            "Failed to apply reskin for player %s", playerId);
-                } finally {
-                    processing.remove(playerId);
-                    cache.remove(playerId);
-                }
-            });
-        } else {
-            processing.remove(playerId);
-            cache.remove(playerId);
-        }
     }
 
     /**
@@ -314,23 +200,11 @@ public final class ReskinDataPreserver {
     }
 
     /**
-     * Resolves the vanilla quality ID for an item.
-     */
-    @Nullable
-    private static String resolveQualityId(@Nonnull Item item) {
-        int qualityIndex = item.getQualityIndex();
-        var quality = com.hypixel.hytale.server.core.asset.type.item.config.ItemQuality
-                .getAssetMap().getAsset(qualityIndex);
-        return quality != null ? quality.getId() : null;
-    }
-
-    /**
      * Cached RPG data for a player's pending reskin operation.
      */
     private record CachedReskinData(
             @Nonnull GearData gearData,
             @Nonnull GearRarity rarity,
-            @Nonnull Set<String> allowedQualities,
             long cachedAtMs
     ) {
         boolean isExpired() {
