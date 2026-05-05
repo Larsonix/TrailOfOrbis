@@ -47,6 +47,14 @@ public enum AttackType {
     AREA("Area", Set.of("explosion", "sweep", "area", "splash", "shockwave", "blast", "nova")),
 
     /**
+     * Spell attack (hex bolt, combustion, etc.)
+     * Applies spellDamagePercent bonus. Base damage placed in spell element slot.
+     *
+     * <p>Detected by keywords: spell, hex, cast, magic
+     */
+    SPELL("Spell", Set.of("spell", "hex", "cast", "magic")),
+
+    /**
      * Unknown or unclassified attack type.
      * No type-specific bonus applied.
      */

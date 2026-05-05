@@ -11,13 +11,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for CombatCalculator.
  *
- * <p>Tests the PoE-inspired damage formulas:
+ * <p>Tests damage formulas:
  * <ul>
  *   <li>Attacker: (Base + Flat) * (1 + %/100) * CritMultiplier</li>
- *   <li>Defender: Armor / (Armor + 10*Damage), capped at 90%</li>
+ *   <li>Defender: Armor / (Armor + levelScale*AttackerLevel + baseConstant), capped at 90%</li>
  * </ul>
  */
 public class CombatCalculatorTest {
+
+    /** Standard attacker level for armor tests. With default k=9, c=50: denominator contribution = 9*10+50 = 140. */
+    private static final int TEST_LEVEL = 10;
 
     private CombatCalculator calculator;
 
@@ -225,33 +228,35 @@ public class CombatCalculatorTest {
     class DefenderArmorTests {
 
         @Test
-        @DisplayName("PoE formula: 100 armor vs 10 damage = 50% reduction")
+        @DisplayName("Level-scaled formula: 100 armor at level 10 = 41.67% reduction")
         void armorFormulaBasic() {
             ComputedStats stats = ComputedStats.builder()
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats);
+            var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
-            // 100 / (100 + 10*10) = 100 / 200 = 0.5 = 50%
-            assertEquals(50f, result.reductionPercent(), 0.001f);
-            assertEquals(5f, result.finalDamage(), 0.001f);
+            // 100 / (100 + 140) = 100 / 240 = 41.67%
+            assertEquals(41.67f, result.reductionPercent(), 0.01f);
+            assertEquals(5.833f, result.finalDamage(), 0.01f);
             assertEquals(10f, result.beforeArmor(), 0.001f);
             assertEquals(100f, result.armorValue(), 0.001f);
         }
 
         @Test
-        @DisplayName("Armor vs high damage = lower reduction")
-        void armorVsHighDamage() {
+        @DisplayName("Reduction is damage-independent: same % for 10 and 100 damage")
+        void armorReductionDamageIndependent() {
             ComputedStats stats = ComputedStats.builder()
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(100f, stats);
+            var smallHit = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
+            var largeHit = calculator.calculateDefenderReduction(100f, stats, 0f, TEST_LEVEL);
 
-            // 100 / (100 + 10*100) = 100 / 1100 = 0.0909 = 9.09%
-            assertEquals(9.09f, result.reductionPercent(), 0.1f);
-            assertEquals(90.9f, result.finalDamage(), 0.1f);
+            // 100 / (100 + 140) = 41.67% regardless of damage
+            assertEquals(41.67f, smallHit.reductionPercent(), 0.01f);
+            assertEquals(41.67f, largeHit.reductionPercent(), 0.01f);
+            assertEquals(58.33f, largeHit.finalDamage(), 0.01f);
         }
 
         @Test
@@ -261,9 +266,9 @@ public class CombatCalculatorTest {
                 .armor(10000f) // Very high armor
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats);
+            var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
-            // Would be 10000 / (10000 + 100) = 99.01%, but capped at 90%
+            // Would be 10000 / (10000 + 140) = 98.62%, but capped at 90%
             assertTrue(result.reductionPercent() <= 90f, "Reduction should be capped at 90%");
             assertEquals(90f, result.reductionPercent(), 0.001f);
             assertEquals(1f, result.finalDamage(), 0.001f); // 10% gets through
@@ -276,7 +281,7 @@ public class CombatCalculatorTest {
                 .armor(0f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(50f, stats);
+            var result = calculator.calculateDefenderReduction(50f, stats, 0f, TEST_LEVEL);
 
             assertEquals(0f, result.reductionPercent(), 0.001f);
             assertEquals(50f, result.finalDamage(), 0.001f);
@@ -289,7 +294,7 @@ public class CombatCalculatorTest {
                 .armor(-50f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(50f, stats);
+            var result = calculator.calculateDefenderReduction(50f, stats, 0f, TEST_LEVEL);
 
             assertEquals(0f, result.reductionPercent(), 0.001f);
             assertEquals(50f, result.finalDamage(), 0.001f);
@@ -302,30 +307,29 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(0f, stats);
+            var result = calculator.calculateDefenderReduction(0f, stats, 0f, TEST_LEVEL);
 
             assertEquals(0f, result.reductionPercent(), 0.001f);
             assertEquals(0f, result.finalDamage(), 0.001f);
         }
 
         @Test
-        @DisplayName("Diminishing returns: armor scales better vs small hits")
-        void diminishingReturns() {
+        @DisplayName("Hit-size independent: same reduction for small and large hits")
+        void hitSizeIndependentReduction() {
             ComputedStats stats = ComputedStats.builder()
                 .armor(50f)
                 .build();
 
-            // Small hit: 50 / (50 + 10*5) = 50/100 = 50%
-            var smallHit = calculator.calculateDefenderReduction(5f, stats);
-            assertEquals(50f, smallHit.reductionPercent(), 0.1f);
+            // 50 / (50 + 140) = 50/190 = 26.32% for both hit sizes
+            var smallHit = calculator.calculateDefenderReduction(5f, stats, 0f, TEST_LEVEL);
+            assertEquals(26.32f, smallHit.reductionPercent(), 0.01f);
 
-            // Large hit: 50 / (50 + 10*50) = 50/550 = 9.09%
-            var largeHit = calculator.calculateDefenderReduction(50f, stats);
-            assertEquals(9.09f, largeHit.reductionPercent(), 0.1f);
+            var largeHit = calculator.calculateDefenderReduction(50f, stats, 0f, TEST_LEVEL);
+            assertEquals(26.32f, largeHit.reductionPercent(), 0.01f);
 
-            // Verify small hits get more reduction
-            assertTrue(smallHit.reductionPercent() > largeHit.reductionPercent(),
-                "Small hits should receive more armor reduction");
+            // Verify consistent reduction regardless of hit size
+            assertEquals(smallHit.reductionPercent(), largeHit.reductionPercent(), 0.001f,
+                "Reduction should be identical regardless of hit size");
         }
 
         @Test
@@ -336,12 +340,12 @@ public class CombatCalculatorTest {
                 .armorPercent(50f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats);
+            var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
             // Effective armor = 100 * (1 + 50/100) = 150
-            // Reduction = 150 / (150 + 10*10) = 150/250 = 60%
-            assertEquals(60f, result.reductionPercent(), 0.1f);
-            assertEquals(4f, result.finalDamage(), 0.1f);
+            // Reduction = 150 / (150 + 140) = 150/290 = 51.72%
+            assertEquals(51.72f, result.reductionPercent(), 0.01f);
+            assertEquals(4.828f, result.finalDamage(), 0.01f);
         }
 
         @Test
@@ -355,8 +359,8 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var resultWith = calculator.calculateDefenderReduction(10f, withPercent);
-            var resultWithout = calculator.calculateDefenderReduction(10f, without);
+            var resultWith = calculator.calculateDefenderReduction(10f, withPercent, 0f, TEST_LEVEL);
+            var resultWithout = calculator.calculateDefenderReduction(10f, without, 0f, TEST_LEVEL);
 
             assertEquals(resultWithout.reductionPercent(), resultWith.reductionPercent(), 0.001f);
         }
@@ -369,11 +373,11 @@ public class CombatCalculatorTest {
                 .armorPercent(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats);
+            var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
             // Effective armor = 100 * 2 = 200
-            // Reduction = 200 / (200 + 100) = 200/300 = 66.67%
-            assertEquals(66.67f, result.reductionPercent(), 0.1f);
+            // Reduction = 200 / (200 + 140) = 200/340 = 58.82%
+            assertEquals(58.82f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -384,11 +388,11 @@ public class CombatCalculatorTest {
                 .armorPercent(-50f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats);
+            var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
             // Effective armor = 100 * 0.5 = 50
-            // Reduction = 50 / (50 + 100) = 50/150 = 33.33%
-            assertEquals(33.33f, result.reductionPercent(), 0.1f);
+            // Reduction = 50 / (50 + 140) = 50/190 = 26.32%
+            assertEquals(26.32f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -400,11 +404,11 @@ public class CombatCalculatorTest {
                 .build();
 
             // 50% penetration
-            var result = calculator.calculateDefenderReduction(10f, stats, 50f);
+            var result = calculator.calculateDefenderReduction(10f, stats, 50f, TEST_LEVEL);
 
             // Effective armor = 100 * 1.5 = 150, then pen: 150 * 0.5 = 75
-            // Reduction = 75 / (75 + 100) = 75/175 = 42.86%
-            assertEquals(42.86f, result.reductionPercent(), 0.1f);
+            // Reduction = 75 / (75 + 140) = 75/215 = 34.88%
+            assertEquals(34.88f, result.reductionPercent(), 0.01f);
         }
     }
 
@@ -421,12 +425,12 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats, 25f);
+            var result = calculator.calculateDefenderReduction(10f, stats, 25f, TEST_LEVEL);
 
             // Effective armor = 100 * max(0.5, 1 - 0.25) = 100 * 0.75 = 75
-            // Reduction = 75 / (75 + 10*10) = 75/175 = 42.86%
+            // Reduction = 75 / (75 + 140) = 75/215 = 34.88%
             assertEquals(75f, result.effectiveArmor(), 0.1f);
-            assertEquals(42.86f, result.reductionPercent(), 0.1f);
+            assertEquals(34.88f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -436,12 +440,12 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats, 50f);
+            var result = calculator.calculateDefenderReduction(10f, stats, 50f, TEST_LEVEL);
 
             // Effective armor = 100 * max(0.5, 1 - 0.5) = 100 * 0.5 = 50
-            // Reduction = 50 / (50 + 100) = 50/150 = 33.33%
+            // Reduction = 50 / (50 + 140) = 50/190 = 26.32%
             assertEquals(50f, result.effectiveArmor(), 0.1f);
-            assertEquals(33.33f, result.reductionPercent(), 0.1f);
+            assertEquals(26.32f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -451,8 +455,8 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result50 = calculator.calculateDefenderReduction(10f, stats, 50f);
-            var result75 = calculator.calculateDefenderReduction(10f, stats, 75f);
+            var result50 = calculator.calculateDefenderReduction(10f, stats, 50f, TEST_LEVEL);
+            var result75 = calculator.calculateDefenderReduction(10f, stats, 75f, TEST_LEVEL);
 
             // Both should have same effective armor due to floor
             assertEquals(result50.effectiveArmor(), result75.effectiveArmor(), 0.001f);
@@ -466,7 +470,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats, 100f);
+            var result = calculator.calculateDefenderReduction(10f, stats, 100f, TEST_LEVEL);
 
             // Even 100% pen can't go below floor
             assertEquals(50f, result.effectiveArmor(), 0.1f);
@@ -482,7 +486,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = custom.calculateDefenderReduction(10f, stats, 100f);
+            var result = custom.calculateDefenderReduction(10f, stats, 100f, TEST_LEVEL);
 
             // Effective armor = 100 * 0.25 = 25
             assertEquals(25f, result.effectiveArmor(), 0.1f);
@@ -498,7 +502,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = custom.calculateDefenderReduction(10f, stats, 100f);
+            var result = custom.calculateDefenderReduction(10f, stats, 100f, TEST_LEVEL);
 
             // 100% pen with no floor = 0 effective armor
             assertEquals(0f, result.effectiveArmor(), 0.001f);
@@ -516,7 +520,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = custom.calculateDefenderReduction(10f, stats, 100f);
+            var result = custom.calculateDefenderReduction(10f, stats, 100f, TEST_LEVEL);
 
             // Even 100% pen does nothing with 100% floor
             assertEquals(100f, result.effectiveArmor(), 0.1f);
@@ -530,7 +534,7 @@ public class CombatCalculatorTest {
                 .armorPercent(50f) // +50% = 150 armor
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats, 75f);
+            var result = calculator.calculateDefenderReduction(10f, stats, 75f, TEST_LEVEL);
 
             // Armor after % bonus = 100 * 1.5 = 150
             // Pen effect = max(0.5, 1 - 0.75) = 0.5 (floor)
@@ -547,13 +551,13 @@ public class CombatCalculatorTest {
                 .build();
 
             // Ravager has 50% armor pen (3.5× base multiplier)
-            var result = calculator.calculateDefenderReduction(100f, playerStats, 50f);
+            var result = calculator.calculateDefenderReduction(100f, playerStats, 50f, TEST_LEVEL);
 
             // With floor: effective = 1000 * max(0.5, 0.5) = 500
             // Without floor: effective = 1000 * 0.5 = 500 (same at exactly 50%)
             assertEquals(500f, result.effectiveArmor(), 0.1f);
-            // Reduction = 500 / (500 + 1000) = 500/1500 = 33.33%
-            assertEquals(33.33f, result.reductionPercent(), 0.1f);
+            // Reduction = 500 / (500 + 140) = 500/640 = 78.13%
+            assertEquals(78.13f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -565,12 +569,13 @@ public class CombatCalculatorTest {
                 .build();
 
             // Executioner has 75% armor pen - but floor caps it at 50%
-            var result = calculator.calculateDefenderReduction(100f, playerStats, 75f);
+            var result = calculator.calculateDefenderReduction(100f, playerStats, 75f, TEST_LEVEL);
 
             // With floor: effective = 1000 * max(0.5, 0.25) = 1000 * 0.5 = 500
             assertEquals(500f, result.effectiveArmor(), 0.1f);
             // Same reduction as 50% pen due to floor
-            assertEquals(33.33f, result.reductionPercent(), 0.1f);
+            // Reduction = 500 / (500 + 140) = 500/640 = 78.13%
+            assertEquals(78.13f, result.reductionPercent(), 0.01f);
         }
 
         @Test
@@ -580,7 +585,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .build();
 
-            var result = calculator.calculateDefenderReduction(10f, stats, -25f);
+            var result = calculator.calculateDefenderReduction(10f, stats, -25f, TEST_LEVEL);
 
             // Negative pen should not increase armor
             // -25% → clamp to 0% → effectiveness = max(0.5, 1) = 1
@@ -633,7 +638,7 @@ public class CombatCalculatorTest {
                 .armor(200f)
                 .build();
 
-            var armorResult = calculator.calculateDefenderReduction(20f, defenderStats);
+            var armorResult = calculator.calculateDefenderReduction(20f, defenderStats, 0f, TEST_LEVEL);
 
             assertEquals(20f, armorResult.beforeArmor());
             assertEquals(200f, armorResult.armorValue());

@@ -19,6 +19,7 @@ import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator.ValidationResult;
 import io.github.larsonix.trailoforbis.gear.equipment.RequirementCalculator;
 import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
+import io.github.larsonix.trailoforbis.gear.migration.ItemMigrationService;
 import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
 import io.github.larsonix.trailoforbis.gear.loot.LootCalculator;
@@ -115,6 +116,7 @@ public final class GearManager implements GearService {
     private EquipmentListener equipmentListener;
     private GearStatCalculator statCalculator;
     private GearStatApplier statApplier;
+    private ItemMigrationService itemMigrationService;
 
     // Rich tooltip components (Message API)
     private TooltipConfig tooltipConfig;
@@ -136,6 +138,9 @@ public final class GearManager implements GearService {
 
     // World-level item sync (for pickup notification fix)
     private ItemWorldSyncService itemWorldSyncService;
+
+    // Equipment definition broadcast (armor rendering on remote clients)
+    private io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem equipmentBroadcastSystem;
 
     // Sync coordinator (coalesces dirty-marking into minimal packet bursts)
     private ItemSyncCoordinator syncCoordinator;
@@ -180,6 +185,7 @@ public final class GearManager implements GearService {
     // State
     private boolean initialized = false;
     private boolean craftingConversionPending = false;  // Deferred until LevelingService available
+    private boolean timedCraftPending = false;          // Deferred until LevelingService available
 
     /**
      * Creates a GearManager.
@@ -286,10 +292,34 @@ public final class GearManager implements GearService {
                     plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
                     craftingConversionPending = false;
                     LOGGER.at(Level.INFO).log("Registered deferred crafting conversion ECS system");
+
+                    // Update crafting preview tooltips on level-up so the displayed
+                    // gear level reflects the player's new RPG level.
+                    if (craftingPreviewService != null) {
+                        levelingService.registerLevelUpListener((playerId, newLevel, oldLevel, totalXp) -> {
+                            com.hypixel.hytale.server.core.universe.PlayerRef ref =
+                                    com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(playerId);
+                            if (ref != null && ref.isValid() && craftingPreviewService.isInitialized()) {
+                                craftingPreviewService.syncToPlayer(ref, newLevel);
+                            }
+                        });
+                    }
                 },
                 () -> LOGGER.at(Level.WARNING).log(
                     "LevelingService still not available - crafting conversion will not work")
             );
+        }
+
+        // Initialize timed craft handler if it was deferred
+        if (timedCraftPending && timedCraftHandler == null) {
+            initializeTimedCraftHandler();
+            if (timedCraftHandler != null) {
+                timedCraftPending = false;
+                LOGGER.at(Level.INFO).log("Deferred timed craft handler now initialized");
+            } else {
+                LOGGER.at(Level.WARNING).log(
+                    "LevelingService still not available - timed craft conversion will not work");
+            }
         }
     }
 
@@ -327,6 +357,12 @@ public final class GearManager implements GearService {
         if (itemWorldSyncService != null) {
             itemWorldSyncService.shutdown();
             itemWorldSyncService = null;
+        }
+
+        // Shutdown equipment broadcast system
+        if (equipmentBroadcastSystem != null) {
+            equipmentBroadcastSystem.shutdown();
+            equipmentBroadcastSystem = null;
         }
 
         // Clear references (allow GC)
@@ -425,6 +461,14 @@ public final class GearManager implements GearService {
         gearGenerator = new GearGenerator(balanceConfig, modifierConfig,
                 configLoader.getEquipmentStatConfig(), itemRegistryService);
 
+        // Item migration (validates + fixes stale gear on player login)
+        itemMigrationService = new ItemMigrationService(
+                modifierConfig, balanceConfig, configLoader.getEquipmentStatConfig());
+        // Wire item registry for resolving legacy items' base IDs from custom rpg_gear_* IDs
+        itemMigrationService.setItemRegistryService(itemRegistryService);
+        // Wire gear generator as source of truth for implicit correctness
+        itemMigrationService.setGearGenerator(gearGenerator);
+
         // Requirements
         requirementCalculator = new RequirementCalculator(balanceConfig, modifierConfig);
 
@@ -451,7 +495,7 @@ public final class GearManager implements GearService {
         // Rich tooltip formatting (Message API)
         tooltipConfig = configLoader.getTooltipConfig();
         richTooltipFormatter = new RichTooltipFormatter(
-                modifierConfig, requirementCalculator, attributeManager, tooltipConfig);
+                modifierConfig, balanceConfig, requirementCalculator, attributeManager, tooltipConfig);
         itemNameFormatter = new ItemNameFormatter(
                 modifierConfig,
                 tooltipConfig.includePrefix(),
@@ -506,9 +550,9 @@ public final class GearManager implements GearService {
             });
 
         // Unified pickup notification service
-        // Handles both item sync and chat notifications for all item types
+        // Handles item sync and guide milestones for all item types
         pickupNotificationService = new PickupNotificationService(
-                itemDisplayNameService, itemSyncService, customItemSyncService, richTooltipFormatter);
+                itemSyncService, customItemSyncService);
 
         // World-level item sync (for pickup notification fix)
         // This syncs custom items to ALL nearby players when items spawn,
@@ -611,6 +655,12 @@ public final class GearManager implements GearService {
         // Crafting preview tooltips — appends RPG info to vanilla weapon/armor descriptions.
         // MUST be after initializeVanillaConversion() for ItemClassifier and MaterialTierMapper.
         initializeCraftingPreview();
+
+        // Wire crafting preview into reskin preserver (deferred — reskin system initializes
+        // before crafting preview because it doesn't need VanillaItemConverter)
+        if (craftingPreviewService != null && reskinDataPreserver != null) {
+            reskinDataPreserver.setCraftingPreviewService(craftingPreviewService);
+        }
     }
 
     /**
@@ -634,6 +684,11 @@ public final class GearManager implements GearService {
             gearGenerator,
             gearGenerator.getRarityRoller()
         );
+
+        // Wire into item migration service for login-time conversion of vanilla inventory items
+        if (itemMigrationService != null) {
+            itemMigrationService.setVanillaItemConverter(vanillaItemConverter);
+        }
 
         // Register ECS system for crafting conversion (may be deferred if LevelingService not yet available)
         if (vanillaItemConverter.isSourceEnabled(VanillaItemConverter.AcquisitionSource.CRAFTING)) {
@@ -694,9 +749,17 @@ public final class GearManager implements GearService {
             LOGGER.at(Level.WARNING).log("Cannot initialize timed craft handler: missing distance calculator or converter");
             return;
         }
-        timedCraftHandler = new io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler(
-                vanillaItemConverter, distCalc, convConfig, itemSyncService);
-        LOGGER.at(Level.INFO).log("Initialized timed craft conversion handler (BasicCrafting, DiagramCrafting, Processing)");
+        ServiceRegistry.get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class).ifPresentOrElse(
+            levelingService -> {
+                timedCraftHandler = new io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler(
+                        vanillaItemConverter, distCalc, convConfig, levelingService, itemSyncService);
+                LOGGER.at(Level.INFO).log("Initialized timed craft conversion handler (BasicCrafting, DiagramCrafting, Processing)");
+            },
+            () -> {
+                timedCraftPending = true;
+                LOGGER.at(Level.INFO).log("Timed craft handler deferred (LevelingService will be available later)");
+            }
+        );
     }
 
     @Nullable
@@ -764,6 +827,9 @@ public final class GearManager implements GearService {
 
         // Cache-only data preserver (registered later via InventoryChangeEventSystem)
         reskinDataPreserver = new ReskinDataPreserver();
+
+        // Note: craftingPreviewService wiring is deferred to after initializeCraftingPreview()
+        // because the crafting preview system needs VanillaItemConverter which isn't ready yet.
 
         // Craft interceptor (registered as ECS system in TrailOfOrbis.registerEcsSystems)
         reskinCraftInterceptor = new ReskinCraftInterceptor(
@@ -1099,6 +1165,16 @@ public final class GearManager implements GearService {
         return itemWorldSyncService;
     }
 
+    public void setEquipmentBroadcastSystem(
+            @Nonnull io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem system) {
+        this.equipmentBroadcastSystem = system;
+    }
+
+    @Nullable
+    public io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem getEquipmentBroadcastSystem() {
+        return equipmentBroadcastSystem;
+    }
+
     /**
      * Gets the unified pickup notification service.
      *
@@ -1198,6 +1274,11 @@ public final class GearManager implements GearService {
     public io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig getEquipmentStatConfig() {
         ensureInitialized();
         return configLoader.getEquipmentStatConfig();
+    }
+
+    public ItemMigrationService getItemMigrationService() {
+        ensureInitialized();
+        return itemMigrationService;
     }
 
     public boolean isInitialized() {

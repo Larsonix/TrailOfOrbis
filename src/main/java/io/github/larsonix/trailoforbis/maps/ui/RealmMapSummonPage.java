@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.maps.ui;
 
 import com.hypixel.hytale.builtin.portals.PortalsPlugin;
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.builtin.portals.components.PortalDevice;
 import com.hypixel.hytale.builtin.portals.components.PortalDeviceConfig;
 import com.hypixel.hytale.builtin.portals.utils.BlockTypeUtils;
@@ -31,6 +32,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.gear.GearManager;
+import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.api.RealmsService.ValidationResult;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
@@ -43,6 +46,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Custom UI page that shows realm map details using the native PortalDeviceSummon.ui template.
@@ -108,8 +112,10 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
 
         cmd.append("Pages/PortalDeviceSummon.ui");
 
-        // Title: "[Rarity] [Biome] Realm"
-        String title = capitalize(mapData.rarity().name()) + " " + mapData.biome().getDisplayName() + " Realm";
+        // Title: "[Rarity] [Biome] Realm" or "[Rarity] Realm (Unidentified)"
+        String title = mapData.identified()
+                ? capitalize(mapData.rarity().name()) + " " + mapData.biome().getDisplayName() + " Realm"
+                : capitalize(mapData.rarity().name()) + " Realm (Unidentified)";
         cmd.set("#Title0.TextSpans", Message.raw(title).color(mapData.rarity().getHexColor()));
 
         // Artwork: use default for now (vanilla DefaultArtwork.png stays)
@@ -132,28 +138,38 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
         double qualityMult = mapData.qualityMultiplier();
 
         // Difficulty modifiers — populate vanilla #ObjectivesList with prefixes
-        // Vanilla pattern: set visibility, then append BulletPoint.ui children to the list
-        List<RealmModifier> prefixes = mapData.prefixes();
-        cmd.set("#Objectives.Visible", !prefixes.isEmpty());
-        for (int i = 0; i < prefixes.size(); i++) {
-            cmd.append("#ObjectivesList", "Pages/Portals/BulletPoint.ui");
-            cmd.set("#ObjectivesList[" + i + "] #Label.TextSpans",
-                    Message.raw(formatModifier(prefixes.get(i), qualityMult)).color(COLOR_DIFFICULTY));
+        // Only show modifiers if the map is identified
+        if (mapData.identified()) {
+            List<RealmModifier> prefixes = mapData.prefixes();
+            cmd.set("#Objectives.Visible", !prefixes.isEmpty());
+            for (int i = 0; i < prefixes.size(); i++) {
+                cmd.append("#ObjectivesList", "Pages/Portals/BulletPoint.ui");
+                cmd.set("#ObjectivesList[" + i + "] #Label.TextSpans",
+                        Message.raw(formatModifier(prefixes.get(i), qualityMult)).color(COLOR_DIFFICULTY));
+            }
+
+            // Reward modifiers — populate vanilla #TipsList with suffixes
+            List<RealmModifier> suffixes = mapData.suffixes();
+            cmd.set("#Tips.Visible", !suffixes.isEmpty());
+            for (int i = 0; i < suffixes.size(); i++) {
+                cmd.append("#TipsList", "Pages/Portals/BulletPoint.ui");
+                cmd.set("#TipsList[" + i + "] #Label.TextSpans",
+                        Message.raw(formatModifier(suffixes.get(i), qualityMult)).color(COLOR_REWARD));
+            }
+        } else {
+            cmd.set("#Objectives.Visible", false);
+            cmd.set("#Tips.Visible", false);
         }
 
-        // Reward modifiers — populate vanilla #TipsList with suffixes
-        List<RealmModifier> suffixes = mapData.suffixes();
-        cmd.set("#Tips.Visible", !suffixes.isEmpty());
-        for (int i = 0; i < suffixes.size(); i++) {
-            cmd.append("#TipsList", "Pages/Portals/BulletPoint.ui");
-            cmd.set("#TipsList[" + i + "] #Label.TextSpans",
-                    Message.raw(formatModifier(suffixes.get(i), qualityMult)).color(COLOR_REWARD));
-        }
-
-        // Pill badges: Rarity + Biome + Size
+        // Pill badges: Rarity + Biome + Size (hide biome/size when unidentified)
         addPill(cmd, 0, capitalize(mapData.rarity().name()), mapData.rarity().getHexColor());
-        addPill(cmd, 1, mapData.biome().getDisplayName(), PILL_BIOME_COLOR);
-        addPill(cmd, 2, mapData.size().getDisplayName(), PILL_SIZE_COLOR);
+        if (mapData.identified()) {
+            addPill(cmd, 1, mapData.biome().getDisplayName(), PILL_BIOME_COLOR);
+            addPill(cmd, 2, mapData.size().getDisplayName(), PILL_SIZE_COLOR);
+        } else {
+            addPill(cmd, 1, "???", PILL_BIOME_COLOR);
+            addPill(cmd, 2, "???", PILL_SIZE_COLOR);
+        }
 
         // Flavor text: Level + Quality + IIQ summary
         Message flavor = Message.empty()
@@ -301,12 +317,20 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
         LOGGER.atInfo().log("Realm %s created via portal UI, activating portal at %s",
                 realm.getRealmId(), portalPosition);
 
-        // Activate the portal device and let the vanilla PortalsPlugin handle
-        // the actual teleportation when the player steps through. The map was
-        // already consumed in handleDataEvent (many ticks ago), so even if the
-        // player is standing on the portal and gets auto-teleported by vanilla,
-        // there's no UpdateItems packet racing with the JoinWorld packet — the
-        // inventory change was fully processed by the client long before this.
+        // Suppress item sync BEFORE activating the portal. Between portal activation
+        // and DrainPlayerFromWorldEvent (~1s gap), any equipment change (hotbar switch,
+        // stat recalc) would fire item sync packets that arrive on the client in the
+        // same network frame as JoinWorldPacket → NullReferenceException. The map
+        // consumption was already handled earlier, but OTHER inventory changes (like a
+        // hotbar switch while stepping onto the portal) are not covered.
+        // DrainPlayerFromWorldEvent will call suppressPlayer again (idempotent).
+        // onPlayerReady will unsuppress + flush in the new world.
+        GearManager gearManager = TrailOfOrbis.getInstance().getGearManager();
+        ItemSyncCoordinator syncCoordinator = gearManager != null ? gearManager.getSyncCoordinator() : null;
+        if (syncCoordinator != null) {
+            syncCoordinator.suppressPlayer(playerId);
+        }
+
         sourceWorld.execute(() -> {
             activatePortalDevice(sourceWorld, realm);
 
@@ -316,6 +340,19 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
 
             LOGGER.atInfo().log("Portal at %s activated for realm %s by player %s",
                     portalPosition, realm.getRealmId(), playerId);
+
+            // Safety net: if the player walks away and never enters the portal,
+            // unsuppress after 10s so their item sync resumes normally.
+            // If they DO teleport, DrainPlayerFromWorldEvent → onPlayerReady handles it.
+            if (syncCoordinator != null) {
+                HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                    if (syncCoordinator.isPlayerSuppressed(playerId)) {
+                        LOGGER.atInfo().log("Safety unsuppress for %s — portal not entered within 10s",
+                                playerId.toString().substring(0, 8));
+                        syncCoordinator.safetyUnsuppress(playerId);
+                    }
+                }, 10, TimeUnit.SECONDS);
+            }
         });
     }
 

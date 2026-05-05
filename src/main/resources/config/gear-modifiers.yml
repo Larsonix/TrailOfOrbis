@@ -34,6 +34,7 @@ prefixes:
     scale_per_level: 0.11
     weight: 100
     allowed_slots: [weapon, hands]
+    required_attribute: FIRE  # Physical damage → Glass Cannon
 
   heavy:
     display_name: "Heavy"
@@ -44,6 +45,7 @@ prefixes:
     scale_per_level: 0.08
     weight: 100
     allowed_slots: [weapon, hands]
+    required_attribute: FIRE  # Physical damage → Glass Cannon
 
   brutal:
     display_name: "Brutal"
@@ -217,7 +219,7 @@ prefixes:
     scale_per_level: 0.03
     weight: 25
     allowed_slots: [weapon, hands]
-    required_attribute: WIND
+    required_attribute: LIGHTNING  # Crit chance → Storm Blitz (LIGHTNING grants critChance)
 
   deadly:
     display_name: "Deadly"
@@ -228,7 +230,7 @@ prefixes:
     scale_per_level: 0.11
     weight: 10
     allowed_slots: [weapon, hands]
-    required_attribute: LIGHTNING  # Crit multiplier → Storm archetype
+    required_attribute: FIRE  # Crit multiplier → Glass Cannon (FIRE grants critMultiplier)
 
   # ===========================================================================
   # PENETRATION (×0.55)
@@ -402,7 +404,7 @@ prefixes:
     scale_per_level: 0.1
     weight: 50
     allowed_slots: [shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Block chance → Iron Fortress (EARTH grants blockChance)
 
   bulwark:
     display_name: "Bulwark"
@@ -435,7 +437,7 @@ prefixes:
     scale_per_level: 0.3
     weight: 25
     allowed_slots: [head, chest, legs, shield]
-    required_attribute: FIRE
+    required_attribute: EARTH  # Block damage reduction → Iron Fortress (EARTH owns blocking)
 
   enduring:
     display_name: "Enduring"
@@ -557,7 +559,7 @@ prefixes:
     scale_per_level: 0.08
     weight: 20
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: FIRE  # Ignite → Glass Cannon (FIRE grants igniteChance)
 
   chilling:
     display_name: "Chilling"
@@ -568,7 +570,7 @@ prefixes:
     scale_per_level: 0.08
     weight: 20
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: WATER  # Freeze → Arcane Mage (WATER grants freezeChance)
 
   electrifying:
     display_name: "Electrifying"
@@ -579,7 +581,7 @@ prefixes:
     scale_per_level: 0.08
     weight: 20
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: LIGHTNING  # Shock → Storm Blitz (LIGHTNING grants shockChance)
 
   # ===========================================================================
   # PROJECTILE (×0.55)
@@ -659,12 +661,12 @@ suffixes:
     display_name: "of the Whale"
     stat: max_health
     stat_type: flat
-    base_min: 5.0
-    base_max: 15.0
-    scale_per_level: 1.0
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.56
     weight: 100
     allowed_slots: [head, chest, legs, hands, shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Max health → Iron Fortress (EARTH grants maxHealthPercent)
 
   of_vitality:
     display_name: "of Vitality"
@@ -675,7 +677,7 @@ suffixes:
     scale_per_level: 0.1
     weight: 50
     allowed_slots: [head, chest, legs, hands, shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Max health → Iron Fortress (EARTH grants maxHealthPercent)
 
   of_the_sage:
     display_name: "of the Sage"
@@ -714,12 +716,23 @@ suffixes:
     display_name: "of the Barrier"
     stat: energy_shield
     stat_type: flat
-    base_min: 5.0
-    base_max: 15.0
-    scale_per_level: 1.0
+    base_min: 2.0
+    base_max: 5.0
+    scale_per_level: 0.36
     weight: 25
     allowed_slots: [head, chest, legs, hands, shield]
     required_attribute: VOID
+
+  of_renewal:
+    display_name: "of Renewal"
+    stat: energy_shield_regen
+    stat_type: flat
+    base_min: 0.5
+    base_max: 1.5
+    scale_per_level: 0.06
+    weight: 20
+    allowed_slots: [head, chest, legs, hands, shield]
+    required_attribute: WATER
 
   # ===========================================================================
   # REGENERATION
@@ -811,6 +824,7 @@ suffixes:
     scale_per_level: 0.2
     weight: 15
     allowed_slots: [head, chest, legs, hands, shield, weapon]
+    required_attribute: LIGHTNING  # Stamina recovery → Storm Blitz
 
   # ===========================================================================
   # ARMOR / DEFENSE
@@ -820,12 +834,12 @@ suffixes:
     display_name: "of the Fortress"
     stat: armor
     stat_type: flat
-    base_min: 5.0
-    base_max: 15.0
-    scale_per_level: 1.0
+    base_min: 3.0
+    base_max: 8.0
+    scale_per_level: 0.46
     weight: 100
     allowed_slots: [head, chest, legs, hands, shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Armor → Iron Fortress (EARTH grants armor)
 
   of_iron_skin:
     display_name: "of Iron Skin"
@@ -836,7 +850,7 @@ suffixes:
     scale_per_level: 0.15
     weight: 50
     allowed_slots: [head, chest, legs, hands, shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Armor → Iron Fortress (EARTH grants armor)
 
   of_stone:
     display_name: "of Stone"
@@ -857,9 +871,9 @@ suffixes:
     display_name: "of Evasion"
     stat: evasion
     stat_type: flat
-    base_min: 3.0
-    base_max: 8.0
-    scale_per_level: 0.4
+    base_min: 2.0
+    base_max: 6.0
+    scale_per_level: 0.42
     weight: 25
     allowed_slots: [head, chest, legs, hands, shield]
     required_attribute: WIND
@@ -940,7 +954,7 @@ suffixes:
     scale_per_level: 0.3
     weight: 25
     allowed_slots: [head, chest, legs, hands, shield]
-    required_attribute: WATER
+    required_attribute: EARTH  # Knockback resistance → Iron Fortress (EARTH grants KB resist)
 
   of_the_cat:
     display_name: "of the Cat"
@@ -977,6 +991,7 @@ suffixes:
     scale_per_level: 0.008
     weight: 25
     allowed_slots: [weapon]
+    required_attribute: VOID  # Life leech → Life Devourer
 
   siphoning:
     display_name: "Siphoning"
@@ -1002,6 +1017,7 @@ suffixes:
     scale_per_level: 0.015
     weight: 15
     allowed_slots: [weapon]
+    required_attribute: VOID  # Life steal → Life Devourer
 
   of_the_mana_thief:
     display_name: "of the Mana Thief"
@@ -1093,7 +1109,7 @@ suffixes:
     scale_per_level: 0.055
     weight: 15
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: FIRE  # Burn damage → Glass Cannon (FIRE grants burnDmgPercent)
 
   of_frostbite:
     display_name: "of Frostbite"
@@ -1104,7 +1120,7 @@ suffixes:
     scale_per_level: 0.055
     weight: 15
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: WATER  # Freeze damage → Arcane Mage (WATER grants freezeChance)
 
   of_voltage:
     display_name: "of Voltage"
@@ -1115,7 +1131,7 @@ suffixes:
     scale_per_level: 0.055
     weight: 15
     allowed_slots: [weapon]
-    required_attribute: VOID
+    required_attribute: LIGHTNING  # Shock damage → Storm Blitz (LIGHTNING grants shockChance)
 
   of_venom:
     display_name: "of Venom"
@@ -1362,6 +1378,7 @@ suffixes:
     scale_per_level: 0.08
     weight: 20
     allowed_slots: [weapon, hands]
+    required_attribute: WIND  # Draw accuracy → Ghost Ranger (accuracy)
 
   hex_cast_speed:
     display_name: "of Quickening"

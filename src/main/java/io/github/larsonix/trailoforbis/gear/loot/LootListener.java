@@ -31,10 +31,13 @@ import io.github.larsonix.trailoforbis.gear.loot.LootCalculator.LootRoll;
 import io.github.larsonix.trailoforbis.gear.loot.LootSettings.MobType;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
+import io.github.larsonix.trailoforbis.gear.model.GearData;
+import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
 import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -133,11 +136,14 @@ public class LootListener extends DeathSystems.OnDeathSystem {
         // Extract realm context for loot bonuses
         RealmLootContext realmContext = extractRealmContext(store, ref, killerInfo.playerId());
 
+        // Apply realm DROP_LEVEL_BONUS — gear drops at higher level
+        int effectiveMobLevel = mobLevel + getRealmDropLevelBonus(store, ref);
+
         // Calculate loot with realm context
         LootRoll lootRoll = calculator.calculateLoot(
                 killerInfo.playerId(),
                 mobType,
-                mobLevel,
+                effectiveMobLevel,
                 playerLevel,
                 deathPosition,
                 realmContext
@@ -154,6 +160,12 @@ public class LootListener extends DeathSystems.OnDeathSystem {
         if (drops.isEmpty()) {
             LOGGER.atFine().log("Generated 0 drops (generation failed)");
             return;
+        }
+
+        // Apply realm GEAR_QUALITY_BONUS — boost quality on each gear drop
+        int qualityBonus = getRealmQualityBonus(store, ref);
+        if (qualityBonus > 0) {
+            applyQualityBonus(drops, qualityBonus);
         }
 
         // Sync item definitions to ALL nearby players BEFORE spawning
@@ -353,6 +365,66 @@ public class LootListener extends DeathSystems.OnDeathSystem {
             playerId.toString().substring(0, 8), iiqBonus, iirBonus);
 
         return RealmLootContext.of(iiqBonus, iirBonus);
+    }
+
+    /**
+     * Gets the DROP_LEVEL_BONUS value from the realm the dying mob belongs to.
+     *
+     * @return Level bonus to add to gear drop level, or 0 if not in realm/no modifier
+     */
+    private int getRealmDropLevelBonus(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> ref) {
+        RealmMobComponent realmMob = store.getComponent(ref, RealmMobComponent.getComponentType());
+        if (realmMob == null || realmMob.getRealmId() == null) {
+            return 0;
+        }
+        RealmsManager realmsManager = plugin.getRealmsManager();
+        if (realmsManager == null) {
+            return 0;
+        }
+        Optional<RealmInstance> realmOpt = realmsManager.getRealm(realmMob.getRealmId());
+        if (realmOpt.isEmpty()) {
+            return 0;
+        }
+        return realmOpt.get().getMapData().getModifierValue(RealmModifierType.DROP_LEVEL_BONUS);
+    }
+
+    /**
+     * Gets the GEAR_QUALITY_BONUS value from the realm the dying mob belongs to.
+     *
+     * @return Quality bonus to add to gear drops, or 0 if not in realm/no modifier
+     */
+    private int getRealmQualityBonus(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> ref) {
+        RealmMobComponent realmMob = store.getComponent(ref, RealmMobComponent.getComponentType());
+        if (realmMob == null || realmMob.getRealmId() == null) {
+            return 0;
+        }
+        RealmsManager realmsManager = plugin.getRealmsManager();
+        if (realmsManager == null) {
+            return 0;
+        }
+        Optional<RealmInstance> realmOpt = realmsManager.getRealm(realmMob.getRealmId());
+        if (realmOpt.isEmpty()) {
+            return 0;
+        }
+        return realmOpt.get().getMapData().getModifierValue(RealmModifierType.GEAR_QUALITY_BONUS);
+    }
+
+    /**
+     * Boosts quality on all gear items in the drop list.
+     */
+    private void applyQualityBonus(@Nonnull List<ItemStack> drops, int bonus) {
+        for (int i = 0; i < drops.size(); i++) {
+            ItemStack item = drops.get(i);
+            Optional<GearData> gearOpt = GearUtils.getGearData(item);
+            if (gearOpt.isPresent()) {
+                GearData data = gearOpt.get();
+                int boosted = Math.min(101, data.quality() + bonus);
+                if (boosted != data.quality()) {
+                    GearData updated = data.withQuality(boosted);
+                    drops.set(i, GearUtils.setGearData(item, updated));
+                }
+            }
+        }
     }
 
     /**

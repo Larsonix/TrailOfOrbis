@@ -101,7 +101,7 @@ public final class ReskinRecipeGenerator {
                             continue;
                         }
                         if (items.size() > MAX_RECIPES_PER_GROUP) {
-                            LOGGER.atWarning().log("Reskin group %s/%s/%s has %d items, capping at %d",
+                            LOGGER.atInfo().log("Reskin group %s/%s/%s has %d items, capping at %d",
                                     slot, qualityId, category, items.size(), MAX_RECIPES_PER_GROUP);
                             items = items.subList(0, MAX_RECIPES_PER_GROUP);
                         }
@@ -119,7 +119,7 @@ public final class ReskinRecipeGenerator {
                         continue;
                     }
                     if (allItemsInGroup.size() > MAX_RECIPES_PER_GROUP) {
-                        LOGGER.atWarning().log("Reskin group %s/%s has %d items, capping at %d",
+                        LOGGER.atInfo().log("Reskin group %s/%s has %d items, capping at %d",
                                 slot, qualityId, allItemsInGroup.size(), MAX_RECIPES_PER_GROUP);
                         allItemsInGroup = allItemsInGroup.subList(0, MAX_RECIPES_PER_GROUP);
                     }

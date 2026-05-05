@@ -18,6 +18,7 @@ import io.github.larsonix.trailoforbis.combat.DamageBreakdown;
 import io.github.larsonix.trailoforbis.combat.EnergyShieldTracker;
 import io.github.larsonix.trailoforbis.combat.detection.DamageTypeClassifier;
 import io.github.larsonix.trailoforbis.combat.resolution.CombatEntityResolver;
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.config.ConfigManager;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
 
@@ -180,6 +181,22 @@ public class DamageModifierProcessor {
             shieldAbsorbed = beforeShield - rpgDamage;
             if (shieldAbsorbed > 0) {
                 breakdown = breakdown.withShieldAbsorbed(shieldAbsorbed, rpgDamage);
+                // Notify shield HUD of change
+                PlayerRef shieldDefender = store.getComponent(defenderRef, PlayerRef.getComponentType());
+                if (shieldDefender != null) {
+                    TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+                    if (rpg != null && rpg.getEnergyShieldHudManager() != null) {
+                        rpg.getEnergyShieldHudManager().notifyShieldChanged(shieldDefender.getUuid());
+                    }
+                }
+            }
+
+            // Reset regen delay on ANY hit that reaches HP (shield depleted or overflow).
+            // absorbDamage() only resets the timer when shield absorbs, but the delay
+            // should also reset when the player takes HP damage — otherwise the shield
+            // starts regenerating prematurely while still in combat.
+            if (rpgDamage > 0 && energyShieldTracker != null && defenderUuid != null) {
+                energyShieldTracker.recordHit(defenderUuid);
             }
         }
 

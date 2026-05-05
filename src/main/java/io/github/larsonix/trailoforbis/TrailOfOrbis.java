@@ -28,6 +28,7 @@ import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.attributes.StatMapBridge;
 import io.github.larsonix.trailoforbis.systems.StatsApplicationSystem;
 import io.github.larsonix.trailoforbis.config.ConfigManager;
+import io.github.larsonix.trailoforbis.database.DatabaseBackupService;
 import io.github.larsonix.trailoforbis.database.DataManager;
 import io.github.larsonix.trailoforbis.database.repository.PlayerDataRepository;
 import io.github.larsonix.trailoforbis.systems.HytaleStatProvider;
@@ -67,6 +68,7 @@ import io.github.larsonix.trailoforbis.combat.deathrecap.KillFeedDecedentSystem;
 import io.github.larsonix.trailoforbis.combat.deathrecap.KillFeedKillerSystem;
 import io.github.larsonix.trailoforbis.combat.deathrecap.DeathRecapTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentCalculator;
+import io.github.larsonix.trailoforbis.ailments.AilmentDeathCleanupSystem;
 import io.github.larsonix.trailoforbis.ailments.AilmentEffectManager;
 import io.github.larsonix.trailoforbis.ailments.AilmentTickSystem;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
@@ -145,7 +147,6 @@ import io.github.larsonix.trailoforbis.gear.listener.UnifiedPickupListener;
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootCalculator;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
-import io.github.larsonix.trailoforbis.gear.loot.LootItemsConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootListener;
 import io.github.larsonix.trailoforbis.gear.loot.LootSettings;
 import io.github.larsonix.trailoforbis.gear.stats.GearBonusProvider;
@@ -300,11 +301,23 @@ public class TrailOfOrbis extends JavaPlugin {
     // Inventory detection system (shows Stats button when inventory is open)
     private InventoryDetectionManager inventoryDetectionManager;
 
+    // HUD toggle service (/hud command — hides/shows all custom HUDs)
+    private io.github.larsonix.trailoforbis.ui.hud.HudToggleService hudToggleService;
+
     // XP bar HUD (persistent above hotbar)
     private XpBarHudManager xpBarHudManager;
 
+    // Energy shield bar HUD (semi-transparent overlay near health bar)
+    private io.github.larsonix.trailoforbis.ui.hud.EnergyShieldHudManager energyShieldHudManager;
+
+    // Persistent HUD lifecycle (drain→restore→disconnect for all persistent HUDs)
+    private io.github.larsonix.trailoforbis.ui.hud.HudLifecycleManager hudLifecycleManager;
+
     // Animation speed sync (visual swing speed matching attack speed stat)
     private io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncManager animationSpeedSyncManager;
+
+    // Attack speed: server-side chain timing + cooldown acceleration
+    private io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem interactionTimeShiftSystem;
 
     // Loot filter system (blocks pickup of unwanted gear)
     private io.github.larsonix.trailoforbis.lootfilter.LootFilterManager lootFilterManager;
@@ -314,6 +327,12 @@ public class TrailOfOrbis extends JavaPlugin {
 
     // Colored combat text system (per-element damage number colors)
     private io.github.larsonix.trailoforbis.combat.indicators.color.CombatTextColorManager combatTextColorManager;
+
+    // Ghost entity manager for self-CombatText (avoidance/recovery floating text)
+    private io.github.larsonix.trailoforbis.combat.indicators.CombatFeedbackGhostManager combatFeedbackGhostManager;
+
+    // Debug stat override provider (admin testing tool — in-memory only)
+    private io.github.larsonix.trailoforbis.attributes.debug.DebugStatOverrideProvider debugStatOverrideProvider;
 
     // Persistent container loot tracking (ChunkStore resource, survives restarts)
     private ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResourceType;
@@ -404,9 +423,16 @@ public class TrailOfOrbis extends JavaPlugin {
                     UUIDComponent uuidComp = event.getHolder().getComponent(UUIDComponent.getComponentType());
                     if (uuidComp == null) return;
                     UUID playerId = uuidComp.getUuid();
-                    if (xpBarHudManager != null) {
-                        xpBarHudManager.discardStaleHud(playerId);
+
+                    // Persistent HUDs — lifecycle manager handles drain + restore
+                    if (hudLifecycleManager != null) {
+                        hudLifecycleManager.discardAll(playerId);
                     }
+
+                    // Clear init-dedup so the next world gets full initialization
+                    PlayerJoinListener.clearLastInitializedWorld(playerId);
+
+                    // Context-specific HUDs — managed by their own systems
                     if (skillSanctumManager != null) {
                         skillSanctumManager.getSkillPointHudManager().discardStaleHud(playerId);
                         skillSanctumManager.getSkillNodeHudManager().discardStaleHud(playerId);
@@ -414,6 +440,7 @@ public class TrailOfOrbis extends JavaPlugin {
                     if (realmsManager != null) {
                         realmsManager.getHudManager().discardAllHudsForPlayer(playerId);
                     }
+
                     // Reset Hexcode spell state to prevent crash when CraftingSystem
                     // ticks pedestal refs that point to the old world after teleport
                     HexcodeCompat.forceIdleIfCasting(event.getHolder());
@@ -446,6 +473,11 @@ public class TrailOfOrbis extends JavaPlugin {
         getCommandRegistry().registerCommand(new SkillTreeShortcutCommand(this));
         getCommandRegistry().registerCommand(new SanctumShortcutCommand(this));
 
+        // HUD toggle command (/hud) — hides/shows all custom RPG HUDs
+        hudToggleService = new io.github.larsonix.trailoforbis.ui.hud.HudToggleService();
+        getCommandRegistry().registerCommand(
+            new io.github.larsonix.trailoforbis.commands.too.TooHudCommand(this));
+
         // Phase 4: Register ECS components
         // Components must be registered in setup() so they exist before systems reference them.
         // Systems are registered later in start() per Hytale ECS best practice.
@@ -456,7 +488,7 @@ public class TrailOfOrbis extends JavaPlugin {
             "trailoforbis:MobScalingComponent",
             MobScalingComponent.CODEC
         );
-        getLogger().atInfo().log("Registered MobScalingComponent (with CODEC)");
+        getLogger().atFine().log("Registered MobScalingComponent (with CODEC)");
 
         // MobStatComponent - Dirichlet-based stat generation
         mobStatComponentType = getEntityStoreRegistry().registerComponent(
@@ -464,7 +496,7 @@ public class TrailOfOrbis extends JavaPlugin {
             "trailoforbis:MobStatComponent",
             MobStatComponent.CODEC
         );
-        getLogger().atInfo().log("Registered MobStatComponent (with CODEC)");
+        getLogger().atFine().log("Registered MobStatComponent (with CODEC)");
 
         // RPGSpawnedMarker - spawn loop prevention
         rpgSpawnedMarkerType = getEntityStoreRegistry().registerComponent(
@@ -472,7 +504,7 @@ public class TrailOfOrbis extends JavaPlugin {
             "trailoforbis:RPGSpawnedMarker",
             RPGSpawnedMarker.CODEC
         );
-        getLogger().atInfo().log("Registered RPGSpawnedMarker (with CODEC)");
+        getLogger().atFine().log("Registered RPGSpawnedMarker (with CODEC)");
 
         // Realm components for realm instance tracking
         realmMobComponentType = getEntityStoreRegistry().registerComponent(
@@ -481,7 +513,7 @@ public class TrailOfOrbis extends JavaPlugin {
             io.github.larsonix.trailoforbis.maps.components.RealmMobComponent.CODEC
         );
         io.github.larsonix.trailoforbis.maps.components.RealmMobComponent.TYPE = realmMobComponentType;
-        getLogger().atInfo().log("Registered RealmMobComponent (with CODEC)");
+        getLogger().atFine().log("Registered RealmMobComponent (with CODEC)");
 
         realmPlayerComponentType = getEntityStoreRegistry().registerComponent(
             io.github.larsonix.trailoforbis.maps.components.RealmPlayerComponent.class,
@@ -489,7 +521,7 @@ public class TrailOfOrbis extends JavaPlugin {
             io.github.larsonix.trailoforbis.maps.components.RealmPlayerComponent.CODEC
         );
         io.github.larsonix.trailoforbis.maps.components.RealmPlayerComponent.TYPE = realmPlayerComponentType;
-        getLogger().atInfo().log("Registered RealmPlayerComponent (with CODEC)");
+        getLogger().atFine().log("Registered RealmPlayerComponent (with CODEC)");
 
         // SkillNodeComponent for Skill Sanctum node orbs
         skillNodeComponentType = getEntityStoreRegistry().registerComponent(
@@ -498,7 +530,7 @@ public class TrailOfOrbis extends JavaPlugin {
             SkillNodeComponent.CODEC
         );
         SkillNodeComponent.TYPE = skillNodeComponentType;
-        getLogger().atInfo().log("Registered SkillNodeComponent (with CODEC)");
+        getLogger().atFine().log("Registered SkillNodeComponent (with CODEC)");
 
         // SkillNodeSubtitleComponent for Skill Sanctum subtitle entities
         skillNodeSubtitleComponentType = getEntityStoreRegistry().registerComponent(
@@ -507,7 +539,24 @@ public class TrailOfOrbis extends JavaPlugin {
             io.github.larsonix.trailoforbis.sanctum.components.SkillNodeSubtitleComponent.CODEC
         );
         io.github.larsonix.trailoforbis.sanctum.components.SkillNodeSubtitleComponent.setComponentType(skillNodeSubtitleComponentType);
-        getLogger().atInfo().log("Registered SkillNodeSubtitleComponent (with CODEC)");
+        getLogger().atFine().log("Registered SkillNodeSubtitleComponent (with CODEC)");
+
+        // Ailment DOT ECS components (drives RpgBurnTickSystem / RpgPoisonTickSystem)
+        io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent.TYPE =
+            getEntityStoreRegistry().registerComponent(
+                io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent.class,
+                "trailoforbis:RpgBurnComponent",
+                io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent.CODEC
+            );
+        getLogger().atFine().log("Registered RpgBurnComponent");
+
+        io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent.TYPE =
+            getEntityStoreRegistry().registerComponent(
+                io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent.class,
+                "trailoforbis:RpgPoisonComponent",
+                io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent.CODEC
+            );
+        getLogger().atFine().log("Registered RpgPoisonComponent");
 
         // Phase 5: Register custom interactions
         registerCustomInteractions();
@@ -656,6 +705,12 @@ public class TrailOfOrbis extends JavaPlugin {
         energyShieldTracker = new EnergyShieldTracker(3000L);
         getLogger().atInfo().log("Initialized EnergyShieldTracker (regenDelay=%dms)", energyShieldTracker.getRegenDelayMs());
 
+        // Energy Shield HUD - semi-transparent bar overlay near the health bar
+        energyShieldHudManager = new io.github.larsonix.trailoforbis.ui.hud.EnergyShieldHudManager(
+            energyShieldTracker, attributeManager);
+        energyShieldHudManager.setHudToggleService(hudToggleService);
+        getLogger().atInfo().log("Initialized EnergyShieldHudManager");
+
         // Regeneration System - applies health/mana regeneration every second
         regenerationSystem = new RegenerationTickSystem();
         getEntityStoreRegistry().registerSystem(regenerationSystem);
@@ -733,10 +788,11 @@ public class TrailOfOrbis extends JavaPlugin {
         if (gearManager != null && gearManager.getTimedCraftHandler() != null) {
             inventoryChangeEventSystem.addHandler(gearManager.getTimedCraftHandler()::onInventoryChange);
         }
-        // LAST priority: sanctum visual refresh
-        if (skillSanctumManager != null) {
-            inventoryChangeEventSystem.addHandler(skillSanctumManager::onInventoryChange);
-        }
+        // Crafting preview is sent globally on join (via ItemSyncCoordinator.onPlayerReady).
+        // No InventoryChangeEvent handler needed — RPG items are immune to base definition
+        // changes because they don't use variant=true.
+        // Sanctum visual refresh handler REMOVED — replaced by sanctum suppression
+        // in ItemSyncCoordinator (prevents UpdateItems flushes entirely while in sanctum)
         getEntityStoreRegistry().registerSystem(inventoryChangeEventSystem);
         getLogger().atInfo().log("Registered InventoryChangeEventSystem");
 
@@ -873,6 +929,9 @@ public class TrailOfOrbis extends JavaPlugin {
             getLogger().atInfo().log("Colored combat text system disabled or failed to initialize");
         }
 
+        // Phase 1.9: Backup database before any schema changes
+        new DatabaseBackupService(dataFolder).backup();
+
         // Phase 2: Initialize database
         dataManager = new DataManager(dataFolder, configManager.getRPGConfig());
         if (!dataManager.initialize()) {
@@ -887,10 +946,27 @@ public class TrailOfOrbis extends JavaPlugin {
         // Phase 3: Initialize AttributeManager
         attributeManager = new AttributeManager(dataManager, configManager, new HytaleStatProvider());
 
+        // Wire debug stat override provider (admin testing tool)
+        debugStatOverrideProvider = new io.github.larsonix.trailoforbis.attributes.debug.DebugStatOverrideProvider();
+        attributeManager.setDebugStatOverrideProvider(debugStatOverrideProvider);
+
         // Register stats application callback for automatic ECS sync
         // This ensures skill tree allocations, commands, and other stat changes
         // are automatically applied to the player's entity in the ECS
         attributeManager.setStatsApplicationCallback(playerId -> {
+            // Defense-in-depth: skip ECS stat application during world transitions.
+            // Entity-add in the new world triggers InventoryChangeEvent → recalculateStats
+            // BEFORE isJoining() is set. The EntityStatMap modifications from applyAllStats
+            // generate EntityStatUpdate packets that crash the client during JoinWorld.
+            // The deferred stat application in onPlayerReady handles this correctly.
+            if (gearManager != null) {
+                var coordinator = gearManager.getSyncCoordinator();
+                if (coordinator != null && coordinator.isPlayerSuppressed(playerId)) {
+                    LOGGER.atFine().log("[STATS] Skipping ECS apply for %s — world transition suppressed", playerId);
+                    return;
+                }
+            }
+
             LOGGER.atFine().log("[STATS] Callback entry for player %s", playerId);
 
             // Find player via cached world lookup
@@ -1130,8 +1206,10 @@ public class TrailOfOrbis extends JavaPlugin {
 
             // Phase 6.1: Initialize XP bar HUD manager
             xpBarHudManager = new io.github.larsonix.trailoforbis.ui.hud.XpBarHudManager(levelingManager);
+            xpBarHudManager.setHudToggleService(hudToggleService);
             xpBarHudManager.registerEventListeners(levelingManager);
             getLogger().atInfo().log("XP bar HUD manager initialized");
+
         } else {
             getLogger().atInfo().log("Leveling system disabled in config");
         }
@@ -1164,6 +1242,21 @@ public class TrailOfOrbis extends JavaPlugin {
         // are initialized, while components are registered in setup().
         registerEcsSystems();
 
+        // Phase 6.10: Initialize HUD lifecycle manager (persistent HUD drain→restore cycle)
+        // Must be AFTER registerEcsSystems() which creates energyShieldHudManager,
+        // and AFTER xpBarHudManager initialization above.
+        hudLifecycleManager = new io.github.larsonix.trailoforbis.ui.hud.HudLifecycleManager();
+        if (xpBarHudManager != null) {
+            hudLifecycleManager.register(xpBarHudManager);
+        }
+        if (energyShieldHudManager != null) {
+            hudLifecycleManager.register(energyShieldHudManager);
+        }
+        combatFeedbackGhostManager = new io.github.larsonix.trailoforbis.combat.indicators.CombatFeedbackGhostManager();
+        hudLifecycleManager.register(combatFeedbackGhostManager);
+        hudLifecycleManager.registerEventListeners(getEventRegistry());
+        getLogger().atInfo().log("HUD lifecycle manager initialized");
+
         // Phase 7: Initialize Mob Level Refresh System (throttled: max 5 mobs/tick)
         MobScalingConfig mobScalingConfig = configManager.getMobScalingConfig();
         if (mobScalingConfig.isEnabled() && mobScalingConfig.getDynamicRefresh().isEnabled()) {
@@ -1194,11 +1287,23 @@ public class TrailOfOrbis extends JavaPlugin {
         // Phase 7.7.1: Register deferred GearManager systems (now that LevelingService + RealmsManager are available)
         if (gearManager != null) {
             gearManager.registerDeferredSystems();
+            // Register deferred timed craft handler with InventoryChangeEventSystem
+            // (was null at initial handler registration time because LevelingService wasn't ready)
+            if (gearManager.getTimedCraftHandler() != null && inventoryChangeEventSystem != null) {
+                inventoryChangeEventSystem.addHandler(gearManager.getTimedCraftHandler()::onInventoryChange);
+            }
         }
 
         // Phase 7.7.2: Register container loot interceptor (ECS system for UseBlockEvent.Pre)
         // Replaces vanilla weapons/armor in world containers with RPG gear on first open.
         registerContainerLootInterceptor();
+
+        // Phase 7.7.3: Register container gear migration (migrates stale items on container open)
+        if (gearManager != null && gearManager.isInitialized()) {
+            getEntityStoreRegistry().registerSystem(
+                new io.github.larsonix.trailoforbis.gear.migration.ContainerGearMigrationSystem(
+                    gearManager.getItemMigrationService()));
+        }
 
         // Phase 7.7.5: Initialize Skill Sanctum System (3D skill tree exploration)
         initializeSkillSanctumSystem();
@@ -1234,6 +1339,12 @@ public class TrailOfOrbis extends JavaPlugin {
 
         // Phase 7.10.5: Initialize Loot Filter System
         initializeLootFilterSystem();
+
+        // Phase 7.11: Suppress native pickup toasts
+        // We own the entire pickup notification pipeline — our PickupNotificationService
+        // sends toasts AFTER the loot filter, so filtered items get no toast.
+        // Native toasts fire BEFORE the loot filter and can't be suppressed per-item.
+        suppressNativePickupToasts();
 
         // Phase 8: Verify custom assets loaded
         verifyCustomAssets();
@@ -1398,14 +1509,20 @@ public class TrailOfOrbis extends JavaPlugin {
             inventoryDetectionManager = null;
         }
 
-        // Phase 1.14: Shutdown XP bar HUD manager
+        // Phase 1.14: Shutdown persistent HUD lifecycle
+        if (hudLifecycleManager != null) {
+            getLogger().atInfo().log("Shutting down HUD lifecycle manager...");
+            hudLifecycleManager.shutdown();
+            hudLifecycleManager = null;
+        }
         if (xpBarHudManager != null) {
-            getLogger().atInfo().log("Shutting down XP bar HUD manager...");
             if (levelingManager != null) {
                 xpBarHudManager.unregisterEventListeners(levelingManager);
             }
-            xpBarHudManager.removeAllHuds();
             xpBarHudManager = null;
+        }
+        if (energyShieldHudManager != null) {
+            energyShieldHudManager = null;
         }
 
         // Legacy shutdown - remove after confirming GearManager handles everything
@@ -1506,6 +1623,15 @@ public class TrailOfOrbis extends JavaPlugin {
         return attributeManager;
     }
 
+    /** Gets the debug stat override provider for admin stat testing. */
+    @Nonnull
+    public io.github.larsonix.trailoforbis.attributes.debug.DebugStatOverrideProvider getDebugStatOverrideProvider() {
+        if (debugStatOverrideProvider == null) {
+            throw new IllegalStateException("Plugin not fully initialized - DebugStatOverrideProvider unavailable");
+        }
+        return debugStatOverrideProvider;
+    }
+
     /**
      * @throws IllegalStateException if called before start() completes
      */
@@ -1545,6 +1671,12 @@ public class TrailOfOrbis extends JavaPlugin {
     @Nullable
     public HotbarSlotTrackingSystem getHotbarSlotTrackingSystem() {
         return hotbarSlotTrackingSystem;
+    }
+
+    /** @return null if not initialized or disabled in config */
+    @Nullable
+    public io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem getInteractionTimeShiftSystem() {
+        return interactionTimeShiftSystem;
     }
 
     /**
@@ -1734,10 +1866,25 @@ public class TrailOfOrbis extends JavaPlugin {
         return inventoryDetectionManager;
     }
 
+    @Nullable
+    public io.github.larsonix.trailoforbis.ui.hud.HudToggleService getHudToggleService() {
+        return hudToggleService;
+    }
+
     /** @return null if leveling is disabled */
     @Nullable
     public io.github.larsonix.trailoforbis.ui.hud.XpBarHudManager getXpBarHudManager() {
         return xpBarHudManager;
+    }
+
+    @Nullable
+    public io.github.larsonix.trailoforbis.ui.hud.EnergyShieldHudManager getEnergyShieldHudManager() {
+        return energyShieldHudManager;
+    }
+
+    @Nullable
+    public io.github.larsonix.trailoforbis.ui.hud.HudLifecycleManager getHudLifecycleManager() {
+        return hudLifecycleManager;
     }
 
     /** @return null if not yet registered */
@@ -1805,6 +1952,9 @@ public class TrailOfOrbis extends JavaPlugin {
             getLogger().atInfo().log("RealmsManager created, initializing...");
 
             realmsManager.initialize(getEventRegistry());
+            if (hudToggleService != null) {
+                realmsManager.getHudManager().setHudToggleService(hudToggleService);
+            }
             getLogger().atInfo().log("RealmsManager initialized");
 
             // Register realm map interaction system (for right-click to work)
@@ -1937,6 +2087,11 @@ public class TrailOfOrbis extends JavaPlugin {
             skillSanctumManager = new SkillSanctumManager(this, skillTreeManager,
                 configManager.getSkillSanctumConfig());
             if (skillSanctumManager.initialize()) {
+                // Wire HUD toggle service into sanctum HUD managers
+                if (hudToggleService != null) {
+                    skillSanctumManager.getSkillPointHudManager().setHudToggleService(hudToggleService);
+                    skillSanctumManager.getSkillNodeHudManager().setHudToggleService(hudToggleService);
+                }
                 getLogger().atInfo().log("Skill Sanctum system initialized");
             } else {
                 getLogger().atWarning().log("Skill Sanctum system failed to initialize");
@@ -2057,12 +2212,14 @@ public class TrailOfOrbis extends JavaPlugin {
                 animationSpeedSyncManager);
             getLogger().atInfo().log("Animation speed sync initialized");
 
-            // Initialize Tier 1 interaction time shift (damage windows match visual speed)
+            // Initialize Tier 1 interaction time shift + cooldown acceleration
             if (configClass.isInteractionTimeShiftEnabled()) {
-                io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem timeShiftSystem =
+                interactionTimeShiftSystem =
                     new io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem(this, animConfig);
-                getEntityStoreRegistry().registerSystem(timeShiftSystem);
-                getLogger().atInfo().log("Interaction time shift system initialized");
+                getEntityStoreRegistry().registerSystem(interactionTimeShiftSystem);
+                getLogger().atInfo().log("Interaction time shift system initialized (cooldown acceleration: %s)",
+                    io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem
+                        .isCooldownAccelerationAvailable() ? "active" : "unavailable");
             }
 
         } catch (Exception e) {
@@ -2414,12 +2571,21 @@ public class TrailOfOrbis extends JavaPlugin {
             ailmentEffectManager = new AilmentEffectManager(this);
             ailmentEffectManager.initialize();
 
-            // Register AilmentTickSystem for DoT processing
-            // This runs every tick and processes Burn/Poison damage + duration tracking
-            AilmentTickSystem ailmentTickSystem = new AilmentTickSystem(
-                ailmentTracker, ailmentConfig, energyShieldTracker,
-                playerId -> attributeManager != null ? attributeManager.getStats(playerId) : null);
+            // Register AilmentTickSystem for non-DOT ailment processing (Freeze/Shock duration)
+            AilmentTickSystem ailmentTickSystem = new AilmentTickSystem(ailmentTracker, ailmentConfig);
             getEntityStoreRegistry().registerSystem(ailmentTickSystem);
+
+            // Register DOT tick systems — ECS-native, only iterate entities with active DOTs
+            // Fires damage through DamageSystems.executeDamage for full pipeline integration
+            // (indicators, death detection, kill attribution, death recap, SHIELD_REGEN_ON_DOT)
+            getEntityStoreRegistry().registerSystem(
+                new io.github.larsonix.trailoforbis.ailments.component.RpgBurnTickSystem(ailmentTracker));
+            getEntityStoreRegistry().registerSystem(
+                new io.github.larsonix.trailoforbis.ailments.component.RpgPoisonTickSystem(ailmentTracker));
+
+            // Register death cleanup system — clears ailment visuals/state on entity death
+            // Prevents screen overlays (red burn tint, green poison) from persisting through death screen
+            getEntityStoreRegistry().registerSystem(new AilmentDeathCleanupSystem(this));
 
             getLogger().atInfo().log("Ailment system initialized (tick_rate: %.2fs, burn_chance: %.0f%%, freeze_chance: %.0f%%, shock_chance: %.0f%%, poison_chance: %.0f%%)",
                     ailmentConfig.getTickRateSeconds(),
@@ -2495,6 +2661,16 @@ public class TrailOfOrbis extends JavaPlugin {
                 getLogger().atInfo().log("Loot system registered");
             }
 
+            // Equipment definition broadcast — sends RPG gear definitions to nearby
+            // players so armor renders correctly on remote clients. Runs BEFORE
+            // LegacyEquipment in the entity tracker pipeline.
+            var broadcastSystem = new io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem(
+                    gearManager.getItemDefinitionBuilder(),
+                    gearManager.getTranslationSyncService());
+            gearManager.setEquipmentBroadcastSystem(broadcastSystem);
+            getEntityStoreRegistry().registerSystem(broadcastSystem);
+            getLogger().atInfo().log("Registered EquipmentDefinitionBroadcastSystem");
+
             getLogger().atInfo().log("Gear system initialized via GearManager - equipment bonuses, item sync, and loot enabled");
 
             // Initialize Gem System (requires GearManager's ItemRegistryService and CustomItemSyncService)
@@ -2562,6 +2738,11 @@ public class TrailOfOrbis extends JavaPlugin {
         return combatTextColorManager;
     }
 
+    @Nullable
+    public io.github.larsonix.trailoforbis.combat.indicators.CombatFeedbackGhostManager getCombatFeedbackGhostManager() {
+        return combatFeedbackGhostManager;
+    }
+
     /**
      * Initializes the loot filter system (pickup filtering for RPG gear).
      *
@@ -2584,8 +2765,7 @@ public class TrailOfOrbis extends JavaPlugin {
 
             // Register loot filter as FIRST handler on InventoryChangeEventSystem
             // This ensures filtered items are ejected before other handlers process them
-            var feedbackService = new io.github.larsonix.trailoforbis.lootfilter.feedback.BlockFeedbackService(
-                    lfConfig.getFeedback());
+            var feedbackService = new io.github.larsonix.trailoforbis.lootfilter.feedback.BlockFeedbackService();
             var filterHandler = new io.github.larsonix.trailoforbis.lootfilter.system.LootFilterInventoryHandler(
                     lootFilterManager, feedbackService);
             inventoryChangeEventSystem.addFirstHandler(filterHandler::onInventoryChange);
@@ -2610,6 +2790,59 @@ public class TrailOfOrbis extends JavaPlugin {
             getLogger().atWarning().withCause(e).log(
                     "Failed to initialize loot filter system - filtering disabled");
             lootFilterManager = null;
+        }
+    }
+
+    /**
+     * Disables Hytale's native pickup toast notifications globally.
+     *
+     * <p>Hytale's {@code Player.notifyPickupItem()} sends a "Picked up [item]" toast
+     * SYNCHRONOUSLY during the pickup tick — before our {@code InventoryChangeEvent}
+     * handlers can run. This means the loot filter can never suppress it.
+     *
+     * <p>By disabling the native toasts, our {@link io.github.larsonix.trailoforbis.gear.notification.PickupNotificationService}
+     * becomes the sole notification channel. It runs AFTER the loot filter has ejected
+     * blocked items, so filtered items naturally get no toast.
+     *
+     * <p>For non-RPG items (vanilla rocks, branches, etc.), {@code PickupNotificationService}
+     * sends a simple "Picked up [item]" toast that replicates the native behavior exactly.
+     *
+     * <p>Uses reflection because {@code GameplayConfig.showItemPickupNotifications} is
+     * {@code protected} with no setter. If reflection fails, the plugin continues with
+     * native toasts still active (no regression — just the current double-toast behavior).
+     */
+    private void suppressNativePickupToasts() {
+        try {
+            java.lang.reflect.Field field = com.hypixel.hytale.server.core.asset.type.gameplay.GameplayConfig.class
+                    .getDeclaredField("showItemPickupNotifications");
+            field.setAccessible(true);
+
+            // Suppress on DEFAULT (fallback for worlds without a named config)
+            field.setBoolean(com.hypixel.hytale.server.core.asset.type.gameplay.GameplayConfig.DEFAULT, false);
+            int count = 1;
+
+            // Suppress on all named configs (e.g., "Portal" used by realm worlds)
+            var assetMap = com.hypixel.hytale.server.core.asset.type.gameplay.GameplayConfig.getAssetMap();
+            if (assetMap != null) {
+                Map<String, com.hypixel.hytale.server.core.asset.type.gameplay.GameplayConfig> configs =
+                        assetMap.getAssetMap();
+                if (configs != null) {
+                    for (var entry : configs.entrySet()) {
+                        field.setBoolean(entry.getValue(), false);
+                        count++;
+                    }
+                }
+            }
+
+            getLogger().atInfo().log("Suppressed native pickup toasts on %d GameplayConfig(s) — " +
+                    "PickupNotificationService is now the sole notification channel", count);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            getLogger().atWarning().withCause(e).log(
+                    "Failed to suppress native pickup toasts — native toasts will still fire " +
+                    "(Uncommon+ gear will show double toast, filtered items will still show native toast)");
+        } catch (Exception e) {
+            getLogger().atWarning().withCause(e).log(
+                    "Unexpected error suppressing native pickup toasts");
         }
     }
 

@@ -7,6 +7,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
 import io.github.larsonix.trailoforbis.skilltree.api.SkillTreeEvents;
+import io.github.larsonix.trailoforbis.ui.hud.HudRefreshHelper;
+import io.github.larsonix.trailoforbis.ui.hud.HudToggleService;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -42,6 +44,8 @@ public class SkillPointHudManager {
     /** The skill tree manager for data queries. */
     private final SkillTreeManager skillTreeManager;
 
+    @Nullable private HudToggleService hudToggleService;
+
     /** Registered event listeners (stored for cleanup). */
     @Nullable
     private SkillTreeEvents.NodeAllocatedListener nodeAllocatedListener;
@@ -49,6 +53,8 @@ public class SkillPointHudManager {
     private SkillTreeEvents.NodeDeallocatedListener nodeDeallocatedListener;
     @Nullable
     private SkillTreeEvents.RespecListener respecListener;
+    @Nullable
+    private SkillTreeEvents.RefundPointsChangedListener refundPointsChangedListener;
 
     // ═══════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -61,6 +67,10 @@ public class SkillPointHudManager {
      */
     public SkillPointHudManager(@Nonnull SkillTreeManager skillTreeManager) {
         this.skillTreeManager = skillTreeManager;
+    }
+
+    public void setHudToggleService(@Nullable HudToggleService service) {
+        this.hudToggleService = service;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -85,6 +95,7 @@ public class SkillPointHudManager {
         try {
             HyUIHud hud = SkillPointHud.create(playerRef, store, skillTreeManager);
             activeHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
             LOGGER.atInfo().log("Showed skill point HUD for player %s", playerId.toString().substring(0, 8));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to show skill point HUD for player %s",
@@ -137,9 +148,13 @@ public class SkillPointHudManager {
         respecListener = (playerId, nodesCleared, pointsRefunded, freeRespecsRemaining) ->
             notifyPointsChanged(playerId);
 
+        refundPointsChangedListener = (playerId, newRefundPoints) ->
+            notifyPointsChanged(playerId);
+
         skillTreeManager.registerNodeAllocatedListener(nodeAllocatedListener);
         skillTreeManager.registerNodeDeallocatedListener(nodeDeallocatedListener);
         skillTreeManager.registerRespecListener(respecListener);
+        skillTreeManager.registerRefundPointsChangedListener(refundPointsChangedListener);
         LOGGER.atInfo().log("Registered skill point HUD event listeners");
     }
 
@@ -159,6 +174,10 @@ public class SkillPointHudManager {
             skillTreeManager.unregisterRespecListener(respecListener);
             respecListener = null;
         }
+        if (refundPointsChangedListener != null) {
+            skillTreeManager.unregisterRefundPointsChangedListener(refundPointsChangedListener);
+            refundPointsChangedListener = null;
+        }
         LOGGER.atInfo().log("Unregistered skill point HUD event listeners");
     }
 
@@ -169,20 +188,27 @@ public class SkillPointHudManager {
     /**
      * Triggers an immediate HUD refresh for a player after skill point change.
      *
+     * <p>Uses {@link HudRefreshHelper#safeRefreshWithToggle} for atomic Clear+Append.
+     *
      * @param playerId The player's UUID
      */
     private void notifyPointsChanged(@Nonnull UUID playerId) {
         HyUIHud hud = activeHuds.get(playerId);
         if (hud != null) {
             try {
-                hud.triggerRefresh();                  // Update builder values in memory
-                hud.refreshOrRerender(false, false);   // Push diff update to client immediately
+                HudRefreshHelper.safeRefreshWithToggle(hud, playerId, hudToggleService);
             } catch (Exception e) {
                 LOGGER.atFine().withCause(e).log(
                     "Failed to trigger skill point HUD refresh for player %s",
                     playerId.toString().substring(0, 8));
             }
         }
+    }
+
+    /** Gets the active HUD for a player, or null. */
+    @Nullable
+    public HyUIHud getHud(@Nonnull UUID playerId) {
+        return activeHuds.get(playerId);
     }
 
     /**

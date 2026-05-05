@@ -2,6 +2,8 @@ package io.github.larsonix.trailoforbis.listeners;
 
 import com.hypixel.hytale.builtin.instances.InstancesPlugin;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.Message;
+import io.github.larsonix.trailoforbis.util.MessageColors;
 import java.util.logging.Level;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
@@ -49,10 +51,12 @@ import com.hypixel.hytale.server.core.modules.interaction.Interactions;
 import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
 import io.github.larsonix.trailoforbis.sanctum.interactions.SkillNodeInteraction;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.instance.RealmPortalManager;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -87,6 +91,9 @@ public class PlayerJoinListener {
      */
     private static final Set<UUID> freshlyConnected = ConcurrentHashMap.newKeySet();
 
+    /** Tracks players who have already had item integrity check this session (prevents re-run on world transitions). */
+    private static final Set<UUID> migratedThisSession = ConcurrentHashMap.newKeySet();
+
     /**
      * Tracks UUIDs currently being processed in onPlayerReady to prevent
      * equipment change events from triggering stat recalculation before
@@ -99,6 +106,21 @@ public class PlayerJoinListener {
     private static final Set<UUID> joiningPlayers = ConcurrentHashMap.newKeySet();
 
     /**
+     * Tracks which world each player was last fully initialized in.
+     *
+     * <p>Hytale sends TWO ClientReady packets during instance world transitions.
+     * Each triggers PlayerReadyEvent, which would run the full initialization twice.
+     * On remote connections, the second ClientReady can arrive 30+ seconds later,
+     * causing stat/item packets to arrive while the client is re-processing
+     * OnWorldJoined → NullReferenceException crash.
+     *
+     * <p>By tracking the last-initialized world, we skip the redundant second init.
+     * Cleared on DrainPlayerFromWorldEvent (so the next world gets full init) and
+     * on disconnect.
+     */
+    private static final Map<UUID, String> lastInitializedWorld = new ConcurrentHashMap<>();
+
+    /**
      * Checks if a player is currently in the process of joining.
      *
      * <p>Used by {@link EquipmentChangeListener} to skip equipment change events
@@ -109,6 +131,15 @@ public class PlayerJoinListener {
      */
     public static boolean isJoining(UUID playerId) {
         return joiningPlayers.contains(playerId);
+    }
+
+    /**
+     * Clears the per-world initialization dedup tracker for a player.
+     * Called from DrainPlayerFromWorldEvent (so the next world gets full init)
+     * and from onPlayerDisconnect.
+     */
+    public static void clearLastInitializedWorld(UUID playerId) {
+        lastInitializedWorld.remove(playerId);
     }
 
     /**
@@ -219,6 +250,18 @@ public class PlayerJoinListener {
         UUID uuid = playerRef.getUuid();
         String username = playerRef.getUsername();
 
+        // Deduplicate: skip if already initialized in this world.
+        // Hytale fires two ClientReady packets per world transition. On remote
+        // connections the second can arrive 30+ seconds later, causing stat/item
+        // packets to crash the client during its second OnWorldJoined processing.
+        String worldId = world.getName();
+        if (worldId != null && worldId.equals(lastInitializedWorld.get(uuid))) {
+            LOGGER.at(Level.INFO).log("Skipping redundant onPlayerReady for %s (already initialized in %s)",
+                username, worldId);
+            return;
+        }
+        lastInitializedWorld.put(uuid, worldId);
+
         // Mark player as joining to suppress equipment change events during initialization.
         joiningPlayers.add(uuid);
 
@@ -267,6 +310,23 @@ public class PlayerJoinListener {
             .map(svc -> (LevelingManager) svc)
             .ifPresent(mgr -> mgr.loadPlayer(uuid));
 
+        // Item integrity check: only once per connection (not on world transitions)
+        if (migratedThisSession.add(uuid)) {
+            TrailOfOrbis rpgForMigration = TrailOfOrbis.getInstanceOrNull();
+            if (rpgForMigration != null && rpgForMigration.getGearManager() != null
+                    && rpgForMigration.getGearManager().isInitialized()) {
+                var integrityResult = rpgForMigration.getGearManager().getItemMigrationService()
+                        .migratePlayerGear(player, uuid);
+                if (integrityResult.total() > 0) {
+                    playerRef.sendMessage(Message.empty()
+                            .insert(Message.raw("[Trail of Orbis] ").color(MessageColors.GRAY))
+                            .insert(Message.raw("Updated ").color(MessageColors.WHITE))
+                            .insert(Message.raw(String.valueOf(integrityResult.total())).color(MessageColors.WARNING))
+                            .insert(Message.raw(" item(s) to the latest version.").color(MessageColors.WHITE)));
+                }
+            }
+        }
+
         // Cache vanilla stats and apply ECS operations
         Ref<EntityStore> entityRef = playerRef.getReference();
         if (entityRef != null && entityRef.isValid()) {
@@ -276,9 +336,55 @@ public class PlayerJoinListener {
             if (!VanillaStatCache.hasCached(uuid)) {
                 VanillaStatCache.cacheOnJoin(uuid, store, entityRef);
             }
+
+            // Recalculate ComputedStats — pure computation, no packets, safe to run immediately.
+            // ComputedStats must be ready before the coordinator's 200ms item flush (tooltip colors).
             attributeService.recalculateStats(uuid);
-            applyEcsStats(playerRef, uuid, store, repo);
-            LOGGER.at(Level.INFO).log("Stats applied for %s", username);
+
+            // Detect world transition: the coordinator suppresses the player during
+            // DrainPlayerFromWorldEvent. If suppressed, we're entering a new world.
+            boolean isWorldTransition = ServiceRegistry.get(GearService.class)
+                .filter(svc -> svc instanceof GearManager)
+                .map(svc -> (GearManager) svc)
+                .map(mgr -> mgr.getSyncCoordinator())
+                .map(coord -> coord.isPlayerSuppressed(uuid))
+                .orElse(false);
+
+            if (isWorldTransition) {
+                // DEFER stat application for world transitions.
+                // During transitions, the client needs ~200ms after OnWorldJoined to
+                // initialize entity renderers and stat bar UI components. If EntityStatUpdate
+                // packets arrive during this window, the client's rendering code accesses
+                // a null stat bar component → NullReferenceException at 0x421beb.
+                //
+                // applyEcsStats() modifies EntityStatMap (removeModifier + putModifier +
+                // setStatValue × 3 resource stats), which the entity tracker sends as
+                // EntityStatUpdate packets on the next world tick. By deferring 300ms,
+                // these packets arrive AFTER the client is fully initialized.
+                //
+                // recalculateStats() already ran above — ComputedStats is correct for
+                // the coordinator's 200ms tooltip flush. Only the ECS write is deferred.
+                final UUID deferredUuid = uuid;
+                final World deferredWorld = world;
+                CompletableFuture.delayedExecutor(300, TimeUnit.MILLISECONDS).execute(() -> {
+                    deferredWorld.execute(() -> {
+                        // Fresh refs — player may have disconnected during the 300ms delay
+                        PlayerRef freshRef = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(deferredUuid);
+                        if (freshRef == null) return;
+                        Ref<EntityStore> freshEntityRef = freshRef.getReference();
+                        if (freshEntityRef == null || !freshEntityRef.isValid()) return;
+                        Store<EntityStore> freshStore = freshEntityRef.getStore();
+
+                        applyEcsStats(freshRef, deferredUuid, freshStore, repo);
+                        LOGGER.atInfo().log("Deferred stats applied for %s (world transition, 300ms delay)",
+                            freshRef.getUsername());
+                    });
+                });
+            } else {
+                // First connect — no old world to tear down, safe to apply immediately.
+                applyEcsStats(playerRef, uuid, store, repo);
+                LOGGER.at(Level.INFO).log("Stats applied for %s", username);
+            }
 
             initializeGameModeBypass(uuid, player);
 
@@ -295,25 +401,28 @@ public class PlayerJoinListener {
                     }
                 });
 
+            // Broadcast RPG gear definitions to/from other players.
+            // This ensures armor renders correctly on remote clients by sending
+            // UpdateItems definitions before the Equipment packet arrives.
+            ServiceRegistry.get(GearService.class)
+                .filter(svc -> svc instanceof GearManager)
+                .map(svc -> (GearManager) svc)
+                .ifPresent(mgr -> {
+                    var broadcast = mgr.getEquipmentBroadcastSystem();
+                    if (broadcast != null) {
+                        broadcast.syncOnPlayerJoin(playerRef, player, world);
+                    }
+                });
+
             cleanupSanctumInteractions(uuid, store, entityRef);
             tryPlaceSpawnGateways(world);
 
-            // Defer XP bar HUD creation to the NEXT tick after PlayerReadyEvent.
-            // MultipleHUD.setCustomHud() calls show() TWICE — the second call generates
-            // Set-only commands (hasBuilt=true) referencing elements from the first call's
-            // Append. If both packets arrive during JoinWorld processing on the client,
-            // the Set can reference elements not yet created. Deferring by one tick ensures
-            // the client has fully processed the JoinWorld before receiving HUD packets.
+            // Persistent HUD restoration (XP bar, energy shield) is handled by
+            // HudLifecycleManager's LATE-priority PlayerReadyEvent handler.
+            // It runs after this EARLY handler completes initialization, uses fresh
+            // refs, and includes a 1-second safety-net timer for reliability.
+
             TrailOfOrbis rpgInstance = TrailOfOrbis.getInstanceOrNull();
-            if (rpgInstance != null && rpgInstance.getXpBarHudManager() != null) {
-                final UUID deferredUuid = uuid;
-                final PlayerRef deferredRef = playerRef;
-                world.execute(() -> {
-                    if (!deferredRef.isValid()) return;
-                    Store<EntityStore> deferredStore = world.getEntityStore().getStore();
-                    rpgInstance.getXpBarHudManager().showHud(deferredUuid, deferredRef, deferredStore);
-                });
-            }
 
             // Initialize loot filter state for this player
             if (rpgInstance != null && rpgInstance.getLootFilterManager() != null) {
@@ -342,10 +451,8 @@ public class PlayerJoinListener {
                     .setupArmorValidation(player.getInventory(), playerRef);
             }
 
-            // Sync colored combat text templates to player
-            if (rpgInstance != null && rpgInstance.getCombatTextColorManager() != null) {
-                rpgInstance.getCombatTextColorManager().onPlayerReady(playerRef);
-            }
+            // Combat text templates are applied on-demand during combat hits
+            // (no pre-sync needed — avoids maxId race with asset pipeline)
 
             // Note: Vanilla gems/crystals are NOT hidden from creative — they're legitimate
             // decorative items. Only our custom _Light variants are hidden via Variant:true
@@ -371,12 +478,36 @@ public class PlayerJoinListener {
             attributeService.recalculateStats(uuid);
         }
 
+            // Reactivate portals that were suppressed during sanctum exit.
+            // Delayed by 3s after PlayerReadyEvent to ensure the client's chunk pipeline
+            // has fully stabilized before allowing portal CollisionEnter interactions.
+            schedulePortalUnsuppression(uuid, world);
+
         } catch (Exception e) {
             LOGGER.at(Level.SEVERE).withCause(e).log("Failed to initialize player data for %s", username);
         } finally {
             joiningPlayers.remove(uuid);
         }
         });
+    }
+
+    /**
+     * Schedules reactivation of portals suppressed during sanctum exit.
+     * Runs 3 seconds after PlayerReadyEvent on the world thread.
+     */
+    private static void schedulePortalUnsuppression(@Nonnull UUID playerId, @Nonnull World world) {
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (rpg == null || rpg.getRealmsManager() == null) {
+            return;
+        }
+
+        RealmPortalManager portalManager = rpg.getRealmsManager().getPortalManager();
+        if (!portalManager.hasSuppressedPortals(playerId)) {
+            return;
+        }
+
+        CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS)
+                .execute(() -> world.execute(() -> portalManager.unsuppressPortals(world, playerId)));
     }
 
     /**
@@ -562,6 +693,8 @@ public class PlayerJoinListener {
 
         // Clear joining guard in case disconnect fires during join (e.g., timeout)
         joiningPlayers.remove(uuid);
+        lastInitializedWorld.remove(uuid);
+        migratedThisSession.remove(uuid);
 
         // Guard against duplicate disconnect events (fires once per world when
         // player exists in multiple worlds, e.g., realm instance + overworld)
@@ -596,6 +729,13 @@ public class PlayerJoinListener {
                     if (syncService != null) {
                         syncService.onPlayerDisconnect(uuid);
                     }
+                    // Clean up equipment broadcast tracking (viewer cache + gear state)
+                    var broadcast = mgr.getEquipmentBroadcastSystem();
+                    if (broadcast != null) {
+                        broadcast.onPlayerDisconnect(uuid);
+                    }
+                    // Crafting preview has no per-player state to clean up
+                    // (definitions are sent globally, not tracked per-player)
                 }
             });
 
@@ -624,7 +764,20 @@ public class PlayerJoinListener {
             rpg.getHotbarSlotTrackingSystem().onPlayerDisconnect(uuid);
         }
 
-        // Clean up energy shield state to prevent memory leak
+        // Clean up attack speed cooldown tracking
+        if (rpg != null && rpg.getInteractionTimeShiftSystem() != null) {
+            rpg.getInteractionTimeShiftSystem().onPlayerDisconnect(uuid);
+        }
+
+        // Clean up HUD toggle state (player always starts with HUDs visible on next join)
+        if (rpg != null && rpg.getHudToggleService() != null) {
+            rpg.getHudToggleService().onDisconnect(uuid);
+        }
+
+        // Clean up persistent HUDs (XP bar, energy shield) via lifecycle manager
+        if (rpg != null && rpg.getHudLifecycleManager() != null) {
+            rpg.getHudLifecycleManager().onPlayerDisconnect(uuid);
+        }
         if (rpg != null && rpg.getEnergyShieldTracker() != null) {
             rpg.getEnergyShieldTracker().cleanupPlayer(uuid);
         }
@@ -686,10 +839,7 @@ public class PlayerJoinListener {
             rpg.getInventoryDetectionManager().removeTracker(uuid);
         }
 
-        // Clean up XP bar HUD
-        if (rpg != null && rpg.getXpBarHudManager() != null) {
-            rpg.getXpBarHudManager().removeHud(uuid);
-        }
+        // Note: XP bar + energy shield HUD removal handled above via hudLifecycleManager
 
         // Clean up per-player locks in AttributeManager to prevent memory leak
         attributeServiceOpt.ifPresent(attributeService -> attributeService.cleanupPlayer(uuid));
@@ -775,4 +925,5 @@ public class PlayerJoinListener {
         InventoryComponent.Utility utility = store.getComponent(ref, InventoryComponent.Utility.getComponentType());
         if (utility != null) utility.markDirty();
     }
+
 }

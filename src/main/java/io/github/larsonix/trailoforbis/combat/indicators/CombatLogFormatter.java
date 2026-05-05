@@ -12,6 +12,7 @@ import io.github.larsonix.trailoforbis.combat.modifiers.ConditionalResult;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -86,47 +87,47 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- Avoidance Stats --\n").color(MessageColors.WARNING));
 
         if (avoidanceStats.dodgeChance() > 0) {
-            m = m.insert(Message.raw(String.format("Dodge: %.1f%%\n",
-                avoidanceStats.dodgeChance())).color(
+            m = m.insert(Message.raw(String.format("Dodge: %s\n",
+                NumberFormatter.percent(avoidanceStats.dodgeChance()))).color(
                 reason == DamageBreakdown.AvoidanceReason.DODGED ? MessageColors.SUCCESS : MessageColors.GRAY));
         }
         if (avoidanceStats.evasion() > 0 || avoidanceStats.accuracy() > 0) {
-            m = m.insert(Message.raw(String.format("Evasion: %.0f vs Accuracy: %.0f\n",
-                avoidanceStats.evasion(), avoidanceStats.accuracy())).color(MessageColors.INFO));
-            m = m.insert(Message.raw(String.format("Hit Chance: %.1f%%\n",
-                avoidanceStats.hitChance())).color(
+            m = m.insert(Message.raw(String.format("Evasion: %s vs Accuracy: %s\n",
+                NumberFormatter.flat(avoidanceStats.evasion()), NumberFormatter.flat(avoidanceStats.accuracy()))).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Hit Chance: %s\n",
+                NumberFormatter.percent(avoidanceStats.hitChance()))).color(
                 reason == DamageBreakdown.AvoidanceReason.MISSED ? MessageColors.SUCCESS : MessageColors.GRAY));
         }
         if (avoidanceStats.passiveBlockChance() > 0 || avoidanceStats.activeBlockChance() > 0) {
             if (avoidanceStats.wasActiveBlock()) {
-                m = m.insert(Message.raw(String.format("Block: %.0f%% (passive:%.0f%% + active:%.0f%%)\n",
-                    avoidanceStats.activeBlockChance(),
-                    avoidanceStats.passiveBlockChance(),
-                    avoidanceStats.activeBlockChance() - avoidanceStats.passiveBlockChance())).color(
+                m = m.insert(Message.raw(String.format("Block: %s (passive:%s + active:%s)\n",
+                    NumberFormatter.percent(avoidanceStats.activeBlockChance()),
+                    NumberFormatter.percent(avoidanceStats.passiveBlockChance()),
+                    NumberFormatter.percent(avoidanceStats.activeBlockChance() - avoidanceStats.passiveBlockChance()))).color(
                     reason == DamageBreakdown.AvoidanceReason.BLOCKED ? MessageColors.SUCCESS : MessageColors.GRAY));
                 if (reason == DamageBreakdown.AvoidanceReason.BLOCKED) {
-                    m = m.insert(Message.raw(String.format("Reduction: %.0f%%\n",
-                        avoidanceStats.blockDamageReduction())).color(MessageColors.INFO));
+                    m = m.insert(Message.raw(String.format("Reduction: %s\n",
+                        NumberFormatter.percent(avoidanceStats.blockDamageReduction()))).color(MessageColors.INFO));
                     if (avoidanceStats.blockStaminaCost() > 0) {
-                        m = m.insert(Message.raw(String.format("Stamina Cost: %.0f\n",
-                            avoidanceStats.blockStaminaCost())).color(MessageColors.GRAY));
+                        m = m.insert(Message.raw(String.format("Stamina Cost: %s\n",
+                            NumberFormatter.flat(avoidanceStats.blockStaminaCost()))).color(MessageColors.GRAY));
                     }
                 }
             } else if (avoidanceStats.passiveBlockChance() > 0) {
-                m = m.insert(Message.raw(String.format("Block: %.0f%% (passive)\n",
-                    avoidanceStats.passiveBlockChance())).color(
+                m = m.insert(Message.raw(String.format("Block: %s (passive)\n",
+                    NumberFormatter.percent(avoidanceStats.passiveBlockChance()))).color(
                     reason == DamageBreakdown.AvoidanceReason.BLOCKED ? MessageColors.SUCCESS : MessageColors.GRAY));
             }
         }
         if (avoidanceStats.parryChance() > 0) {
-            m = m.insert(Message.raw(String.format("Parry: %.0f%%\n",
-                avoidanceStats.parryChance())).color(
+            m = m.insert(Message.raw(String.format("Parry: %s\n",
+                NumberFormatter.percent(avoidanceStats.parryChance()))).color(
                 reason == DamageBreakdown.AvoidanceReason.PARRIED ? MessageColors.SUCCESS : MessageColors.GRAY));
         }
 
         // Estimated damage
         if (estimatedDamage > 0) {
-            m = m.insert(Message.raw(String.format("\nEstimated Damage Avoided: ~%.0f\n", estimatedDamage)).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("\nEstimated Damage Avoided: ~%s\n", NumberFormatter.flat(estimatedDamage))).color(MessageColors.GRAY));
         }
 
         m = m.insert(Message.raw("==========================\n").color(MessageColors.SUCCESS));
@@ -169,12 +170,12 @@ public final class CombatLogFormatter {
         // Add key avoidance stats inline
         if (avoidanceStats != null) {
             String detail = switch (reason) {
-                case DODGED -> String.format(" -- Dodge:%.0f%%", avoidanceStats.dodgeChance());
-                case MISSED -> String.format(" -- Evasion:%.0f", avoidanceStats.evasion());
+                case DODGED -> String.format(" -- Dodge:%s", NumberFormatter.percent(avoidanceStats.dodgeChance()));
+                case MISSED -> String.format(" -- Evasion:%s", NumberFormatter.flat(avoidanceStats.evasion()));
                 case BLOCKED -> avoidanceStats.wasActiveBlock()
-                    ? String.format(" -- Block:%.0f%% (active)", avoidanceStats.activeBlockChance())
-                    : String.format(" -- Block:%.0f%%", avoidanceStats.passiveBlockChance());
-                case PARRIED -> String.format(" -- Parry:%.0f%%", avoidanceStats.parryChance());
+                    ? String.format(" -- Block:%s (active)", NumberFormatter.percent(avoidanceStats.activeBlockChance()))
+                    : String.format(" -- Block:%s", NumberFormatter.percent(avoidanceStats.passiveBlockChance()));
+                case PARRIED -> String.format(" -- Parry:%s", NumberFormatter.percent(avoidanceStats.parryChance()));
             };
             message = message.insert(Message.raw(detail).color(MessageColors.GRAY));
         }
@@ -232,8 +233,8 @@ public final class CombatLogFormatter {
 
         // Total (uses effectiveFinalDamage which accounts for active blocking)
         m = m.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
-        m = m.insert(Message.raw(String.format("Total:     %.1f\n",
-            trace.effectiveFinalDamage())).color(MessageColors.SUCCESS));
+        m = m.insert(Message.raw(String.format("Total:     %s\n",
+            NumberFormatter.smallFlat(trace.effectiveFinalDamage()))).color(MessageColors.SUCCESS));
 
         // Recovery & Thorns
         m = appendTracedRecovery(m, trace);
@@ -276,9 +277,9 @@ public final class CombatLogFormatter {
         for (ElementType elem : ElementType.values()) {
             totalPreDefense += trace.elemBeforeResist().getOrDefault(elem, 0f);
         }
-        m = m.insert(Message.raw(String.format("Pre-Defense Total: %.1f", totalPreDefense)).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Pre-Defense Total: %s", NumberFormatter.smallFlat(totalPreDefense))).color(MessageColors.WHITE));
         if (trace.wasCritical()) {
-            m = m.insert(Message.raw(String.format(" (CRIT x%.2f)", trace.critMultiplierApplied())).color(MessageColors.GOLD));
+            m = m.insert(Message.raw(String.format(" (CRIT %s)", NumberFormatter.multiplier(trace.critMultiplierApplied()))).color(MessageColors.GOLD));
         }
         m = m.insert(Message.raw("\n").color(MessageColors.GRAY));
 
@@ -294,10 +295,10 @@ public final class CombatLogFormatter {
 
         if (armor > 0) {
             StringBuilder armorLine = new StringBuilder();
-            armorLine.append(String.format("Armor: %.0f", armor));
-            if (armorPct > 0) armorLine.append(String.format(" x (1+%.0f%%)", armorPct));
-            if (armorPen > 0) armorLine.append(String.format(" - %.0f%% pen", armorPen));
-            armorLine.append(String.format(" = %.0f eff -> -%.1f%%", effArmor, armorRedPct));
+            armorLine.append(String.format("Armor: %s", NumberFormatter.flat(armor)));
+            if (armorPct > 0) armorLine.append(String.format(" x (1+%s)", NumberFormatter.percent(armorPct)));
+            if (armorPen > 0) armorLine.append(String.format(" - %s pen", NumberFormatter.percent(armorPen)));
+            armorLine.append(String.format(" = %s eff -> -%s", NumberFormatter.flat(effArmor), NumberFormatter.percent(armorRedPct)));
             String armorSrc = statSources(bkd, ComputedStats::getArmor);
             armorLine.append(armorSrc);
             m = m.insert(Message.raw(armorLine + "\n").color(MessageColors.INFO));
@@ -308,7 +309,7 @@ public final class CombatLogFormatter {
         // Physical resistance
         float physResist = trace.physResistPercent();
         if (physResist > 0) {
-            m = m.insert(Message.raw(String.format("Phys Resist: %.1f%%\n", physResist)).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Phys Resist: %s\n", NumberFormatter.percent(physResist))).color(MessageColors.INFO));
         }
 
         // Elemental resistances
@@ -319,11 +320,11 @@ public final class CombatLogFormatter {
             String color = getElementColor(elem);
             if (raw != 0 || pen != 0) {
                 if (pen > 0) {
-                    m = m.insert(Message.raw(String.format("%s: %.0f%% - %.0f%% pen = %.0f%% eff\n",
-                        elem.getDisplayName(), raw, pen, eff)).color(color));
+                    m = m.insert(Message.raw(String.format("%s: %s - %s pen = %s eff\n",
+                        elem.getDisplayName(), NumberFormatter.percent(raw), NumberFormatter.percent(pen), NumberFormatter.percent(eff))).color(color));
                 } else {
-                    m = m.insert(Message.raw(String.format("%s: %.0f%%\n",
-                        elem.getDisplayName(), raw)).color(color));
+                    m = m.insert(Message.raw(String.format("%s: %s\n",
+                        elem.getDisplayName(), NumberFormatter.percent(raw))).color(color));
                 }
             }
         }
@@ -332,8 +333,8 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- Damage Taken --\n").color(MessageColors.WARNING));
 
         // Physical after armor + resist
-        m = m.insert(Message.raw(String.format("Physical: %.1f -> %.1f (armor) -> %.1f (resist)\n",
-            trace.physBeforeArmor(), trace.physAfterArmor(), trace.physAfterResist())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Physical: %s -> %s (armor) -> %s (resist)\n",
+            NumberFormatter.smallFlat(trace.physBeforeArmor()), NumberFormatter.smallFlat(trace.physAfterArmor()), NumberFormatter.smallFlat(trace.physAfterResist()))).color(MessageColors.WHITE));
 
         // Elemental after resist
         for (ElementType elem : ElementType.values()) {
@@ -343,19 +344,19 @@ public final class CombatLogFormatter {
                 String color = getElementColor(elem);
                 float eff = trace.effectiveResist().getOrDefault(elem, 0f);
                 if (eff != 0) {
-                    m = m.insert(Message.raw(String.format("%s: %.1f x %.0f%% = %.1f\n",
-                        elem.getDisplayName(), before, 100f - eff, after)).color(color));
+                    m = m.insert(Message.raw(String.format("%s: %s x %s = %s\n",
+                        elem.getDisplayName(), NumberFormatter.smallFlat(before), NumberFormatter.percent(100f - eff), NumberFormatter.smallFlat(after))).color(color));
                 } else {
-                    m = m.insert(Message.raw(String.format("%s: %.1f\n",
-                        elem.getDisplayName(), after)).color(color));
+                    m = m.insert(Message.raw(String.format("%s: %s\n",
+                        elem.getDisplayName(), NumberFormatter.smallFlat(after))).color(color));
                 }
             }
         }
 
         // True damage
         if (trace.trueDamage() > 0) {
-            m = m.insert(Message.raw(String.format("True: +%.1f (bypasses defenses)\n",
-                trace.trueDamage())).color(MessageColors.PURPLE));
+            m = m.insert(Message.raw(String.format("True: +%s (bypasses defenses)\n",
+                NumberFormatter.smallFlat(trace.trueDamage()))).color(MessageColors.PURPLE));
         }
 
         // Post-calc modifications
@@ -370,8 +371,8 @@ public final class CombatLogFormatter {
             if (trace.defenderCritNullifyChance() > 0) {
                 String result = trace.critWasNullified() ? "NULLIFIED" : "passed";
                 String color = trace.critWasNullified() ? MessageColors.SUCCESS : MessageColors.GRAY;
-                m = m.insert(Message.raw(String.format("Crit Nullify: %.0f%% chance -> %s\n",
-                    trace.defenderCritNullifyChance(), result)).color(color));
+                m = m.insert(Message.raw(String.format("Crit Nullify: %s chance -> %s\n",
+                    NumberFormatter.percent(trace.defenderCritNullifyChance()), result)).color(color));
             }
 
             // Energy shield
@@ -379,41 +380,41 @@ public final class CombatLogFormatter {
                 float shieldAfter = Math.max(0f, trace.energyShieldBefore() - trace.shieldAbsorbed());
                 float remainPct = trace.energyShieldCapacity() > 0
                     ? (shieldAfter / trace.energyShieldCapacity()) * 100f : 0f;
-                m = m.insert(Message.raw(String.format("Shield: %.0f -> %.0f (absorbed %.1f, %.0f%% remaining)\n",
-                    trace.energyShieldBefore(), shieldAfter, trace.shieldAbsorbed(), remainPct)).color(MessageColors.LIGHT_BLUE));
+                m = m.insert(Message.raw(String.format("Shield: %s -> %s (absorbed %s, %s remaining)\n",
+                    NumberFormatter.flat(trace.energyShieldBefore()), NumberFormatter.flat(shieldAfter), NumberFormatter.smallFlat(trace.shieldAbsorbed()), NumberFormatter.percent(remainPct))).color(MessageColors.LIGHT_BLUE));
             }
 
             // Parry
             if (trace.wasParried()) {
-                m = m.insert(Message.raw(String.format("Parried: taking %.0f%% damage\n",
-                    trace.parryReductionMult() * 100f)).color(MessageColors.INFO));
+                m = m.insert(Message.raw(String.format("Parried: taking %s damage\n",
+                    NumberFormatter.percent(trace.parryReductionMult() * 100f))).color(MessageColors.INFO));
             }
 
             // Mind over Matter
             if (trace.manaAbsorbed() > 0) {
-                m = m.insert(Message.raw(String.format("Mana Buffer: %.0f%% -> absorbed %.1f\n",
-                    trace.manaBufferPercent(), trace.manaAbsorbed())).color(MessageColors.INFO));
+                m = m.insert(Message.raw(String.format("Mana Buffer: %s -> absorbed %s\n",
+                    NumberFormatter.percent(trace.manaBufferPercent()), NumberFormatter.smallFlat(trace.manaAbsorbed()))).color(MessageColors.INFO));
             }
 
             // Shock amplification
             if (trace.shockBonusPercent() > 0) {
-                m = m.insert(Message.raw(String.format("Shock Amp: +%.0f%% applied\n",
-                    trace.shockBonusPercent())).color(COLOR_LIGHTNING));
+                m = m.insert(Message.raw(String.format("Shock Amp: +%s applied\n",
+                    NumberFormatter.percent(trace.shockBonusPercent()))).color(COLOR_LIGHTNING));
             }
 
             // Unarmed penalty
             if (trace.unarmedMultiplier() != 0) {
-                m = m.insert(Message.raw(String.format("Unarmed: x%.2f (%.1f -> %.1f)\n",
-                    trace.unarmedMultiplier(), trace.damageBeforeUnarmed(),
-                    trace.damageBeforeUnarmed() * trace.unarmedMultiplier())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Unarmed: %s (%s -> %s)\n",
+                    NumberFormatter.multiplier(trace.unarmedMultiplier()), NumberFormatter.smallFlat(trace.damageBeforeUnarmed()),
+                    NumberFormatter.smallFlat(trace.damageBeforeUnarmed() * trace.unarmedMultiplier()))).color(MessageColors.GRAY));
             }
 
             // Active blocking reduction
             if (trace.wasActiveBlocking()) {
                 String blockType = trace.isShieldBlock() ? "Shield Block" : "Weapon Block";
-                m = m.insert(Message.raw(String.format("%s: -%.0f%% (%.1f -> %.1f)\n",
-                    blockType, trace.blockReductionPercent(),
-                    trace.damageBeforeBlock(), trace.damageAfterBlock())).color(MessageColors.INFO));
+                m = m.insert(Message.raw(String.format("%s: -%s (%s -> %s)\n",
+                    blockType, NumberFormatter.percent(trace.blockReductionPercent()),
+                    NumberFormatter.smallFlat(trace.damageBeforeBlock()), NumberFormatter.smallFlat(trace.damageAfterBlock()))).color(MessageColors.INFO));
             }
         }
 
@@ -423,20 +424,20 @@ public final class CombatLogFormatter {
             || av.passiveBlockChance() > 0 || av.parryChance() > 0)) {
             m = m.insert(Message.raw("\n-- Your Avoidance (all failed) --\n").color(MessageColors.WARNING));
             if (av.dodgeChance() > 0) {
-                m = m.insert(Message.raw(String.format("Dodge: %.1f%% -> failed\n",
-                    av.dodgeChance())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Dodge: %s -> failed\n",
+                    NumberFormatter.percent(av.dodgeChance()))).color(MessageColors.GRAY));
             }
             if (av.evasion() > 0 || av.accuracy() > 0) {
-                m = m.insert(Message.raw(String.format("Evasion: %.0f vs %.0f acc -> %.1f%% hit -> they hit\n",
-                    av.evasion(), av.accuracy(), av.hitChance())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Evasion: %s vs %s acc -> %s hit -> they hit\n",
+                    NumberFormatter.flat(av.evasion()), NumberFormatter.flat(av.accuracy()), NumberFormatter.percent(av.hitChance()))).color(MessageColors.GRAY));
             }
             if (av.wasActiveBlock() && av.activeBlockChance() > 0) {
-                m = m.insert(Message.raw(String.format("Perfect Block: %.0f%% -> failed\n",
-                    av.activeBlockChance())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Perfect Block: %s -> failed\n",
+                    NumberFormatter.percent(av.activeBlockChance()))).color(MessageColors.GRAY));
             }
             if (av.parryChance() > 0) {
-                m = m.insert(Message.raw(String.format("Parry: %.0f%% -> failed\n",
-                    av.parryChance())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Parry: %s -> failed\n",
+                    NumberFormatter.percent(av.parryChance()))).color(MessageColors.GRAY));
             }
         }
 
@@ -446,19 +447,19 @@ public final class CombatLogFormatter {
         float defMaxHp = trace.defenderMaxHealth() > 0 ? trace.defenderMaxHealth() : snapshot.defenderMaxHealth();
         if (defMaxHp > 0) {
             float pctOfHp = (totalTaken / defMaxHp) * 100f;
-            m = m.insert(Message.raw(String.format("Total Taken: %.1f (%.1f%% of %.0f HP)\n",
-                totalTaken, pctOfHp, defMaxHp)).color(MessageColors.ERROR));
+            m = m.insert(Message.raw(String.format("Total Taken: %s (%s of %s HP)\n",
+                NumberFormatter.smallFlat(totalTaken), NumberFormatter.percent(pctOfHp), NumberFormatter.flat(defMaxHp))).color(MessageColors.ERROR));
         } else {
-            m = m.insert(Message.raw(String.format("Total Taken: %.1f\n",
-                totalTaken)).color(MessageColors.ERROR));
+            m = m.insert(Message.raw(String.format("Total Taken: %s\n",
+                NumberFormatter.smallFlat(totalTaken))).color(MessageColors.ERROR));
         }
 
         // HP change
         m = m.insert(Message.raw("\n").color(MessageColors.GRAY));
         float hpPct = snapshot.defenderMaxHealth() > 0
             ? (snapshot.defenderHealthAfter() / snapshot.defenderMaxHealth()) * 100f : 0f;
-        m = m.insert(Message.raw(String.format("Your HP: %.0f -> %.0f (%.0f%%)\n",
-            snapshot.defenderHealthBefore(), snapshot.defenderHealthAfter(), hpPct)).color(MessageColors.PINK));
+        m = m.insert(Message.raw(String.format("Your HP: %s -> %s (%s)\n",
+            NumberFormatter.flat(snapshot.defenderHealthBefore()), NumberFormatter.flat(snapshot.defenderHealthAfter()), NumberFormatter.percent(hpPct))).color(MessageColors.PINK));
 
         // Footer
         m = m.insert(Message.raw("==========================\n").color(MessageColors.ERROR));
@@ -477,19 +478,19 @@ public final class CombatLogFormatter {
     private static Message appendDamageSnapshot(@Nonnull Message m, float phys,
                                                  @Nullable EnumMap<ElementType, Float> elemental) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("-> Phys: %.1f", phys));
+        sb.append(String.format("-> Phys: %s", NumberFormatter.smallFlat(phys)));
         float total = phys;
         if (elemental != null) {
             for (ElementType elem : ElementType.values()) {
                 float val = elemental.getOrDefault(elem, 0f);
                 if (val > 0.05f) {
-                    sb.append(String.format(" | %s: %.1f", elem.getDisplayName(), val));
+                    sb.append(String.format(" | %s: %s", elem.getDisplayName(), NumberFormatter.smallFlat(val)));
                     total += val;
                 }
             }
         }
         if (total != phys) {
-            sb.append(String.format(" | Total: %.1f", total));
+            sb.append(String.format(" | Total: %s", NumberFormatter.smallFlat(total)));
         }
         sb.append("\n");
         m = m.insert(Message.raw(sb.toString()).color(MessageColors.GRAY));
@@ -514,8 +515,8 @@ public final class CombatLogFormatter {
     @Nonnull
     private static Message appendTracedBase(@Nonnull Message m, @Nonnull DamageTrace t) {
         m = m.insert(Message.raw("\n-- Base Damage --\n").color(MessageColors.WARNING));
-        m = m.insert(Message.raw(String.format("Weapon Base:      %.1f\n",
-            t.weaponBaseDamage())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Weapon Base:      %s\n",
+            NumberFormatter.smallFlat(t.weaponBaseDamage()))).color(MessageColors.WHITE));
 
         float atkMult = t.attackTypeMultiplier();
 
@@ -525,18 +526,18 @@ public final class CombatLogFormatter {
             float rawRatio = t.vanillaDamage() / t.referenceDamage();
             if (Math.abs(rawRatio - atkMult) > 0.01f) {
                 // Value was clamped — show raw->clamped
-                m = m.insert(Message.raw(String.format("Attack: %s (x%.2f raw, clamped to x%.2f)\n",
-                    atkName, rawRatio, atkMult))
+                m = m.insert(Message.raw(String.format("Attack: %s (%s raw, clamped to %s)\n",
+                    atkName, NumberFormatter.multiplier(rawRatio), NumberFormatter.multiplier(atkMult)))
                     .color(MessageColors.GRAY));
             } else {
                 // Not clamped — show derivation
-                m = m.insert(Message.raw(String.format("Attack: %s (vanilla: %.1f / ref: %.1f = x%.2f)\n",
-                    atkName, t.vanillaDamage(), t.referenceDamage(), atkMult))
+                m = m.insert(Message.raw(String.format("Attack: %s (vanilla: %s / ref: %s = %s)\n",
+                    atkName, NumberFormatter.smallFlat(t.vanillaDamage()), NumberFormatter.smallFlat(t.referenceDamage()), NumberFormatter.multiplier(atkMult)))
                     .color(MessageColors.GRAY));
             }
         } else if (atkMult != 1.0f) {
-            m = m.insert(Message.raw(String.format("Attack: %s (x%.2f)\n",
-                t.attackType().name().toLowerCase(), atkMult))
+            m = m.insert(Message.raw(String.format("Attack: %s (%s)\n",
+                t.attackType().name().toLowerCase(), NumberFormatter.multiplier(atkMult)))
                 .color(MessageColors.GRAY));
         }
 
@@ -552,16 +553,16 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- Flat Physical --\n").color(MessageColors.WARNING));
         if (t.flatPhysFromStats() != 0) {
             String src = statSources(bkd, ComputedStats::getPhysicalDamage);
-            m = m.insert(Message.raw(String.format("+ Physical:       %+.1f%s\n",
-                t.flatPhysFromStats(), src)).color(MessageColors.WHITE));
+            m = m.insert(Message.raw(String.format("+ Physical:       %s%s\n",
+                NumberFormatter.signed(t.flatPhysFromStats()), src)).color(MessageColors.WHITE));
         }
         if (t.flatMelee() != 0) {
             String src = statSources(bkd, ComputedStats::getMeleeDamage);
-            m = m.insert(Message.raw(String.format("+ Melee:          %+.1f%s\n",
-                t.flatMelee(), src)).color(MessageColors.WHITE));
+            m = m.insert(Message.raw(String.format("+ Melee:          %s%s\n",
+                NumberFormatter.signed(t.flatMelee()), src)).color(MessageColors.WHITE));
         }
-        m = m.insert(Message.raw(String.format("= Physical:       %.1f\n",
-            t.physAfterFlat())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("= Physical:       %s\n",
+            NumberFormatter.smallFlat(t.physAfterFlat()))).color(MessageColors.WHITE));
         m = appendDamageSnapshot(m, t.physAfterFlat(), null);
         return m;
     }
@@ -578,8 +579,8 @@ public final class CombatLogFormatter {
         for (ElementType elem : ElementType.values()) {
             float flat = t.flatElementalAdded().getOrDefault(elem, 0f);
             if (flat > 0) {
-                m = m.insert(Message.raw(String.format("+ %s:  +%.1f\n",
-                    padRight(elem.getDisplayName(), 12), flat)).color(getElementColor(elem)));
+                m = m.insert(Message.raw(String.format("+ %s:  +%s\n",
+                    padRight(elem.getDisplayName(), 12), NumberFormatter.smallFlat(flat))).color(getElementColor(elem)));
             }
         }
         m = appendDamageSnapshot(m, t.physAfterFlat(), t.flatElementalAdded());
@@ -599,17 +600,17 @@ public final class CombatLogFormatter {
             float pct = t.conversionPercents().getOrDefault(elem, 0f);
             if (pct > 0) {
                 float converted = t.convertedAmounts().getOrDefault(elem, 0f);
-                m = m.insert(Message.raw(String.format("%s Conv: %.0f%% of %.1f = %.1f phys->%s\n",
-                    elem.getDisplayName(), pct, t.physBeforeConversion(), converted,
+                m = m.insert(Message.raw(String.format("%s Conv: %s of %s = %s phys->%s\n",
+                    elem.getDisplayName(), NumberFormatter.percent(pct), NumberFormatter.smallFlat(t.physBeforeConversion()), NumberFormatter.smallFlat(converted),
                     elem.getDisplayName().toLowerCase())).color(getElementColor(elem)));
             }
         }
         if (t.scaleFactor() != 1.0f) {
-            m = m.insert(Message.raw(String.format("Scale Factor: %.2f (total conv > 100%%)\n",
-                t.scaleFactor())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Scale Factor: %s (total conv > 100%%)\n",
+                NumberFormatter.multiplier(t.scaleFactor()))).color(MessageColors.GRAY));
         }
-        m = m.insert(Message.raw(String.format("Physical: %.1f -> %.1f\n",
-            t.physBeforeConversion(), t.physAfterConversion())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Physical: %s -> %s\n",
+            NumberFormatter.smallFlat(t.physBeforeConversion()), NumberFormatter.smallFlat(t.physAfterConversion()))).color(MessageColors.WHITE));
         m = appendDamageSnapshot(m, t.physAfterConversion(), buildElemMapPreMods(t));
         return m;
     }
@@ -622,21 +623,21 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- % Increased Physical --\n").color(MessageColors.WARNING));
         StringBuilder components = new StringBuilder();
         if (t.physDmgPercent() != 0) {
-            components.append(String.format("physDmg%%: %.0f", t.physDmgPercent()));
+            components.append(String.format("physDmg%%: %s", NumberFormatter.percent(t.physDmgPercent())));
         }
         if (t.attackTypePercent() != 0) {
             if (components.length() > 0) components.append(" + ");
-            components.append(String.format("type%%: %.0f", t.attackTypePercent()));
+            components.append(String.format("type%%: %s", NumberFormatter.percent(t.attackTypePercent())));
         }
         if (t.globalDmgPercent() != 0) {
             if (components.length() > 0) components.append(" + ");
-            components.append(String.format("dmg%%: %.0f", t.globalDmgPercent()));
+            components.append(String.format("dmg%%: %s", NumberFormatter.percent(t.globalDmgPercent())));
         }
-        m = m.insert(Message.raw(String.format("%s = +%.0f%%\n",
-            components, t.totalIncreasedPercent())).color(MessageColors.INFO));
-        m = m.insert(Message.raw(String.format("Physical: %.1f x %.2f = %.1f\n",
-            t.physAfterConversion() > 0 ? t.physAfterConversion() : t.physAfterFlat(),
-            1f + t.totalIncreasedPercent() / 100f, t.physAfterIncreased())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("%s = +%s\n",
+            components, NumberFormatter.percent(t.totalIncreasedPercent()))).color(MessageColors.INFO));
+        m = m.insert(Message.raw(String.format("Physical: %s x %s = %s\n",
+            NumberFormatter.smallFlat(t.physAfterConversion() > 0 ? t.physAfterConversion() : t.physAfterFlat()),
+            NumberFormatter.multiplier(1f + t.totalIncreasedPercent() / 100f), NumberFormatter.smallFlat(t.physAfterIncreased()))).color(MessageColors.WHITE));
         m = appendDamageSnapshot(m, t.physAfterIncreased(), buildElemMapPreMods(t));
         return m;
     }
@@ -664,8 +665,8 @@ public final class CombatLogFormatter {
             float moreMult = 1f + more / 100f;
             float preMod = (incMult > 0 && moreMult > 0) ? after / (incMult * moreMult) : after;
 
-            m = m.insert(Message.raw(String.format("%s: %.1f x (1%+.0f%%inc) x (1%+.0f%%more) = %.1f\n",
-                padRight(elem.getDisplayName(), 10), preMod, inc, more, after)).color(getElementColor(elem)));
+            m = m.insert(Message.raw(String.format("%s: %s x (1%sinc) x (1%smore) = %s\n",
+                padRight(elem.getDisplayName(), 10), NumberFormatter.smallFlat(preMod), NumberFormatter.signedPercent(inc), NumberFormatter.signedPercent(more), NumberFormatter.smallFlat(after))).color(getElementColor(elem)));
         }
         m = appendDamageSnapshot(m, t.physAfterIncreased(), t.elemAfterMods());
         return m;
@@ -677,15 +678,15 @@ public final class CombatLogFormatter {
 
         m = m.insert(Message.raw("\n-- % More Multipliers --\n").color(MessageColors.WARNING));
         if (t.allDamagePercent() != 0) {
-            m = m.insert(Message.raw(String.format("allDmg%%: %+.0f%% -> x%.2f\n",
-                t.allDamagePercent(), 1f + t.allDamagePercent() / 100f)).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("allDmg%%: %s -> %s\n",
+                NumberFormatter.signedPercent(t.allDamagePercent()), NumberFormatter.multiplier(1f + t.allDamagePercent() / 100f))).color(MessageColors.INFO));
         }
         if (t.damageMultiplier() != 0) {
-            m = m.insert(Message.raw(String.format("dmgMult: %+.0f%% -> x%.2f\n",
-                t.damageMultiplier(), 1f + t.damageMultiplier() / 100f)).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("dmgMult: %s -> %s\n",
+                NumberFormatter.signedPercent(t.damageMultiplier()), NumberFormatter.multiplier(1f + t.damageMultiplier() / 100f))).color(MessageColors.INFO));
         }
-        m = m.insert(Message.raw(String.format("Phys After: %.1f\n",
-            t.physAfterMore())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Phys After: %s\n",
+            NumberFormatter.smallFlat(t.physAfterMore()))).color(MessageColors.WHITE));
 
         // Show elemental after-more values if any
         for (ElementType elem : ElementType.values()) {
@@ -693,8 +694,8 @@ public final class CombatLogFormatter {
             if (afterMore > 0) {
                 float beforeMore = t.elemAfterMods().getOrDefault(elem, 0f);
                 if (Math.abs(afterMore - beforeMore) > 0.01f) {
-                    m = m.insert(Message.raw(String.format("%s After: %.1f -> %.1f\n",
-                        elem.getDisplayName(), beforeMore, afterMore)).color(getElementColor(elem)));
+                    m = m.insert(Message.raw(String.format("%s After: %s -> %s\n",
+                        elem.getDisplayName(), NumberFormatter.smallFlat(beforeMore), NumberFormatter.smallFlat(afterMore))).color(getElementColor(elem)));
                 }
             }
         }
@@ -713,32 +714,32 @@ public final class CombatLogFormatter {
         // Attack type multiplier (shown first)
         if (atkMult != 1.0f) {
             String atkLabel = t.attackName() != null ? t.attackName() : t.attackType().name().toLowerCase();
-            m = m.insert(Message.raw(String.format("Attack Type:     x%.2f (%s)\n",
-                atkMult, atkLabel)).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Attack Type:     %s (%s)\n",
+                NumberFormatter.multiplier(atkMult), atkLabel)).color(MessageColors.INFO));
         }
         if (cond.realm() != 1.0f) {
-            m = m.insert(Message.raw(String.format("Realm Damage:    x%.2f\n",
-                cond.realm())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Realm Damage:    %s\n",
+                NumberFormatter.multiplier(cond.realm()))).color(MessageColors.INFO));
         }
         if (cond.execute() != 1.0f) {
-            m = m.insert(Message.raw(String.format("Execute (%+.0f%%):  x%.2f\n",
-                (cond.execute() - 1f) * 100f, cond.execute())).color(MessageColors.ORANGE));
+            m = m.insert(Message.raw(String.format("Execute (%s):  %s\n",
+                NumberFormatter.signedPercent((cond.execute() - 1f) * 100f), NumberFormatter.multiplier(cond.execute()))).color(MessageColors.ORANGE));
         }
         if (cond.vsFrozen() != 1.0f) {
-            m = m.insert(Message.raw(String.format("vs Frozen (%+.0f%%): x%.2f\n",
-                (cond.vsFrozen() - 1f) * 100f, cond.vsFrozen())).color(COLOR_WATER));
+            m = m.insert(Message.raw(String.format("vs Frozen (%s): %s\n",
+                NumberFormatter.signedPercent((cond.vsFrozen() - 1f) * 100f), NumberFormatter.multiplier(cond.vsFrozen()))).color(COLOR_WATER));
         }
         if (cond.vsShocked() != 1.0f) {
-            m = m.insert(Message.raw(String.format("vs Shocked (%+.0f%%): x%.2f\n",
-                (cond.vsShocked() - 1f) * 100f, cond.vsShocked())).color(COLOR_LIGHTNING));
+            m = m.insert(Message.raw(String.format("vs Shocked (%s): %s\n",
+                NumberFormatter.signedPercent((cond.vsShocked() - 1f) * 100f), NumberFormatter.multiplier(cond.vsShocked()))).color(COLOR_LIGHTNING));
         }
         if (cond.lowLife() != 1.0f) {
-            m = m.insert(Message.raw(String.format("Low Life (%+.0f%%): x%.2f\n",
-                (cond.lowLife() - 1f) * 100f, cond.lowLife())).color(MessageColors.ERROR));
+            m = m.insert(Message.raw(String.format("Low Life (%s): %s\n",
+                NumberFormatter.signedPercent((cond.lowLife() - 1f) * 100f), NumberFormatter.multiplier(cond.lowLife()))).color(MessageColors.ERROR));
         }
         if (cond.consecutive() != 1.0f) {
-            m = m.insert(Message.raw(String.format("Consecutive (%+.0f%%): x%.2f\n",
-                (cond.consecutive() - 1f) * 100f, cond.consecutive())).color(MessageColors.WHITE));
+            m = m.insert(Message.raw(String.format("Consecutive (%s): %s\n",
+                NumberFormatter.signedPercent((cond.consecutive() - 1f) * 100f), NumberFormatter.multiplier(cond.consecutive()))).color(MessageColors.WHITE));
         }
         float fullCombined = cond.combined() * atkMult;
         m = m.insert(Message.raw(String.format("Combined:        x%.4f\n",
@@ -748,15 +749,15 @@ public final class CombatLogFormatter {
         float physBefore = t.physAfterMore();
         float physAfter = t.physAfterConditionals();
         if (physBefore > 0.05f) {
-            m = m.insert(Message.raw(String.format("Physical: %.1f x %.4f = %.1f\n",
-                physBefore, fullCombined, physAfter)).color(MessageColors.WHITE));
+            m = m.insert(Message.raw(String.format("Physical: %s x %.4f = %s\n",
+                NumberFormatter.smallFlat(physBefore), fullCombined, NumberFormatter.smallFlat(physAfter))).color(MessageColors.WHITE));
         }
         for (ElementType elem : ElementType.values()) {
             float elemBefore = t.elemAfterMore().getOrDefault(elem, 0f);
             float elemAfter = t.elemAfterConditionals().getOrDefault(elem, 0f);
             if (elemBefore > 0.05f) {
-                m = m.insert(Message.raw(String.format("%s: %.1f x %.4f = %.1f\n",
-                    elem.getDisplayName(), elemBefore, fullCombined, elemAfter)).color(getElementColor(elem)));
+                m = m.insert(Message.raw(String.format("%s: %s x %.4f = %s\n",
+                    elem.getDisplayName(), NumberFormatter.smallFlat(elemBefore), fullCombined, NumberFormatter.smallFlat(elemAfter))).color(getElementColor(elem)));
             }
         }
         m = appendDamageSnapshot(m, t.physAfterConditionals(), t.elemAfterConditionals());
@@ -769,28 +770,28 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- Critical Strike --\n").color(MessageColors.WARNING));
 
         String chanceSrc = statSources(bkd, ComputedStats::getCriticalChance);
-        m = m.insert(Message.raw(String.format("Crit Chance: %.1f%%%s\n",
-            t.critChance(), chanceSrc)).color(MessageColors.INFO));
+        m = m.insert(Message.raw(String.format("Crit Chance: %s%s\n",
+            NumberFormatter.percent(t.critChance()), chanceSrc)).color(MessageColors.INFO));
 
         if (t.wasCritical()) {
             String multSrc = statSources(bkd, cs -> cs.getCriticalMultiplier() / 100f);
             m = m.insert(Message.raw("Roll: CRIT!\n").color(MessageColors.GOLD));
-            m = m.insert(Message.raw(String.format("Crit Multi:  x%.2f%s\n",
-                t.critMultiplierApplied(), multSrc)).color(MessageColors.GOLD));
+            m = m.insert(Message.raw(String.format("Crit Multi:  %s%s\n",
+                NumberFormatter.multiplier(t.critMultiplierApplied()), multSrc)).color(MessageColors.GOLD));
 
             // Show resulting damage per type
             float physBefore = t.physAfterConditionals();
             float physAfter = t.physAfterCrit();
             if (physBefore > 0.05f) {
-                m = m.insert(Message.raw(String.format("Physical: %.1f x %.2f = %.1f\n",
-                    physBefore, t.critMultiplierApplied(), physAfter)).color(MessageColors.WHITE));
+                m = m.insert(Message.raw(String.format("Physical: %s x %s = %s\n",
+                    NumberFormatter.smallFlat(physBefore), NumberFormatter.multiplier(t.critMultiplierApplied()), NumberFormatter.smallFlat(physAfter))).color(MessageColors.WHITE));
             }
             for (ElementType elem : ElementType.values()) {
                 float elemBefore = t.elemAfterConditionals().getOrDefault(elem, 0f);
                 float elemAfter = t.elemAfterCrit().getOrDefault(elem, 0f);
                 if (elemBefore > 0.05f) {
-                    m = m.insert(Message.raw(String.format("%s: %.1f x %.2f = %.1f\n",
-                        elem.getDisplayName(), elemBefore, t.critMultiplierApplied(), elemAfter)).color(getElementColor(elem)));
+                    m = m.insert(Message.raw(String.format("%s: %s x %s = %s\n",
+                        elem.getDisplayName(), NumberFormatter.smallFlat(elemBefore), NumberFormatter.multiplier(t.critMultiplierApplied()), NumberFormatter.smallFlat(elemAfter))).color(getElementColor(elem)));
                 }
             }
         } else {
@@ -812,24 +813,24 @@ public final class CombatLogFormatter {
         float redPct = t.armorReductionPercent();
 
         if (armor > 0 || eff > 0) {
-            StringBuilder armorLine = new StringBuilder(String.format("Armor: %.0f", armor));
-            if (armorPct > 0) armorLine.append(String.format(" x (1+%.0f%%)", armorPct));
-            armorLine.append(String.format(" = %.0f", eff + (pen > 0 ? eff * pen / (100f - pen) : 0)));
-            if (pen > 0) armorLine.append(String.format("\nPen: %.0f%% -> %.0f eff", pen, eff));
+            StringBuilder armorLine = new StringBuilder(String.format("Armor: %s", NumberFormatter.flat(armor)));
+            if (armorPct > 0) armorLine.append(String.format(" x (1+%s)", NumberFormatter.percent(armorPct)));
+            armorLine.append(String.format(" = %s", NumberFormatter.flat(eff + (pen > 0 ? eff * pen / (100f - pen) : 0))));
+            if (pen > 0) armorLine.append(String.format("\nPen: %s -> %s eff", NumberFormatter.percent(pen), NumberFormatter.flat(eff)));
             m = m.insert(Message.raw(armorLine + "\n").color(MessageColors.INFO));
-            m = m.insert(Message.raw(String.format("Formula: %.0f / (%.0f + 10x%.1f) = %.1f%%\n",
-                eff, eff, t.physBeforeArmor(), redPct)).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Formula: %s / (%s + 10x%s) = %s\n",
+                NumberFormatter.flat(eff), NumberFormatter.flat(eff), NumberFormatter.smallFlat(t.physBeforeArmor()), NumberFormatter.percent(redPct))).color(MessageColors.GRAY));
         }
 
         // Physical: before armor -> after armor -> after resist
-        m = m.insert(Message.raw(String.format("Physical: %.1f x %.1f%% = %.1f\n",
-            t.physBeforeArmor(), 100f - redPct, t.physAfterArmor())).color(MessageColors.WHITE));
+        m = m.insert(Message.raw(String.format("Physical: %s x %s = %s\n",
+            NumberFormatter.smallFlat(t.physBeforeArmor()), NumberFormatter.percent(100f - redPct), NumberFormatter.smallFlat(t.physAfterArmor()))).color(MessageColors.WHITE));
 
         // Physical resistance
         float physResist = t.physResistPercent();
         if (physResist > 0) {
-            m = m.insert(Message.raw(String.format("Phys Resist: %.1f%% -> %.1f x %.1f%% = %.1f\n",
-                physResist, t.physAfterArmor(), 100f - physResist, t.physAfterResist())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Phys Resist: %s -> %s x %s = %s\n",
+                NumberFormatter.percent(physResist), NumberFormatter.smallFlat(t.physAfterArmor()), NumberFormatter.percent(100f - physResist), NumberFormatter.smallFlat(t.physAfterResist()))).color(MessageColors.INFO));
         }
 
         // Elemental resistances
@@ -844,14 +845,14 @@ public final class CombatLogFormatter {
             String color = getElementColor(elem);
 
             if (effResist != 0) {
-                StringBuilder line = new StringBuilder(String.format("%s: %.0f%%",
-                    elem.getDisplayName(), raw));
-                if (elemPen > 0) line.append(String.format(" - %.0f%% pen = %.0f%% eff", elemPen, effResist));
-                line.append(String.format(" -> %.1f x %.0f%% = %.1f", before, 100f - effResist, after));
+                StringBuilder line = new StringBuilder(String.format("%s: %s",
+                    elem.getDisplayName(), NumberFormatter.percent(raw)));
+                if (elemPen > 0) line.append(String.format(" - %s pen = %s eff", NumberFormatter.percent(elemPen), NumberFormatter.percent(effResist)));
+                line.append(String.format(" -> %s x %s = %s", NumberFormatter.smallFlat(before), NumberFormatter.percent(100f - effResist), NumberFormatter.smallFlat(after)));
                 m = m.insert(Message.raw(line + "\n").color(color));
             } else {
-                m = m.insert(Message.raw(String.format("%s: 0%% -> %.1f\n",
-                    elem.getDisplayName(), after)).color(color));
+                m = m.insert(Message.raw(String.format("%s: 0%% -> %s\n",
+                    elem.getDisplayName(), NumberFormatter.smallFlat(after))).color(color));
             }
         }
         m = appendDamageSnapshot(m, t.physAfterResist(), t.elemAfterResist());
@@ -862,8 +863,8 @@ public final class CombatLogFormatter {
     private static Message appendTracedTrueDamage(@Nonnull Message m, @Nonnull DamageTrace t) {
         if (t.trueDamage() <= 0) return m;
         m = m.insert(Message.raw("\n-- True Damage --\n").color(MessageColors.WARNING));
-        m = m.insert(Message.raw(String.format("True: +%.1f (bypasses defenses)\n",
-            t.trueDamage())).color(MessageColors.PURPLE));
+        m = m.insert(Message.raw(String.format("True: +%s (bypasses defenses)\n",
+            NumberFormatter.smallFlat(t.trueDamage()))).color(MessageColors.PURPLE));
         return m;
     }
 
@@ -881,63 +882,63 @@ public final class CombatLogFormatter {
         if (t.defenderCritNullifyChance() > 0) {
             String result = t.critWasNullified() ? "NULLIFIED" : "passed";
             String color = t.critWasNullified() ? MessageColors.ERROR : MessageColors.GRAY;
-            m = m.insert(Message.raw(String.format("Crit Nullify: %.0f%% chance -> %s\n",
-                t.defenderCritNullifyChance(), result)).color(color));
+            m = m.insert(Message.raw(String.format("Crit Nullify: %s chance -> %s\n",
+                NumberFormatter.percent(t.defenderCritNullifyChance()), result)).color(color));
         }
 
         // Parry
         if (t.parryChance() > 0 || t.wasParried()) {
             if (t.wasParried()) {
-                m = m.insert(Message.raw(String.format("Parry: %.0f%% chance -> PARRIED (taking %.0f%% dmg, after: %.1f)\n",
-                    t.parryChance(), t.parryReductionMult() * 100f, t.damageAfterParry())).color(MessageColors.INFO));
+                m = m.insert(Message.raw(String.format("Parry: %s chance -> PARRIED (taking %s dmg, after: %s)\n",
+                    NumberFormatter.percent(t.parryChance()), NumberFormatter.percent(t.parryReductionMult() * 100f), NumberFormatter.smallFlat(t.damageAfterParry()))).color(MessageColors.INFO));
             } else {
-                m = m.insert(Message.raw(String.format("Parry: %.0f%% chance -> no\n",
-                    t.parryChance())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("Parry: %s chance -> no\n",
+                    NumberFormatter.percent(t.parryChance()))).color(MessageColors.GRAY));
             }
         }
 
         // Energy shield
         if (t.shieldAbsorbed() > 0 || t.energyShieldCapacity() > 0) {
             float shieldAfter = t.energyShieldBefore() - t.shieldAbsorbed();
-            m = m.insert(Message.raw(String.format("Shield: %.0f/%.0f -> %.0f/%.0f (absorbed %.1f)\n",
-                t.energyShieldBefore(), t.energyShieldCapacity(),
-                Math.max(0f, shieldAfter), t.energyShieldCapacity(),
-                t.shieldAbsorbed())).color(MessageColors.LIGHT_BLUE));
+            m = m.insert(Message.raw(String.format("Shield: %s/%s -> %s/%s (absorbed %s)\n",
+                NumberFormatter.flat(t.energyShieldBefore()), NumberFormatter.flat(t.energyShieldCapacity()),
+                NumberFormatter.flat(Math.max(0f, shieldAfter)), NumberFormatter.flat(t.energyShieldCapacity()),
+                NumberFormatter.smallFlat(t.shieldAbsorbed()))).color(MessageColors.LIGHT_BLUE));
         }
 
         // Mind over Matter
         if (t.manaAbsorbed() > 0) {
-            m = m.insert(Message.raw(String.format("Mana Buffer: %.0f%% -> %.1f mana absorbed\n",
-                t.manaBufferPercent(), t.manaAbsorbed())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Mana Buffer: %s -> %s mana absorbed\n",
+                NumberFormatter.percent(t.manaBufferPercent()), NumberFormatter.smallFlat(t.manaAbsorbed()))).color(MessageColors.INFO));
         }
 
         // Shock amplification
         if (t.shockBonusPercent() > 0) {
             float afterShock = t.damageBeforeShock() * (1f + t.shockBonusPercent() / 100f);
-            m = m.insert(Message.raw(String.format("Shock Amp: +%.0f%% -> %.1f x %.2f = %.1f\n",
-                t.shockBonusPercent(), t.damageBeforeShock(),
-                1f + t.shockBonusPercent() / 100f, afterShock)).color(COLOR_LIGHTNING));
+            m = m.insert(Message.raw(String.format("Shock Amp: +%s -> %s x %s = %s\n",
+                NumberFormatter.percent(t.shockBonusPercent()), NumberFormatter.smallFlat(t.damageBeforeShock()),
+                NumberFormatter.multiplier(1f + t.shockBonusPercent() / 100f), NumberFormatter.smallFlat(afterShock))).color(COLOR_LIGHTNING));
         }
 
         // Damage taken modifier
         if (t.damageTakenModifier() != 0) {
-            m = m.insert(Message.raw(String.format("Dmg Taken: x%.2f (defender has %+.0f%% damage taken)\n",
-                1f + t.damageTakenModifier() / 100f, t.damageTakenModifier())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Dmg Taken: %s (defender has %s damage taken)\n",
+                NumberFormatter.multiplier(1f + t.damageTakenModifier() / 100f), NumberFormatter.signedPercent(t.damageTakenModifier()))).color(MessageColors.GRAY));
         }
 
         // Unarmed penalty
         if (t.unarmedMultiplier() != 0) {
-            m = m.insert(Message.raw(String.format("Unarmed: x%.2f (%.1f -> %.1f)\n",
-                t.unarmedMultiplier(), t.damageBeforeUnarmed(),
-                t.damageBeforeUnarmed() * t.unarmedMultiplier())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Unarmed: %s (%s -> %s)\n",
+                NumberFormatter.multiplier(t.unarmedMultiplier()), NumberFormatter.smallFlat(t.damageBeforeUnarmed()),
+                NumberFormatter.smallFlat(t.damageBeforeUnarmed() * t.unarmedMultiplier()))).color(MessageColors.GRAY));
         }
 
         // Active blocking reduction
         if (t.wasActiveBlocking()) {
             String blockType = t.isShieldBlock() ? "Shield Block" : "Weapon Block";
-            m = m.insert(Message.raw(String.format("%s: -%.0f%% (%.1f -> %.1f)\n",
-                blockType, t.blockReductionPercent(),
-                t.damageBeforeBlock(), t.damageAfterBlock())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("%s: -%s (%s -> %s)\n",
+                blockType, NumberFormatter.percent(t.blockReductionPercent()),
+                NumberFormatter.smallFlat(t.damageBeforeBlock()), NumberFormatter.smallFlat(t.damageAfterBlock()))).color(MessageColors.INFO));
         }
 
         return m;
@@ -950,20 +951,20 @@ public final class CombatLogFormatter {
 
         m = m.insert(Message.raw("\n-- Recovery --\n").color(MessageColors.WARNING));
         if (t.lifeLeechAmount() > 0) {
-            m = m.insert(Message.raw(String.format("Life Leech: %.1f%% x %.1f = %.1f HP\n",
-                t.lifeLeechPercent(), t.breakdown().totalDamage(), t.lifeLeechAmount())).color(MessageColors.SUCCESS));
+            m = m.insert(Message.raw(String.format("Life Leech: %s x %s = %s HP\n",
+                NumberFormatter.percent(t.lifeLeechPercent()), NumberFormatter.smallFlat(t.breakdown().totalDamage()), NumberFormatter.smallFlat(t.lifeLeechAmount()))).color(MessageColors.SUCCESS));
         }
         if (t.lifeStealAmount() > 0) {
-            m = m.insert(Message.raw(String.format("Life Steal: %.1f%% x %.1f = %.1f HP\n",
-                t.lifeStealPercent(), t.breakdown().totalDamage(), t.lifeStealAmount())).color(MessageColors.SUCCESS));
+            m = m.insert(Message.raw(String.format("Life Steal: %s x %s = %s HP\n",
+                NumberFormatter.percent(t.lifeStealPercent()), NumberFormatter.smallFlat(t.breakdown().totalDamage()), NumberFormatter.smallFlat(t.lifeStealAmount()))).color(MessageColors.SUCCESS));
         }
         if (t.manaLeechAmount() > 0) {
-            m = m.insert(Message.raw(String.format("Mana Leech: %.1f%% x %.1f = %.1f mana\n",
-                t.manaLeechPercent(), t.breakdown().totalDamage(), t.manaLeechAmount())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Mana Leech: %s x %s = %s mana\n",
+                NumberFormatter.percent(t.manaLeechPercent()), NumberFormatter.smallFlat(t.breakdown().totalDamage()), NumberFormatter.smallFlat(t.manaLeechAmount()))).color(MessageColors.INFO));
         }
         if (t.manaStealAmount() > 0) {
-            m = m.insert(Message.raw(String.format("Mana Steal: %.1f%% x %.1f = %.1f mana\n",
-                t.manaStealPercent(), t.breakdown().totalDamage(), t.manaStealAmount())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format("Mana Steal: %s x %s = %s mana\n",
+                NumberFormatter.percent(t.manaStealPercent()), NumberFormatter.smallFlat(t.breakdown().totalDamage()), NumberFormatter.smallFlat(t.manaStealAmount()))).color(MessageColors.INFO));
         }
         return m;
     }
@@ -974,17 +975,17 @@ public final class CombatLogFormatter {
 
         m = m.insert(Message.raw("\n-- Thorns Returned --\n").color(MessageColors.WARNING));
         if (t.thornsDamageFlat() > 0) {
-            m = m.insert(Message.raw(String.format("Flat: %.0f x (1+%.0f%%) = %.1f\n",
-                t.thornsDamageFlat(), t.thornsDamagePercent(),
-                t.thornsDamageFlat() * (1f + t.thornsDamagePercent() / 100f))).color(MessageColors.ORANGE));
+            m = m.insert(Message.raw(String.format("Flat: %s x (1+%s) = %s\n",
+                NumberFormatter.flat(t.thornsDamageFlat()), NumberFormatter.percent(t.thornsDamagePercent()),
+                NumberFormatter.smallFlat(t.thornsDamageFlat() * (1f + t.thornsDamagePercent() / 100f)))).color(MessageColors.ORANGE));
         }
         if (t.reflectDamagePercent() > 0) {
-            m = m.insert(Message.raw(String.format("Reflect: %.0f%% x %.1f = %.1f\n",
-                t.reflectDamagePercent(), t.breakdown().totalDamage(),
-                t.breakdown().totalDamage() * t.reflectDamagePercent() / 100f)).color(MessageColors.ORANGE));
+            m = m.insert(Message.raw(String.format("Reflect: %s x %s = %s\n",
+                NumberFormatter.percent(t.reflectDamagePercent()), NumberFormatter.smallFlat(t.breakdown().totalDamage()),
+                NumberFormatter.smallFlat(t.breakdown().totalDamage() * t.reflectDamagePercent() / 100f))).color(MessageColors.ORANGE));
         }
-        m = m.insert(Message.raw(String.format("Total: %.1f back to you\n",
-            t.totalThornsReturned())).color(MessageColors.ERROR));
+        m = m.insert(Message.raw(String.format("Total: %s back to you\n",
+            NumberFormatter.smallFlat(t.totalThornsReturned()))).color(MessageColors.ERROR));
         return m;
     }
 
@@ -1000,11 +1001,11 @@ public final class CombatLogFormatter {
         String weapon = t.weaponItemId() != null ? t.weaponItemId() : "Unarmed";
         m = m.insert(Message.raw(String.format("Weapon: %s", weapon)).color(MessageColors.WHITE));
         if (t.attackTypeMultiplier() != 1.0f) {
-            m = m.insert(Message.raw(String.format(" | %s x%.2f",
-                t.attackType().name().toLowerCase(), t.attackTypeMultiplier())).color(MessageColors.INFO));
+            m = m.insert(Message.raw(String.format(" | %s %s",
+                t.attackType().name().toLowerCase(), NumberFormatter.multiplier(t.attackTypeMultiplier()))).color(MessageColors.INFO));
         }
         if (t.attackSpeedPercent() != 0) {
-            m = m.insert(Message.raw(String.format(" | AtkSpd: %+.0f%%", t.attackSpeedPercent())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format(" | AtkSpd: %s", NumberFormatter.signedPercent(t.attackSpeedPercent()))).color(MessageColors.GRAY));
         }
         m = m.insert(Message.raw("\n").color(MessageColors.GRAY));
 
@@ -1012,8 +1013,8 @@ public final class CombatLogFormatter {
         float total = t.effectiveFinalDamage();
         if (t.defenderMaxHealth() > 0) {
             float pctOfHp = (total / t.defenderMaxHealth()) * 100f;
-            m = m.insert(Message.raw(String.format("Total: %.1f | %.1f%% of target HP (%.0f)\n",
-                total, pctOfHp, t.defenderMaxHealth())).color(MessageColors.SUCCESS));
+            m = m.insert(Message.raw(String.format("Total: %s | %s of target HP (%s)\n",
+                NumberFormatter.smallFlat(total), NumberFormatter.percent(pctOfHp), NumberFormatter.flat(t.defenderMaxHealth()))).color(MessageColors.SUCCESS));
         }
 
         // Damage composition
@@ -1022,19 +1023,19 @@ public final class CombatLogFormatter {
         float trueDmg = bd.trueDamage();
         if (total > 0) {
             StringBuilder comp = new StringBuilder("  ");
-            if (phys > 0) comp.append(String.format("Physical: %.1f (%.0f%%)  ", phys, phys / total * 100f));
+            if (phys > 0) comp.append(String.format("Physical: %s (%s)  ", NumberFormatter.smallFlat(phys), NumberFormatter.percent(phys / total * 100f)));
             for (ElementType elem : ElementType.values()) {
                 float elemDmg = bd.getElementalDamage(elem);
-                if (elemDmg > 0) comp.append(String.format("%s: %.1f (%.0f%%)  ",
-                    elem.getDisplayName(), elemDmg, elemDmg / total * 100f));
+                if (elemDmg > 0) comp.append(String.format("%s: %s (%s)  ",
+                    elem.getDisplayName(), NumberFormatter.smallFlat(elemDmg), NumberFormatter.percent(elemDmg / total * 100f)));
             }
-            if (trueDmg > 0) comp.append(String.format("True: %.1f (%.0f%%)", trueDmg, trueDmg / total * 100f));
+            if (trueDmg > 0) comp.append(String.format("True: %s (%s)", NumberFormatter.smallFlat(trueDmg), NumberFormatter.percent(trueDmg / total * 100f)));
             m = m.insert(Message.raw(comp.toString().trim() + "\n").color(MessageColors.GRAY));
         }
 
         // Crit indicator
         if (t.wasCritical()) {
-            m = m.insert(Message.raw(String.format("CRIT x%.2f\n", t.critMultiplierApplied())).color(MessageColors.GOLD));
+            m = m.insert(Message.raw(String.format("CRIT %s\n", NumberFormatter.multiplier(t.critMultiplierApplied()))).color(MessageColors.GOLD));
         }
 
         m = m.insert(Message.raw("----\n").color(MessageColors.GRAY));
@@ -1057,20 +1058,20 @@ public final class CombatLogFormatter {
         m = m.insert(Message.raw("\n-- Target Avoidance (all passed) --\n").color(MessageColors.WARNING));
 
         if (av.dodgeChance() > 0) {
-            m = m.insert(Message.raw(String.format("Dodge: %.1f%% -> passed\n",
-                av.dodgeChance())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Dodge: %s -> passed\n",
+                NumberFormatter.percent(av.dodgeChance()))).color(MessageColors.GRAY));
         }
         if (av.evasion() > 0 || av.accuracy() > 0) {
-            m = m.insert(Message.raw(String.format("Evasion: %.0f vs your %.0f acc -> %.1f%% hit -> hit\n",
-                av.evasion(), av.accuracy(), av.hitChance())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Evasion: %s vs your %s acc -> %s hit -> hit\n",
+                NumberFormatter.flat(av.evasion()), NumberFormatter.flat(av.accuracy()), NumberFormatter.percent(av.hitChance()))).color(MessageColors.GRAY));
         }
         if (av.wasActiveBlock() && av.activeBlockChance() > 0) {
-            m = m.insert(Message.raw(String.format("Perfect Block: %.0f%% -> passed\n",
-                av.activeBlockChance())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Perfect Block: %s -> passed\n",
+                NumberFormatter.percent(av.activeBlockChance()))).color(MessageColors.GRAY));
         }
         if (av.parryChance() > 0) {
-            m = m.insert(Message.raw(String.format("Parry: %.0f%% -> passed\n",
-                av.parryChance())).color(MessageColors.GRAY));
+            m = m.insert(Message.raw(String.format("Parry: %s -> passed\n",
+                NumberFormatter.percent(av.parryChance()))).color(MessageColors.GRAY));
         }
         return m;
     }
@@ -1089,15 +1090,15 @@ public final class CombatLogFormatter {
             String ailmentName = attempt.ailmentName() != null ? attempt.ailmentName() : "?";
 
             if (attempt.applied()) {
-                m = m.insert(Message.raw(String.format("%s (%.1f dmg): %s %.0f%% -> APPLIED (roll %.1f)",
-                    attempt.element().getDisplayName(), attempt.elementalDamage(),
-                    ailmentName, attempt.applicationChance(), attempt.roll())).color(elemColor));
-                m = m.insert(Message.raw(String.format(" -- %.1f mag, %.1fs\n",
-                    attempt.magnitude(), attempt.durationSeconds())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("%s (%s dmg): %s %s -> APPLIED (roll %s)",
+                    attempt.element().getDisplayName(), NumberFormatter.smallFlat(attempt.elementalDamage()),
+                    ailmentName, NumberFormatter.percent(attempt.applicationChance()), NumberFormatter.smallFlat(attempt.roll()))).color(elemColor));
+                m = m.insert(Message.raw(String.format(" -- %s mag, %s\n",
+                    NumberFormatter.smallFlat(attempt.magnitude()), NumberFormatter.time(attempt.durationSeconds()))).color(MessageColors.GRAY));
             } else {
-                m = m.insert(Message.raw(String.format("%s (%.1f dmg): %s %.0f%% -> FAILED (roll %.1f)\n",
-                    attempt.element().getDisplayName(), attempt.elementalDamage(),
-                    ailmentName, attempt.applicationChance(), attempt.roll())).color(MessageColors.GRAY));
+                m = m.insert(Message.raw(String.format("%s (%s dmg): %s %s -> FAILED (roll %s)\n",
+                    attempt.element().getDisplayName(), NumberFormatter.smallFlat(attempt.elementalDamage()),
+                    ailmentName, NumberFormatter.percent(attempt.applicationChance()), NumberFormatter.smallFlat(attempt.roll()))).color(MessageColors.GRAY));
             }
         }
         return m;
@@ -1201,32 +1202,32 @@ public final class CombatLogFormatter {
     @Nonnull
     private static Message appendAttackSection(@Nonnull Message message, @Nonnull CombatSnapshot snapshot) {
         // Base damage
-        message = message.insert(Message.raw(String.format("Base Damage :     %.1f\n",
-            snapshot.baseDamage())).color(MessageColors.WHITE));
+        message = message.insert(Message.raw(String.format("Base Damage :     %s\n",
+            NumberFormatter.smallFlat(snapshot.baseDamage()))).color(MessageColors.WHITE));
 
         // Flat bonus
         if (snapshot.flatBonus() > 0) {
-            message = message.insert(Message.raw(String.format("+ Flat Bonus :    +%.1f\n",
-                snapshot.flatBonus())).color(MessageColors.SUCCESS));
+            message = message.insert(Message.raw(String.format("+ Flat Bonus :    +%s\n",
+                NumberFormatter.smallFlat(snapshot.flatBonus()))).color(MessageColors.SUCCESS));
         }
 
         // Percent bonus
         if (snapshot.percentBonus() > 0) {
             float percentAdd = snapshot.baseDamage() * (snapshot.percentBonus() / 100f);
-            message = message.insert(Message.raw(String.format("+ %% Bonus :       +%.0f%% (+%.1f)\n",
-                snapshot.percentBonus(), percentAdd)).color(MessageColors.SUCCESS));
+            message = message.insert(Message.raw(String.format("+ %% Bonus :       +%s (+%s)\n",
+                NumberFormatter.percent(snapshot.percentBonus()), NumberFormatter.smallFlat(percentAdd))).color(MessageColors.SUCCESS));
         }
 
         // Critical hit
         if (snapshot.wasCritical()) {
-            message = message.insert(Message.raw(String.format("* CRIT ! :         x%.1f (%.1f)\n",
-                snapshot.critMultiplier(), snapshot.damageAfterAttackerBonuses())).color(MessageColors.GOLD));
+            message = message.insert(Message.raw(String.format("* CRIT ! :         %s (%s)\n",
+                NumberFormatter.multiplier(snapshot.critMultiplier()), NumberFormatter.smallFlat(snapshot.damageAfterAttackerBonuses()))).color(MessageColors.GOLD));
         }
 
         // Pre-defense total
         message = message.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
-        message = message.insert(Message.raw(String.format("Pre-Defense :     %.1f\n",
-            snapshot.damageAfterAttackerBonuses())).color(MessageColors.WHITE));
+        message = message.insert(Message.raw(String.format("Pre-Defense :     %s\n",
+            NumberFormatter.smallFlat(snapshot.damageAfterAttackerBonuses()))).color(MessageColors.WHITE));
 
         return message;
     }
@@ -1239,12 +1240,12 @@ public final class CombatLogFormatter {
         // Armor
         if (snapshot.defenderArmor() > 0) {
             if (snapshot.armorPenetration() > 0) {
-                message = message.insert(Message.raw(String.format("Armor : %.0f (%.0f%% pen -> %.0f eff) -> -%.0f%%\n",
-                    snapshot.defenderArmor(), snapshot.armorPenetration(),
-                    snapshot.effectiveArmor(), snapshot.reductionPercent())).color(MessageColors.INFO));
+                message = message.insert(Message.raw(String.format("Armor : %s (%s pen -> %s eff) -> -%s\n",
+                    NumberFormatter.flat(snapshot.defenderArmor()), NumberFormatter.percent(snapshot.armorPenetration()),
+                    NumberFormatter.flat(snapshot.effectiveArmor()), NumberFormatter.percent(snapshot.reductionPercent()))).color(MessageColors.INFO));
             } else {
-                message = message.insert(Message.raw(String.format("Armor : %.0f -> -%.0f%%\n",
-                    snapshot.defenderArmor(), snapshot.reductionPercent())).color(MessageColors.INFO));
+                message = message.insert(Message.raw(String.format("Armor : %s -> -%s\n",
+                    NumberFormatter.flat(snapshot.defenderArmor()), NumberFormatter.percent(snapshot.reductionPercent()))).color(MessageColors.INFO));
             }
         }
 
@@ -1259,11 +1260,11 @@ public final class CombatLogFormatter {
 
                     if (pen > 0 && rawResist > 0) {
                         float effectiveResist = Math.max(0, rawResist - pen);
-                        message = message.insert(Message.raw(String.format("%s Resist : %.0f%% (%.0f%% pen -> %.0f%% eff)\n",
-                            elem.getDisplayName(), rawResist, pen, effectiveResist)).color(color));
+                        message = message.insert(Message.raw(String.format("%s Resist : %s (%s pen -> %s eff)\n",
+                            elem.getDisplayName(), NumberFormatter.percent(rawResist), NumberFormatter.percent(pen), NumberFormatter.percent(effectiveResist))).color(color));
                     } else {
-                        message = message.insert(Message.raw(String.format("%s Resist : %.0f%%\n",
-                            elem.getDisplayName(), rawResist)).color(color));
+                        message = message.insert(Message.raw(String.format("%s Resist : %s\n",
+                            elem.getDisplayName(), NumberFormatter.percent(rawResist))).color(color));
                     }
                 }
             }
@@ -1285,11 +1286,11 @@ public final class CombatLogFormatter {
             float preArmor = reductionPct > 0 ? postArmor / (1f - reductionPct / 100f) : postArmor;
 
             if (reductionPct > 0) {
-                message = message.insert(Message.raw(String.format("Physical :        %.1f (%.1f * (1 - %.0f%%) = %.1f)\n",
-                    postArmor, preArmor, reductionPct, postArmor)).color(MessageColors.WHITE));
+                message = message.insert(Message.raw(String.format("Physical :        %s (%s * (1 - %s) = %s)\n",
+                    NumberFormatter.smallFlat(postArmor), NumberFormatter.smallFlat(preArmor), NumberFormatter.percent(reductionPct), NumberFormatter.smallFlat(postArmor))).color(MessageColors.WHITE));
             } else {
-                message = message.insert(Message.raw(String.format("Physical :        %.1f\n",
-                    postArmor)).color(MessageColors.WHITE));
+                message = message.insert(Message.raw(String.format("Physical :        %s\n",
+                    NumberFormatter.smallFlat(postArmor))).color(MessageColors.WHITE));
             }
         }
 
@@ -1320,12 +1321,12 @@ public final class CombatLogFormatter {
 
                     if (effectiveResist != 0) {
                         message = message.insert(Message.raw(String.format(
-                            "%s:            +%.1f (%.1f * (1 - %.0f%%) = %.1f)\n",
-                            elem.getDisplayName(), elemDmg, preResist, effectiveResist, elemDmg)).color(color));
+                            "%s:            +%s (%s * (1 - %s) = %s)\n",
+                            elem.getDisplayName(), NumberFormatter.smallFlat(elemDmg), NumberFormatter.smallFlat(preResist), NumberFormatter.percent(effectiveResist), NumberFormatter.smallFlat(elemDmg))).color(color));
                     } else {
                         message = message.insert(Message.raw(String.format(
-                            "%s :            +%.1f\n",
-                            elem.getDisplayName(), elemDmg)).color(color));
+                            "%s :            +%s\n",
+                            elem.getDisplayName(), NumberFormatter.smallFlat(elemDmg))).color(color));
                     }
                 }
             }
@@ -1333,8 +1334,8 @@ public final class CombatLogFormatter {
 
         // Total
         message = message.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
-        message = message.insert(Message.raw(String.format("Total Dealt :     %.1f\n",
-            snapshot.finalDamage())).color(MessageColors.SUCCESS));
+        message = message.insert(Message.raw(String.format("Total Dealt :     %s\n",
+            NumberFormatter.smallFlat(snapshot.finalDamage()))).color(MessageColors.SUCCESS));
 
         return message;
     }

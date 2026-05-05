@@ -171,7 +171,7 @@ modifier_scaling:
 
 loot:
   # Base chance for gear to drop from any mob (0.0-1.0)
-  base_drop_chance: 0.08            # 8% base chance
+  base_drop_chance: 0.12            # 12% base chance (was 8% — smooths L60-80 gear valley)
 
   # How WIND attribute affects drop rarity (Ghost archetype = fortune/loot bonus)
   # Higher rarity% = better chance for rare items
@@ -256,6 +256,13 @@ implicit_damage:
 
   # Two-handed weapons get this multiplier applied to the final range
   two_handed_multiplier: 1.5
+
+  # Spellbook implicit: mana_regen (support identity, not damage)
+  # Tuned so implicit_avg ≈ of_the_arcane max × 1.5 quality at L50
+  spellbook:
+    base_min: 0.1
+    base_max: 0.3
+    scale_factor: 3.0
 
 # -----------------------------------------------------------------------------
 # IMPLICIT DEFENSE (Armor Base Defense)

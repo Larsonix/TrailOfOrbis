@@ -273,6 +273,6 @@ ECS event fired when a block at a position is replaced (by player building, worl
 - `IncludesAssetPack` must be `true` in manifest — without it, `Common/` assets are ignored
 - Block textures go in `Common/BlockTextures/`, not `Common/Textures/`
 - The `ItemId` in `Gathering.Breaking` should match the block's `Id` for the block to drop itself when broken
-- Check `/home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Server/` for existing block definitions to see all available property values
+- Check `<hytale-decompiled>/Assets/Server/` for existing block definitions to see all available property values
 
 ```

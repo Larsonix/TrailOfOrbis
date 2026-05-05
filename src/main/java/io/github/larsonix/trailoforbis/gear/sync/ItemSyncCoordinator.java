@@ -82,6 +82,9 @@ public class ItemSyncCoordinator {
     /** Players currently mid-world-transition. Dirty marks accumulate but no flush fires. */
     private final Set<UUID> suppressedPlayers = ConcurrentHashMap.newKeySet();
 
+    /** Players in the Skill Sanctum. Flushes suppressed to prevent node visual corruption. */
+    private final Set<UUID> sanctumPlayers = ConcurrentHashMap.newKeySet();
+
     /** Single daemon thread for scheduling delayed flushes. */
     private final ScheduledExecutorService flushScheduler;
 
@@ -110,6 +113,18 @@ public class ItemSyncCoordinator {
 
         /** True after RPGItemPreSyncSystem has run the initial mandatory sync. */
         volatile boolean preSyncComplete = false;
+
+        /**
+         * True while a flush is executing on the world thread.
+         * <p>
+         * Prevents the sync-equipment-stats feedback loop: our UpdateItems packet
+         * triggers Hytale equipment events which call markStatsDirty, scheduling
+         * another flush. With this guard, feedback dirty-marks accumulate in the
+         * state but don't schedule new flushes. The next real player action
+         * (equipment swap, level up, realm entry) triggers a normal flush that
+         * picks up any accumulated state.
+         */
+        volatile boolean currentlyFlushing = false;
 
         boolean hasPendingDirty() {
             return allGearDirty || !dirtyGearItemIds.isEmpty();
@@ -166,8 +181,7 @@ public class ItemSyncCoordinator {
         state.allGearDirty = true;
         scheduleFlush(playerId);
 
-        // DIAGNOSTIC: Log who is marking dirty (stack trace origin)
-        LOGGER.atInfo().log("[DIAG] markStatsDirty called for %s (caller: %s)",
+        LOGGER.atFine().log("[DIAG] markStatsDirty called for %s (caller: %s)",
             playerId.toString().substring(0, 8),
             Thread.currentThread().getStackTrace().length > 3
                 ? Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName()
@@ -196,7 +210,7 @@ public class ItemSyncCoordinator {
      * JoinWorldPacket causes a NullReferenceException crash.
      */
     public boolean isPlayerSuppressed(@Nonnull UUID playerId) {
-        return suppressedPlayers.contains(playerId);
+        return suppressedPlayers.contains(playerId) || sanctumPlayers.contains(playerId);
     }
 
     /**
@@ -216,6 +230,45 @@ public class ItemSyncCoordinator {
 
         LOGGER.atFine().log("Suppressed sync for player %s (world transition)",
             playerId.toString().substring(0, 8));
+    }
+
+    /**
+     * Safety unsuppress for early portal suppression. If the player never stepped
+     * through the portal (walked away), this restores normal sync. Marks all gear
+     * dirty and schedules a catch-up flush.
+     */
+    public void safetyUnsuppress(@Nonnull UUID playerId) {
+        if (!suppressedPlayers.remove(playerId)) return;
+        PlayerSyncState state = playerStates.get(playerId);
+        if (state != null) state.allGearDirty = true;
+        scheduleFlush(playerId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SANCTUM SUPPRESSION
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Suppress flushes while in the Skill Sanctum. Dirty marks accumulate;
+     * one flush on exit catches up all tooltip changes.
+     * <p>
+     * A periodic keep-alive in {@code SkillSanctumInstance} handles any
+     * non-UpdateItems corruption from Hytale's engine as a safety net.
+     */
+    public void suppressForSanctum(@Nonnull UUID playerId) {
+        sanctumPlayers.add(playerId);
+        ScheduledFuture<?> pending = pendingFlushes.remove(playerId);
+        if (pending != null) pending.cancel(false);
+    }
+
+    /**
+     * Unsuppress on sanctum exit. Marks all gear dirty and schedules a catch-up flush.
+     */
+    public void unsuppressFromSanctum(@Nonnull UUID playerId) {
+        if (!sanctumPlayers.remove(playerId)) return;
+        PlayerSyncState state = playerStates.get(playerId);
+        if (state != null) state.allGearDirty = true;
+        scheduleFlush(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -278,12 +331,23 @@ public class ItemSyncCoordinator {
         }
 
         ScheduledFuture<?> task = flushScheduler.schedule(() -> {
+            // Skip flush if player entered sanctum during the delay
+            if (sanctumPlayers.contains(playerId)) {
+                suppressedPlayers.remove(playerId);
+                return;
+            }
+
             // Send crafting preview BEFORE RPG items — vanilla items get preview
-            // text, then the RPG flush immediately overrides for RPG gear items
-            // with their own correct tooltips.
+            // text. RPG gear items are unaffected because they don't use
+            // variant=true (their definitions are complete clones with their
+            // own translationProperties).
             if (craftingPreviewService != null && craftingPreviewService.isInitialized()
                     && playerRef.isValid()) {
-                craftingPreviewService.syncToPlayer(playerRef);
+                int playerLevel = io.github.larsonix.trailoforbis.api.ServiceRegistry
+                        .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
+                        .map(ls -> ls.getLevel(playerId))
+                        .orElse(1);
+                craftingPreviewService.syncToPlayer(playerRef, playerLevel);
             }
 
             suppressedPlayers.remove(playerId);
@@ -300,6 +364,7 @@ public class ItemSyncCoordinator {
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
         playerStates.remove(playerId);
         suppressedPlayers.remove(playerId);
+        sanctumPlayers.remove(playerId);
 
         ScheduledFuture<?> pending = pendingFlushes.remove(playerId);
         if (pending != null) {
@@ -323,6 +388,7 @@ public class ItemSyncCoordinator {
         pendingFlushes.clear();
         playerStates.clear();
         suppressedPlayers.clear();
+        sanctumPlayers.clear();
 
         flushScheduler.shutdown();
         try {
@@ -346,7 +412,19 @@ public class ItemSyncCoordinator {
     }
 
     private void scheduleFlush(@Nonnull UUID playerId, long delayMs) {
-        if (shuttingDown || suppressedPlayers.contains(playerId)) {
+        if (shuttingDown || suppressedPlayers.contains(playerId) || sanctumPlayers.contains(playerId)) {
+            return;
+        }
+
+        // Guard against sync-equipment-stats feedback loop.
+        // When a flush sends UpdateItems, Hytale fires equipment events synchronously
+        // on the same world thread, which call markEquipmentDirty/markStatsDirty.
+        // Without this guard, one flush cascades into 11+ cycles (observed in production,
+        // 1903 client warnings, NullReferenceException crash on realm transition).
+        // Dirty marks during the flush accumulate in the state — they're echoes of our
+        // own sync, not real player actions. The next real trigger picks them up.
+        PlayerSyncState state = playerStates.get(playerId);
+        if (state != null && state.currentlyFlushing) {
             return;
         }
 
@@ -396,56 +474,66 @@ public class ItemSyncCoordinator {
      * handles the filtering — items with unchanged hashes produce zero packets.
      */
     private void flushOnWorldThread(@Nonnull UUID playerId, @Nonnull PlayerSyncState state) {
-        // Snapshot and clear dirty state
-        boolean gearDirty = state.allGearDirty;
-        state.allGearDirty = false;
+        // Raise the flushing guard BEFORE any sync operations.
+        // syncAllItems() → updateItems() triggers Hytale equipment events synchronously
+        // on this same world thread. Those events call markStatsDirty → scheduleFlush,
+        // which checks this flag and returns early — breaking the feedback loop.
+        state.currentlyFlushing = true;
+        try {
+            // Snapshot and clear dirty state
+            boolean gearDirty = state.allGearDirty;
+            state.allGearDirty = false;
 
-        Set<String> dirtyGear = Set.copyOf(state.dirtyGearItemIds);
-        state.dirtyGearItemIds.clear();
+            Set<String> dirtyGear = Set.copyOf(state.dirtyGearItemIds);
+            state.dirtyGearItemIds.clear();
 
-        // Nothing dirty after snapshot? Skip.
-        if (!gearDirty && dirtyGear.isEmpty()) {
-            return;
-        }
+            // Nothing dirty after snapshot? Skip.
+            if (!gearDirty && dirtyGear.isEmpty()) {
+                return;
+            }
 
-        PlayerRef playerRef = state.playerRef;
-        Player player = state.player;
-        if (playerRef == null || player == null) return;
+            PlayerRef playerRef = state.playerRef;
+            Player player = state.player;
+            if (playerRef == null || player == null) return;
 
-        // Validate entity is still alive
-        var ref = playerRef.getReference();
-        if (ref == null || !ref.isValid()) return;
+            // Validate entity is still alive
+            var ref = playerRef.getReference();
+            if (ref == null || !ref.isValid()) return;
 
-        @SuppressWarnings("deprecation")
-        Inventory inventory = player.getInventory();
-        if (inventory == null) return;
+            @SuppressWarnings("deprecation")
+            Inventory inventory = player.getInventory();
+            if (inventory == null) return;
 
-        List<ItemStack> allItems = GearManager.collectAllInventoryItems(inventory);
-        int totalSynced = 0;
+            List<ItemStack> allItems = GearManager.collectAllInventoryItems(inventory);
+            int totalSynced = 0;
 
-        // ── Gear sync ──
-        if (gearDirty) {
-            // Stats changed — evaluate ALL gear. Hash dedup skips unchanged items.
-            totalSynced += itemSyncService.syncAllItems(playerRef, allItems);
-        } else if (!dirtyGear.isEmpty()) {
-            // Only specific items changed — filter to dirty set
-            List<ItemStack> dirtyItems = new ArrayList<>();
-            for (ItemStack item : allItems) {
-                Optional<io.github.larsonix.trailoforbis.gear.model.GearData> gearData =
-                    GearUtils.readGearData(item);
-                if (gearData.isPresent() && dirtyGear.contains(gearData.get().getItemId())) {
-                    dirtyItems.add(item);
+            // ── Gear sync ──
+            if (gearDirty) {
+                // Stats changed — evaluate ALL gear. Hash dedup skips unchanged items.
+                totalSynced += itemSyncService.syncAllItems(playerRef, allItems);
+            } else if (!dirtyGear.isEmpty()) {
+                // Only specific items changed — filter to dirty set
+                List<ItemStack> dirtyItems = new ArrayList<>();
+                for (ItemStack item : allItems) {
+                    Optional<io.github.larsonix.trailoforbis.gear.model.GearData> gearData =
+                        GearUtils.readGearData(item);
+                    if (gearData.isPresent() && dirtyGear.contains(gearData.get().getItemId())) {
+                        dirtyItems.add(item);
+                    }
+                }
+                if (!dirtyItems.isEmpty()) {
+                    totalSynced += itemSyncService.syncAllItems(playerRef, dirtyItems);
                 }
             }
-            if (!dirtyItems.isEmpty()) {
-                totalSynced += itemSyncService.syncAllItems(playerRef, dirtyItems);
-            }
-        }
 
-        if (totalSynced > 0) {
-            LOGGER.atFine().log("Flushed %d gear items for player %s [%s]",
-                totalSynced, playerId.toString().substring(0, 8),
-                gearDirty ? "ALL (stats changed)" : dirtyGear.size() + " specific");
+            if (totalSynced > 0) {
+                LOGGER.atFine().log("Flushed %d gear items for player %s [%s]",
+                    totalSynced, playerId.toString().substring(0, 8),
+                    gearDirty ? "ALL (stats changed)" : dirtyGear.size() + " specific");
+            }
+        } finally {
+            // ALWAYS clear — even on exception — so the player isn't permanently blocked.
+            state.currentlyFlushing = false;
         }
     }
 }

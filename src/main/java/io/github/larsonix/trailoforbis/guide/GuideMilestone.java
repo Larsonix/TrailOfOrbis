@@ -285,7 +285,9 @@ public enum GuideMilestone {
         "first_realm",
         Priority.CRITICAL,
         "Inside a Realm",
-        "**You're inside a Realm.** Timer's ticking, mobs are spawned, let's go."
+        "**You're inside a Realm.** Timer's ticking, mobs are spawned, let's go.\n"
+            + "Don't worry for now, I protect you on spawn, you can take *almost* all "
+            + "the time you want to read this..."
             + "\n\n"
             + "Kill every single mob before the timer runs out. You get ||1.5x XP|| and ||double|| "
             + "the item drops in here compared to the overworld, so it's absolutely worth it."

@@ -1,6 +1,5 @@
 package io.github.larsonix.trailoforbis.mobs;
 
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.util.LevelScaling;
 
 import javax.annotation.Nonnull;
@@ -33,11 +32,7 @@ public class MobScalingConfig {
     private EliteChanceConfig eliteChance = new EliteChanceConfig();
     private BalanceMultiplierConfig balanceMultipliers = new BalanceMultiplierConfig();
 
-    // Legacy - now using standalone MobStatPoolConfig from ConfigManager
-    @Deprecated
-    private PoolConfig pool = new PoolConfig();
-    @Deprecated
-    private MobStatPoolConfig statPool = MobStatPoolConfig.createDefaults();
+    // MobStatPoolConfig is now loaded standalone from ConfigManager (mob-stat-pool.yml)
 
     // ==================== Getters and Setters ====================
 
@@ -161,26 +156,6 @@ public class MobScalingConfig {
         this.balanceMultipliers = balanceMultipliers;
     }
 
-    @Deprecated
-    public PoolConfig getPool() {
-        return pool;
-    }
-
-    @Deprecated
-    public void setPool(PoolConfig pool) {
-        this.pool = pool;
-    }
-
-    @Deprecated
-    public MobStatPoolConfig getStatPool() {
-        return statPool;
-    }
-
-    @Deprecated
-    public void setStatPool(MobStatPoolConfig statPool) {
-        this.statPool = statPool;
-    }
-
     // ==================== Validation ====================
 
     /**
@@ -200,6 +175,9 @@ public class MobScalingConfig {
         }
         if (distanceScaling.poolPerBlock < 0) {
             throw new ConfigValidationException("distance_scaling.pool_per_block must be >= 0");
+        }
+        if (distanceScaling.poolPerLevel < 0) {
+            throw new ConfigValidationException("distance_scaling.pool_per_level must be >= 0");
         }
         if (playerDetection.detectionRadius <= 0) {
             throw new ConfigValidationException("player_detection.detection_radius must be > 0");
@@ -253,7 +231,8 @@ public class MobScalingConfig {
         sb.append("  transition_end: ").append(safeZone.transitionEnd).append(" blocks\n");
         sb.append("\n[Distance Scaling]\n");
         sb.append("  scaling_start: ").append(distanceScaling.scalingStart).append(" blocks\n");
-        sb.append("  pool_per_block: ").append(distanceScaling.poolPerBlock).append("\n");
+        sb.append("  pool_per_block: ").append(distanceScaling.poolPerBlock).append(" (legacy)\n");
+        sb.append("  pool_per_level: ").append(distanceScaling.poolPerLevel).append("\n");
         sb.append("  max_bonus_pool: ").append(distanceScaling.maxBonusPool > 0 ? distanceScaling.maxBonusPool : "unlimited").append("\n");
         sb.append("\n[Player Detection]\n");
         sb.append("  detection_radius: ").append(playerDetection.detectionRadius).append(" blocks\n");
@@ -310,6 +289,7 @@ public class MobScalingConfig {
     public static class DistanceScalingConfig {
         private double scalingStart = 200.0;
         private double poolPerBlock = 0.3;
+        private double poolPerLevel = 2.0;
         private double maxBonusPool = 0.0;
 
         public double getScalingStart() {
@@ -336,6 +316,19 @@ public class MobScalingConfig {
         // YAML snake_case setter
         public void setPool_per_block(double poolPerBlock) {
             this.poolPerBlock = poolPerBlock;
+        }
+
+        public double getPoolPerLevel() {
+            return poolPerLevel;
+        }
+
+        public void setPoolPerLevel(double poolPerLevel) {
+            this.poolPerLevel = poolPerLevel;
+        }
+
+        // YAML snake_case setter
+        public void setPool_per_level(double poolPerLevel) {
+            this.poolPerLevel = poolPerLevel;
         }
 
         public double getMaxBonusPool() {
@@ -575,74 +568,6 @@ public class MobScalingConfig {
         public void setLevel_change_threshold(int levelChangeThreshold) {
             this.levelChangeThreshold = levelChangeThreshold;
         }
-    }
-
-    /**
-     * Legacy unified pool configuration.
-     * @deprecated Use standalone MobStatPoolConfig from mob-stat-pool.yml instead
-     */
-    @Deprecated
-    public static class PoolConfig {
-        public static final int STAT_COUNT = 13;
-        private double pointsPerLevel = 17.25;
-        private double fixedRatio = 0.40;
-        private double randomRatio = 0.60;
-        private double healthFactor = 1.76;    // × 2 for tankier mobs
-        private double damageFactor = 0.1675;  // ÷ 2 for sustained fights
-        private double armorFactor = 0.282;
-        private double speedFactor = 0.0022;
-        private double critChanceFactor = 0.11;
-        private double critMultiplierFactor = 0.44;
-        private double dodgeChanceFactor = 0.11;
-        private double lifeStealFactor = 0.066;
-        private double armorPenFactor = 0.176;
-        private double healthRegenFactor = 0.044;
-        private double blockChanceFactor = 0.08;
-        private double parryChanceFactor = 0.06;
-        private double trueDamageFactor = 0.1;
-        private double baseCritChance = 5.0;
-        private double baseCritMultiplier = 150.0;
-        private double minSpeed = 0.5;
-
-        // All getters and setters...
-        public double getPointsPerLevel() { return pointsPerLevel; }
-        public void setPointsPerLevel(double v) { this.pointsPerLevel = v; }
-        public double getFixedRatio() { return fixedRatio; }
-        public void setFixedRatio(double v) { this.fixedRatio = v; }
-        public double getRandomRatio() { return randomRatio; }
-        public void setRandomRatio(double v) { this.randomRatio = v; }
-        public double getHealthFactor() { return healthFactor; }
-        public void setHealthFactor(double v) { this.healthFactor = v; }
-        public double getDamageFactor() { return damageFactor; }
-        public void setDamageFactor(double v) { this.damageFactor = v; }
-        public double getArmorFactor() { return armorFactor; }
-        public void setArmorFactor(double v) { this.armorFactor = v; }
-        public double getSpeedFactor() { return speedFactor; }
-        public void setSpeedFactor(double v) { this.speedFactor = v; }
-        public double getCritChanceFactor() { return critChanceFactor; }
-        public void setCritChanceFactor(double v) { this.critChanceFactor = v; }
-        public double getCritMultiplierFactor() { return critMultiplierFactor; }
-        public void setCritMultiplierFactor(double v) { this.critMultiplierFactor = v; }
-        public double getDodgeChanceFactor() { return dodgeChanceFactor; }
-        public void setDodgeChanceFactor(double v) { this.dodgeChanceFactor = v; }
-        public double getLifeStealFactor() { return lifeStealFactor; }
-        public void setLifeStealFactor(double v) { this.lifeStealFactor = v; }
-        public double getArmorPenFactor() { return armorPenFactor; }
-        public void setArmorPenFactor(double v) { this.armorPenFactor = v; }
-        public double getHealthRegenFactor() { return healthRegenFactor; }
-        public void setHealthRegenFactor(double v) { this.healthRegenFactor = v; }
-        public double getBlockChanceFactor() { return blockChanceFactor; }
-        public void setBlockChanceFactor(double v) { this.blockChanceFactor = v; }
-        public double getParryChanceFactor() { return parryChanceFactor; }
-        public void setParryChanceFactor(double v) { this.parryChanceFactor = v; }
-        public double getTrueDamageFactor() { return trueDamageFactor; }
-        public void setTrueDamageFactor(double v) { this.trueDamageFactor = v; }
-        public double getBaseCritChance() { return baseCritChance; }
-        public void setBaseCritChance(double v) { this.baseCritChance = v; }
-        public double getBaseCritMultiplier() { return baseCritMultiplier; }
-        public void setBaseCritMultiplier(double v) { this.baseCritMultiplier = v; }
-        public double getMinSpeed() { return minSpeed; }
-        public void setMinSpeed(double v) { this.minSpeed = v; }
     }
 
     /**

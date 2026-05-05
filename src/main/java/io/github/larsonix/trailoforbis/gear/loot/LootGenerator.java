@@ -24,13 +24,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * </ul>
  *
  * <h2>Item Discovery</h2>
- * <p>This generator supports two modes:
- * <ul>
- *   <li><b>Dynamic discovery</b> (preferred): Uses {@link DynamicLootRegistry} to
- *       automatically discover weapons/armor from Hytale's item registry</li>
- *   <li><b>Static config</b> (legacy): Uses {@link LootItemsConfig} with hardcoded
- *       item IDs from loot-items.yml</li>
- * </ul>
+ * <p>Uses {@link DynamicLootRegistry} to automatically discover weapons/armor
+ * from Hytale's item registry, making the plugin compatible with any mod
+ * that properly registers weapons/armor.
  *
  * <h2>Thread Safety</h2>
  * <p>This class is thread-safe when constructed with the default constructor
@@ -54,16 +50,7 @@ public final class LootGenerator {
         OFF_HAND
     }
 
-    // Dynamic registry (new system)
-    @Nullable
     private final DynamicLootRegistry dynamicRegistry;
-
-    // Static config (legacy fallback)
-    @Nullable
-    private final LootItemsConfig staticConfig;
-
-    // Base item IDs per slot (from static config, only used if dynamicRegistry is null)
-    private final Map<EquipmentSlot, List<String>> baseItems;
 
     // Slot weights for random selection
     private final Map<EquipmentSlot, Integer> slotWeights;
@@ -100,113 +87,23 @@ public final class LootGenerator {
         this.gearGenerator = Objects.requireNonNull(gearGenerator, "gearGenerator cannot be null");
         this.dynamicRegistry = Objects.requireNonNull(registry, "registry cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
-
-        // No static config when using dynamic registry
-        this.staticConfig = null;
-        this.baseItems = Collections.emptyMap();
-
-        // Get slot weights from registry config
         this.slotWeights = registry.getSlotWeights();
     }
 
     // =========================================================================
-    // CONSTRUCTORS - STATIC CONFIG (LEGACY)
+    // DROP GENERATION — RARITY-FIRST PIPELINE
     // =========================================================================
-
-    /**
-     * Creates a LootGenerator with default static config and ThreadLocalRandom.
-     *
-     * @param gearGenerator The gear generation system
-     * @deprecated Use constructor with DynamicLootRegistry for automatic mod compatibility
-     */
-    @Deprecated
-    public LootGenerator(GearGenerator gearGenerator) {
-        this(gearGenerator, LootItemsConfig.createDefaults(), ThreadLocalRandom.current());
-    }
-
-    /**
-     * Creates a LootGenerator with custom static config and ThreadLocalRandom.
-     *
-     * @param gearGenerator The gear generation system
-     * @param config The loot items configuration
-     * @deprecated Use constructor with DynamicLootRegistry for automatic mod compatibility
-     */
-    @Deprecated
-    public LootGenerator(GearGenerator gearGenerator, LootItemsConfig config) {
-        this(gearGenerator, config, ThreadLocalRandom.current());
-    }
-
-    /**
-     * Creates a LootGenerator with custom random (for testing).
-     *
-     * @param gearGenerator The gear generation system
-     * @param random The random number generator
-     * @deprecated Use constructor with DynamicLootRegistry for automatic mod compatibility
-     */
-    @Deprecated
-    public LootGenerator(GearGenerator gearGenerator, Random random) {
-        this(gearGenerator, LootItemsConfig.createDefaults(), random);
-    }
-
-    /**
-     * Creates a LootGenerator with custom static config and random (for testing).
-     *
-     * @param gearGenerator The gear generation system
-     * @param config The loot items configuration
-     * @param random The random number generator
-     * @deprecated Use constructor with DynamicLootRegistry for automatic mod compatibility
-     */
-    @Deprecated
-    public LootGenerator(GearGenerator gearGenerator, LootItemsConfig config, Random random) {
-        this.gearGenerator = Objects.requireNonNull(gearGenerator, "gearGenerator cannot be null");
-        this.staticConfig = Objects.requireNonNull(config, "config cannot be null");
-        this.random = Objects.requireNonNull(random, "random cannot be null");
-
-        // No dynamic registry when using static config
-        this.dynamicRegistry = null;
-
-        // Build slot maps from static config
-        this.baseItems = buildBaseItemsMap(config);
-        this.slotWeights = buildSlotWeightsMap(config);
-    }
-
-    /**
-     * Builds the base items map from static config.
-     */
-    private static Map<EquipmentSlot, List<String>> buildBaseItemsMap(LootItemsConfig config) {
-        Map<EquipmentSlot, List<String>> map = new EnumMap<>(EquipmentSlot.class);
-
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            String slotName = slot.name().toLowerCase();
-            List<String> items = config.getItemsForSlot(slotName);
-            if (!items.isEmpty()) {
-                map.put(slot, items);
-            }
-        }
-
-        return map;
-    }
-
-    /**
-     * Builds the slot weights map from static config.
-     */
-    private static Map<EquipmentSlot, Integer> buildSlotWeightsMap(LootItemsConfig config) {
-        Map<EquipmentSlot, Integer> map = new EnumMap<>(EquipmentSlot.class);
-
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            String slotName = slot.name().toLowerCase();
-            int weight = config.getWeightForSlot(slotName);
-            if (weight > 0) {
-                map.put(slot, weight);
-            }
-        }
-
-        return map;
-    }
-
-    // =========================================================================
-    // DROP GENERATION
-    // =========================================================================
+    //
+    // The loot table is existence-gated: only (slot, category, rarity) combos
+    // with real Hytale skins can be rolled. The pipeline is:
+    //
+    //   1. RARITY   → Roll independently (geometric weights + bonuses)
+    //   2. SLOT     → Roll from slots that have items at this rarity
+    //   3. CATEGORY → Roll from categories that have items at this (rarity, slot)
+    //   4. SKIN     → Pick random from matching (rarity, slot, category) skins
+    //   5. GENERATE → GearGenerator creates stats
+    //
+    // Every step is constrained to what exists. No invalid combinations.
 
     /**
      * Generates loot drops based on a loot roll result.
@@ -235,50 +132,83 @@ public final class LootGenerator {
     }
 
     /**
-     * Generates a single gear drop.
+     * Generates a single gear drop using the rarity-first pipeline.
      *
-     * <p>Rarity is rolled FIRST, then used to filter the base item skin pool
-     * by Hytale quality tier. This ensures visual identity per rarity:
-     * Common RPG items look like crude/wood weapons, Epic items look like
-     * adamantite, etc.
+     * <p>Pipeline:
+     * <ol>
+     *   <li>Roll rarity (independent, geometric 4× weights + bonus)</li>
+     *   <li>Select slot constrained to what has items at this rarity</li>
+     *   <li>Select category constrained to what has items at this rarity + slot</li>
+     *   <li>Select skin from the exact (slot, category, rarity) match</li>
+     *   <li>Generate gear with the pre-rolled rarity</li>
+     * </ol>
+     *
+     * <p>Only combinations that have a real Hytale skin can be rolled.
+     * If a rarity has no items in any slot, this returns null.
      *
      * @param itemLevel The level of the gear
-     * @param rarityBonus The rarity bonus to apply (percentage)
+     * @param rarityBonus The rarity bonus to apply (percentage, e.g. 25.0 for +25%)
      * @return Generated ItemStack with gear data, or null on failure
      */
     public ItemStack generateSingleDrop(int itemLevel, double rarityBonus) {
-        // 1. Select equipment slot
-        EquipmentSlot slot = selectRandomSlot();
+        if (!dynamicRegistry.isDiscovered()) {
+            LOGGER.atWarning().log("DynamicLootRegistry not yet discovered — cannot generate drop");
+            return null;
+        }
+        return generateSingleDropDynamic(itemLevel, rarityBonus);
+    }
 
-        // 2. Roll rarity FIRST — needed for quality-filtered skin selection
+    /**
+     * Rarity-first pipeline using the availability matrix.
+     */
+    private ItemStack generateSingleDropDynamic(int itemLevel, double rarityBonus) {
+        // 1. Roll RARITY — constrained to rarities that actually have items
         double decimalBonus = rarityBonus / 100.0;
-        GearRarity rarity = gearGenerator.getRarityRoller().roll(decimalBonus);
+        Set<GearRarity> availableRarities = dynamicRegistry.getAvailableRarities();
+        if (availableRarities.isEmpty()) {
+            LOGGER.atWarning().log("No rarities have items — cannot generate drop");
+            return null;
+        }
+        GearRarity rarity = gearGenerator.getRarityRoller().roll(decimalBonus, availableRarities);
 
-        // 3. Select base item filtered by rarity's allowed skin qualities
-        String baseItemId = selectBaseItem(slot, rarity);
-        if (baseItemId == null) {
-            LOGGER.atWarning().log("No base items available for slot %s at rarity %s", slot, rarity);
+        // 2. Select SLOT from slots that have items at this rarity
+        EquipmentSlot slot = selectSlotForRarity(rarity);
+        if (slot == null) {
+            LOGGER.atWarning().log("No slots available at rarity %s — skipping drop", rarity);
             return null;
         }
 
-        // 4. Create base ItemStack
+        // 3. Select CATEGORY from categories with items at this (rarity, slot)
+        String category = selectCategoryForRaritySlot(rarity, slot);
+        if (category == null) {
+            LOGGER.atWarning().log("No categories for slot %s at rarity %s — skipping drop", slot, rarity);
+            return null;
+        }
+
+        // 4. Select SKIN from the exact (slot, category, rarity) match
+        String baseItemId = dynamicRegistry.selectSkin(slot, category, rarity);
+        if (baseItemId == null) {
+            LOGGER.atWarning().log("No skin for %s/%s at %s — skipping drop", slot, category, rarity);
+            return null;
+        }
+
+        // 5. Create base item and generate gear
         ItemStack baseItem = createBaseItem(baseItemId);
         if (baseItem == null) {
             LOGGER.atWarning().log("Failed to create base item: %s", baseItemId);
             return null;
         }
 
-        // 5. Generate gear with the pre-rolled rarity
         String slotString = mapSlotToString(slot);
         ItemStack gearItem = gearGenerator.generate(baseItem, itemLevel, slotString, rarity);
 
-        // Verify and log the result
+        // Log result
         Optional<GearData> gearData = GearUtils.readGearData(gearItem);
         if (gearData.isPresent()) {
             GearData data = gearData.get();
             int modCount = data.prefixes().size() + data.suffixes().size();
-            LOGGER.atInfo().log("Generated RPG gear: %s %s (Lv%d, Q%d, %d mods)",
-                    data.rarity(), baseItemId, data.level(), data.quality(), modCount);
+            LOGGER.atInfo().log("Generated RPG gear: %s %s [%s] (Lv%d, Q%d, %d mods)",
+                    data.rarity(), baseItemId, category, data.level(), data.quality(), modCount);
         } else {
             LOGGER.atWarning().log("FAILED to apply gear data to %s - item has no RPG metadata!", baseItemId);
         }
@@ -287,75 +217,79 @@ public final class LootGenerator {
     }
 
     // =========================================================================
-    // SLOT SELECTION
+    // CONSTRAINED SELECTION (rarity-first pipeline)
     // =========================================================================
 
     /**
-     * Selects a random equipment slot based on weights.
+     * Selects a random slot from slots that have items at the given rarity.
+     * Weights from config are applied, but only to available slots.
      *
-     * @return The selected equipment slot
+     * @param rarity The rolled rarity
+     * @return A random available slot, or null if none exist
      */
-    EquipmentSlot selectRandomSlot() {
-        int totalWeight = slotWeights.values().stream().mapToInt(Integer::intValue).sum();
-        if (totalWeight <= 0) {
-            return EquipmentSlot.WEAPON; // Fallback
+    @Nullable
+    private EquipmentSlot selectSlotForRarity(GearRarity rarity) {
+        Set<EquipmentSlot> available = dynamicRegistry.getAvailableSlotsForRarity(rarity);
+        if (available.isEmpty()) return null;
+
+        // Build weighted pool from available slots only
+        int totalWeight = 0;
+        List<Map.Entry<EquipmentSlot, Integer>> pool = new ArrayList<>();
+        for (Map.Entry<EquipmentSlot, Integer> entry : slotWeights.entrySet()) {
+            if (available.contains(entry.getKey()) && entry.getValue() > 0) {
+                pool.add(entry);
+                totalWeight += entry.getValue();
+            }
         }
+        if (pool.isEmpty()) return null;
 
         int roll = random.nextInt(totalWeight);
-
         int cumulative = 0;
-        for (Map.Entry<EquipmentSlot, Integer> entry : slotWeights.entrySet()) {
+        for (Map.Entry<EquipmentSlot, Integer> entry : pool) {
             cumulative += entry.getValue();
             if (roll < cumulative) {
                 return entry.getKey();
             }
         }
-
-        // Fallback (shouldn't happen)
-        return EquipmentSlot.WEAPON;
+        return pool.getLast().getKey();
     }
 
     /**
-     * Selects a random base item for a slot (unfiltered).
+     * Selects a random category from categories that have items at the given (rarity, slot).
+     * Uses configured category weights (weapon or armor weights), only for available categories.
      *
-     * <p>Uses dynamic registry if available, otherwise falls back to static config.
-     *
-     * @param slot The equipment slot
-     * @return The base item ID, or null if none available
+     * @param rarity The rolled rarity
+     * @param slot   The selected slot
+     * @return A random available category name, or null if none exist
      */
     @Nullable
-    String selectBaseItem(EquipmentSlot slot) {
-        // Use dynamic registry if available
-        if (dynamicRegistry != null && dynamicRegistry.isDiscovered()) {
-            return dynamicRegistry.selectRandomItem(slot);
-        }
+    private String selectCategoryForRaritySlot(GearRarity rarity, EquipmentSlot slot) {
+        Set<String> available = dynamicRegistry.getAvailableCategoriesForRaritySlot(rarity, slot);
+        if (available.isEmpty()) return null;
 
-        // Fallback to static config
-        List<String> items = baseItems.get(slot);
-        if (items == null || items.isEmpty()) {
-            return null;
-        }
-        return items.get(random.nextInt(items.size()));
-    }
+        Map<String, Double> weights = dynamicRegistry.getCategoryWeights(slot);
 
-    /**
-     * Selects a random base item for a slot, filtered by RPG rarity's allowed
-     * skin qualities.
-     *
-     * <p>Quality filtering only applies when using the dynamic registry.
-     * Static config has no quality data and falls back to unfiltered selection.
-     *
-     * @param slot   The equipment slot
-     * @param rarity The RPG rarity determining which Hytale quality skins are allowed
-     * @return The base item ID, or null if none available
-     */
-    @Nullable
-    String selectBaseItem(EquipmentSlot slot, GearRarity rarity) {
-        if (dynamicRegistry != null && dynamicRegistry.isDiscovered()) {
-            return dynamicRegistry.selectRandomItemForRarity(slot, rarity);
+        // Build weighted pool — only categories that EXIST, not influenced by skin count
+        double totalWeight = 0;
+        List<Map.Entry<String, Double>> pool = new ArrayList<>();
+        for (String cat : available) {
+            double w = weights.getOrDefault(cat, 1.0);
+            if (w > 0) {
+                pool.add(Map.entry(cat, w));
+                totalWeight += w;
+            }
         }
-        // Static config has no quality data — fall back to unfiltered
-        return selectBaseItem(slot);
+        if (pool.isEmpty()) return null;
+
+        double roll = random.nextDouble() * totalWeight;
+        double cumulative = 0;
+        for (Map.Entry<String, Double> entry : pool) {
+            cumulative += entry.getValue();
+            if (roll < cumulative) {
+                return entry.getKey();
+            }
+        }
+        return pool.getLast().getKey();
     }
 
     /**
@@ -406,6 +340,10 @@ public final class LootGenerator {
 
     /**
      * Builder for customized loot generation.
+     *
+     * <p>Uses the rarity-first pipeline: rarity → slot → category → skin.
+     * Forced values bypass their respective selection step. If rarity is forced,
+     * slot and category are constrained to what exists at that rarity.
      */
     public class DropBuilder {
         private int itemLevel = 1;
@@ -448,7 +386,7 @@ public final class LootGenerator {
         }
 
         /**
-         * Forces a specific base item.
+         * Forces a specific base item (bypasses all selection — slot, category, skin).
          *
          * @param itemId The item ID
          * @return This builder
@@ -470,17 +408,70 @@ public final class LootGenerator {
         }
 
         /**
-         * Builds and returns the generated item.
+         * Builds and returns the generated item using the rarity-first pipeline.
          *
-         * <p>Rarity is determined first (forced or rolled), then used to filter
-         * the skin pool by Hytale quality tier before selecting a base item.
+         * <p>When base item is forced, skips the entire selection pipeline.
+         * When only rarity is forced, slot and category are constrained to
+         * what exists at that rarity.
          *
          * @return The generated ItemStack, or null on failure
          */
         public ItemStack build() {
-            EquipmentSlot slot = forcedSlot != null ? forcedSlot : selectRandomSlot();
+            if (forcedBaseItem != null) {
+                return buildWithForcedBaseItem();
+            }
+            return buildDynamic();
+        }
 
-            // Determine rarity first — needed for quality-filtered skin selection
+        private ItemStack buildDynamic() {
+            // 1. Determine rarity — constrained to available
+            GearRarity effectiveRarity;
+            if (forcedRarity != null) {
+                effectiveRarity = forcedRarity;
+            } else {
+                Set<GearRarity> availableRarities = dynamicRegistry.getAvailableRarities();
+                if (availableRarities.isEmpty()) return null;
+                double decimalBonus = rarityBonus / 100.0;
+                effectiveRarity = gearGenerator.getRarityRoller().roll(decimalBonus, availableRarities);
+            }
+
+            // 2. Select slot (forced or constrained by rarity)
+            EquipmentSlot slot;
+            if (forcedSlot != null) {
+                slot = forcedSlot;
+            } else {
+                slot = selectSlotForRarity(effectiveRarity);
+                if (slot == null) {
+                    LOGGER.atWarning().log("DropBuilder: no slots at rarity %s", effectiveRarity);
+                    return null;
+                }
+            }
+
+            // 3. Select category (constrained by rarity + slot)
+            String category = selectCategoryForRaritySlot(effectiveRarity, slot);
+            if (category == null) {
+                LOGGER.atWarning().log("DropBuilder: no categories for %s at %s", slot, effectiveRarity);
+                return null;
+            }
+
+            // 4. Select skin
+            String baseItemId = dynamicRegistry.selectSkin(slot, category, effectiveRarity);
+            if (baseItemId == null) {
+                LOGGER.atWarning().log("DropBuilder: no skin for %s/%s at %s", slot, category, effectiveRarity);
+                return null;
+            }
+
+            // 5. Generate
+            ItemStack baseItem = createBaseItem(baseItemId);
+            if (baseItem == null) return null;
+
+            String slotString = mapSlotToString(slot);
+            return gearGenerator.generate(baseItem, itemLevel, slotString, effectiveRarity);
+        }
+
+        private ItemStack buildWithForcedBaseItem() {
+            EquipmentSlot slot = forcedSlot != null ? forcedSlot : EquipmentSlot.WEAPON;
+
             GearRarity effectiveRarity;
             if (forcedRarity != null) {
                 effectiveRarity = forcedRarity;
@@ -489,21 +480,8 @@ public final class LootGenerator {
                 effectiveRarity = gearGenerator.getRarityRoller().roll(decimalBonus);
             }
 
-            // Select base item with quality filtering (skipped if baseItem is forced)
-            String baseItemId = forcedBaseItem != null
-                    ? forcedBaseItem
-                    : selectBaseItem(slot, effectiveRarity);
-
-            if (baseItemId == null) {
-                LOGGER.atWarning().log("No base item available for slot %s at rarity %s",
-                        slot, effectiveRarity);
-                return null;
-            }
-
-            ItemStack baseItem = createBaseItem(baseItemId);
-            if (baseItem == null) {
-                return null;
-            }
+            ItemStack baseItem = createBaseItem(forcedBaseItem);
+            if (baseItem == null) return null;
 
             String slotString = mapSlotToString(slot);
             return gearGenerator.generate(baseItem, itemLevel, slotString, effectiveRarity);
@@ -524,31 +502,11 @@ public final class LootGenerator {
     }
 
     /**
-     * Gets the dynamic loot registry, if using dynamic discovery.
-     *
-     * @return The dynamic registry, or null if using static config
+     * Gets the dynamic loot registry.
      */
-    @Nullable
+    @Nonnull
     public DynamicLootRegistry getDynamicRegistry() {
         return dynamicRegistry;
-    }
-
-    /**
-     * Whether this generator uses dynamic item discovery.
-     *
-     * @return true if using DynamicLootRegistry
-     */
-    public boolean isDynamicMode() {
-        return dynamicRegistry != null;
-    }
-
-    /**
-     * Gets the base items map (for testing, static mode only).
-     *
-     * @return Unmodifiable view of base items
-     */
-    public Map<EquipmentSlot, List<String>> getBaseItems() {
-        return Collections.unmodifiableMap(baseItems);
     }
 
     /**
@@ -558,17 +516,5 @@ public final class LootGenerator {
      */
     public Map<EquipmentSlot, Integer> getSlotWeights() {
         return Collections.unmodifiableMap(slotWeights);
-    }
-
-    /**
-     * Gets the static loot items config.
-     *
-     * @return The configuration used by this generator, or null if using dynamic registry
-     * @deprecated Use getDynamicRegistry() for the preferred configuration
-     */
-    @Deprecated
-    @Nullable
-    public LootItemsConfig getConfig() {
-        return staticConfig;
     }
 }

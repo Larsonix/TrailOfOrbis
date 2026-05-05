@@ -17,12 +17,15 @@ import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.math.util.ChunkUtil;
 
+import com.hypixel.hytale.math.vector.Vector3d;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages portal blocks that connect the overworld to realm instances.
@@ -101,6 +104,13 @@ public class RealmPortalManager {
      * When the realm closes, these should be deactivated (not removed).
      */
     private final Set<String> activatedDevices = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Tracks portals temporarily suppressed during sanctum exit.
+     * Maps player UUID → list of suppressed portal positions.
+     * Suppressed portals have their block set to offState but tracking is preserved.
+     */
+    private final Map<UUID, List<Vector3i>> suppressedPortals = new ConcurrentHashMap<>();
 
     /**
      * Portal entry timeout in seconds (default: 2 minutes).
@@ -959,6 +969,122 @@ public class RealmPortalManager {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // PORTAL SUPPRESSION (sanctum exit anti-crash)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Temporarily deactivates realm portals near a position to prevent
+     * the client crash caused by two JoinWorld packets in rapid succession
+     * (sanctum exit → portal auto-teleport within ~2s).
+     *
+     * <p>Sets matching portals to offState WITHOUT removing tracking data.
+     * The portal interaction is deregistered at the block level, so even
+     * stale client CollisionEnter packets are rejected by the server.
+     *
+     * <p>Must be called on the portal world's thread.
+     *
+     * @param world    The world containing the portals
+     * @param position The player's return point position
+     * @param playerId The player triggering the suppression
+     * @param radius   The search radius in blocks
+     */
+    public void suppressPortalsNear(
+            @Nonnull World world,
+            @Nonnull Vector3d position,
+            @Nonnull UUID playerId,
+            double radius) {
+
+        UUID worldUuid = world.getWorldConfig().getUuid();
+        double radiusSq = radius * radius;
+        List<Vector3i> suppressed = new ArrayList<>();
+
+        for (Map.Entry<String, UUID> entry : portalToRealm.entrySet()) {
+            PortalKeyInfo info = parsePortalKey(entry.getKey());
+            if (info == null || !info.worldUuid().equals(worldUuid)) {
+                continue;
+            }
+
+            Vector3i portalPos = info.position();
+            double dx = portalPos.x + 0.5 - position.x;
+            double dy = portalPos.y + 0.5 - position.y;
+            double dz = portalPos.z + 0.5 - position.z;
+
+            if (dx * dx + dy * dy + dz * dz > radiusSq) {
+                continue;
+            }
+
+            // Set to offState WITHOUT removing tracking
+            String offState = "default";
+            PortalDevice portalDevice = getPortalDevice(world, portalPos);
+            if (portalDevice != null && portalDevice.getConfig() != null) {
+                offState = portalDevice.getConfig().getOffState();
+            }
+
+            BlockType blockType = world.getBlockType(portalPos.x, portalPos.y, portalPos.z);
+            if (blockType != null) {
+                world.setBlockInteractionState(portalPos, blockType, offState);
+                suppressed.add(portalPos);
+                LOGGER.atInfo().log("Suppressed portal at %s for player %s (sanctum exit anti-crash)",
+                        portalPos, playerId.toString().substring(0, 8));
+            }
+        }
+
+        if (!suppressed.isEmpty()) {
+            suppressedPortals.put(playerId, suppressed);
+
+            // Safety timeout: reactivate after 15s even if PlayerReadyEvent never fires
+            CompletableFuture.delayedExecutor(15, TimeUnit.SECONDS)
+                    .execute(() -> world.execute(() -> unsuppressPortals(world, playerId)));
+        }
+    }
+
+    /**
+     * Reactivates portals that were suppressed for a player.
+     * Call after the player's PlayerReadyEvent + a safety buffer.
+     *
+     * <p>Must be called on the portal world's thread.
+     *
+     * @param world    The world containing the portals
+     * @param playerId The player whose suppressed portals should be reactivated
+     */
+    public void unsuppressPortals(@Nonnull World world, @Nonnull UUID playerId) {
+        List<Vector3i> positions = suppressedPortals.remove(playerId);
+        if (positions == null || positions.isEmpty()) {
+            return;
+        }
+
+        for (Vector3i portalPos : positions) {
+            // Only reactivate if the portal is still tracked (realm hasn't closed)
+            String key = createPortalKey(world, portalPos);
+            if (!portalToRealm.containsKey(key)) {
+                LOGGER.atFine().log("Skipping unsuppress for %s - portal no longer tracked", portalPos);
+                continue;
+            }
+
+            PortalDevice portalDevice = getPortalDevice(world, portalPos);
+            if (portalDevice == null || portalDevice.getConfig() == null) {
+                LOGGER.atFine().log("Skipping unsuppress for %s - no PortalDevice", portalPos);
+                continue;
+            }
+
+            BlockType blockType = world.getBlockType(portalPos.x, portalPos.y, portalPos.z);
+            if (blockType != null) {
+                String onState = portalDevice.getConfig().getOnState();
+                world.setBlockInteractionState(portalPos, blockType, onState);
+                LOGGER.atInfo().log("Unsuppressed portal at %s for player %s",
+                        portalPos, playerId.toString().substring(0, 8));
+            }
+        }
+    }
+
+    /**
+     * Returns whether a player has suppressed portals pending reactivation.
+     */
+    public boolean hasSuppressedPortals(@Nonnull UUID playerId) {
+        return suppressedPortals.containsKey(playerId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // CLEANUP
     // ═══════════════════════════════════════════════════════════════════
 
@@ -973,6 +1099,7 @@ public class RealmPortalManager {
         portalToOwner.clear();
         portalCreationTime.clear();
         activatedDevices.clear();
+        suppressedPortals.clear();
         LOGGER.atInfo().log("Cleared all portal tracking data");
     }
 

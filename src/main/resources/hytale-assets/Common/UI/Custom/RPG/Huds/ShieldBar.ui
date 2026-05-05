@@ -1,0 +1,64 @@
+// Vanilla Health.ui position: Bottom = ContainerMargin(36) + HotbarHeight(78) + 6 = 120
+// Vanilla Health.ui width: HotbarWidthHud = 702
+// NOTE: Do NOT use $Hotbar cross-reference to vanilla .ui files — it corrupts
+// the server's asset dependency graph and breaks append() for ALL mods.
+
+Group #HealthShieldContainer {
+  LayoutMode: Bottom;
+  Anchor: (Bottom: 120, Width: 702, Height: 12);
+  HitTestVisible: false;
+
+  Group {
+    LayoutMode: Left;
+    HitTestVisible: false;
+
+    Group #HealthIcon {
+      Anchor: (Left: 0, Width: 24, Height: 24, Right: 4, Top: -8);
+      Background: "ShieldBar/HealthIcon.png";
+      HitTestVisible: false;
+    }
+
+    Group #ShieldIcon {
+      Anchor: (Left: 0, Width: 24, Height: 24, Right: 4, Top: -8);
+      Background: "ShieldBar/ShieldIcon.png";
+      HitTestVisible: false;
+      Visible: false;
+    }
+
+    Group {
+      Anchor: (Left: 0, Width: 318, Height: 12);
+      HitTestVisible: false;
+      LayoutMode: Full;
+
+      Group #HealthBarBg {
+        Anchor: (Width: 318, Height: 12);
+        Background: "ShieldBar/HealthBarBackground.png";
+        HitTestVisible: false;
+      }
+
+      ProgressBar #HealthBar {
+        Anchor: (Width: 318, Height: 12);
+        BarTexturePath: "ShieldBar/HealthBarFill.png";
+        Value: 1.0;
+      }
+
+      ProgressBar #HealthBarEffect {
+        Anchor: (Width: 318, Height: 12);
+        BarTexturePath: "ShieldBar/HealthBarEffect.png";
+        Value: 1.0;
+      }
+
+      ProgressBar #ShieldBar {
+        Anchor: (Width: 318, Height: 12);
+        BarTexturePath: "ShieldBar/ShieldBarFill.png";
+        Value: 0.0;
+      }
+
+      ProgressBar #ShieldBarEffect {
+        Anchor: (Width: 318, Height: 12);
+        BarTexturePath: "ShieldBar/ShieldBarEffect.png";
+        Value: 0.0;
+      }
+    }
+  }
+}

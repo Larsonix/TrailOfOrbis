@@ -406,16 +406,11 @@ BIOMES: list[BiomeSpec] = [
             # ═══════════════════════════════════════════════════════════
 
             # ─── VEGETATION: Zone-based (FieldFunction) ───
-            # Noise creates organic zones: open dunes (-1 to -0.2 = nothing),
-            # scattered cacti (-0.2 to 0.4), dry woodland patches (0.4 to 1.0).
+            # Noise creates organic zones: open dunes (-1 to 0.4 = nothing),
+            # dry woodland patches (0.4 to 1.0).
+            # NOTE: Cacti removed — they require block support underneath and float in WorldGen.
             PropLayer("vegetation", [], mesh_scale_x=7, mesh_scale_z=7, skip_chance=0.3,
                       occurrence_max=0.30, zones=[
-                PropZone(-0.2, 0.4, [
-                    {"Path": "Plants/Cacti/Full/Stage_1", "Weight": 4},
-                    {"Path": "Plants/Cacti/Full/Stage_2", "Weight": 3},
-                    {"Path": "Plants/Cacti/Full/Stage_3", "Weight": 1},
-                    {"Path": "Plants/Cacti/Flat/Stage_0", "Weight": 3},
-                ]),
                 PropZone(0.4, 1.0, [
                     {"Path": "Trees/Boab/Stage_2", "Weight": 3},
                     {"Path": "Trees/Dry/Stage_1", "Weight": 4},

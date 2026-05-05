@@ -45,10 +45,11 @@ public class ExploratoryBugHuntTest {
         }
 
         @Test
-        @DisplayName("BUG HUNT: -100% percent modifier should result in zero, not negative")
-        void percentModifier_minus100_shouldBeZero() {
+        @DisplayName("Negative PERCENT on MAX_HEALTH routes to accumulator as negative")
+        void percentModifier_negative_routesToAccumulator() {
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(100f)
+                .maxHealthPercent(50f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -57,16 +58,18 @@ public class ExploratoryBugHuntTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // -100% should result in 0, not negative
-            assertEquals(0f, result.getMaxHealth(), 0.001f,
-                "100 * (1 + -100/100) = 100 * 0 = 0");
+            // PERCENT routes to accumulator: 50 + (-100) = -50
+            assertEquals(100f, result.getMaxHealth(), 0.001f, "maxHealth unchanged");
+            assertEquals(-50f, result.getMaxHealthPercent(), 0.001f,
+                "50% + (-100%) = -50% in accumulator");
         }
 
         @Test
-        @DisplayName("FIXED: -150% percent modifier now clamps to 0, not negative")
-        void percentModifier_minus150_clampedToZero() {
+        @DisplayName("Large negative PERCENT on accumulator can go negative")
+        void percentModifier_largeNegative_accumulatorCanGoNegative() {
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(100f)
+                .maxHealthPercent(10f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -75,47 +78,49 @@ public class ExploratoryBugHuntTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // Formula before clamp: 100 * (1 + -150/100) = 100 * -0.5 = -50
-            // After clamp: max(0, -50) = 0
-            assertEquals(0f, result.getMaxHealth(), 0.001f,
-                "Negative stats are now clamped to 0");
+            // Accumulator: 10 + (-150) = -140
+            // After consolidation: 100 × (1 + -140/100) = 100 × -0.4 → clamped in consolidation
+            assertEquals(-140f, result.getMaxHealthPercent(), 0.001f,
+                "Accumulator can hold negative values (consolidation handles clamping)");
         }
 
         @Test
-        @DisplayName("BUG HUNT: -100% multiplier should result in zero")
-        void multiplierModifier_minus100_shouldBeZero() {
+        @DisplayName("Negative standalone modifiers reduce directly")
+        void standalone_negativeModifiers_reduceStat() {
+            // Use a standalone stat where all types are additive
             ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
+                .criticalChance(10f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, -100f, ModifierType.MULTIPLIER))
+                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, -5f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, -3f, ModifierType.PERCENT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // -100% "more" = multiply by 0
-            assertEquals(0f, result.getPhysicalDamage(), 0.001f,
-                "100 * (1 + -100/100) = 100 * 0 = 0");
+            // Standalone: all additive: 10 + (-5) + (-3) = 2
+            assertEquals(2f, result.getCriticalChance(), 0.1f, "10 - 5 - 3 = 2");
         }
 
         @Test
-        @DisplayName("BUG HUNT: Multiple -50% multipliers - can they go negative?")
-        void multipleNegativeMultipliers_potentialNegative() {
+        @DisplayName("DAMAGE_MULTIPLIER accumulator: negative values reduce the field")
+        void damageMultiplier_negative_reducesAccumulator() {
             ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
+                .damageMultiplier(30f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
-                // Two -50% multipliers: 100 * 0.5 * 0.5 = 25 (fine)
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, -50f, ModifierType.MULTIPLIER))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, -50f, ModifierType.MULTIPLIER))
+                .addModifier(new StatModifier(StatType.DAMAGE_MULTIPLIER, -50f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.DAMAGE_MULTIPLIER, -50f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // 100 * 0.5 * 0.5 = 25
-            assertEquals(25f, result.getPhysicalDamage(), 0.1f);
+            // Accumulator: 30 + (-50) + (-50) = -70
+            // Damage calc will apply: × (1 + -70/100) = × 0.3
+            assertEquals(-70f, result.getDamageMultiplier(), 0.1f,
+                "30 - 50 - 50 = -70 (damage calc applies the formula)");
         }
 
         @Test

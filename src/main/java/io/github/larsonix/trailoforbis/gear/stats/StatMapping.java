@@ -31,25 +31,29 @@ public final class StatMapping {
         // CORE STATS (Flat and Percent)
         // =================================================================
 
+        // Resource percent appliers ADD to the percent accumulator field.
+        // The PoE formula (base × (1 + totalPercent/100)) is applied ONCE
+        // in ComputedStats.consolidateResourcePercents(), after ALL sources
+        // (attributes, skill tree, gear, conditionals) have deposited.
         registerBoth("max_health",
             (s, v) -> s.setMaxHealth(s.getMaxHealth() + v),
-            (s, v) -> s.setMaxHealth(s.getMaxHealth() * (1 + v / 100)));
+            (s, v) -> s.setMaxHealthPercent(s.getMaxHealthPercent() + v.floatValue()));
 
         registerBoth("max_mana",
             (s, v) -> s.setMaxMana(s.getMaxMana() + v),
-            (s, v) -> s.setMaxMana(s.getMaxMana() * (1 + v / 100)));
+            (s, v) -> s.setMaxManaPercent(s.getMaxManaPercent() + v.floatValue()));
 
         registerBoth("max_stamina",
             (s, v) -> s.setMaxStamina(s.getMaxStamina() + v),
-            (s, v) -> s.setMaxStamina(s.getMaxStamina() * (1 + v / 100)));
+            (s, v) -> s.setMaxStaminaPercent(s.getMaxStaminaPercent() + v.floatValue()));
 
         registerBoth("max_oxygen",
             (s, v) -> s.setMaxOxygen(s.getMaxOxygen() + v),
-            (s, v) -> s.setMaxOxygen(s.getMaxOxygen() * (1 + v / 100)));
+            (s, v) -> s.setMaxOxygenPercent(s.getMaxOxygenPercent() + v.floatValue()));
 
         registerBoth("energy_shield",
             (s, v) -> s.setEnergyShield(s.getEnergyShield() + v),
-            (s, v) -> s.setEnergyShield(s.getEnergyShield() * (1 + v / 100)));
+            (s, v) -> s.setEnergyShieldPercent(s.getEnergyShieldPercent() + v.floatValue()));
 
         // =================================================================
         // DAMAGE STATS (Flat and Percent)
@@ -180,23 +184,32 @@ public final class StatMapping {
             (s, v) -> s.setWindResistance(s.getWindResistance() + v));
 
         // =================================================================
-        // REGENERATION STATS (Flat)
+        // REGENERATION STATS (Flat and Percent)
+        // Percent appliers write to the percent accumulator field.
+        // Consumed by consolidateResourcePercents(): regen × (1 + pct/100).
         // =================================================================
 
-        registerFlat("health_regen",
-            (s, v) -> s.setHealthRegen(s.getHealthRegen() + v));
+        registerBoth("health_regen",
+            (s, v) -> s.setHealthRegen(s.getHealthRegen() + v),
+            (s, v) -> s.setHealthRegenPercent(s.getHealthRegenPercent() + v.floatValue()));
 
-        registerFlat("mana_regen",
-            (s, v) -> s.setManaRegen(s.getManaRegen() + v));
+        registerBoth("mana_regen",
+            (s, v) -> s.setManaRegen(s.getManaRegen() + v),
+            (s, v) -> s.setManaRegenPercent(s.getManaRegenPercent() + v.floatValue()));
 
-        registerFlat("stamina_regen",
-            (s, v) -> s.setStaminaRegen(s.getStaminaRegen() + v));
-
-        registerPercent("stamina_regen_percent",
-            (s, v) -> s.setStaminaRegenPercent(s.getStaminaRegenPercent() + v));
+        registerBoth("stamina_regen",
+            (s, v) -> s.setStaminaRegen(s.getStaminaRegen() + v),
+            (s, v) -> s.setStaminaRegenPercent(s.getStaminaRegenPercent() + v.floatValue()));
 
         registerPercent("stamina_regen_start_delay",
             (s, v) -> s.setStaminaRegenStartDelay(s.getStaminaRegenStartDelay() + v));
+
+        registerBoth("energy_shield_regen",
+            (s, v) -> s.setEnergyShieldRegen(s.getEnergyShieldRegen() + v),
+            (s, v) -> s.setEnergyShieldRegenPercent(s.getEnergyShieldRegenPercent() + v.floatValue()));
+
+        registerFlat("energy_shield_regen_delay",
+            (s, v) -> s.setEnergyShieldRegenDelay(s.getEnergyShieldRegenDelay() + v));
 
         registerFlat("oxygen_regen",
             (s, v) -> s.setOxygenRegen(s.getOxygenRegen() + v));
@@ -306,8 +319,7 @@ public final class StatMapping {
         registerPercent("mana_cost_reduction",
             (s, v) -> s.setManaCostReduction(s.getManaCostReduction() + v));
 
-        registerPercent("health_regen_percent",
-            (s, v) -> s.setHealthRegenPercent(s.getHealthRegenPercent() + v));
+        // health_regen_percent is already registered via registerBoth("health_regen")
 
         registerPercent("mana_as_damage_buffer",
             (s, v) -> s.setManaAsDamageBuffer(s.getManaAsDamageBuffer() + v));

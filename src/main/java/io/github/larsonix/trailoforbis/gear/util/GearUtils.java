@@ -3,6 +3,7 @@ package io.github.larsonix.trailoforbis.gear.util;
 import io.github.larsonix.trailoforbis.gear.codec.GearCodecs;
 import io.github.larsonix.trailoforbis.gear.instance.GearInstanceId;
 import io.github.larsonix.trailoforbis.gear.instance.GearInstanceIdGenerator;
+import io.github.larsonix.trailoforbis.gear.migration.ItemVersionRegistry;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
@@ -110,6 +111,9 @@ public final class GearUtils {
     /** Support slot count metadata key (0 for gear without socket stones applied) */
     public static final String KEY_SUPPORT_SLOT_COUNT = KEY_PREFIX + "SupportSlotCount";
 
+    /** Item schema version metadata key (missing = v0, pre-migration) */
+    public static final String KEY_VERSION = KEY_PREFIX + "Version";
+
     // =========================================================================
     // READ OPERATIONS
     // =========================================================================
@@ -130,6 +134,33 @@ public final class GearUtils {
         // Check for rarity key as the marker for RPG gear
         String rarity = itemStack.getFromMetadataOrNull(KEY_RARITY, Codec.STRING);
         return rarity != null;
+    }
+
+    /**
+     * Read the item schema version from an ItemStack.
+     *
+     * <p>Returns 0 if the item has no version stamp (pre-migration legacy item).
+     *
+     * @param itemStack The item to check (may be null)
+     * @return The item schema version (0 if missing/not RPG gear)
+     */
+    public static int readVersion(ItemStack itemStack) {
+        if (itemStack == null) return 0;
+        Integer version = itemStack.getFromMetadataOrNull(KEY_VERSION, Codec.INTEGER);
+        return version != null ? version : 0;
+    }
+
+    /**
+     * Stamps the current item schema version onto an ItemStack without modifying other data.
+     *
+     * <p>Used by the migration service after fixing an item's gear data.
+     *
+     * @param itemStack The item to stamp (must not be null)
+     * @return New ItemStack with version metadata set
+     */
+    public static ItemStack stampVersion(ItemStack itemStack) {
+        Objects.requireNonNull(itemStack, "ItemStack cannot be null");
+        return itemStack.withMetadata(KEY_VERSION, Codec.INTEGER, ItemVersionRegistry.CURRENT_VERSION);
     }
 
     /**
@@ -381,16 +412,21 @@ public final class GearUtils {
             .withMetadata(KEY_SUFFIXES, GearCodecs.MODIFIER_LIST_CODEC, gearData.suffixes())
             .withMetadata(KEY_INSTANCE_ID, Codec.STRING, gearData.instanceId().toCompactString())
             .withMetadata(KEY_BASE_ITEM_ID, Codec.STRING, baseItemId)
-            .withMetadata(KEY_CORRUPTED, Codec.BOOLEAN, gearData.corrupted());
+            .withMetadata(KEY_CORRUPTED, Codec.BOOLEAN, gearData.corrupted())
+            .withMetadata(KEY_VERSION, Codec.INTEGER, ItemVersionRegistry.CURRENT_VERSION);
 
-        // Write implicit if present (weapons only)
+        // Write or clear weapon implicit
         if (gearData.implicit() != null) {
             withMetadata = withMetadata.withMetadata(KEY_IMPLICIT, GearCodecs.IMPLICIT_CODEC, gearData.implicit());
+        } else {
+            withMetadata = withMetadata.withMetadata(KEY_IMPLICIT, GearCodecs.IMPLICIT_CODEC, null);
         }
 
-        // Write armor implicit if present (armor/shields only)
+        // Write or clear armor implicit
         if (gearData.armorImplicit() != null) {
             withMetadata = withMetadata.withMetadata(KEY_ARMOR_IMPLICIT, GearCodecs.ARMOR_IMPLICIT_CODEC, gearData.armorImplicit());
+        } else {
+            withMetadata = withMetadata.withMetadata(KEY_ARMOR_IMPLICIT, GearCodecs.ARMOR_IMPLICIT_CODEC, null);
         }
 
         // Compute durability values BEFORE creating ItemStack

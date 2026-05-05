@@ -14,6 +14,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntitySta
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.InteractionManager;
 import com.hypixel.hytale.server.core.entity.LivingEntity;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
@@ -21,12 +22,16 @@ import com.hypixel.hytale.server.core.modules.interaction.InteractionModule;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.client.ChargingInteraction;
 import com.hypixel.hytale.math.util.MathUtil;
 import com.hypixel.hytale.protocol.BlockMaterial;
+import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.protocol.MovementStates;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.EnergyShieldTracker;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import com.hypixel.hytale.server.core.modules.entity.stamina.SprintStaminaRegenDelay;
 
@@ -64,8 +69,8 @@ import java.util.UUID;
  */
 public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
 
-    /** Shield regenerates at 20% of max per second (full recovery in 5s after delay). */
-    private static final float SHIELD_REGEN_RATE_PER_SECOND = 0.20f;
+    /** Minimum energy shield regen delay in seconds (floor after all reductions). */
+    private static final float MIN_SHIELD_REGEN_DELAY_SECONDS = 0.5f;
 
     /** Set of player UUIDs that have been seen (for cleanup tracking) */
     private final java.util.concurrent.ConcurrentHashMap<UUID, Boolean> trackedPlayers =
@@ -119,6 +124,14 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
         PlayerRef playerRef = store.getComponent(entityRef, playerRefType);
         UUID uuid = playerRef.getUuid();
 
+        // Skip Creative players — Hytale manages their resources natively.
+        // Our bonus regen calls setStatValue() every tick, which can interfere
+        // with Creative mode's invulnerability and infinite resources.
+        Player player = store.getComponent(entityRef, Player.getComponentType());
+        if (player != null && player.getGameMode() == GameMode.Creative) {
+            return;
+        }
+
         // Track player for cleanup purposes
         trackedPlayers.putIfAbsent(uuid, Boolean.TRUE);
 
@@ -140,6 +153,11 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
             return; // Stats not calculated
         }
 
+        // Skip ALL regeneration if player is in a NO_REGENERATION realm
+        if (isRegenSuppressedByRealm(uuid)) {
+            return;
+        }
+
         // Apply smooth regeneration scaled by delta time
         applyRegeneration(store, entityRef, stats, dt, uuid);
     }
@@ -152,6 +170,26 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
      */
     public void cleanupPlayer(@Nonnull UUID uuid) {
         trackedPlayers.remove(uuid);
+    }
+
+    /**
+     * Checks if a player's regeneration is suppressed by the NO_REGENERATION realm modifier.
+     *
+     * @param uuid The player UUID
+     * @return true if the player is in a realm with NO_REGENERATION
+     */
+    private boolean isRegenSuppressedByRealm(@Nonnull UUID uuid) {
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (rpg == null) {
+            return false;
+        }
+        RealmsManager rm = rpg.getRealmsManager();
+        if (rm == null) {
+            return false;
+        }
+        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(uuid);
+        return realmOpt.isPresent()
+            && realmOpt.get().getMapData().hasModifier(RealmModifierType.NO_REGENERATION);
     }
 
     /**
@@ -240,16 +278,28 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
             regenerateStat(statMap, DefaultEntityStatTypes.getSignatureEnergy(), signatureEnergyRegen * dt);
         }
 
-        // Energy shield regeneration (delayed after taking shield damage)
+        // Energy shield regeneration (stat-driven rate and delay)
         float maxShield = stats.getEnergyShield();
-        if (maxShield > 0) {
-            TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-            if (rpg != null) {
-                EnergyShieldTracker shieldTracker = rpg.getEnergyShieldTracker();
-                if (shieldTracker != null) {
-                    float shieldRegenPerSec = maxShield * SHIELD_REGEN_RATE_PER_SECOND;
-                    shieldTracker.tickRegen(uuid, maxShield, shieldRegenPerSec, dt);
+        float shieldRegenPerSec = stats.getEnergyShieldRegen();
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (maxShield > 0 && shieldRegenPerSec > 0 && rpg != null) {
+            EnergyShieldTracker shieldTracker = rpg.getEnergyShieldTracker();
+            if (shieldTracker != null) {
+                float delaySeconds = Math.max(MIN_SHIELD_REGEN_DELAY_SECONDS, stats.getEnergyShieldRegenDelay());
+                long delayMs = (long) (delaySeconds * 1000);
+                shieldTracker.tickRegen(uuid, maxShield, shieldRegenPerSec, delayMs, dt);
+                if (rpg.getEnergyShieldHudManager() != null) {
+                    rpg.getEnergyShieldHudManager().notifyShieldChanged(uuid);
                 }
+            }
+        }
+
+        // Push current health ratio to HUD (catches regen, healing, potions — all sources)
+        if (rpg != null && rpg.getEnergyShieldHudManager() != null) {
+            EntityStatValue healthStat = statMap.get(DefaultEntityStatTypes.getHealth());
+            if (healthStat != null && healthStat.getMax() > 0) {
+                rpg.getEnergyShieldHudManager().updateHealthRatio(uuid,
+                    healthStat.get() / healthStat.getMax());
             }
         }
     }

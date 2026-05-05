@@ -17,7 +17,7 @@ HyUI is a fluent UI builder library for Hytale that provides HTML/CSS-like synta
 
 All HyUI documentation is in markdown format at:
 ```
-/home/larsonix/work/trail-of-orbis/docs/HyUI/
+./docs/HyUI/
 ```
 
 ### Key Files to Read

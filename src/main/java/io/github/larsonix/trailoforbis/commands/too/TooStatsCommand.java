@@ -16,7 +16,10 @@ import io.github.larsonix.trailoforbis.api.services.UIService;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
+import io.github.larsonix.trailoforbis.combat.CombatCalculator;
+import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;
@@ -87,45 +90,40 @@ public class TooStatsCommand extends OpenPlayerCommand {
 
         // Fire (Red theme) - Glass cannon
         sendAttributeLine(player, "FIRE", data.getFire(), "#FF4444",
-            String.format("+%.1f%% Phys, +%.1f%% Charged Atk, +%.1f%% Crit Mult",
-                data.getFire() * attrs.getFireGrants().getPhysicalDamagePercent(),
-                data.getFire() * attrs.getFireGrants().getChargedAttackDamagePercent(),
-                data.getFire() * attrs.getFireGrants().getCriticalMultiplier()));
+            NumberFormatter.signedPercent(data.getFire() * attrs.getFireGrants().getPhysicalDamagePercent()) + " Phys, "
+                + NumberFormatter.signedPercent(data.getFire() * attrs.getFireGrants().getChargedAttackDamagePercent()) + " Charged Atk, "
+                + NumberFormatter.signedPercent(data.getFire() * attrs.getFireGrants().getCriticalMultiplier()) + " Crit Mult");
 
         // Water (Blue theme) - Arcane mage
         sendAttributeLine(player, "WATER", data.getWater(), "#4488FF",
-            String.format("+%.1f%% Spell, +%.1f Mana, +%.0f Barrier",
-                data.getWater() * attrs.getWaterGrants().getSpellDamagePercent(),
-                data.getWater() * attrs.getWaterGrants().getMaxMana(),
-                data.getWater() * attrs.getWaterGrants().getEnergyShield()));
+            NumberFormatter.signedPercent(data.getWater() * attrs.getWaterGrants().getSpellDamagePercent()) + " Spell, "
+                + NumberFormatter.signed(data.getWater() * attrs.getWaterGrants().getMaxMana()) + " Mana, "
+                + NumberFormatter.signedPercent(data.getWater() * attrs.getWaterGrants().getEnergyShieldPercent()) + " ES, "
+                + NumberFormatter.signed(data.getWater() * attrs.getWaterGrants().getEnergyShieldRegen()) + " ES/s");
 
         // Lightning (Yellow theme) - Storm blitz
         sendAttributeLine(player, "LIGHTNING", data.getLightning(), "#FFFF44",
-            String.format("+%.1f%% Atk Speed, +%.1f%% Move, +%.1f%% Crit",
-                data.getLightning() * attrs.getLightningGrants().getAttackSpeedPercent(),
-                data.getLightning() * attrs.getLightningGrants().getMoveSpeedPercent(),
-                data.getLightning() * attrs.getLightningGrants().getCritChance()));
+            NumberFormatter.signedPercent(data.getLightning() * attrs.getLightningGrants().getAttackSpeedPercent()) + " Atk Speed, "
+                + NumberFormatter.signedPercent(data.getLightning() * attrs.getLightningGrants().getMoveSpeedPercent()) + " Move, "
+                + NumberFormatter.signedPercent(data.getLightning() * attrs.getLightningGrants().getCritChance()) + " Crit");
 
         // Earth (Brown theme) - Iron fortress
         sendAttributeLine(player, "EARTH", data.getEarth(), "#8B4513",
-            String.format("+%.1f%% Max HP, +%.0f Armor, +%.1f%% Block",
-                data.getEarth() * attrs.getEarthGrants().getMaxHealthPercent(),
-                data.getEarth() * attrs.getEarthGrants().getArmor(),
-                data.getEarth() * attrs.getEarthGrants().getBlockChance()));
+            NumberFormatter.signedPercent(data.getEarth() * attrs.getEarthGrants().getMaxHealthPercent()) + " Max HP, "
+                + NumberFormatter.signed(data.getEarth() * attrs.getEarthGrants().getArmor()) + " Armor, "
+                + NumberFormatter.signedPercent(data.getEarth() * attrs.getEarthGrants().getBlockChance()) + " Block");
 
         // Wind (Pale green theme) - Ghost ranger
         sendAttributeLine(player, "WIND", data.getWind(), "#AAFFAA",
-            String.format("+%.0f Eva, +%.0f Acc, +%.1f%% Proj Dmg",
-                data.getWind() * attrs.getWindGrants().getEvasion(),
-                data.getWind() * attrs.getWindGrants().getAccuracy(),
-                data.getWind() * attrs.getWindGrants().getProjectileDamagePercent()));
+            NumberFormatter.signed(data.getWind() * attrs.getWindGrants().getEvasion()) + " Eva, "
+                + NumberFormatter.signed(data.getWind() * attrs.getWindGrants().getAccuracy()) + " Acc, "
+                + NumberFormatter.signedPercent(data.getWind() * attrs.getWindGrants().getProjectileDamagePercent()) + " Proj Dmg");
 
         // Void (Purple theme) - Life devourer
         sendAttributeLine(player, "VOID", data.getVoidAttr(), "#8844AA",
-            String.format("+%.1f%% Life Steal, +%.2f%% True Dmg, +%.1f%% DoT",
-                data.getVoidAttr() * attrs.getVoidGrants().getLifeSteal(),
-                data.getVoidAttr() * attrs.getVoidGrants().getPercentHitAsTrueDamage(),
-                data.getVoidAttr() * attrs.getVoidGrants().getDotDamagePercent()));
+            NumberFormatter.signedPercent(data.getVoidAttr() * attrs.getVoidGrants().getLifeSteal()) + " Life Steal, "
+                + NumberFormatter.signedPercent(data.getVoidAttr() * attrs.getVoidGrants().getPercentHitAsTrueDamage()) + " True Dmg, "
+                + NumberFormatter.signedPercent(data.getVoidAttr() * attrs.getVoidGrants().getDotDamagePercent()) + " DoT");
 
         // Unallocated points
         player.sendMessage(Message.empty()
@@ -142,55 +140,75 @@ public class TooStatsCommand extends OpenPlayerCommand {
         sendSectionHeader(player, "RESOURCES", MessageColors.SUCCESS);
 
         sendResourceLine(player, "Health", stats.getMaxHealth(), stats.getHealthRegen(),
-            MessageColors.ERROR, "/sec");
+            MessageColors.ERROR);
         sendResourceLine(player, "Mana", stats.getMaxMana(), stats.getManaRegen(),
-            MessageColors.BLUE, "/sec");
+            MessageColors.BLUE);
         sendResourceLine(player, "Stamina", stats.getMaxStamina(), stats.getStaminaRegen(),
-            MessageColors.ORANGE, "/sec");
+            MessageColors.ORANGE);
         sendResourceLine(player, "Oxygen", stats.getMaxOxygen(), stats.getOxygenRegen(),
-            MessageColors.LIGHT_BLUE, "/sec");
+            MessageColors.LIGHT_BLUE);
         sendResourceLine(player, "Sig.Energy", stats.getMaxSignatureEnergy(), stats.getSignatureEnergyRegen(),
-            MessageColors.PURPLE, "/sec");
+            MessageColors.PURPLE);
+
+        // Energy Shield subsection
+        if (stats.getEnergyShield() > 0) {
+            player.sendMessage(Message.empty()
+                .insert(Message.raw("  E. Shield : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.flat(stats.getEnergyShield())).color(MessageColors.LIGHT_BLUE))
+                .insert(Message.raw("  (" + NumberFormatter.regen(stats.getEnergyShieldRegen())
+                    + ", " + NumberFormatter.time(stats.getEnergyShieldRegenDelay()) + " delay)").color(MessageColors.GRAY)));
+        }
+
+        // Stamina recovery speed (if modified from default)
+        if (stats.getStaminaRegenStartDelay() != 0) {
+            player.sendMessage(Message.empty()
+                .insert(Message.raw("  Stamina Recovery : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getStaminaRegenStartDelay())).color(
+                    stats.getStaminaRegenStartDelay() > 0 ? MessageColors.SUCCESS : MessageColors.ERROR)));
+        }
 
         // ==================== OFFENSE SECTION ====================
         sendSectionHeader(player, "OFFENSE", MessageColors.ERROR);
 
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Physical : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.1f flat", stats.getPhysicalDamage())).color(MessageColors.WHITE))
-            .insert(Message.raw(String.format(", +%.1f%%", stats.getPhysicalDamagePercent())).color(MessageColors.GRAY)));
+            .insert(Message.raw(NumberFormatter.signed(stats.getPhysicalDamage()) + " flat").color(MessageColors.WHITE))
+            .insert(Message.raw(", " + NumberFormatter.signedPercent(stats.getPhysicalDamagePercent())).color(MessageColors.GRAY)));
 
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Spell : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.1f flat", stats.getSpellDamage())).color(MessageColors.WHITE))
-            .insert(Message.raw(String.format(", +%.1f%%", stats.getSpellDamagePercent())).color(MessageColors.GRAY)));
+            .insert(Message.raw(NumberFormatter.signed(stats.getSpellDamage()) + " flat").color(MessageColors.WHITE))
+            .insert(Message.raw(", " + NumberFormatter.signedPercent(stats.getSpellDamagePercent())).color(MessageColors.GRAY)));
 
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Critical : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("%.1f%% chance", stats.getCriticalChance())).color(MessageColors.WARNING))
-            .insert(Message.raw(String.format(", %.0f%% multiplier", stats.getCriticalMultiplier())).color(MessageColors.GRAY)));
+            .insert(Message.raw(NumberFormatter.percent(stats.getCriticalChance()) + " chance").color(MessageColors.WARNING))
+            .insert(Message.raw(", " + NumberFormatter.percent(stats.getCriticalMultiplier()) + " multiplier").color(MessageColors.GRAY)));
 
         if (stats.getMeleeDamagePercent() > 0 || stats.getProjectileDamagePercent() > 0) {
             player.sendMessage(Message.empty()
                 .insert(Message.raw("  Melee : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("+%.1f%%", stats.getMeleeDamagePercent())).color(MessageColors.WHITE))
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getMeleeDamagePercent())).color(MessageColors.WHITE))
                 .insert(Message.raw("  Projectile : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("+%.1f%%", stats.getProjectileDamagePercent())).color(MessageColors.WHITE)));
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getProjectileDamagePercent())).color(MessageColors.WHITE)));
         }
 
         // ==================== DEFENSE SECTION ====================
         sendSectionHeader(player, "DEFENSE", MessageColors.INFO);
 
+        int playerLevel = ServiceRegistry.get(LevelingService.class)
+            .map(ls -> ls.getLevel(uuid)).orElse(1);
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Armor : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("%.1f", stats.getArmor())).color(MessageColors.WHITE))
-            .insert(Message.raw(String.format(" (%.1f%% reduction vs 100 dmg)",
-                calculateArmorReduction(stats.getArmor(), 100f))).color(MessageColors.GRAY)));
+            .insert(Message.raw(NumberFormatter.smallFlat(stats.getArmor())).color(MessageColors.WHITE))
+            .insert(Message.raw(" (" + NumberFormatter.percent(
+                CombatCalculator.estimateArmorReduction(stats.getArmor(), playerLevel))
+                + " reduction vs Lv" + playerLevel + ")").color(MessageColors.GRAY)));
 
         if (stats.getFallDamageReduction() > 0) {
             player.sendMessage(Message.empty()
                 .insert(Message.raw("  Fall Resist : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.1f%%", stats.getFallDamageReduction())).color(MessageColors.SUCCESS)));
+                .insert(Message.raw(NumberFormatter.percent(stats.getFallDamageReduction())).color(MessageColors.SUCCESS)));
         }
 
         if (stats.getFireResistance() > 0 || stats.getWaterResistance() > 0 ||
@@ -198,23 +216,23 @@ public class TooStatsCommand extends OpenPlayerCommand {
             stats.getWindResistance() > 0 || stats.getVoidResistance() > 0) {
             player.sendMessage(Message.empty()
                 .insert(Message.raw("  Resists : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Fire %.0f%%", stats.getFireResistance())).color("#FF6600"))
+                .insert(Message.raw("Fire " + NumberFormatter.percent(stats.getFireResistance())).color("#FF6600"))
                 .insert(Message.raw(", ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Water %.0f%%", stats.getWaterResistance())).color("#66CCFF"))
+                .insert(Message.raw("Water " + NumberFormatter.percent(stats.getWaterResistance())).color("#66CCFF"))
                 .insert(Message.raw(", ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Light %.0f%%", stats.getLightningResistance())).color("#FFFF00"))
+                .insert(Message.raw("Light " + NumberFormatter.percent(stats.getLightningResistance())).color("#FFFF00"))
                 .insert(Message.raw(", ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Earth %.0f%%", stats.getEarthResistance())).color("#8B4513"))
+                .insert(Message.raw("Earth " + NumberFormatter.percent(stats.getEarthResistance())).color("#8B4513"))
                 .insert(Message.raw(", ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Wind %.0f%%", stats.getWindResistance())).color("#AAFFAA"))
+                .insert(Message.raw("Wind " + NumberFormatter.percent(stats.getWindResistance())).color("#AAFFAA"))
                 .insert(Message.raw(", ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("Void %.0f%%", stats.getVoidResistance())).color(MessageColors.DARK_PURPLE)));
+                .insert(Message.raw("Void " + NumberFormatter.percent(stats.getVoidResistance())).color(MessageColors.DARK_PURPLE)));
         }
 
         if (stats.getEvasion() > 0) {
             player.sendMessage(Message.empty()
                 .insert(Message.raw("  Evasion : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.1f", stats.getEvasion())).color(MessageColors.WHITE)));
+                .insert(Message.raw(NumberFormatter.smallFlat(stats.getEvasion())).color(MessageColors.WHITE)));
         }
 
         // ==================== MOVEMENT SECTION ====================
@@ -222,15 +240,15 @@ public class TooStatsCommand extends OpenPlayerCommand {
 
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Move Speed : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.0f%%", stats.getMovementSpeedPercent())).color(MessageColors.WHITE))
+            .insert(Message.raw(NumberFormatter.signedPercent(stats.getMovementSpeedPercent())).color(MessageColors.WHITE))
             .insert(Message.raw("  Sprint : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.0f%%", stats.getSprintSpeedBonus())).color(MessageColors.WHITE)));
+            .insert(Message.raw(NumberFormatter.signedPercent(stats.getSprintSpeedBonus())).color(MessageColors.WHITE)));
 
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Jump Force : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.0f%%", stats.getJumpForceBonus())).color(MessageColors.WHITE))
+            .insert(Message.raw(NumberFormatter.signedPercent(stats.getJumpForceBonus())).color(MessageColors.WHITE))
             .insert(Message.raw("  Climb : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("+%.0f%%", stats.getClimbSpeedBonus())).color(MessageColors.WHITE)));
+            .insert(Message.raw(NumberFormatter.signedPercent(stats.getClimbSpeedBonus())).color(MessageColors.WHITE)));
 
         // ==================== FOOTER ====================
         player.sendMessage(Message.raw("==========================================").color(MessageColors.GOLD));
@@ -262,22 +280,17 @@ public class TooStatsCommand extends OpenPlayerCommand {
         @Nonnull String name,
         float maxValue,
         float regenRate,
-        @Nonnull String color,
-        @Nonnull String regenSuffix
+        @Nonnull String color
     ) {
         Message msg = Message.empty()
             .insert(Message.raw("  " + name + " : ").color(MessageColors.GRAY))
-            .insert(Message.raw(String.format("%.0f", maxValue)).color(color));
+            .insert(Message.raw(NumberFormatter.flat(maxValue)).color(color));
 
         if (regenRate > 0) {
-            msg.insert(Message.raw(String.format("  (+%.1f%s)", regenRate, regenSuffix)).color(MessageColors.GRAY));
+            msg.insert(Message.raw("  (" + NumberFormatter.regen(regenRate) + ")").color(MessageColors.GRAY));
         }
 
         player.sendMessage(msg);
     }
 
-    private float calculateArmorReduction(float armor, float damage) {
-        if (armor <= 0 || damage <= 0) return 0f;
-        return (armor / (armor + 10f * damage)) * 100f;
-    }
 }

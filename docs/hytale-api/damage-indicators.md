@@ -705,26 +705,26 @@ Suppress vanilla combat text and send custom `CombatTextUpdate` packets with arb
 
 ```bash
 # Find CombatText asset
-cat /home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Server/Entity/UI/CombatText.json
+cat <hytale-decompiled>/Assets/Server/Entity/UI/CombatText.json
 
 # Find DamageCause schema
-cat /home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Schema/DamageCause.json
+cat <hytale-decompiled>/Assets/Schema/DamageCause.json
 
 # Find all vanilla damage causes
-ls /home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Server/Entity/Damage/
+ls <hytale-decompiled>/Assets/Server/Entity/Damage/
 
 # Find EntityUI protocol classes
-grep "^UpdateEntityUIComponents\|^EntityUIComponent\|^CombatTextUpdate\|^UIComponentsUpdate\|^CombatTextEntityUI" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLASS_INDEX.txt
+grep "^UpdateEntityUIComponents\|^EntityUIComponent\|^CombatTextUpdate\|^UIComponentsUpdate\|^CombatTextEntityUI" <hytale-decompiled>/.index/CLASS_INDEX.txt
 
 # Find EntityUI server-side asset classes
-grep "^CombatTextUIComponent\|^UIComponentList\|^EntityUIModule\|^EntityUIComponentPacketGenerator" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLASS_INDEX.txt
+grep "^CombatTextUIComponent\|^UIComponentList\|^EntityUIModule\|^EntityUIComponentPacketGenerator" <hytale-decompiled>/.index/CLASS_INDEX.txt
 
 # Find our colored combat text system
-grep "CombatText" /home/larsonix/work/trail-of-orbis/.index/CLASS_INDEX.txt
+grep "CombatText" .index/CLASS_INDEX.txt
 
 # Read client-side CombatText.ui template
-cat /home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/Game/Interface/InGame/EntityUI/CombatText.ui
+cat <hytale-decompiled>/ClientData/Game/Interface/InGame/EntityUI/CombatText.ui
 
 # Search client localization for damage-related strings
-grep "damage" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_LANG_INDEX.txt
+grep "damage" <hytale-decompiled>/.index/CLIENT_LANG_INDEX.txt
 ```

@@ -281,6 +281,104 @@ class RarityRollerTest {
     }
 
     // =========================================================================
+    // CONSTRAINED ROLL TESTS (new rarity-first loot system)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Constrained Roll Tests")
+    class ConstrainedRollTests {
+
+        @Test
+        @DisplayName("constrained roll only returns available rarities")
+        void constrainedRoll_OnlyReturnsAvailable() {
+            RarityRoller roller = new RarityRoller(config, new Random(42));
+            Set<GearRarity> available = EnumSet.of(GearRarity.RARE, GearRarity.EPIC);
+
+            for (int i = 0; i < 10000; i++) {
+                GearRarity result = roller.roll(0.0, available);
+                assertTrue(available.contains(result),
+                    "Rolled " + result + " which is not in available set " + available);
+            }
+        }
+
+        @Test
+        @DisplayName("single available rarity always returns that rarity")
+        void constrainedRoll_SingleAvailable_AlwaysReturnsThat() {
+            RarityRoller roller = new RarityRoller(config, new Random(42));
+            Set<GearRarity> available = EnumSet.of(GearRarity.LEGENDARY);
+
+            for (int i = 0; i < 100; i++) {
+                assertEquals(GearRarity.LEGENDARY, roller.roll(0.0, available));
+            }
+        }
+
+        @Test
+        @DisplayName("empty available set throws IllegalArgumentException")
+        void constrainedRoll_EmptySet_Throws() {
+            RarityRoller roller = new RarityRoller(config, new Random(42));
+            assertThrows(IllegalArgumentException.class,
+                () -> roller.roll(0.0, EnumSet.noneOf(GearRarity.class)));
+        }
+
+        @Test
+        @DisplayName("rarity bonus shifts distribution within constrained set")
+        void constrainedRoll_BonusShiftsDistribution() {
+            RarityRoller roller = new RarityRoller(config, new Random(42));
+            Set<GearRarity> available = EnumSet.of(GearRarity.COMMON, GearRarity.RARE, GearRarity.EPIC);
+
+            // With high bonus, EPIC should appear more often
+            Map<GearRarity, Integer> counts = new EnumMap<>(GearRarity.class);
+            for (int i = 0; i < 10000; i++) {
+                GearRarity result = roller.roll(5.0, available);
+                counts.merge(result, 1, Integer::sum);
+            }
+
+            // With 5.0 bonus in {COMMON(64), RARE(4), EPIC(1)} set:
+            // Epic adjusted weight = 1 × (1 + 5 × 3/6) = 3.5, total ~78
+            // Expected Epic ~4.5% of 10000 = ~450. Use loose threshold.
+            int epicCount = counts.getOrDefault(GearRarity.EPIC, 0);
+            assertTrue(epicCount > 200, "Epic should appear >2% with 5.0 bonus, got " + epicCount);
+        }
+
+        @Test
+        @DisplayName("constrained roll respects relative weights between available rarities")
+        void constrainedRoll_RespectsRelativeWeights() {
+            RarityRoller roller = new RarityRoller(config, new Random(42));
+            // Common (weight 64) and Rare (weight 4) — Common should dominate
+            Set<GearRarity> available = EnumSet.of(GearRarity.COMMON, GearRarity.RARE);
+
+            Map<GearRarity, Integer> counts = new EnumMap<>(GearRarity.class);
+            for (int i = 0; i < 10000; i++) {
+                GearRarity result = roller.roll(0.0, available);
+                counts.merge(result, 1, Integer::sum);
+            }
+
+            int commonCount = counts.getOrDefault(GearRarity.COMMON, 0);
+            int rareCount = counts.getOrDefault(GearRarity.RARE, 0);
+            // Expect ~94% Common, ~6% Rare (64:4 ratio = 16:1)
+            assertTrue(commonCount > rareCount * 5,
+                "Common should be much more frequent than Rare, got " + commonCount + " vs " + rareCount);
+        }
+
+        @Test
+        @DisplayName("full rarity set behaves same as unconstrained roll")
+        void constrainedRoll_FullSet_SameAsUnconstrained() {
+            // Both should produce the same distribution with the same seed
+            Set<GearRarity> allRarities = EnumSet.allOf(GearRarity.class);
+
+            RarityRoller roller1 = new RarityRoller(config, new Random(12345));
+            RarityRoller roller2 = new RarityRoller(config, new Random(12345));
+
+            for (int i = 0; i < 100; i++) {
+                GearRarity unconstrained = roller1.roll(0.0);
+                GearRarity constrained = roller2.roll(0.0, allRarities);
+                assertEquals(unconstrained, constrained,
+                    "Constrained with full set should match unconstrained at iteration " + i);
+            }
+        }
+    }
+
+    // =========================================================================
     // HELPER METHODS
     // =========================================================================
 

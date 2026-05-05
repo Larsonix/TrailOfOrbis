@@ -57,6 +57,18 @@ public class HexcodeSpellConfig {
      */
     private float max_damage_amplification = 2.0f;
 
+    /**
+     * Multiplier applied to Hexcode spell base damage before it enters the RPG pipeline.
+     * <p>
+     * Hex spells have their own base damage that stacks WITH the staff weapon implicit
+     * AND then gets amplified by all spell scaling stats (spellDmg%, projectileDmg%, MORE).
+     * This multiplier tunes the hex base contribution to prevent double-scaling.
+     * <p>
+     * 1.0 = full hex base (no reduction). 0.5 = halved. Only affects the hex portion;
+     * the staff's weapon implicit is applied at full value regardless.
+     */
+    private float spell_base_multiplier = 0.5f;
+
     public HexcodeSpellConfig() {
         initializeDefaults();
     }
@@ -181,6 +193,14 @@ public class HexcodeSpellConfig {
         this.max_damage_amplification = max_damage_amplification;
     }
 
+    public float getSpell_base_multiplier() {
+        return spell_base_multiplier;
+    }
+
+    public void setSpell_base_multiplier(float spell_base_multiplier) {
+        this.spell_base_multiplier = spell_base_multiplier;
+    }
+
     public HexcodePedestalPlacer.HexcodePedestalConfig getRealm_pedestal() {
         return realm_pedestal;
     }
@@ -220,6 +240,12 @@ public class HexcodeSpellConfig {
             LOGGER.atWarning().log("Hexcode spell config: max_damage_amplification %.2f below 1.0, clamping to 1.0",
                 max_damage_amplification);
             max_damage_amplification = 1.0f;
+        }
+
+        if (spell_base_multiplier < 0f) {
+            LOGGER.atWarning().log("Hexcode spell config: spell_base_multiplier %.2f negative, clamping to 0",
+                spell_base_multiplier);
+            spell_base_multiplier = 0f;
         }
 
         for (Map.Entry<String, SpellMapping> entry : damage_type_map.entrySet()) {

@@ -25,13 +25,15 @@ import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
+import io.github.larsonix.trailoforbis.combat.CombatCalculator;
 import io.github.larsonix.trailoforbis.combat.avoidance.AvoidanceProcessor;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
 import io.github.larsonix.trailoforbis.ui.attributes.AttributePage;
 import io.github.larsonix.trailoforbis.ui.stats.BuildSummaryCalculator.BuildSummary;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -300,8 +302,8 @@ public class StatsPage {
                 });
             }
 
-            // Rebuild page to apply all changes
-            ctx.updatePage(true);
+            // Rebuild page to apply all changes (guard against dismissed page)
+            ctx.getPage().ifPresent(page -> ctx.updatePage(true));
         });
     }
 
@@ -428,9 +430,9 @@ public class StatsPage {
         sb.append("      <div style=\"layout-mode: Left; anchor-height: 26; anchor-horizontal: 0;\" data-hyui-style=\"Padding: (Horizontal: 20; Vertical: 4)\">\n");
         String xpDisplay = xpForLevel == 0
             ? "XP : MAX"
-            : String.format("XP : %,d / %,d", xpInLevel, xpForLevel);
+            : "XP : " + NumberFormatter.flat((float) xpInLevel) + " / " + NumberFormatter.flat((float) xpForLevel);
         sb.append("        <div style=\"flex-weight: 1;\"><p style=\"font-size: 13; color: ").append(RPGStyles.TEXT_MUTED).append(";\">").append(xpDisplay).append("</p></div>\n");
-        sb.append("        <div><p style=\"font-size: 13; color: ").append(RPGStyles.TEXT_MUTED).append(";\">").append(String.format("%.0f%%", levelProgress * 100)).append("</p></div>\n");
+        sb.append("        <div><p style=\"font-size: 13; color: ").append(RPGStyles.TEXT_MUTED).append(";\">").append(NumberFormatter.percent(levelProgress * 100f)).append("</p></div>\n");
         sb.append("      </div>\n");
 
         // Subtle divider line
@@ -613,7 +615,7 @@ public class StatsPage {
         // Avg Damage / Hit — always shown
         if (summary.hasWeapon()) {
             rows.add(new StatRow("Avg Damage / Hit",
-                String.format("%,d", (int) summary.avgDamagePerHit()),
+                NumberFormatter.flat((float) summary.avgDamagePerHit()),
                 null, true, false));
             tooltips.put("Avg Damage / Hit", buildDamageTooltip(summary));
         } else {
@@ -623,7 +625,7 @@ public class StatsPage {
 
         // Effective HP — always shown
         rows.add(new StatRow("Effective HP",
-            String.format("%,d", (int) summary.effectiveHP()),
+            NumberFormatter.flat((float) summary.effectiveHP()),
             null, true, false));
         tooltips.put("Effective HP", buildEHPTooltip(summary));
 
@@ -655,7 +657,7 @@ public class StatsPage {
         // Level — always shown
         String xpDetail = xpForLevel == 0
             ? "MAX"
-            : String.format("%.0f%% to next", levelProgress * 100);
+            : NumberFormatter.percent(levelProgress * 100f) + " to next";
         rows.add(new StatRow("Level", String.valueOf(level), xpDetail, false, false));
 
         // Attribute Points — only if unallocated > 0
@@ -698,7 +700,7 @@ public class StatsPage {
         StringBuilder sb = new StringBuilder("<tooltip>");
 
         // Title
-        ttSpan(sb, "Avg Damage / Hit: " + String.format("%,d", (int) d.avgDamagePerHit()), RPGStyles.TITLE_GOLD, true);
+        ttSpan(sb, "Avg Damage / Hit: " + NumberFormatter.flat((float) d.avgDamagePerHit()), RPGStyles.TITLE_GOLD, true);
         ttSeparator(sb);
 
         // Weapon base
@@ -711,8 +713,16 @@ public class StatsPage {
         if (d.flatMelee() > 0) {
             ttSpan(sb, "+ Flat Melee: +" + RPGStyles.formatFlat(d.flatMelee()), RPGStyles.POSITIVE);
         }
+        if (d.flatSpell() > 0) {
+            ttSpan(sb, "+ Flat Spell: +" + RPGStyles.formatFlat(d.flatSpell()), RPGStyles.POSITIVE);
+        }
         if (d.flatElemental() > 0) {
             ttSpan(sb, "+ Flat Elemental: +" + RPGStyles.formatFlat(d.flatElemental()), RPGStyles.POSITIVE);
+        }
+
+        // Conversion (if any phys→elem conversion)
+        if (d.conversionPct() > 0) {
+            ttSpan(sb, "Conversion: " + NumberFormatter.percent(d.conversionPct()) + " phys to elemental", RPGStyles.TEXT_INFO);
         }
 
         // Base total
@@ -722,6 +732,11 @@ public class StatsPage {
         if (d.totalIncreasedPct() != 0) {
             ttSpan(sb, "x Increased: x" + RPGStyles.formatNumber(d.increasedMult())
                 + " (+" + RPGStyles.formatFlat(d.totalIncreasedPct()) + "%)", "#BB99FF");
+        }
+
+        // Elemental modifiers (if any elemental damage after mods)
+        if (d.elementalAfterMods() > 0 && d.flatElemental() > 0) {
+            ttSpan(sb, "Elemental After Mods: " + NumberFormatter.flat(d.elementalAfterMods()), RPGStyles.TEXT_INFO);
         }
 
         // % More (if any)
@@ -743,9 +758,14 @@ public class StatsPage {
                 + RPGStyles.formatFlat(d.critMultRaw()) + "%)", RPGStyles.TEXT_ORANGE);
         }
 
+        // True damage (if any — bypasses defenses)
+        if (d.trueDamage() > 0) {
+            ttSpan(sb, "+ True Damage: +" + RPGStyles.formatFlat(d.trueDamage()), "#DD88FF");
+        }
+
         // Final result
         ttSeparator(sb);
-        ttSpan(sb, "= Average Hit: " + String.format("%,d", (int) d.avgDamagePerHit()), RPGStyles.TITLE_GOLD, true);
+        ttSpan(sb, "= Average Hit: " + NumberFormatter.flat((float) d.avgDamagePerHit()), RPGStyles.TITLE_GOLD, true);
 
         ttClose(sb);
         return sb.toString();
@@ -760,25 +780,25 @@ public class StatsPage {
         StringBuilder sb = new StringBuilder("<tooltip>");
 
         // Title
-        ttSpan(sb, "Effective HP: " + String.format("%,d", (int) e.effectiveHP()), RPGStyles.TITLE_GOLD, true);
+        ttSpan(sb, "Effective HP: " + NumberFormatter.flat((float) e.effectiveHP()), RPGStyles.TITLE_GOLD, true);
         ttSeparator(sb);
 
         // Max Health
-        ttSpan(sb, "Max Health: " + String.format("%,d", (int) e.maxHealth()), "#FF8888");
+        ttSpan(sb, "Max Health: " + NumberFormatter.flat((float) e.maxHealth()), "#FF8888");
 
         // Energy Shield (if any)
         if (e.energyShield() > 0) {
-            ttSpan(sb, "+ Energy Shield: +" + String.format("%,d", (int) e.energyShield()), "#88CCFF");
+            ttSpan(sb, "+ Energy Shield: +" + NumberFormatter.flat((float) e.energyShield()), "#88CCFF");
         }
 
         // Raw HP
-        ttSpan(sb, "= Raw HP: " + String.format("%,d", (int) e.rawHP()), RPGStyles.TEXT_PRIMARY);
+        ttSpan(sb, "= Raw HP: " + NumberFormatter.flat((float) e.rawHP()), RPGStyles.TEXT_PRIMARY);
 
         // Armor
         if (e.armor() > 0) {
-            ttSpan(sb, "Armor: " + String.format("%,d", (int) e.armor())
-                + " (" + String.format("%.1f%%", e.armorMitigation() * 100f) + " reduction)", RPGStyles.TEXT_ORANGE);
-            ttSpan(sb, "= After Armor: " + String.format("%,d", (int) e.ehpFromArmor()), RPGStyles.TEXT_PRIMARY);
+            ttSpan(sb, "Armor: " + NumberFormatter.flat((float) e.armor())
+                + " (" + NumberFormatter.percent(e.armorMitigation() * 100f) + " reduction)", RPGStyles.TEXT_ORANGE);
+            ttSpan(sb, "= After Armor: " + NumberFormatter.flat((float) e.ehpFromArmor()), RPGStyles.TEXT_PRIMARY);
         }
 
         // Avoidance (if any)
@@ -797,13 +817,13 @@ public class StatsPage {
                 if (!avoidParts.isEmpty()) avoidParts.append(" + ");
                 avoidParts.append("parry");
             }
-            ttSpan(sb, "Avoidance: " + String.format("%.1f%%", e.combinedAvoidPct())
+            ttSpan(sb, "Avoidance: " + NumberFormatter.percent(e.combinedAvoidPct())
                 + " (" + avoidParts + ")", RPGStyles.POSITIVE);
         }
 
         // Final result
         ttSeparator(sb);
-        ttSpan(sb, "= Effective HP: " + String.format("%,d", (int) e.effectiveHP()), RPGStyles.TITLE_GOLD, true);
+        ttSpan(sb, "= Effective HP: " + NumberFormatter.flat((float) e.effectiveHP()), RPGStyles.TITLE_GOLD, true);
 
         ttClose(sb);
         return sb.toString();
@@ -828,11 +848,11 @@ public class StatsPage {
         var fg = attrs.getFireGrants();
         rows.add(new StatRow("Fire", String.valueOf(fp), null, false, false, RPGStyles.ELEMENT_FIRE));
         buildAttributeTooltip(tooltips, "Fire", fp, RPGStyles.ELEMENT_FIRE, "Glass Cannon",
-            String.format("%+.1f%% Physical Damage", fm * fg.getPhysicalDamagePercent()),
-            String.format("%+.1f%% Charged Attack Damage", fm * fg.getChargedAttackDamagePercent()),
-            String.format("%+.1f%% Critical Multiplier", fm * fg.getCriticalMultiplier()),
-            String.format("%+.1f%% Burn Damage", fm * fg.getBurnDamagePercent()),
-            String.format("%+.1f%% Ignite Chance", fm * fg.getIgniteChance()));
+            NumberFormatter.signedPercent(fm * fg.getPhysicalDamagePercent()) + " Physical Damage",
+            NumberFormatter.signedPercent(fm * fg.getChargedAttackDamagePercent()) + " Charged Attack Damage",
+            NumberFormatter.signedPercent(fm * fg.getCriticalMultiplier()) + " Critical Multiplier",
+            NumberFormatter.signedPercent(fm * fg.getBurnDamagePercent()) + " Burn Damage",
+            NumberFormatter.signedPercent(fm * fg.getIgniteChance()) + " Ignite Chance");
 
         // WATER - Arcane mage
         int wtp = data.getWater();
@@ -840,11 +860,12 @@ public class StatsPage {
         var wg = attrs.getWaterGrants();
         rows.add(new StatRow("Water", String.valueOf(wtp), null, false, false, RPGStyles.ELEMENT_WATER));
         buildAttributeTooltip(tooltips, "Water", wtp, RPGStyles.ELEMENT_WATER, "Arcane Mage",
-            String.format("%+.1f%% Spell Damage", wtm * wg.getSpellDamagePercent()),
-            String.format("%+.1f Max Mana", wtm * wg.getMaxMana()),
-            String.format("%+.0f Energy Shield", wtm * wg.getEnergyShield()),
-            String.format("%+.1f/s Mana Regen", wtm * wg.getManaRegen()),
-            String.format("%+.1f%% Freeze Chance", wtm * wg.getFreezeChance()));
+            NumberFormatter.signedPercent(wtm * wg.getSpellDamagePercent()) + " Spell Damage",
+            NumberFormatter.signed(wtm * wg.getMaxMana()) + " Max Mana",
+            NumberFormatter.signedPercent(wtm * wg.getEnergyShieldPercent()) + " Max ES",
+            NumberFormatter.signed(wtm * wg.getEnergyShieldRegen()) + "/s ES Regen",
+            NumberFormatter.signed(wtm * wg.getManaRegen()) + "/s Mana Regen",
+            NumberFormatter.signedPercent(wtm * wg.getFreezeChance()) + " Freeze Chance");
 
         // LIGHTNING - Storm blitz
         int lp = data.getLightning();
@@ -852,11 +873,11 @@ public class StatsPage {
         var lg = attrs.getLightningGrants();
         rows.add(new StatRow("Lightning", String.valueOf(lp), null, false, false, RPGStyles.ELEMENT_LIGHTNING));
         buildAttributeTooltip(tooltips, "Lightning", lp, RPGStyles.ELEMENT_LIGHTNING, "Storm Blitz",
-            String.format("%+.1f%% Attack Speed", lm * lg.getAttackSpeedPercent()),
-            String.format("%+.1f%% Move Speed", lm * lg.getMoveSpeedPercent()),
-            String.format("%+.1f%% Critical Chance", lm * lg.getCritChance()),
-            String.format("%+.1f/s Stamina Regen", lm * lg.getStaminaRegen()),
-            String.format("%+.1f%% Shock Chance", lm * lg.getShockChance()));
+            NumberFormatter.signedPercent(lm * lg.getAttackSpeedPercent()) + " Attack Speed",
+            NumberFormatter.signedPercent(lm * lg.getMoveSpeedPercent()) + " Move Speed",
+            NumberFormatter.signedPercent(lm * lg.getCritChance()) + " Critical Chance",
+            NumberFormatter.signed(lm * lg.getStaminaRegen()) + "/s Stamina Regen",
+            NumberFormatter.signedPercent(lm * lg.getShockChance()) + " Shock Chance");
 
         // EARTH - Iron fortress
         int ep = data.getEarth();
@@ -864,11 +885,11 @@ public class StatsPage {
         var eg = attrs.getEarthGrants();
         rows.add(new StatRow("Earth", String.valueOf(ep), null, false, false, RPGStyles.ELEMENT_EARTH));
         buildAttributeTooltip(tooltips, "Earth", ep, RPGStyles.ELEMENT_EARTH, "Iron Fortress",
-            String.format("%+.1f%% Max Health", em * eg.getMaxHealthPercent()),
-            String.format("%+.0f Armor", em * eg.getArmor()),
-            String.format("%+.1f/s Health Regen", em * eg.getHealthRegen()),
-            String.format("%+.1f%% Perfect Block", em * eg.getBlockChance()),
-            String.format("%+.1f%% Knockback Resistance", em * eg.getKnockbackResistance()));
+            NumberFormatter.signedPercent(em * eg.getMaxHealthPercent()) + " Max Health",
+            NumberFormatter.signed(em * eg.getArmor()) + " Armor",
+            NumberFormatter.signed(em * eg.getHealthRegen()) + "/s Health Regen",
+            NumberFormatter.signedPercent(em * eg.getBlockChance()) + " Perfect Block",
+            NumberFormatter.signedPercent(em * eg.getKnockbackResistance()) + " Knockback Resistance");
 
         // WIND - Ghost ranger
         int wdp = data.getWind();
@@ -876,11 +897,11 @@ public class StatsPage {
         var wdg = attrs.getWindGrants();
         rows.add(new StatRow("Wind", String.valueOf(wdp), null, false, false, RPGStyles.ELEMENT_WIND));
         buildAttributeTooltip(tooltips, "Wind", wdp, RPGStyles.ELEMENT_WIND, "Ghost Ranger",
-            String.format("%+.0f Evasion", wdm * wdg.getEvasion()),
-            String.format("%+.0f Accuracy", wdm * wdg.getAccuracy()),
-            String.format("%+.1f%% Projectile Damage", wdm * wdg.getProjectileDamagePercent()),
-            String.format("%+.1f%% Jump Force", wdm * wdg.getJumpForcePercent()),
-            String.format("%+.1f%% Projectile Speed", wdm * wdg.getProjectileSpeedPercent()));
+            NumberFormatter.signed(wdm * wdg.getEvasion()) + " Evasion",
+            NumberFormatter.signed(wdm * wdg.getAccuracy()) + " Accuracy",
+            NumberFormatter.signedPercent(wdm * wdg.getProjectileDamagePercent()) + " Projectile Damage",
+            NumberFormatter.signedPercent(wdm * wdg.getJumpForcePercent()) + " Jump Force",
+            NumberFormatter.signedPercent(wdm * wdg.getProjectileSpeedPercent()) + " Projectile Speed");
 
         // VOID - Life devourer
         int vp = data.getVoidAttr();
@@ -888,11 +909,11 @@ public class StatsPage {
         var vg = attrs.getVoidGrants();
         rows.add(new StatRow("Void", String.valueOf(vp), null, false, false, RPGStyles.ELEMENT_VOID));
         buildAttributeTooltip(tooltips, "Void", vp, RPGStyles.ELEMENT_VOID, "Life Devourer",
-            String.format("%+.1f%% Life Steal", vm * vg.getLifeSteal()),
-            String.format("%+.2f%% True Damage", vm * vg.getPercentHitAsTrueDamage()),
-            String.format("%+.1f%% DoT Damage", vm * vg.getDotDamagePercent()),
-            String.format("%+.1f Mana on Kill", vm * vg.getManaOnKill()),
-            String.format("%+.1f%% Status Effect Duration", vm * vg.getStatusEffectDuration()));
+            NumberFormatter.signedPercent(vm * vg.getLifeSteal()) + " Life Steal",
+            NumberFormatter.signedPercent(vm * vg.getPercentHitAsTrueDamage()) + " True Damage",
+            NumberFormatter.signedPercent(vm * vg.getDotDamagePercent()) + " DoT Damage",
+            NumberFormatter.signed(vm * vg.getManaOnKill()) + " Mana on Kill",
+            NumberFormatter.signedPercent(vm * vg.getStatusEffectDuration()) + " Status Effect Duration");
 
         // Summary
         rows.add(new StatRow(null, null, null, false, false));
@@ -934,7 +955,7 @@ public class StatsPage {
         rows.add(new StatRow("Stamina Regen", formatRegen(stats.getStaminaRegen()),
             formatPercent(stats.getStaminaRegenPercent()), stats.getStaminaRegen() > 0, false));
         if (stats.getStaminaRegenStartDelay() > 0) {
-            rows.add(new StatRow("Regen Start Delay",
+            rows.add(new StatRow("Stamina Recovery Speed",
                 RPGStyles.formatValue(stats.getStaminaRegenStartDelay(), true), null, true, false));
         }
 
@@ -959,31 +980,51 @@ public class StatsPage {
         }
 
         // Energy Shield
-        if (stats.getEnergyShield() > 0) {
+        boolean hasShield = stats.getEnergyShield() > 0 || stats.getEnergyShieldRegen() > 0;
+        if (hasShield) {
             rows.add(new StatRow(null, null, null, false, false));
             rows.add(new StatRow("ENERGY SHIELD", null, null, false, true));
-            rows.add(new StatRow("Energy Shield", RPGStyles.formatFlat(stats.getEnergyShield()), null, true, false));
+            rows.add(new StatRow("Energy Shield", RPGStyles.formatFlat(stats.getEnergyShield()), null, stats.getEnergyShield() > 0, false));
+            rows.add(new StatRow("ES Regen", formatRegen(stats.getEnergyShieldRegen()), null, stats.getEnergyShieldRegen() > 0, false));
+            rows.add(new StatRow("ES Regen Delay", NumberFormatter.time(stats.getEnergyShieldRegenDelay()), null, false, false));
         }
 
-        // Breakdown tooltips
-        putBreakdownTooltip(tooltips, "Max Health", breakdown, ComputedStats::getMaxHealth);
-        putBreakdownTooltip(tooltips, "Health Regen", breakdown, ComputedStats::getHealthRegen);
+        // Breakdown tooltips — ARPG formula for resource stats (flat/increased/more layers)
+        putResourceBreakdownTooltip(tooltips, "Max Health", breakdown, stats,
+            ComputedStats::getMaxHealth, ComputedStats::getMaxHealthPercent, "maxHealth");
+        putResourceBreakdownTooltip(tooltips, "Health Regen", breakdown, stats,
+            ComputedStats::getHealthRegen, ComputedStats::getHealthRegenPercent, "healthRegen");
         putBreakdownTooltip(tooltips, "Health Recovery", breakdown, ComputedStats::getHealthRecoveryPercent);
-        putBreakdownTooltip(tooltips, "Max Mana", breakdown, ComputedStats::getMaxMana);
-        putBreakdownTooltip(tooltips, "Mana Regen", breakdown, ComputedStats::getManaRegen);
+
+        putResourceBreakdownTooltip(tooltips, "Max Mana", breakdown, stats,
+            ComputedStats::getMaxMana, ComputedStats::getMaxManaPercent, "maxMana");
+        putResourceBreakdownTooltip(tooltips, "Mana Regen", breakdown, stats,
+            ComputedStats::getManaRegen, ComputedStats::getManaRegenPercent, "manaRegen");
         putBreakdownTooltip(tooltips, "Mana on Kill", breakdown, ComputedStats::getManaOnKill);
         putBreakdownTooltip(tooltips, "Mana Cost", breakdown, ComputedStats::getManaCostPercent);
         putBreakdownTooltip(tooltips, "Mana Cost Reduction", breakdown, ComputedStats::getManaCostReduction);
-        putBreakdownTooltip(tooltips, "Max Stamina", breakdown, ComputedStats::getMaxStamina);
-        putBreakdownTooltip(tooltips, "Stamina Regen", breakdown, ComputedStats::getStaminaRegen);
-        putBreakdownTooltip(tooltips, "Regen Start Delay", breakdown, ComputedStats::getStaminaRegenStartDelay);
-        putBreakdownTooltip(tooltips, "Max Oxygen", breakdown, ComputedStats::getMaxOxygen);
+
+        putResourceBreakdownTooltip(tooltips, "Max Stamina", breakdown, stats,
+            ComputedStats::getMaxStamina, ComputedStats::getMaxStaminaPercent, "maxStamina");
+        putResourceBreakdownTooltip(tooltips, "Stamina Regen", breakdown, stats,
+            ComputedStats::getStaminaRegen, ComputedStats::getStaminaRegenPercent, "staminaRegen");
+        putBreakdownTooltip(tooltips, "Stamina Recovery Speed", breakdown, ComputedStats::getStaminaRegenStartDelay);
+
+        putResourceBreakdownTooltip(tooltips, "Max Oxygen", breakdown, stats,
+            ComputedStats::getMaxOxygen, ComputedStats::getMaxOxygenPercent, "maxOxygen");
         putBreakdownTooltip(tooltips, "Oxygen Regen", breakdown, ComputedStats::getOxygenRegen);
-        putBreakdownTooltip(tooltips, "Max Sig. Energy", breakdown, ComputedStats::getMaxSignatureEnergy);
+
+        putResourceBreakdownTooltip(tooltips, "Energy Shield", breakdown, stats,
+            ComputedStats::getEnergyShield, ComputedStats::getEnergyShieldPercent, "energyShield");
+        putResourceBreakdownTooltip(tooltips, "ES Regen", breakdown, stats,
+            ComputedStats::getEnergyShieldRegen, ComputedStats::getEnergyShieldRegenPercent, "energyShieldRegen");
+        putBreakdownTooltip(tooltips, "ES Regen Delay", breakdown, ComputedStats::getEnergyShieldRegenDelay);
+
+        putResourceBreakdownTooltip(tooltips, "Max Sig. Energy", breakdown, stats,
+            ComputedStats::getMaxSignatureEnergy, ComputedStats::getSignatureEnergyMaxPercent, "maxSignatureEnergy");
         putBreakdownTooltip(tooltips, "Sig. Energy Regen", breakdown, ComputedStats::getSignatureEnergyRegen);
         putBreakdownTooltip(tooltips, "Sig. Energy Max %", breakdown, ComputedStats::getSignatureEnergyMaxPercent);
         putBreakdownTooltip(tooltips, "Sig. Energy per Hit", breakdown, ComputedStats::getSignatureEnergyPerHit);
-        putBreakdownTooltip(tooltips, "Energy Shield", breakdown, ComputedStats::getEnergyShield);
 
         return buildStatRows(rows, tooltips);
     }
@@ -1231,13 +1272,16 @@ public class StatsPage {
 
         // ── SURVIVABILITY (always show — hero section) ──
         section = new ArrayList<>();
-        section.add(new StatRow("Effective HP", String.format("%,d", (int) buildSummary.effectiveHP()), null, true, false));
+        section.add(new StatRow("Effective HP", NumberFormatter.flat((float) buildSummary.effectiveHP()), null, true, false));
         tooltips.put("Effective HP", buildEHPTooltip(buildSummary));
         section.add(new StatRow("Max Health", RPGStyles.formatFlat(stats.getMaxHealth()), null, false, false));
-        if (stats.getEnergyShield() > 0) {
-            section.add(new StatRow("Energy Shield", RPGStyles.formatFlat(stats.getEnergyShield()), null, true, false));
+        if (stats.getEnergyShield() > 0 || stats.getEnergyShieldRegen() > 0) {
+            section.add(new StatRow("Energy Shield", RPGStyles.formatFlat(stats.getEnergyShield()), null, stats.getEnergyShield() > 0, false));
+            if (stats.getEnergyShieldRegen() > 0) {
+                section.add(new StatRow("ES Regen", formatRegen(stats.getEnergyShieldRegen()), null, true, false));
+            }
         }
-        section.add(new StatRow("Armor", RPGStyles.formatFlat(stats.getArmor()), formatArmorReduction(stats.getArmor()), stats.getArmor() > 0, false));
+        section.add(new StatRow("Armor", RPGStyles.formatFlat(stats.getArmor()), formatArmorReduction(stats.getArmor(), level), stats.getArmor() > 0, false));
         addSection(rows, "SURVIVABILITY", section, true);
 
         // ── AVOIDANCE (hide if all zero) ──
@@ -1297,14 +1341,16 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("Shock Threshold", RPGStyles.formatFlat(stats.getShockThreshold()), null, stats.getShockThreshold() > 0, false), stats.getShockThreshold());
         addSection(rows, "STATUS THRESHOLDS", section, false);
 
-        // ── Breakdown tooltips ──
-        putBreakdownTooltip(tooltips, "Max Health", breakdown, ComputedStats::getMaxHealth);
-        putBreakdownTooltip(tooltips, "Energy Shield", breakdown, ComputedStats::getEnergyShield);
+        // ── Breakdown tooltips — ARPG formula for resource stats ──
+        putResourceBreakdownTooltip(tooltips, "Max Health", breakdown, stats,
+            ComputedStats::getMaxHealth, ComputedStats::getMaxHealthPercent, "maxHealth");
+        putResourceBreakdownTooltip(tooltips, "Energy Shield", breakdown, stats,
+            ComputedStats::getEnergyShield, ComputedStats::getEnergyShieldPercent, "energyShield");
         putBreakdownTooltip(tooltips, "Armor", breakdown, ComputedStats::getArmor);
         putBreakdownTooltip(tooltips, "Evasion", breakdown, ComputedStats::getEvasion);
         putBreakdownTooltip(tooltips, "Dodge Chance", breakdown, ComputedStats::getDodgeChance);
         putBreakdownTooltip(tooltips, "Parry Chance", breakdown, ComputedStats::getParryChance);
-        putBreakdownTooltip(tooltips, "Perfect Block Chance", breakdown, ComputedStats::getBlockChance);
+        putBreakdownTooltip(tooltips, "Block Chance", breakdown, ComputedStats::getBlockChance);
         putBreakdownTooltip(tooltips, "Block Dmg Reduction", breakdown, ComputedStats::getBlockDamageReduction);
         putBreakdownTooltip(tooltips, "Block Heal", breakdown, ComputedStats::getBlockHealPercent);
         putBreakdownTooltip(tooltips, "Block Recovery", breakdown, ComputedStats::getBlockRecoveryPercent);
@@ -1429,10 +1475,10 @@ public class StatsPage {
      * Formats armor reduction percentage.
      */
     @Nullable
-    private String formatArmorReduction(float armor) {
+    private String formatArmorReduction(float armor, int level) {
         if (armor <= 0) return null;
-        float reduction = (armor / (armor + 1000f)) * 100f;
-        return String.format("%.1f%% reduction", reduction);
+        float reduction = CombatCalculator.estimateArmorReduction(armor, level);
+        return NumberFormatter.percent(reduction) + " reduction";
     }
 
     /**
@@ -1458,12 +1504,11 @@ public class StatsPage {
             MobStatPoolConfig poolConfig = configService.getMobStatPoolConfig();
             if (poolConfig == null) return null;
 
-            float refAccuracy = (float) new MobStatGenerator(poolConfig)
-                    .getBaseStats(level).accuracy();
+            float refAccuracy = (float) MobStatFactory.getReferenceAccuracy(poolConfig, level);
             float hitChance = AvoidanceProcessor.calculateHitChance(
                     evasionConfig, refAccuracy, evasion);
             float evadeChance = (1f - hitChance) * 100f;
-            return String.format("%.1f%% vs Lv.%d", evadeChance, level);
+            return NumberFormatter.percent(evadeChance) + " vs Lv." + level;
         } catch (Exception e) {
             LOGGER.at(Level.WARNING).withCause(e)
                     .log("Failed to compute evasion chance detail");
@@ -1486,7 +1531,7 @@ public class StatsPage {
     @Nonnull
     private String formatRegen(float value) {
         if (value <= 0) return "0";
-        return String.format("+%.1f/sec", value);
+        return NumberFormatter.signed(value) + "/sec";
     }
 
     /**
@@ -1496,7 +1541,7 @@ public class StatsPage {
     @Nullable
     private String formatRegenDetail(float value) {
         if (value <= 0) return null;
-        return String.format("(+%.1f/s)", value);
+        return "(" + NumberFormatter.regen(value) + ")";
     }
 
     /**
@@ -1526,7 +1571,7 @@ public class StatsPage {
         if (!hasNonBase) return;
 
         StringBuilder sb = new StringBuilder("<tooltip>");
-        ttSpan(sb, name + ": " + RPGStyles.formatFlat(total), RPGStyles.TITLE_GOLD, true);
+        ttSpan(sb, name + ": " + NumberFormatter.autoFlat(total), RPGStyles.TITLE_GOLD, true);
         ttSeparator(sb);
 
         // Source lines (only non-zero) — each source has a distinct color
@@ -1535,6 +1580,138 @@ public class StatsPage {
         if (treeVal != 0)  ttSourceSpan(sb, "Skill Tree",   treeVal, RPGStyles.POSITIVE);
         if (gearVal != 0)  ttSourceSpan(sb, "Gear",         gearVal, RPGStyles.TEXT_ORANGE);
         if (condVal != 0)  ttSourceSpan(sb, "Conditionals", condVal, "#BB88DD");
+
+        ttClose(sb);
+        tooltips.put(name, sb.toString());
+    }
+
+    /**
+     * Builds a three-layer ARPG formula breakdown tooltip for resource stats.
+     *
+     * <p>Shows the full formula: {@code Final = (base + flat) × (1 + percent/100) × multiplier}
+     * with per-source contributions for each layer (Flat, Increased%, More×).
+     *
+     * <p>Only used for the 10 resource stats that go through
+     * {@code ComputedStats.consolidateResourcePercents()}: maxHealth, maxMana,
+     * maxStamina, maxOxygen, maxSignatureEnergy, energyShield, healthRegen,
+     * staminaRegen, manaRegen, energyShieldRegen.
+     *
+     * @param flatGetter    Extracts the raw flat field (e.g., {@code ComputedStats::getMaxHealth})
+     * @param pctGetter     Extracts the percent accumulator (e.g., {@code ComputedStats::getMaxHealthPercent})
+     * @param multFieldName The multiplierProducts map key (e.g., {@code "maxHealth"})
+     * @param realStats     The real consolidated stats for the final value display
+     */
+    private void putResourceBreakdownTooltip(
+        @Nonnull Map<String, String> tooltips,
+        @Nonnull String name,
+        @Nullable StatBreakdownResult breakdown,
+        @Nonnull ComputedStats realStats,
+        @Nonnull ToDoubleFunction<ComputedStats> flatGetter,
+        @Nonnull ToDoubleFunction<ComputedStats> pctGetter,
+        @Nonnull String multFieldName
+    ) {
+        if (breakdown == null) return;
+
+        // ── Extract flat deltas per source (unconsolidated raw field) ──
+        float baseFlat = (float) flatGetter.applyAsDouble(breakdown.base());
+        float attrFlat = (float) flatGetter.applyAsDouble(breakdown.afterAttributes()) - baseFlat;
+        float treeFlat = (float) flatGetter.applyAsDouble(breakdown.afterSkillTree())
+                       - (float) flatGetter.applyAsDouble(breakdown.afterAttributes());
+        float gearFlat = (float) flatGetter.applyAsDouble(breakdown.afterGear())
+                       - (float) flatGetter.applyAsDouble(breakdown.afterSkillTree());
+        float condFlat = (float) flatGetter.applyAsDouble(breakdown.afterConditionals())
+                       - (float) flatGetter.applyAsDouble(breakdown.afterGear());
+        float totalFlat = (float) flatGetter.applyAsDouble(breakdown.afterConditionals());
+
+        // ── Extract percent deltas per source (unconsolidated accumulator) ──
+        float basePct = (float) pctGetter.applyAsDouble(breakdown.base());
+        float attrPct = (float) pctGetter.applyAsDouble(breakdown.afterAttributes()) - basePct;
+        float treePct = (float) pctGetter.applyAsDouble(breakdown.afterSkillTree())
+                      - (float) pctGetter.applyAsDouble(breakdown.afterAttributes());
+        float gearPct = (float) pctGetter.applyAsDouble(breakdown.afterGear())
+                      - (float) pctGetter.applyAsDouble(breakdown.afterSkillTree());
+        float condPct = (float) pctGetter.applyAsDouble(breakdown.afterConditionals())
+                      - (float) pctGetter.applyAsDouble(breakdown.afterGear());
+        float totalPct = (float) pctGetter.applyAsDouble(breakdown.afterConditionals());
+
+        // ── Extract multiplier product from final snapshot ──
+        float multProduct = breakdown.afterConditionals().getMultiplierProduct(multFieldName);
+        boolean hasMultiplier = Math.abs(multProduct - 1.0f) > 0.0001f;
+
+        // ── Skip if nothing interesting (base only, no percent, no multiplier) ──
+        boolean hasPct = totalPct != 0 || basePct != 0;
+        boolean hasNonBaseFlat = attrFlat != 0 || treeFlat != 0 || gearFlat != 0 || condFlat != 0;
+        boolean hasNonBase = hasNonBaseFlat || hasPct || hasMultiplier
+                           || attrPct != 0 || treePct != 0 || gearPct != 0 || condPct != 0;
+        if (!hasNonBase) return;
+
+        // Final value from the real consolidated stats (matches what the player sees in ECS)
+        float finalValue = (float) flatGetter.applyAsDouble(realStats);
+
+        StringBuilder sb = new StringBuilder("<tooltip>");
+
+        // ── Title ──
+        ttSpan(sb, name + ": " + NumberFormatter.autoFlat(finalValue), RPGStyles.TITLE_GOLD, true);
+        ttSeparator(sb);
+
+        // ── Flat section ──
+        if (hasPct || hasMultiplier) {
+            ttSpan(sb, "Flat", RPGStyles.TEXT_MUTED);
+        }
+        if (baseFlat != 0)  ttSourceSpan(sb, "  Base",         baseFlat, RPGStyles.TEXT_GRAY);
+        if (attrFlat != 0)  ttSourceSpan(sb, "  Attributes",   attrFlat, RPGStyles.TEXT_INFO);
+        if (treeFlat != 0)  ttSourceSpan(sb, "  Skill Tree",   treeFlat, RPGStyles.POSITIVE);
+        if (gearFlat != 0)  ttSourceSpan(sb, "  Gear",         gearFlat, RPGStyles.TEXT_ORANGE);
+        if (condFlat != 0)  ttSourceSpan(sb, "  Conditionals", condFlat, "#BB88DD");
+        if (hasNonBaseFlat && (hasPct || hasMultiplier)) {
+            ttSpan(sb, "  = " + NumberFormatter.autoFlat(totalFlat), RPGStyles.TEXT_PRIMARY);
+        }
+
+        // ── Increased (%) section ──
+        if (hasPct) {
+            ttSeparator(sb);
+            ttSpan(sb, "Increased", RPGStyles.TEXT_MUTED);
+            if (basePct != 0)  ttSpan(sb, "  Base: " + NumberFormatter.signedPercent(basePct), RPGStyles.TEXT_GRAY);
+            if (attrPct != 0)  ttSpan(sb, "  Attributes: " + NumberFormatter.signedPercent(attrPct), RPGStyles.TEXT_INFO);
+            if (treePct != 0)  ttSpan(sb, "  Skill Tree: " + NumberFormatter.signedPercent(treePct), RPGStyles.POSITIVE);
+            if (gearPct != 0)  ttSpan(sb, "  Gear: " + NumberFormatter.signedPercent(gearPct), RPGStyles.TEXT_ORANGE);
+            if (condPct != 0)  ttSpan(sb, "  Conditionals: " + NumberFormatter.signedPercent(condPct), "#BB88DD");
+
+            float afterPct = totalFlat * (1f + totalPct / 100f);
+            ttSpan(sb, "  " + NumberFormatter.autoFlat(totalFlat) + " x "
+                + NumberFormatter.trimmed(1f + totalPct / 100f) + " = "
+                + NumberFormatter.autoFlat(afterPct), RPGStyles.TEXT_PRIMARY);
+        }
+
+        // ── More (×) section ──
+        if (hasMultiplier) {
+            ttSeparator(sb);
+            ttSpan(sb, "More", RPGStyles.TEXT_MUTED);
+
+            // Per-source multiplier contributions (ratio between consecutive snapshots)
+            float baseMult = breakdown.base().getMultiplierProduct(multFieldName);
+            float attrMult = breakdown.afterAttributes().getMultiplierProduct(multFieldName);
+            float treeMult = breakdown.afterSkillTree().getMultiplierProduct(multFieldName);
+            float gearMult = breakdown.afterGear().getMultiplierProduct(multFieldName);
+
+            if (baseMult > 0 && Math.abs(attrMult / baseMult - 1f) > 0.0001f)
+                ttSpan(sb, "  Attributes: x" + NumberFormatter.trimmed(attrMult / baseMult), RPGStyles.TEXT_INFO);
+            if (attrMult > 0 && Math.abs(treeMult / attrMult - 1f) > 0.0001f)
+                ttSpan(sb, "  Skill Tree: x" + NumberFormatter.trimmed(treeMult / attrMult), RPGStyles.POSITIVE);
+            if (treeMult > 0 && Math.abs(gearMult / treeMult - 1f) > 0.0001f)
+                ttSpan(sb, "  Gear: x" + NumberFormatter.trimmed(gearMult / treeMult), RPGStyles.TEXT_ORANGE);
+            if (gearMult > 0 && Math.abs(multProduct / gearMult - 1f) > 0.0001f)
+                ttSpan(sb, "  Conditionals: x" + NumberFormatter.trimmed(multProduct / gearMult), "#BB88DD");
+
+            float afterPct = totalFlat * (1f + totalPct / 100f);
+            ttSpan(sb, "  " + NumberFormatter.autoFlat(afterPct) + " x "
+                + NumberFormatter.trimmed(multProduct) + " = "
+                + NumberFormatter.autoFlat(afterPct * multProduct), RPGStyles.TEXT_PRIMARY);
+        }
+
+        // ── Final result ──
+        ttSeparator(sb);
+        ttSpan(sb, "= " + NumberFormatter.autoFlat(finalValue), RPGStyles.TITLE_GOLD, true);
 
         ttClose(sb);
         tooltips.put(name, sb.toString());
@@ -1609,8 +1786,7 @@ public class StatsPage {
 
     /** Appends a signed source contribution span (e.g. "Gear: +25.0"). */
     private void ttSourceSpan(@Nonnull StringBuilder sb, @Nonnull String label, float value, @Nonnull String color) {
-        String sign = value >= 0 ? "+" : "";
-        ttSpan(sb, label + ": " + sign + RPGStyles.formatFlat(value), color);
+        ttSpan(sb, label + ": " + NumberFormatter.signed(value), color);
     }
 
     /**

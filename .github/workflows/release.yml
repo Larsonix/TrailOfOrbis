@@ -78,7 +78,7 @@ jobs:
           # Extract changelog section for current version from wiki changelog
           VERSION_ESCAPED=$(echo "$VERSION" | sed 's/\./\\./g')
           CHANGELOG=$(sed -n "/^## ${VERSION_ESCAPED}/,/^## /{ /^## ${VERSION_ESCAPED}/d; /^## /d; p; }" \
-            Wiki/content/Larsonix_TrailOfOrbis/changelog.md | head -100)
+            Wiki/content/trailoforbis_TrailOfOrbis/changelog.md | head -100)
           if [ -z "$CHANGELOG" ]; then
             CHANGELOG="Release v${VERSION}"
           fi

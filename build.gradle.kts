@@ -312,9 +312,9 @@ kotlin {
 }
 
 // ─── Platform Publishing (CurseForge, ModTale, Modifold) ───
-// HytalePublisher plugin (com.azuredoom.hytalepublisher) provides ./gradlew publishAll
+// Gradle publishing plugin provides ./gradlew publishAll
 // BLOCKED: Plugin compiled targeting Java 25 but Gradle daemon runs Java 21.
-//          Kotlin DSL breaks on Java 25 daemon. Ask AzureDoom to target Java 21.
+//          Kotlin DSL breaks on Java 25 daemon. Waiting on upstream Java 21 target.
 //          Until then, platform uploads use the release.yml GitHub Action workflow.
 //
 // When unblocked, uncomment the plugin in plugins {} and this config:

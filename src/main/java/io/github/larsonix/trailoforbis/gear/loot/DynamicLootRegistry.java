@@ -85,6 +85,22 @@ public final class DynamicLootRegistry {
     // Compiled blacklist patterns for efficiency
     private final List<Pattern> blacklistPatterns;
 
+    // =========================================================================
+    // AVAILABILITY MATRIX — the core of the rarity-first loot system
+    // =========================================================================
+    // Pre-computed at discovery time. Maps (slot, category, rarity) → skins.
+    // Only combinations with ≥1 skin can be rolled. This is the single source
+    // of truth for what can drop.
+
+    // slot → category → rarity → skins (immutable after discovery)
+    private Map<EquipmentSlot, Map<String, Map<GearRarity, List<DiscoveredItem>>>> availabilityMatrix;
+
+    // Reverse lookup: rarity → set of slots that have ≥1 item (cached for fast roll)
+    private Map<GearRarity, Set<EquipmentSlot>> slotsPerRarity;
+
+    // Reverse lookup: (rarity, slot) → set of categories (cached for fast roll)
+    private Map<GearRarity, Map<EquipmentSlot, Set<String>>> categoriesPerRaritySlot;
+
     // Whether discovery has been performed
     private volatile boolean discovered = false;
 
@@ -235,7 +251,15 @@ public final class DynamicLootRegistry {
             // Armor: ItemSoundSet-based material detection, falling back to name parsing.
             String category;
             if (slot == EquipmentSlot.WEAPON || slot == EquipmentSlot.OFF_HAND) {
-                category = WeaponType.fromItemIdOrUnknown(itemId).name();
+                WeaponType weaponType = WeaponType.fromItemIdOrUnknown(itemId);
+                if (weaponType == WeaponType.UNKNOWN) {
+                    // Extract a dynamic category from the item ID instead of lumping into "UNKNOWN".
+                    // Pattern: Weapon_{Type}_{Material} → extract {Type} as category.
+                    // Modded items like "Weapon_Scythe_Iron" become category "SCYTHE".
+                    category = extractDynamicWeaponCategory(itemId);
+                } else {
+                    category = weaponType.name();
+                }
             } else {
                 category = classifyArmorMaterial(item, itemId).name();
             }
@@ -295,7 +319,9 @@ public final class DynamicLootRegistry {
                 itemsBySlot.get(EquipmentSlot.OFF_HAND).add(discoveredItem);
                 itemsByMod.computeIfAbsent(modSource, k -> new ArrayList<>()).add(discoveredItem);
 
-                String category = WeaponType.fromItemIdOrUnknown(bookId).name();
+                WeaponType bookWeaponType = WeaponType.fromItemIdOrUnknown(bookId);
+                String category = (bookWeaponType == WeaponType.UNKNOWN)
+                        ? extractDynamicWeaponCategory(bookId) : bookWeaponType.name();
                 itemsByCategory.get(EquipmentSlot.OFF_HAND)
                         .computeIfAbsent(category, k -> new ArrayList<>())
                         .add(discoveredItem);
@@ -332,6 +358,9 @@ public final class DynamicLootRegistry {
             }
         }
 
+        // Build the availability matrix from the quality → category index
+        buildAvailabilityMatrix();
+
         discovered = true;
 
         LOGGER.atInfo().log("Discovered %d droppable items (%d weapons [%d hexcode forced], %d armor) from %d total items (%d skipped)",
@@ -365,6 +394,9 @@ public final class DynamicLootRegistry {
         LOGGER.atInfo().log("Items by quality tier (for skin filtering):");
         qualityCounts.forEach((q, c) -> LOGGER.atInfo().log("  %s: %d items", q, c));
 
+        // Log the availability matrix — shows exactly what can drop at each rarity
+        logAvailabilityMatrix();
+
         // Log unclassified residuals for diagnostics
         logUnclassifiedResiduals();
     }
@@ -389,6 +421,12 @@ public final class DynamicLootRegistry {
             // This applies to all mods: Hexcode books, vanilla spellbooks, and other mods.
             if (itemId != null && WeaponType.fromItemIdOrUnknown(itemId) == WeaponType.SPELLBOOK) {
                 return EquipmentSlot.OFF_HAND;
+            }
+            // Thrown consumables (kunai, bombs, darts) are not persistent gear — exclude from loot pool.
+            // GearGenerator.isStatEligible() already skips these, but filtering here prevents
+            // the "item has no RPG metadata" warning when the loot system tries to apply stats.
+            if (itemId != null && WeaponType.fromItemIdOrUnknown(itemId).isThrown()) {
+                return null;
             }
             return EquipmentSlot.WEAPON;
         }
@@ -504,6 +542,35 @@ public final class DynamicLootRegistry {
     }
 
     /**
+     * Extracts a dynamic weapon category from an item ID when WeaponType is UNKNOWN.
+     *
+     * <p>Parses the standard Hytale naming convention: {@code Weapon_{Type}_{Material}}.
+     * Falls back to "UNKNOWN" if the ID has fewer than 2 segments.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>{@code Weapon_Scythe_Iron} → "SCYTHE"</li>
+     *   <li>{@code Weapon_Halberd_Bronze} → "HALBERD"</li>
+     *   <li>{@code Hex_Scepter_Fire} → "SCEPTER"</li>
+     *   <li>{@code SomeWeird_Item} → "ITEM" (best effort)</li>
+     *   <li>{@code NoUnderscores} → "UNKNOWN"</li>
+     * </ul>
+     *
+     * @param itemId The item ID to extract from
+     * @return Category name in UPPER_CASE
+     */
+    @Nonnull
+    private String extractDynamicWeaponCategory(@Nonnull String itemId) {
+        String[] segments = itemId.split("_");
+        if (segments.length >= 2) {
+            // Take the second segment as the weapon type
+            // Weapon_Scythe_Iron → "Scythe" → "SCYTHE"
+            return segments[1].toUpperCase();
+        }
+        return "UNKNOWN";
+    }
+
+    /**
      * Classifies armor material using a layered approach:
      * <ol>
      *   <li>ItemSoundSet lookup (ISS_Armor_Heavy → PLATE, etc.)</li>
@@ -583,6 +650,248 @@ public final class DynamicLootRegistry {
     }
 
     // =========================================================================
+    // AVAILABILITY MATRIX — BUILD & QUERY
+    // =========================================================================
+
+    /**
+     * Maps a Hytale quality ID to the set of RPG rarities it unlocks.
+     *
+     * <p>A "Common" skin unlocks COMMON rarity. An "Epic" skin unlocks
+     * EPIC, LEGENDARY, MYTHIC, and UNIQUE (since those higher tiers
+     * share Epic-quality visuals).
+     */
+    private static final Map<String, Set<GearRarity>> QUALITY_TO_RARITIES = Map.of(
+        "Common", EnumSet.of(GearRarity.COMMON),
+        "Uncommon", EnumSet.of(GearRarity.UNCOMMON),
+        "Rare", EnumSet.of(GearRarity.RARE),
+        "Epic", EnumSet.of(GearRarity.EPIC, GearRarity.LEGENDARY, GearRarity.MYTHIC, GearRarity.UNIQUE),
+        "Legendary", EnumSet.of(GearRarity.LEGENDARY, GearRarity.MYTHIC, GearRarity.UNIQUE)
+    );
+
+    /**
+     * Builds the availability matrix from the existing quality → category index.
+     *
+     * <p>For each (slot, qualityId, category, skins) tuple, maps qualityId to
+     * the RPG rarities it unlocks and stores the skins under each rarity.
+     * After this method, the matrix is immutable and queryable.
+     */
+    private void buildAvailabilityMatrix() {
+        Map<EquipmentSlot, Map<String, Map<GearRarity, List<DiscoveredItem>>>> matrix = new EnumMap<>(EquipmentSlot.class);
+
+        for (Map.Entry<EquipmentSlot, Map<String, Map<String, List<DiscoveredItem>>>> slotEntry : itemsByQualityCategory.entrySet()) {
+            EquipmentSlot slot = slotEntry.getKey();
+            Map<String, Map<GearRarity, List<DiscoveredItem>>> categoryMap = new HashMap<>();
+
+            for (Map.Entry<String, Map<String, List<DiscoveredItem>>> qualityEntry : slotEntry.getValue().entrySet()) {
+                String qualityId = qualityEntry.getKey();
+                Set<GearRarity> unlockedRarities = QUALITY_TO_RARITIES.getOrDefault(qualityId, Set.of());
+
+                if (unlockedRarities.isEmpty()) {
+                    LOGGER.atFine().log("Unknown quality '%s' — no RPG rarities mapped, skins skipped", qualityId);
+                    continue;
+                }
+
+                for (Map.Entry<String, List<DiscoveredItem>> catEntry : qualityEntry.getValue().entrySet()) {
+                    String category = catEntry.getKey();
+                    List<DiscoveredItem> skins = catEntry.getValue();
+                    if (skins.isEmpty()) continue;
+
+                    Map<GearRarity, List<DiscoveredItem>> rarityMap =
+                            categoryMap.computeIfAbsent(category, k -> new EnumMap<>(GearRarity.class));
+
+                    for (GearRarity rarity : unlockedRarities) {
+                        rarityMap.computeIfAbsent(rarity, k -> new ArrayList<>()).addAll(skins);
+                    }
+                }
+            }
+
+            matrix.put(slot, categoryMap);
+        }
+
+        // Sort skin lists for deterministic ordering
+        for (Map<String, Map<GearRarity, List<DiscoveredItem>>> categoryMap : matrix.values()) {
+            for (Map<GearRarity, List<DiscoveredItem>> rarityMap : categoryMap.values()) {
+                for (List<DiscoveredItem> skins : rarityMap.values()) {
+                    skins.sort(Comparator.comparing(DiscoveredItem::itemId));
+                }
+            }
+        }
+
+        this.availabilityMatrix = Collections.unmodifiableMap(matrix);
+
+        // Build reverse lookups for fast constrained rolls
+        Map<GearRarity, Set<EquipmentSlot>> slotsLookup = new EnumMap<>(GearRarity.class);
+        Map<GearRarity, Map<EquipmentSlot, Set<String>>> catsLookup = new EnumMap<>(GearRarity.class);
+
+        for (GearRarity rarity : GearRarity.values()) {
+            Set<EquipmentSlot> slots = EnumSet.noneOf(EquipmentSlot.class);
+            Map<EquipmentSlot, Set<String>> slotCats = new EnumMap<>(EquipmentSlot.class);
+
+            for (Map.Entry<EquipmentSlot, Map<String, Map<GearRarity, List<DiscoveredItem>>>> slotEntry : matrix.entrySet()) {
+                EquipmentSlot slot = slotEntry.getKey();
+                Set<String> cats = new HashSet<>();
+
+                for (Map.Entry<String, Map<GearRarity, List<DiscoveredItem>>> catEntry : slotEntry.getValue().entrySet()) {
+                    List<DiscoveredItem> skins = catEntry.getValue().getOrDefault(rarity, List.of());
+                    if (!skins.isEmpty()) {
+                        cats.add(catEntry.getKey());
+                    }
+                }
+
+                if (!cats.isEmpty()) {
+                    slots.add(slot);
+                    slotCats.put(slot, Collections.unmodifiableSet(cats));
+                }
+            }
+
+            slotsLookup.put(rarity, Collections.unmodifiableSet(slots));
+            catsLookup.put(rarity, Collections.unmodifiableMap(slotCats));
+        }
+
+        this.slotsPerRarity = Collections.unmodifiableMap(slotsLookup);
+        this.categoriesPerRaritySlot = Collections.unmodifiableMap(catsLookup);
+    }
+
+    /**
+     * Logs the full availability matrix at INFO level.
+     *
+     * <p>Shows exactly which (slot, category, rarity) combinations can drop,
+     * allowing operators to verify the loot table at server start.
+     */
+    private void logAvailabilityMatrix() {
+        LOGGER.atInfo().log("Availability matrix (what can drop at each rarity):");
+
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            Map<String, Map<GearRarity, List<DiscoveredItem>>> categories =
+                    availabilityMatrix.getOrDefault(slot, Map.of());
+            if (categories.isEmpty()) continue;
+
+            LOGGER.atInfo().log("  %s:", slot.name().toLowerCase());
+            categories.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(catEntry -> {
+                        StringBuilder line = new StringBuilder("    ").append(catEntry.getKey()).append(": ");
+                        for (GearRarity r : GearRarity.values()) {
+                            List<DiscoveredItem> skins = catEntry.getValue().getOrDefault(r, List.of());
+                            if (!skins.isEmpty()) {
+                                line.append(r.name().charAt(0)).append("(").append(skins.size()).append(") ");
+                            }
+                        }
+                        LOGGER.atInfo().log(line.toString());
+                    });
+        }
+
+        // Log summary: how many categories per rarity
+        LOGGER.atInfo().log("Categories available per rarity:");
+        for (GearRarity rarity : GearRarity.values()) {
+            Set<EquipmentSlot> slots = slotsPerRarity.getOrDefault(rarity, Set.of());
+            int totalCategories = 0;
+            for (EquipmentSlot slot : slots) {
+                totalCategories += categoriesPerRaritySlot
+                        .getOrDefault(rarity, Map.of())
+                        .getOrDefault(slot, Set.of()).size();
+            }
+            if (totalCategories > 0) {
+                LOGGER.atInfo().log("  %s: %d slots, %d categories",
+                        rarity.name(), slots.size(), totalCategories);
+            }
+        }
+    }
+
+    /**
+     * Gets the set of equipment slots that have at least one item at the given rarity.
+     *
+     * @param rarity The RPG rarity
+     * @return Immutable set of available slots (may be empty)
+     */
+    @Nonnull
+    public Set<EquipmentSlot> getAvailableSlotsForRarity(@Nonnull GearRarity rarity) {
+        ensureDiscovered();
+        return slotsPerRarity.getOrDefault(rarity, Set.of());
+    }
+
+    /**
+     * Gets the set of categories that have at least one item at the given rarity and slot.
+     *
+     * @param rarity The RPG rarity
+     * @param slot   The equipment slot
+     * @return Immutable set of available category names (may be empty)
+     */
+    @Nonnull
+    public Set<String> getAvailableCategoriesForRaritySlot(@Nonnull GearRarity rarity, @Nonnull EquipmentSlot slot) {
+        ensureDiscovered();
+        return categoriesPerRaritySlot
+                .getOrDefault(rarity, Map.of())
+                .getOrDefault(slot, Set.of());
+    }
+
+    /**
+     * Selects a random skin for an exact (slot, category, rarity) combination.
+     *
+     * <p>Callers MUST verify the combination is valid via
+     * {@link #getAvailableCategoriesForRaritySlot} before calling this.
+     *
+     * @param slot     The equipment slot
+     * @param category The category name (e.g., "SWORD", "PLATE")
+     * @param rarity   The RPG rarity
+     * @return A random item ID from the matching skins, or null if none exist
+     */
+    @Nullable
+    public String selectSkin(@Nonnull EquipmentSlot slot, @Nonnull String category, @Nonnull GearRarity rarity) {
+        ensureDiscovered();
+        List<DiscoveredItem> skins = availabilityMatrix
+                .getOrDefault(slot, Map.of())
+                .getOrDefault(category, Map.of())
+                .getOrDefault(rarity, List.of());
+        if (skins.isEmpty()) return null;
+        return skins.get(ThreadLocalRandom.current().nextInt(skins.size())).itemId();
+    }
+
+    /**
+     * Checks whether any items exist at the given rarity across all slots.
+     *
+     * @param rarity The RPG rarity
+     * @return true if at least one (slot, category) combination exists
+     */
+    public boolean hasItemsAtRarity(@Nonnull GearRarity rarity) {
+        ensureDiscovered();
+        return !slotsPerRarity.getOrDefault(rarity, Set.of()).isEmpty();
+    }
+
+    /**
+     * Gets the set of all RPG rarities that have at least one item anywhere.
+     *
+     * <p>Used to pre-filter rarity rolls so no roll is wasted on a rarity
+     * with zero skins.
+     *
+     * @return Immutable set of available rarities (never empty if items exist)
+     */
+    @Nonnull
+    public Set<GearRarity> getAvailableRarities() {
+        ensureDiscovered();
+        EnumSet<GearRarity> available = EnumSet.noneOf(GearRarity.class);
+        for (Map.Entry<GearRarity, Set<EquipmentSlot>> entry : slotsPerRarity.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                available.add(entry.getKey());
+            }
+        }
+        return Collections.unmodifiableSet(available);
+    }
+
+    /**
+     * Gets the category weights config for a given slot type.
+     *
+     * @param slot The equipment slot
+     * @return Configured category weights (weapon or armor weights depending on slot)
+     */
+    @Nonnull
+    public Map<String, Double> getCategoryWeights(@Nonnull EquipmentSlot slot) {
+        return (slot == EquipmentSlot.WEAPON || slot == EquipmentSlot.OFF_HAND)
+                ? config.getWeaponCategoryWeights()
+                : config.getArmorCategoryWeights();
+    }
+
+    // =========================================================================
     // ACCESSORS
     // =========================================================================
 
@@ -620,67 +929,6 @@ public final class DynamicLootRegistry {
     }
 
     /**
-     * Selects a random item for a slot using stratified two-tier selection.
-     *
-     * <p>Tier 1: Pick a category (weapon type or armor material) using configured weights.
-     * <p>Tier 2: Pick a random skin within that category.
-     *
-     * <p>This prevents weapon types with many skins (e.g. swords) from dominating
-     * drops over types with fewer skins (e.g. daggers).
-     *
-     * @param slot The equipment slot
-     * @return A random item ID, or null if no items available
-     */
-    @Nullable
-    public String selectRandomItem(@Nonnull EquipmentSlot slot) {
-        ensureDiscovered();
-        Map<String, List<DiscoveredItem>> categories = itemsByCategory.get(slot);
-        return selectFromCategories(categories, slot);
-    }
-
-    /**
-     * Selects a random item for a slot, filtered by the allowed skin qualities
-     * for the given RPG rarity.
-     *
-     * <p>This ensures visual identity per rarity tier: Common RPG items use
-     * Common-quality skins (crude, wood), Epic items use Epic-quality skins
-     * (adamantite, cindercloth), etc.
-     *
-     * <p>Falls back to unfiltered selection if no items match the allowed qualities.
-     *
-     * @param slot   The equipment slot
-     * @param rarity The RPG rarity determining allowed skin qualities
-     * @return A random item ID matching the quality filter, or null if none available
-     */
-    @Nullable
-    public String selectRandomItemForRarity(@Nonnull EquipmentSlot slot, @Nonnull GearRarity rarity) {
-        ensureDiscovered();
-
-        Set<String> allowedQualities = rarity.getAllowedSkinQualities();
-        Map<String, Map<String, List<DiscoveredItem>>> qualityMap =
-                itemsByQualityCategory.getOrDefault(slot, Map.of());
-
-        // Merge categories from all allowed quality tiers
-        Map<String, List<DiscoveredItem>> mergedCategories = new HashMap<>();
-        for (String q : allowedQualities) {
-            Map<String, List<DiscoveredItem>> qCategories = qualityMap.getOrDefault(q, Map.of());
-            for (Map.Entry<String, List<DiscoveredItem>> entry : qCategories.entrySet()) {
-                mergedCategories.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                        .addAll(entry.getValue());
-            }
-        }
-
-        if (mergedCategories.isEmpty()) {
-            LOGGER.atWarning().log(
-                    "No items for slot %s with qualities %s — falling back to unfiltered",
-                    slot, allowedQualities);
-            return selectRandomItem(slot);
-        }
-
-        return selectFromCategories(mergedCategories, slot);
-    }
-
-    /**
      * Checks if a discovered item is eligible for a given drop level based on
      * Hexcode level-range config.
      *
@@ -706,63 +954,6 @@ public final class DynamicLootRegistry {
     @Nullable
     public HexcodeItemConfig getHexcodeItemConfig() {
         return hexcodeItemConfig;
-    }
-
-    /**
-     * Stratified two-tier selection from a category map.
-     *
-     * <p>Tier 1: Pick a category using configured weights.
-     * <p>Tier 2: Pick a random item within that category.
-     *
-     * @param categories Map of category name to item list
-     * @param slot       The equipment slot (determines which weight config to use)
-     * @return A random item ID, or null if categories is empty
-     */
-    @Nullable
-    private String selectFromCategories(
-            @Nullable Map<String, List<DiscoveredItem>> categories,
-            @Nonnull EquipmentSlot slot
-    ) {
-        if (categories == null || categories.isEmpty()) {
-            return null;
-        }
-
-        // Get config weights based on slot type
-        Map<String, Double> weights = (slot == EquipmentSlot.WEAPON || slot == EquipmentSlot.OFF_HAND)
-                ? config.getWeaponCategoryWeights()
-                : config.getArmorCategoryWeights();
-
-        // Build weighted pool (only non-empty categories with positive weight)
-        double totalWeight = 0;
-        List<Map.Entry<String, Double>> pool = new ArrayList<>();
-        for (Map.Entry<String, List<DiscoveredItem>> entry : categories.entrySet()) {
-            if (!entry.getValue().isEmpty()) {
-                double w = weights.getOrDefault(entry.getKey(), 1.0);
-                if (w > 0) {
-                    pool.add(Map.entry(entry.getKey(), w));
-                    totalWeight += w;
-                }
-            }
-        }
-        if (pool.isEmpty()) {
-            return null;
-        }
-
-        // Tier 1: Pick category via cumulative weight
-        double roll = ThreadLocalRandom.current().nextDouble() * totalWeight;
-        String selectedCategory = pool.getLast().getKey();
-        double cumulative = 0;
-        for (Map.Entry<String, Double> entry : pool) {
-            cumulative += entry.getValue();
-            if (roll < cumulative) {
-                selectedCategory = entry.getKey();
-                break;
-            }
-        }
-
-        // Tier 2: Pick random skin within category
-        List<DiscoveredItem> items = categories.get(selectedCategory);
-        return items.get(ThreadLocalRandom.current().nextInt(items.size())).itemId();
     }
 
     /**

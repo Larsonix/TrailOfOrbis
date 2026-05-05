@@ -66,6 +66,16 @@ public final class NoOpPartyBridge implements PartyBridge {
     }
 
     @Override
+    public void setCustomText1(@Nonnull UUID playerId, String text) {
+        // No-op
+    }
+
+    @Override
+    public void setCustomText2(@Nonnull UUID playerId, String text) {
+        // No-op
+    }
+
+    @Override
     public void clearCustomText(@Nonnull UUID playerId) {
         // No-op
     }

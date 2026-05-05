@@ -5,6 +5,7 @@ import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig.RarityConfi
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.ModifierDefinition;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.ValueRange;
+import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
@@ -161,6 +162,15 @@ public final class GearModifierRoller {
             @Nonnull GearData gear,
             @Nonnull String slot,
             @Nonnull Random random) {
+        return rerollTypes(gear, slot, null, random);
+    }
+
+    @Nonnull
+    public GearData rerollTypes(
+            @Nonnull GearData gear,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
 
         // Process prefixes
         List<GearModifier> lockedPrefixes = gear.prefixes().stream()
@@ -168,16 +178,14 @@ public final class GearModifierRoller {
             .toList();
         int unlockedPrefixCount = gear.prefixes().size() - lockedPrefixes.size();
 
-        // Get IDs to exclude (locked modifiers)
         Set<String> excludedPrefixIds = lockedPrefixes.stream()
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
-        // Roll new prefixes
         List<GearModifier> newPrefixes = new ArrayList<>(lockedPrefixes);
         if (unlockedPrefixCount > 0) {
             List<GearModifier> rolledPrefixes = rollModifiersExcluding(
-                ModifierType.PREFIX, unlockedPrefixCount, gear.level(), slot, gear.rarity(), excludedPrefixIds, random);
+                ModifierType.PREFIX, unlockedPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random);
             newPrefixes.addAll(rolledPrefixes);
         }
 
@@ -191,11 +199,10 @@ public final class GearModifierRoller {
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
-        // Roll new suffixes
         List<GearModifier> newSuffixes = new ArrayList<>(lockedSuffixes);
         if (unlockedSuffixCount > 0) {
             List<GearModifier> rolledSuffixes = rollModifiersExcluding(
-                ModifierType.SUFFIX, unlockedSuffixCount, gear.level(), slot, gear.rarity(), excludedSuffixIds, random);
+                ModifierType.SUFFIX, unlockedSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random);
             newSuffixes.addAll(rolledSuffixes);
         }
 
@@ -222,43 +229,47 @@ public final class GearModifierRoller {
             @Nonnull GearData gear,
             @Nonnull String slot,
             @Nonnull Random random) {
+        return addModifier(gear, slot, null, random);
+    }
+
+    @Nonnull
+    public GearData addModifier(
+            @Nonnull GearData gear,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
 
         if (!gear.canAddModifier()) {
-            return gear; // At maximum modifiers
+            return gear;
         }
 
-        // Determine which type to add based on available slots
         boolean canAddPrefix = gear.canAddPrefix();
         boolean canAddSuffix = gear.canAddSuffix();
 
         ModifierType typeToAdd;
         if (canAddPrefix && canAddSuffix) {
-            // Randomly choose between prefix and suffix
             typeToAdd = random.nextBoolean() ? ModifierType.PREFIX : ModifierType.SUFFIX;
         } else if (canAddPrefix) {
             typeToAdd = ModifierType.PREFIX;
         } else if (canAddSuffix) {
             typeToAdd = ModifierType.SUFFIX;
         } else {
-            return gear; // Cannot add either type
+            return gear;
         }
 
-        // Get existing modifier IDs of this type to exclude
         Set<String> existingIds = (typeToAdd == ModifierType.PREFIX ? gear.prefixes() : gear.suffixes())
             .stream()
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
-        // Roll a new modifier
         List<GearModifier> rolled = rollModifiersExcluding(
-            typeToAdd, 1, gear.level(), slot, gear.rarity(), existingIds, random);
+            typeToAdd, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
 
         if (rolled.isEmpty()) {
-            return gear; // No available modifiers
+            return gear;
         }
 
-        GearModifier newModifier = rolled.get(0);
-        return gear.withAddedModifier(newModifier);
+        return gear.withAddedModifier(rolled.get(0));
     }
 
     /**
@@ -278,6 +289,16 @@ public final class GearModifierRoller {
             @Nonnull ModifierType type,
             @Nonnull String slot,
             @Nonnull Random random) {
+        return addModifierOfType(gear, type, slot, null, random);
+    }
+
+    @Nonnull
+    public GearData addModifierOfType(
+            @Nonnull GearData gear,
+            @Nonnull ModifierType type,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
 
         boolean canAdd = type == ModifierType.PREFIX ? gear.canAddPrefix() : gear.canAddSuffix();
         if (!canAdd) {
@@ -290,7 +311,7 @@ public final class GearModifierRoller {
             .collect(Collectors.toSet());
 
         List<GearModifier> rolled = rollModifiersExcluding(
-            type, 1, gear.level(), slot, gear.rarity(), existingIds, random);
+            type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
 
         if (rolled.isEmpty()) {
             return gear;
@@ -378,6 +399,15 @@ public final class GearModifierRoller {
             @Nonnull GearData gear,
             @Nonnull String slot,
             @Nonnull Random random) {
+        return transmute(gear, slot, null, random);
+    }
+
+    @Nonnull
+    public GearData transmute(
+            @Nonnull GearData gear,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
 
         // Collect unlocked modifiers
         List<ModifierLocation> unlocked = new ArrayList<>();
@@ -396,13 +426,11 @@ public final class GearModifierRoller {
         }
 
         if (unlocked.isEmpty()) {
-            return gear; // All modifiers are locked
+            return gear;
         }
 
-        // Pick random unlocked modifier to replace
         ModifierLocation target = unlocked.get(random.nextInt(unlocked.size()));
 
-        // Get all existing IDs of the same type, excluding the one being replaced
         Set<String> existingIds;
         if (target.type == ModifierType.PREFIX) {
             existingIds = gear.prefixes().stream()
@@ -416,9 +444,8 @@ public final class GearModifierRoller {
                 .collect(Collectors.toSet());
         }
 
-        // Roll a new modifier of the same type
         List<GearModifier> rolled = rollModifiersExcluding(
-            target.type, 1, gear.level(), slot, gear.rarity(), existingIds, random);
+            target.type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
 
         if (rolled.isEmpty()) {
             return gear; // No replacement available
@@ -585,69 +612,34 @@ public final class GearModifierRoller {
     }
 
     /**
-     * Rolls modifiers while excluding certain IDs.
+     * Rolls modifiers while excluding certain IDs (backward-compatible — no equipment type).
      */
     @Nonnull
     private List<GearModifier> rollModifiersExcluding(
-            @Nonnull ModifierType type,
-            int count,
-            int itemLevel,
-            @Nonnull String slot,
-            @Nonnull GearRarity rarity,
-            @Nonnull Set<String> excludedIds,
-            @Nonnull Random random) {
+            @Nonnull ModifierType type, int count, int itemLevel,
+            @Nonnull String slot, @Nonnull GearRarity rarity,
+            @Nonnull Set<String> excludedIds, @Nonnull Random random) {
+        return rollModifiersExcluding(type, count, itemLevel, slot, rarity, null, excludedIds, random);
+    }
 
-        if (count <= 0) {
-            return List.of();
-        }
-
-        // Get available modifiers for this slot
-        List<ModifierDefinition> available = type == ModifierType.PREFIX
-            ? modifierConfig.prefixesForSlot(slot)
-            : modifierConfig.suffixesForSlot(slot);
-
-        // Filter out excluded IDs
-        List<ModifierDefinition> filtered = available.stream()
-            .filter(def -> !excludedIds.contains(def.id()))
-            .toList();
-
-        if (filtered.isEmpty()) {
-            return List.of();
-        }
-
-        // Track selected IDs to prevent duplicates
-        Set<String> selectedIds = new HashSet<>(excludedIds);
-        List<GearModifier> result = new ArrayList<>();
-
-        for (int i = 0; i < count && !filtered.isEmpty(); i++) {
-            // Filter out already selected
-            List<ModifierDefinition> remaining = filtered.stream()
-                .filter(m -> !selectedIds.contains(m.id()))
-                .toList();
-
-            if (remaining.isEmpty()) {
-                break;
-            }
-
-            // Roll one modifier
-            ModifierDefinition selected = selectWeighted(remaining, random);
-            selectedIds.add(selected.id());
-
-            // Calculate value
-            double value = calculateValue(selected, itemLevel, rarity, random);
-
-            // Create GearModifier
-            result.add(GearModifier.of(
-                selected.id(),
-                selected.displayName(),
-                type,
-                selected.stat(),
-                selected.statType().name().toLowerCase(),
-                value
-            ));
-        }
-
-        return List.copyOf(result);
+    /**
+     * Rolls modifiers with full two-stage filtering (slot + equipment type) and exclusions.
+     *
+     * <p>Delegates to {@link ModifierPool#rollModifiersExcluding} which applies:
+     * <ol>
+     *   <li>Stage 1: Slot filtering (gear-modifiers.yml allowed_slots)</li>
+     *   <li>Stage 2: Equipment type filtering (equipment-stats.yml allowed lists)</li>
+     *   <li>Stage 3: Excluded ID filtering (prevents duplicates)</li>
+     * </ol>
+     */
+    @Nonnull
+    private List<GearModifier> rollModifiersExcluding(
+            @Nonnull ModifierType type, int count, int itemLevel,
+            @Nonnull String slot, @Nonnull GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Set<String> excludedIds, @Nonnull Random random) {
+        return modifierPool.rollModifiersExcluding(
+                type, count, itemLevel, slot, rarity, equipmentType, excludedIds, random);
     }
 
     /**

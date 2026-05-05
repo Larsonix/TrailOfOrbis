@@ -5,6 +5,7 @@ import io.github.larsonix.trailoforbis.gear.generation.ImplicitDamageCalculator;
 import io.github.larsonix.trailoforbis.gear.generation.ImplicitDefenseCalculator;
 import io.github.larsonix.trailoforbis.gear.model.ArmorImplicit;
 import io.github.larsonix.trailoforbis.gear.model.ArmorMaterial;
+import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType.ArmorSlot;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
@@ -15,6 +16,7 @@ import io.github.larsonix.trailoforbis.stones.StoneActionResult;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 
 /**
@@ -24,12 +26,12 @@ import java.util.Random;
  * behind the {@link ItemTypeHandler} interface, translating each operation
  * into the roller's API (which takes {@code (GearData, slot, Random)}).
  *
- * <p>All roller calls use {@code "weapon"} as the default gear slot since
- * actual slot context is not available during stone application.
+ * <p>The slot is resolved from the item's {@code baseItemId} so that modifier
+ * pool filtering is correct for all equipment types (weapons, shields, armor).
  */
 public class GearStoneHandler implements ItemTypeHandler<GearData> {
 
-    private static final String DEFAULT_GEAR_SLOT = "weapon";
+    private static final String FALLBACK_SLOT = "weapon";
 
     private final GearModifierRoller roller;
     @Nullable
@@ -60,28 +62,30 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     @Override
     @Nonnull
     public StoneActionResult rerollValues(@Nonnull GearData item, @Nonnull Random random) {
-        GearData result = roller.rerollValues(item, DEFAULT_GEAR_SLOT, random);
+        GearData result = roller.rerollValues(item, resolveSlot(item), random);
         return StoneActionResult.success(result, "Modifier values rerolled.");
     }
 
     @Override
     @Nonnull
     public StoneActionResult rerollOneValue(@Nonnull GearData item, @Nonnull Random random) {
-        GearData result = roller.rerollOneValue(item, DEFAULT_GEAR_SLOT, random);
+        GearData result = roller.rerollOneValue(item, resolveSlot(item), random);
         return StoneActionResult.success(result, "Rerolled one modifier value.");
     }
 
     @Override
     @Nonnull
     public StoneActionResult rerollTypes(@Nonnull GearData item, @Nonnull Random random) {
-        GearData result = roller.rerollTypes(item, DEFAULT_GEAR_SLOT, random);
+        var ctx = resolveContext(item);
+        GearData result = roller.rerollTypes(item, ctx.slot(), ctx.equipmentType(), random);
         return StoneActionResult.success(result, "Modifiers rerolled.");
     }
 
     @Override
     @Nonnull
     public StoneActionResult addModifier(@Nonnull GearData item, @Nonnull Random random) {
-        GearData result = roller.addModifier(item, DEFAULT_GEAR_SLOT, random);
+        var ctx = resolveContext(item);
+        GearData result = roller.addModifier(item, ctx.slot(), ctx.equipmentType(), random);
         if (result.modifierCount() == item.modifierCount()) {
             return StoneActionResult.failure("No compatible modifiers available.");
         }
@@ -108,7 +112,8 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     @Override
     @Nonnull
     public StoneActionResult transmute(@Nonnull GearData item, @Nonnull Random random) {
-        GearData result = roller.transmute(item, DEFAULT_GEAR_SLOT, random);
+        var ctx = resolveContext(item);
+        GearData result = roller.transmute(item, ctx.slot(), ctx.equipmentType(), random);
         if (result.modifierCount() < item.modifierCount()) {
             return StoneActionResult.success(result,
                 "Removed a modifier but no replacement available.");
@@ -121,9 +126,12 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     @Nonnull
     public StoneActionResult fillModifiers(@Nonnull GearData item, @Nonnull Random random) {
         GearData result = item;
+        var ctx = resolveContext(item);
+        String slot = ctx.slot();
+        EquipmentType equipType = ctx.equipmentType();
         int startCount = result.modifierCount();
         while (result.canAddModifier()) {
-            GearData next = roller.addModifier(result, DEFAULT_GEAR_SLOT, random);
+            GearData next = roller.addModifier(result, slot, equipType, random);
             if (next.modifierCount() == result.modifierCount()) {
                 break; // No compatible modifiers available
             }
@@ -175,7 +183,8 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
         } else if (roll < 85) {
             // 25%: Add a modifier if possible, then corrupt
             if (item.canAddModifier()) {
-                GearData added = roller.addModifier(item, DEFAULT_GEAR_SLOT, random);
+                var corruptCtx = resolveContext(item);
+                GearData added = roller.addModifier(item, corruptCtx.slot(), corruptCtx.equipmentType(), random);
                 GearData result = added.corrupt();
                 return StoneActionResult.success(result,
                     "Item corrupted with a new modifier !");
@@ -248,34 +257,39 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     }
 
     /**
-     * Changes level and recalculates implicit damage/defense ranges for the new level.
+     * Changes level and rescales implicit damage/defense ranges for the new level.
      *
-     * <p>Implicits are a function of level — when level changes, the range and
-     * rolled value must be recalculated to maintain data integrity. Modifier
-     * values are NOT recalculated (they're independent rolls).
+     * <p>Implicits are a function of level — when level changes, the range must
+     * be recalculated. The original roll percentile is preserved: a 90th-percentile
+     * implicit stays at the 90th percentile of the new level's range. This is a
+     * deterministic operation — the {@code random} parameter is unused for implicits.
+     *
+     * <p>Modifier values are NOT recalculated (they're independent rolls).
      */
     @Override
     @Nonnull
     public StoneActionResult changeLevel(@Nonnull GearData item, int newLevel, @Nonnull Random random) {
         GearData result = item.withLevel(newLevel);
 
-        // Recalculate weapon implicit for new level
+        // Rescale weapon implicit for new level (preserving roll percentile)
         if (result.hasWeaponImplicit() && implicitCalculator != null) {
             String baseItemId = result.getBaseItemId();
             WeaponType weaponType = WeaponType.fromItemIdOrUnknown(baseItemId);
-            WeaponImplicit newImplicit = implicitCalculator.calculate(weaponType, newLevel, random);
-            result = result.withImplicit(newImplicit);
+            WeaponImplicit rescaled = implicitCalculator.rescaleForLevel(
+                    item.implicit(), weaponType, newLevel);
+            result = result.withImplicit(rescaled);
         }
 
-        // Recalculate armor implicit for new level
+        // Rescale armor implicit for new level (preserving roll percentile)
         if (result.hasArmorImplicit() && implicitDefenseCalculator != null) {
             String baseItemId = result.getBaseItemId();
             ArmorMaterial material = ArmorMaterial.fromItemIdOrSpecial(baseItemId);
             ArmorSlot slot = deriveArmorSlot(baseItemId);
             if (slot != null) {
-                ArmorImplicit newImplicit = implicitDefenseCalculator.calculate(material, slot, newLevel, random);
-                if (newImplicit != null) {
-                    result = result.withArmorImplicit(newImplicit);
+                ArmorImplicit rescaled = implicitDefenseCalculator.rescaleForLevel(
+                        item.armorImplicit(), material, slot, newLevel);
+                if (rescaled != null) {
+                    result = result.withArmorImplicit(rescaled);
                 }
             }
         }
@@ -329,4 +343,60 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
             case MYTHIC, UNIQUE -> null;
         };
     }
+
+    /**
+     * Resolves the equipment type from the item's base ID for modifier filtering.
+     *
+     * <p>This ensures stones only roll modifiers that are allowed for the specific
+     * equipment type (e.g., spellbooks only get magic modifiers, not physical).
+     */
+    @Nullable
+    private EquipmentType resolveEquipmentType(@Nonnull GearData item) {
+        return resolveContext(item).equipmentType;
+    }
+
+    /**
+     * Resolves the modifier pool slot string from the item's base ID.
+     *
+     * <p>This ensures stones roll modifiers from the correct pool:
+     * weapons from "weapon", shields from "shield", armor from the armor slot name.
+     */
+    @Nonnull
+    private String resolveSlot(@Nonnull GearData item) {
+        return resolveContext(item).slot;
+    }
+
+    /**
+     * Resolves both slot and equipment type from the item's base ID in a single pass.
+     * Avoids redundant WeaponType/ArmorMaterial lookups when both are needed.
+     */
+    @Nonnull
+    private ModifierContext resolveContext(@Nonnull GearData item) {
+        String baseItemId = item.baseItemId();
+        if (baseItemId == null || baseItemId.isEmpty()) {
+            return new ModifierContext(FALLBACK_SLOT, null);
+        }
+
+        // Weapons (covers spellbooks, shields, staves, bows, etc.)
+        Optional<WeaponType> weaponType = WeaponType.fromItemId(baseItemId);
+        if (weaponType.isPresent()) {
+            EquipmentType equipType = EquipmentType.resolve(weaponType.get(), null, null);
+            return new ModifierContext(equipType.getSlot(), equipType);
+        }
+
+        // Armor
+        Optional<ArmorMaterial> material = ArmorMaterial.fromItemId(baseItemId);
+        if (material.isPresent()) {
+            ArmorSlot armorSlot = deriveArmorSlot(baseItemId);
+            if (armorSlot != null) {
+                EquipmentType equipType = EquipmentType.resolve(null, material.get(), armorSlot);
+                return new ModifierContext(armorSlot.getSlotName(), equipType);
+            }
+        }
+
+        return new ModifierContext(FALLBACK_SLOT, null);
+    }
+
+    /** Holds resolved slot + equipment type for modifier operations. */
+    private record ModifierContext(@Nonnull String slot, @Nullable EquipmentType equipmentType) {}
 }

@@ -251,6 +251,14 @@ public final class TooAdminTestColorCommand extends AbstractPlayerCommand {
             // Identity + network tracking
             holder.ensureComponent(UUIDComponent.getComponentType());
 
+            // Entity UI setup — enables CombatText rendering on client
+            holder.ensureComponent(com.hypixel.hytale.server.core.modules.entityui.UIComponentList.getComponentType());
+            com.hypixel.hytale.server.core.modules.entityui.UIComponentList uiComponents =
+                holder.getComponent(com.hypixel.hytale.server.core.modules.entityui.UIComponentList.getComponentType());
+            if (uiComponents != null) {
+                uiComponents.update();
+            }
+
             // Initialize projectile before adding NetworkId
             if (projectile.getProjectile() == null) {
                 projectile.initialize();

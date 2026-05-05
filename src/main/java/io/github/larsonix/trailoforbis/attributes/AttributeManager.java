@@ -21,6 +21,7 @@ import io.github.larsonix.trailoforbis.skilltree.conditional.ConditionalTriggerS
 import io.github.larsonix.trailoforbis.skilltree.model.SkillTreeData;
 import io.github.larsonix.trailoforbis.skilltree.model.StatModifier;
 import io.github.larsonix.trailoforbis.systems.StatProvider;
+import io.github.larsonix.trailoforbis.attributes.debug.DebugStatOverrideProvider;
 import io.github.larsonix.trailoforbis.gear.stats.GearBonusProvider;
 
 import java.util.List;
@@ -81,6 +82,9 @@ public class AttributeManager implements AttributeService {
 
     // Conditional trigger system for ON_KILL, ON_CRIT, etc. effects
     private volatile ConditionalTriggerSystem conditionalTriggerSystem;
+
+    // Debug stat override provider (admin testing tool)
+    private volatile DebugStatOverrideProvider debugStatOverrideProvider;
 
     // Lazy-initialized breakdown calculator for on-demand stat source analysis
     private volatile StatBreakdownCalculator breakdownCalculator;
@@ -343,11 +347,6 @@ public class AttributeManager implements AttributeService {
             }
         }
 
-        // 4.5. Fold percent resource modifiers (maxHealthPercent, maxManaPercent, etc.) into
-        // actual resource values. These are stored separately by AttributeCalculator and
-        // StatsCombiner but must be applied BEFORE gear bonuses (which layer on top).
-        finalStats.consolidateResourcePercents();
-
         // 5. Apply gear bonuses from equipped items (if gear system is enabled)
         GearBonusProvider gearProvider = this.gearBonusProvider;
         if (gearProvider != null) {
@@ -378,6 +377,20 @@ public class AttributeManager implements AttributeService {
                     conditionalMods.size(), playerId);
             }
         }
+
+        // 6.5. Apply debug stat overrides (admin testing tool — always last)
+        DebugStatOverrideProvider debugProvider = this.debugStatOverrideProvider;
+        if (debugProvider != null) {
+            int overrideCount = debugProvider.applyOverrides(playerId, finalStats);
+            if (overrideCount > 0) {
+                LOGGER.at(Level.FINE).log("Applied %d debug stat overrides for %s", overrideCount, playerId);
+            }
+        }
+
+        // 6.8. Consolidate resource percent accumulators — the PoE "increased" formula.
+        // ALL sources (attributes, skill tree, gear, conditionals) have deposited their
+        // percent bonuses into accumulator fields. Apply once: base × (1 + totalPct/100).
+        finalStats.consolidateResourcePercents();
 
         // 7. Attach to PlayerData (transient, in-memory only)
         // Check if stats actually changed before incrementing version —
@@ -902,6 +915,25 @@ public class AttributeManager implements AttributeService {
     }
 
     /**
+     * Sets the debug stat override provider.
+     *
+     * <p>When set, debug overrides are applied as the final step of the
+     * stat calculation pipeline (after conditionals, before ECS sync).
+     */
+    public void setDebugStatOverrideProvider(@Nullable DebugStatOverrideProvider provider) {
+        this.debugStatOverrideProvider = provider;
+        if (provider != null) {
+            LOGGER.at(Level.INFO).log("Debug stat override provider set - admin stat overrides enabled");
+        }
+    }
+
+    /** @return The debug stat override provider, or null if not configured */
+    @Nullable
+    public DebugStatOverrideProvider getDebugStatOverrideProvider() {
+        return debugStatOverrideProvider;
+    }
+
+    /**
      * Sets the stats application callback for automatic ECS sync.
      *
      * <p>When set, the callback is invoked after every stat recalculation,
@@ -986,6 +1018,12 @@ public class AttributeManager implements AttributeService {
         Objects.requireNonNull(playerId, "playerId cannot be null");
         statsLocks.remove(playerId);
         statsVersions.remove(playerId);
+
+        // Clean up debug stat overrides (prevents memory leak for disconnected players)
+        DebugStatOverrideProvider debugProvider = this.debugStatOverrideProvider;
+        if (debugProvider != null) {
+            debugProvider.cleanupPlayer(playerId);
+        }
     }
 
     // =========================================================================

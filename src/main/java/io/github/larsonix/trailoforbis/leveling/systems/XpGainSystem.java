@@ -39,6 +39,7 @@ import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -182,6 +183,9 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
 
         // Apply experienceGainPercent multiplier from player stats
         xp = applyExperienceGainBonus(attackerUuid, xp);
+
+        // Apply realm EXPERIENCE_BONUS modifier
+        xp = applyRealmExperienceBonus(attackerUuid, xp);
 
         // Grant XP to the player (party-aware: distributes to party if applicable)
         LevelingService levelingService = getLevelingService();
@@ -330,6 +334,34 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         float multiplier = 1.0f + (bonus / 100.0f);
         long result = Math.round(rawXp * multiplier);
         return Math.max(1, result);
+    }
+
+    /**
+     * Applies the realm EXPERIENCE_BONUS modifier to XP.
+     *
+     * <p>If the player is inside a realm with the EXPERIENCE_BONUS modifier,
+     * the XP is increased by the modifier's quality-adjusted percentage.
+     *
+     * @param playerId The player UUID
+     * @param baseXp The XP before realm bonus
+     * @return The XP after applying realm bonus (unchanged if not in realm)
+     */
+    private long applyRealmExperienceBonus(@Nonnull UUID playerId, long baseXp) {
+        RealmsManager rm = plugin.getRealmsManager();
+        if (rm == null) {
+            return baseXp;
+        }
+        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(playerId);
+        if (realmOpt.isEmpty()) {
+            return baseXp;
+        }
+        int bonusPercent = realmOpt.get().getMapData().getModifierValue(RealmModifierType.EXPERIENCE_BONUS);
+        if (bonusPercent <= 0) {
+            return baseXp;
+        }
+        long boosted = (long) (baseXp * (1.0 + bonusPercent / 100.0));
+        LOGGER.at(Level.FINE).log("[RealmXP] +%d%% XP bonus: %d -> %d", bonusPercent, baseXp, boosted);
+        return Math.max(1, boosted);
     }
 
     /**

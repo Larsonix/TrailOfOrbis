@@ -22,9 +22,47 @@ import java.util.*;
  * <p>Uses MEDIAN rolls (roll factor 0.5) for deterministic balance analysis.
  *
  * <p>Equipment slots simulated: weapon, chest, legs, head, hands (5 pieces).
- * Assumes PLATE armor (most common) and one-handed SWORD (baseline weapon).
+ * Weapon type is derived from build element:
+ * <ul>
+ *   <li>WATER → MAGIC (staff, spell_damage implicit)</li>
+ *   <li>WIND → RANGED (bow, physical_damage implicit)</li>
+ *   <li>All others → MELEE (sword, physical_damage implicit)</li>
+ * </ul>
  */
 public final class VirtualGearFactory {
+
+    /**
+     * Weapon category determines weapon item ID and implicit type.
+     */
+    public enum WeaponCategory {
+        MELEE("Weapon_Sword_Iron", false),
+        RANGED("Weapon_Shortbow_Iron", false),
+        MAGIC("Weapon_Staff_Iron", true);
+
+        private final String weaponItemId;
+        private final boolean isSpell;
+
+        WeaponCategory(String weaponItemId, boolean isSpell) {
+            this.weaponItemId = weaponItemId;
+            this.isSpell = isSpell;
+        }
+
+        public String weaponItemId() { return weaponItemId; }
+        public boolean isSpell() { return isSpell; }
+
+        /**
+         * Derives weapon category from the primary build element.
+         * WATER → MAGIC (arcane mage), WIND → RANGED (ghost ranger), all others → MELEE.
+         */
+        public static WeaponCategory fromPrimaryElement(String element) {
+            if (element == null) return MELEE;
+            return switch (element.toLowerCase()) {
+                case "water" -> MAGIC;
+                case "wind" -> RANGED;
+                default -> MELEE;
+            };
+        }
+    }
 
     private static final String[] ARMOR_SLOTS = {"chest", "legs", "head", "hands"};
 
@@ -47,7 +85,15 @@ public final class VirtualGearFactory {
     }
 
     /**
-     * Generates median gear bonuses for a player at the given level.
+     * Generates median gear bonuses for a player at the given level (melee default).
+     */
+    @Nonnull
+    public GearBonuses generateForLevel(int level) {
+        return generateForLevel(level, WeaponCategory.MELEE);
+    }
+
+    /**
+     * Generates median gear bonuses for a player at the given level with specific weapon category.
      *
      * <p>Uses real config values from gear-balance.yml:
      * <ul>
@@ -57,7 +103,7 @@ public final class VirtualGearFactory {
      * </ul>
      */
     @Nonnull
-    public GearBonuses generateForLevel(int level) {
+    public GearBonuses generateForLevel(int level, @Nonnull WeaponCategory weaponCategory) {
         Map<String, Double> flatBonuses = new HashMap<>();
         Map<String, Double> percentBonuses = new HashMap<>();
 
@@ -66,6 +112,8 @@ public final class VirtualGearFactory {
         double qualityMult = 1.0; // Quality 50 → 0.5 + 50/100 = 1.0
 
         // Weapon implicit damage (from ImplicitDamageConfig)
+        // For spell weapons, the implicit is "spell_damage" type — same scaling formula
+        // but the value goes through the spell path in RPGDamageCalculator
         double weaponBaseDamage = calculateWeaponImplicit(level);
 
         // Armor implicit defense (from ImplicitDefenseConfig, PLATE material)
@@ -83,8 +131,8 @@ public final class VirtualGearFactory {
                 Collections.unmodifiableMap(flatBonuses),
                 Collections.unmodifiableMap(percentBonuses),
                 weaponBaseDamage,
-                "generic_sword",
-                true
+                weaponCategory.weaponItemId(),
+                true, null
         );
     }
 
@@ -211,8 +259,8 @@ public final class VirtualGearFactory {
     /** Number of equipment slots to fill. */
     private static final int SLOT_COUNT = 5;
 
-    /** Base gear drop chance per mob kill (from gear-balance.yml: 0.08 = 8%). */
-    private static final double BASE_DROP_CHANCE = 0.08;
+    /** Base gear drop chance per mob kill (from gear-balance.yml: 0.12 = 12%). */
+    private static final double BASE_DROP_CHANCE = 0.12;
 
     /** Effort curve exponent: ln(150/3) / ln(100) ≈ 0.849. From leveling.yml. */
     private static final double EFFORT_EXPONENT = Math.log(150.0 / 3.0) / Math.log(100.0);

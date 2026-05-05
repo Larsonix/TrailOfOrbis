@@ -83,7 +83,6 @@ public enum RealmModifierType {
     /**
      * Healing effectiveness is reduced.
      * Value: percentage reduction (e.g., 40 = 40% less healing)
-     * Note: Display-only for now (effect deferred)
      */
     REDUCED_HEALING(
         "Reduced Healing",
@@ -95,7 +94,6 @@ public enum RealmModifierType {
     /**
      * Life regeneration is disabled.
      * Value: ignored (binary effect)
-     * Note: Display-only for now (effect deferred)
      */
     NO_REGENERATION(
         "No Regeneration",
@@ -133,7 +131,6 @@ public enum RealmModifierType {
     /**
      * Increases experience gained from kills.
      * Value: percentage increase (e.g., 25 = +25% XP)
-     * Note: Display-only for now (effect deferred)
      */
     EXPERIENCE_BONUS(
         "Experience",
@@ -145,7 +142,6 @@ public enum RealmModifierType {
     /**
      * Increases stone drop chance.
      * Value: percentage increase (e.g., 15 = +15% stone drops)
-     * Note: Display-only for now (effect deferred)
      */
     STONE_DROP_BONUS(
         "Stone Drops",
@@ -176,6 +172,194 @@ public enum RealmModifierType {
         Category.SUFFIX,
         0,
         5, 30
+    ),
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NEW PREFIX MODIFIERS — Elemental (mob bonus elemental damage)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Monsters deal bonus Fire damage on their attacks.
+     * Value: percentage of base damage added as Fire (e.g., 30 = +30% as Fire)
+     */
+    MONSTERS_EXTRA_FIRE(
+        "Extra Fire Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    /**
+     * Monsters deal bonus Water damage on their attacks.
+     * Value: percentage of base damage added as Water
+     */
+    MONSTERS_EXTRA_WATER(
+        "Extra Water Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    /**
+     * Monsters deal bonus Lightning damage on their attacks.
+     * Value: percentage of base damage added as Lightning
+     */
+    MONSTERS_EXTRA_LIGHTNING(
+        "Extra Lightning Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    /**
+     * Monsters deal bonus Earth damage on their attacks.
+     * Value: percentage of base damage added as Earth
+     */
+    MONSTERS_EXTRA_EARTH(
+        "Extra Earth Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    /**
+     * Monsters deal bonus Wind damage on their attacks.
+     * Value: percentage of base damage added as Wind
+     */
+    MONSTERS_EXTRA_WIND(
+        "Extra Wind Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    /**
+     * Monsters deal bonus Void damage on their attacks.
+     * Value: percentage of base damage added as Void
+     */
+    MONSTERS_EXTRA_VOID(
+        "Extra Void Damage",
+        Category.PREFIX,
+        1,
+        10, 60
+    ),
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NEW PREFIX MODIFIERS — Mechanical
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Players take increased damage from all sources.
+     * Value: percentage increase (e.g., 25 = player takes 25% more damage)
+     */
+    PLAYER_VULNERABILITY(
+        "Player Vulnerability",
+        Category.PREFIX,
+        2,
+        8, 50
+    ),
+
+    /**
+     * Block damage reduction is less effective.
+     * Value: percentage reduction to block effectiveness (e.g., 40 = blocks reduce 40% less)
+     */
+    REDUCED_BLOCK(
+        "Weakened Blocking",
+        Category.PREFIX,
+        1,
+        15, 80
+    ),
+
+    /**
+     * Monsters have increased armor (physical damage resistance).
+     * Value: percentage bonus to mob armor
+     */
+    ARMORED_MONSTERS(
+        "Armored Monsters",
+        Category.PREFIX,
+        1,
+        15, 100
+    ),
+
+    /**
+     * Monsters cannot be affected by ailments (burn, freeze, shock, poison).
+     * Value: ignored (binary effect)
+     */
+    AILMENT_IMMUNE_MONSTERS(
+        "Ailment Immunity",
+        Category.PREFIX,
+        2,
+        1, 1
+    ),
+
+    /**
+     * Monsters regenerate a percentage of their max HP per second.
+     * Value: percent of max HP regenerated per second (e.g., 2 = 2% max HP/sec)
+     */
+    LIFE_REGEN_MONSTERS(
+        "Regenerating Monsters",
+        Category.PREFIX,
+        2,
+        1, 5
+    ),
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NEW SUFFIX MODIFIERS — Rewards
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Gear drops with higher quality rolls.
+     * Value: flat bonus added to quality roll (e.g., 15 = +15 quality)
+     */
+    GEAR_QUALITY_BONUS(
+        "Superior Gear",
+        Category.SUFFIX,
+        0,
+        5, 40
+    ),
+
+    /**
+     * Gear drops at higher levels than normal.
+     * Value: flat level bonus (e.g., 5 = loot drops at +5 levels)
+     */
+    DROP_LEVEL_BONUS(
+        "Empowered Loot",
+        Category.SUFFIX,
+        0,
+        2, 15
+    ),
+
+    /**
+     * Chance to receive a bonus realm map on completion.
+     * Value: percentage chance (e.g., 10 = 10% chance for bonus map)
+     */
+    MAP_DISCOVERY(
+        "Cartographer's Fortune",
+        Category.SUFFIX,
+        0,
+        3, 25
+    ),
+
+    /**
+     * Stones that drop are upgraded by one rarity tier.
+     * Value: ignored (binary effect — always upgrades by 1 tier)
+     */
+    STONE_RARITY_BONUS(
+        "Enriched Stones",
+        Category.SUFFIX,
+        0,
+        1, 1
+    ),
+
+    /**
+     * Time limit is increased.
+     * Value: percentage increase to time limit (e.g., 25 = +25% time)
+     */
+    BONUS_TIME(
+        "Extended Time",
+        Category.SUFFIX,
+        0,
+        10, 50
     );
 
     private final String displayName;

@@ -230,10 +230,11 @@ public class BuildSummaryCalculatorTest {
         }
 
         @Test
-        @DisplayName("Armor mitigation: 1000 armor → 50% reduction → doubles EHP")
+        @DisplayName("Armor mitigation: 1000 armor at Lv10 → level-scaled reduction")
         void armorMitigation() {
-            // armor / (armor + 1000) = 1000 / 2000 = 0.5
-            // EHP = 1000 / (1 - 0.5) = 2000
+            // Level-scaled formula: armor / (armor + 9*level + 50)
+            // At level 10: 1000 / (1000 + 90 + 50) = 1000/1140 ≈ 0.877
+            // EHP = 1000 / (1 - 0.877) ≈ 8130
             ComputedStats stats = ComputedStats.builder()
                     .maxHealth(1000f)
                     .armor(1000f)
@@ -241,14 +242,16 @@ public class BuildSummaryCalculatorTest {
 
             BuildSummary summary = BuildSummaryCalculator.compute(stats, 10, null, null);
 
-            assertEquals(0.5f, summary.ehpDetail().armorMitigation(), 0.001f);
-            assertEquals(2000f, summary.effectiveHP(), 1f);
+            float expectedMit = 1000f / (1000f + 9f * 10f + 50f);
+            assertEquals(expectedMit, summary.ehpDetail().armorMitigation(), 0.001f);
+            float expectedEhp = 1000f / (1f - expectedMit);
+            assertEquals(expectedEhp, summary.effectiveHP(), 10f);
         }
 
         @Test
-        @DisplayName("High armor: 9000 armor → 90% reduction (cap)")
+        @DisplayName("High armor: 9000 armor at Lv10 → 90% reduction (cap)")
         void highArmorCap() {
-            // armor / (armor + 1000) = 9000 / 10000 = 0.9 (exactly at cap)
+            // At level 10: 9000 / (9000 + 140) = 0.9847 → capped at 0.9
             // EHP = 1000 / (1 - 0.9) = 10000
             ComputedStats stats = ComputedStats.builder()
                     .maxHealth(1000f)
@@ -264,7 +267,7 @@ public class BuildSummaryCalculatorTest {
         @Test
         @DisplayName("Extreme armor: 99000 armor → clamped at 90% reduction")
         void extremeArmorClamped() {
-            // armor / (armor + 1000) = 99000 / 100000 = 0.99 → clamped to 0.9
+            // 99000 / (99000 + 140) = 0.9986 → clamped to 0.9
             ComputedStats stats = ComputedStats.builder()
                     .maxHealth(1000f)
                     .armor(99000f)
@@ -307,10 +310,10 @@ public class BuildSummaryCalculatorTest {
         }
 
         @Test
-        @DisplayName("Combined armor + dodge: 1000 armor (50%) + 25% dodge")
+        @DisplayName("Combined armor + dodge: 1000 armor at Lv10 + 25% dodge")
         void armorPlusDodge() {
-            // Armor: 50% mitigation → rawHP 1000 → ehpFromArmor 2000
-            // Dodge: 25% avoidance → EHP = 2000 / (1 - 0.25) = 2666.67
+            // Armor at Lv10: 1000/(1000+140) ≈ 87.7% → rawHP 1000 → ehpFromArmor ≈ 8130
+            // Dodge: 25% avoidance → EHP ≈ 8130 / (1 - 0.25) ≈ 10840
             ComputedStats stats = ComputedStats.builder()
                     .maxHealth(1000f)
                     .armor(1000f)
@@ -319,7 +322,12 @@ public class BuildSummaryCalculatorTest {
 
             BuildSummary summary = BuildSummaryCalculator.compute(stats, 10, null, null);
 
-            assertEquals(2666.67f, summary.effectiveHP(), 5f);
+            // Armor: 1000/(1140) ≈ 0.877; ehpFromArmor = 1000/(1-0.877) ≈ 8130
+            // Dodge: 25%; combined EHP = 8130 / 0.75 ≈ 10840
+            float armorMit = 1000f / (1000f + 9f * 10f + 50f);
+            float ehpFromArmor = 1000f / (1f - armorMit);
+            float expectedEhp = ehpFromArmor / (1f - 0.25f);
+            assertEquals(expectedEhp, summary.effectiveHP(), 10f);
         }
 
         @Test

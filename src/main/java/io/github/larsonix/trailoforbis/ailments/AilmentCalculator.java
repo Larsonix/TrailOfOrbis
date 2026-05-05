@@ -152,10 +152,26 @@ public class AilmentCalculator {
             float duration
     ) {
         return switch (ailmentType) {
-            case BURN -> calculateBurnDps(hitDamage, attackerStats.getBurnDamage(), duration, ailmentType.getBaseDamageRatio());
+            case BURN -> {
+                float baseDps = calculateBurnDps(hitDamage, attackerStats.getBurnDamage(), duration, ailmentType.getBaseDamageRatio());
+                // Apply burn-specific + global DOT multipliers
+                float burnPctMult = 1f + attackerStats.getBurnDamagePercent() / 100f;
+                float dotPctMult = 1f + attackerStats.getDotDamagePercent() / 100f;
+                yield baseDps * burnPctMult * dotPctMult;
+            }
             case FREEZE -> calculateFreezeSlowPercent(hitDamage, defenderMaxHealth);
-            case SHOCK -> calculateShockDamageIncrease(hitDamage, defenderMaxHealth);
-            case POISON -> calculatePoisonDps(hitDamage, attackerStats.getPoisonDamage(), duration, ailmentType.getBaseDamageRatio());
+            case SHOCK -> {
+                float baseShock = calculateShockDamageIncrease(hitDamage, defenderMaxHealth);
+                // Apply shock-specific multiplier
+                float shockPctMult = 1f + attackerStats.getShockDamagePercent() / 100f;
+                yield Math.min(50f, baseShock * shockPctMult);
+            }
+            case POISON -> {
+                float baseDps = calculatePoisonDps(hitDamage, attackerStats.getPoisonDamage(), duration, ailmentType.getBaseDamageRatio());
+                // Apply global DOT multiplier (poison has no specific % stat)
+                float dotPctMult = 1f + attackerStats.getDotDamagePercent() / 100f;
+                yield baseDps * dotPctMult;
+            }
         };
     }
 

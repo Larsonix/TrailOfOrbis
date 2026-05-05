@@ -5,6 +5,7 @@ import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalCalculator;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 
 import io.github.larsonix.trailoforbis.combat.modifiers.ConditionalResult;
 
@@ -53,9 +54,6 @@ public class RPGDamageCalculator {
     /** Maximum armor damage reduction (90%) */
     private static final float MAX_ARMOR_REDUCTION = 0.9f;
 
-    /** Armor formula divisor (PoE standard) */
-    private static final float ARMOR_FORMULA_DIVISOR = 10.0f;
-
     private final CombatCalculator combatCalculator;
 
     public RPGDamageCalculator() {
@@ -92,7 +90,7 @@ public class RPGDamageCalculator {
         boolean isDOT
     ) {
         return calculate(baseDamage, attackerStats, attackerElemental,
-            defenderStats, defenderElemental, attackType, isDOT, 1.0f);
+            defenderStats, defenderElemental, attackType, isDOT, 1.0f, false, null, 1, false);
     }
 
     /**
@@ -129,10 +127,11 @@ public class RPGDamageCalculator {
         @Nullable ElementalStats defenderElemental,
         @Nonnull AttackType attackType,
         boolean isDOT,
-        float conditionalMultiplier
+        float conditionalMultiplier,
+        int attackerLevel
     ) {
         return calculate(baseDamage, attackerStats, attackerElemental, defenderStats,
-            defenderElemental, attackType, isDOT, conditionalMultiplier, false);
+            defenderElemental, attackType, isDOT, conditionalMultiplier, false, null, attackerLevel, false);
     }
 
     /**
@@ -147,6 +146,8 @@ public class RPGDamageCalculator {
      * @param isDOT Whether this is damage-over-time (skips flat, crit)
      * @param conditionalMultiplier Combined situational multiplier (applied after % more, before crit)
      * @param traceEnabled Whether to log detailed calculation steps for debugging
+     * @param spellElement For spell attacks: the element to place base damage into (null for physical attacks)
+     * @param projectileSpell Whether this spell benefits from projectileDamagePercent (hex spells always do)
      * @return Complete damage breakdown
      */
     @Nonnull
@@ -159,11 +160,51 @@ public class RPGDamageCalculator {
         @Nonnull AttackType attackType,
         boolean isDOT,
         float conditionalMultiplier,
-        boolean traceEnabled
+        boolean traceEnabled,
+        @Nullable ElementType spellElement,
+        int attackerLevel,
+        boolean projectileSpell
     ) {
-        // Initialize damage distribution
+        return calculatePipeline(baseDamage, attackerStats, attackerElemental,
+            defenderStats, defenderElemental, attackType, isDOT, conditionalMultiplier,
+            traceEnabled, spellElement, attackerLevel, projectileSpell,
+            null, 1.0f);
+    }
+
+    /**
+     * Unified 10-phase damage pipeline. Both {@link #calculate} and {@link #calculateTraced}
+     * delegate here. When {@code tb} is non-null, intermediate values are recorded for death recap.
+     * When {@code traceEnabled} is true, debug logging is emitted to console.
+     *
+     * @param tb Optional trace builder for death recap (null = no recording)
+     * @param attackTypeMultiplier Vanilla weapon profile multiplier (1.0 if none)
+     */
+    @Nonnull
+    private DamageBreakdown calculatePipeline(
+        float baseDamage,
+        @Nullable ComputedStats attackerStats,
+        @Nullable ElementalStats attackerElemental,
+        @Nullable ComputedStats defenderStats,
+        @Nullable ElementalStats defenderElemental,
+        @Nonnull AttackType attackType,
+        boolean isDOT,
+        float conditionalMultiplier,
+        boolean traceEnabled,
+        @Nullable ElementType spellElement,
+        int attackerLevel,
+        boolean projectileSpell,
+        @Nullable DamageTrace.Builder tb,
+        float attackTypeMultiplier
+    ) {
+        boolean isSpell = (attackType == AttackType.SPELL && spellElement != null);
+
+        // Initialize damage distribution — spells place base into the element slot
         DamageDistribution dist = new DamageDistribution();
-        dist.setPhysical(baseDamage);
+        if (isSpell) {
+            dist.setElemental(spellElement, baseDamage);
+        } else {
+            dist.setPhysical(baseDamage);
+        }
 
         // Track defense breakdown for death recap
         float armorReduction = 0f;
@@ -172,27 +213,46 @@ public class RPGDamageCalculator {
             resistanceReductions.put(type, 0f);
         }
 
-        // Crit result (will be determined during calculation)
         boolean wasCritical = false;
         float critMultiplier = 1.0f;
 
         if (attackerStats != null) {
-            // ==== STEP 1: Add flat physical damage (skip for DOT) ====
-            float beforeFlat = dist.getPhysical();
-            float flatPhys = 0f, flatMelee = 0f;
+            // ==== STEP 1: Add flat damage (skip for DOT) ====
+            float beforeFlat = isSpell ? dist.getElemental(spellElement) : dist.getPhysical();
+            float flatPhys = 0f, flatMelee = 0f, flatSpell = 0f;
             if (!isDOT) {
-                flatPhys = attackerStats.getPhysicalDamage();
-                flatMelee = (attackType == AttackType.MELEE) ? attackerStats.getMeleeDamage() : 0f;
-                applyFlatDamage(dist, attackerStats, attackType);
+                if (isSpell) {
+                    flatSpell = attackerStats.getSpellDamage();
+                } else {
+                    flatPhys = attackerStats.getPhysicalDamage();
+                    flatMelee = (attackType == AttackType.MELEE) ? attackerStats.getMeleeDamage() : 0f;
+                }
+                applyFlatDamage(dist, attackerStats, attackType, spellElement);
+            }
+            if (tb != null) {
+                tb.physBeforeFlat(beforeFlat);
+                tb.flatPhysFromStats(flatPhys);
+                tb.flatMelee(flatMelee);
+                tb.physAfterFlat(isSpell ? dist.getElemental(spellElement) : dist.getPhysical());
             }
             if (traceEnabled) {
-                LOGGER.at(Level.FINE).log("[CALC] Step 1 - Flat physical: base=%.1f + flatPhys=%.1f + flatMelee=%.1f = %.1f",
-                    beforeFlat, flatPhys, flatMelee, dist.getPhysical());
+                if (isSpell) {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 1 - Flat spell (%s): base=%.1f + flatSpell=%.1f = %.1f",
+                        spellElement.name(), beforeFlat, flatSpell, dist.getElemental(spellElement));
+                } else {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 1 - Flat physical: base=%.1f + flatPhys=%.1f + flatMelee=%.1f = %.1f",
+                        beforeFlat, flatPhys, flatMelee, dist.getPhysical());
+                }
             }
 
             // ==== STEP 2: Add flat elemental damage (skip for DOT) ====
-            // Added EARLY so it benefits from elemental modifiers and crit
             if (attackerElemental != null && !isDOT) {
+                if (tb != null) {
+                    for (ElementType type : ElementType.values()) {
+                        float flat = (float) attackerElemental.getFlatDamage(type);
+                        if (flat > 0) tb.flatElemental(type, flat);
+                    }
+                }
                 addFlatElemental(dist, attackerElemental);
                 if (traceEnabled) {
                     float fireFlat = (float) attackerElemental.getFlatDamage(ElementType.FIRE);
@@ -207,41 +267,105 @@ public class RPGDamageCalculator {
             }
 
             // ==== STEP 3: Apply damage conversion (phys -> elemental) ====
-            // Conversion happens EARLY so converted damage benefits from elemental modifiers
-            float physBeforeConv = dist.getPhysical();
-            float fireConv = attackerStats.getFireConversion();
-            float waterConv = attackerStats.getWaterConversion();
-            float lightConv = attackerStats.getLightningConversion();
-            float earthConv = attackerStats.getEarthConversion();
-            float windConv = attackerStats.getWindConversion();
-            float voidConv = attackerStats.getVoidConversion();
-            applyConversion(dist, attackerStats);
-            if (traceEnabled && (fireConv > 0 || waterConv > 0 || lightConv > 0 || earthConv > 0 || windConv > 0 || voidConv > 0)) {
-                LOGGER.at(Level.FINE).log("[CALC] Step 3 - Conversion: Fire=%.1f%%, Water=%.1f%%, Lightning=%.1f%%, Earth=%.1f%%, Wind=%.1f%%, Void=%.1f%%",
-                    fireConv, waterConv, lightConv, earthConv, windConv, voidConv);
-                LOGGER.at(Level.FINE).log("[CALC]          Phys: %.1f → %.1f | Fire: %.1f | Water: %.1f | Light: %.1f | Earth: %.1f | Wind: %.1f | Void: %.1f",
-                    physBeforeConv, dist.getPhysical(),
-                    dist.getElemental(ElementType.FIRE), dist.getElemental(ElementType.WATER),
-                    dist.getElemental(ElementType.LIGHTNING), dist.getElemental(ElementType.EARTH),
-                    dist.getElemental(ElementType.WIND), dist.getElemental(ElementType.VOID));
+            if (!isSpell) {
+                float physBeforeConv = dist.getPhysical();
+                float fireConv = attackerStats.getFireConversion();
+                float waterConv = attackerStats.getWaterConversion();
+                float lightConv = attackerStats.getLightningConversion();
+                float earthConv = attackerStats.getEarthConversion();
+                float windConv = attackerStats.getWindConversion();
+                float voidConv = attackerStats.getVoidConversion();
+                if (tb != null) {
+                    float totalConv = fireConv + waterConv + lightConv + earthConv + windConv + voidConv;
+                    tb.physBeforeConversion(physBeforeConv);
+                    tb.scaleFactor(totalConv > 100f ? 100f / totalConv : 1f);
+                    tb.conversionPercent(ElementType.FIRE, fireConv);
+                    tb.conversionPercent(ElementType.WATER, waterConv);
+                    tb.conversionPercent(ElementType.LIGHTNING, lightConv);
+                    tb.conversionPercent(ElementType.EARTH, earthConv);
+                    tb.conversionPercent(ElementType.WIND, windConv);
+                    tb.conversionPercent(ElementType.VOID, voidConv);
+                    // Snapshot pre-conversion elemental to compute per-element converted amounts
+                    EnumMap<ElementType, Float> elemBefore = new EnumMap<>(ElementType.class);
+                    for (ElementType type : ElementType.values()) {
+                        elemBefore.put(type, dist.getElemental(type));
+                    }
+                    applyConversion(dist, attackerStats);
+                    tb.physAfterConversion(dist.getPhysical());
+                    for (ElementType type : ElementType.values()) {
+                        float converted = dist.getElemental(type) - elemBefore.get(type);
+                        if (converted > 0) tb.convertedAmount(type, converted);
+                    }
+                } else {
+                    applyConversion(dist, attackerStats);
+                }
+                if (traceEnabled && (fireConv > 0 || waterConv > 0 || lightConv > 0 || earthConv > 0 || windConv > 0 || voidConv > 0)) {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 3 - Conversion: Fire=%.1f%%, Water=%.1f%%, Lightning=%.1f%%, Earth=%.1f%%, Wind=%.1f%%, Void=%.1f%%",
+                        fireConv, waterConv, lightConv, earthConv, windConv, voidConv);
+                    LOGGER.at(Level.FINE).log("[CALC]          Phys: %.1f → %.1f | Fire: %.1f | Water: %.1f | Light: %.1f | Earth: %.1f | Wind: %.1f | Void: %.1f",
+                        physBeforeConv, dist.getPhysical(),
+                        dist.getElemental(ElementType.FIRE), dist.getElemental(ElementType.WATER),
+                        dist.getElemental(ElementType.LIGHTNING), dist.getElemental(ElementType.EARTH),
+                        dist.getElemental(ElementType.WIND), dist.getElemental(ElementType.VOID));
+                }
+            } else {
+                if (tb != null) { tb.physBeforeConversion(0f); tb.physAfterConversion(0f); }
+                if (traceEnabled) {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 3 - Conversion: SKIPPED (spell damage is already elemental)");
+                }
             }
 
-            // ==== STEP 4: Apply % increased to physical ====
-            float beforePercent = dist.getPhysical();
-            float physPct = attackerStats.getPhysicalDamagePercent();
-            float meleePct = (attackType == AttackType.MELEE) ? attackerStats.getMeleeDamagePercent() : 0f;
-            float projPct = (attackType == AttackType.PROJECTILE) ? attackerStats.getProjectileDamagePercent() : 0f;
-            float dmgPct = attackerStats.getDamagePercent();
-            float totalPct = physPct + meleePct + projPct + dmgPct;
-            applyPercentIncreased(dist, attackerStats, attackType);
-            if (traceEnabled) {
-                LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + melee%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
-                    physPct, meleePct + projPct, dmgPct, totalPct, dist.getPhysical());
+            // ==== STEP 4: Apply % increased ====
+            if (isSpell) {
+                float spellPct = attackerStats.getSpellDamagePercent();
+                float dmgPct = attackerStats.getDamagePercent();
+                float projPct = projectileSpell ? attackerStats.getProjectileDamagePercent() : 0f;
+                float totalPct = spellPct + projPct + dmgPct;
+                if (tb != null) {
+                    tb.physDmgPercent(0f);
+                    tb.attackTypePercent(spellPct + projPct);
+                    tb.globalDmgPercent(dmgPct);
+                    tb.totalIncreasedPercent(totalPct);
+                }
+                if (totalPct != 0f) {
+                    dist.applyElementalPercentIncrease(spellElement, totalPct);
+                }
+                if (tb != null) tb.physAfterIncreased(dist.getElemental(spellElement));
+                if (traceEnabled) {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased spell (%s): spellDmg%%=%.1f + proj%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
+                        spellElement.name(), spellPct, projPct, dmgPct, totalPct, dist.getElemental(spellElement));
+                }
+            } else {
+                float physPct = attackerStats.getPhysicalDamagePercent();
+                float atkTypePct = switch (attackType) {
+                    case MELEE -> attackerStats.getMeleeDamagePercent();
+                    case PROJECTILE -> attackerStats.getProjectileDamagePercent();
+                    case AREA, SPELL, UNKNOWN -> 0f;
+                };
+                float dmgPct = attackerStats.getDamagePercent();
+                float totalPct = physPct + atkTypePct + dmgPct;
+                if (tb != null) {
+                    tb.physDmgPercent(physPct);
+                    tb.attackTypePercent(atkTypePct);
+                    tb.globalDmgPercent(dmgPct);
+                    tb.totalIncreasedPercent(totalPct);
+                }
+                applyPercentIncreased(dist, attackerStats, attackType);
+                if (tb != null) tb.physAfterIncreased(dist.getPhysical());
+                if (traceEnabled) {
+                    LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + melee%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
+                        physPct, atkTypePct, dmgPct, totalPct, dist.getPhysical());
+                }
             }
 
             // ==== STEP 5: Apply elemental % modifiers ====
-            // Now includes converted damage, so fire conversion benefits from +fire% damage
             if (attackerElemental != null) {
+                if (tb != null) {
+                    for (ElementType type : ElementType.values()) {
+                        tb.elemPercentInc(type, (float) attackerElemental.getPercentDamage(type));
+                        tb.elemPercentMore(type, (float) attackerElemental.getMultiplierDamage(type));
+                    }
+                }
                 if (traceEnabled) {
                     float firePct = (float) attackerElemental.getPercentDamage(ElementType.FIRE);
                     float waterPct = (float) attackerElemental.getPercentDamage(ElementType.WATER);
@@ -259,21 +383,41 @@ public class RPGDamageCalculator {
                     }
                 }
                 applyElementalModifiers(dist, attackerElemental);
+                if (tb != null) {
+                    for (ElementType type : ElementType.values()) {
+                        tb.elemAfterMod(type, dist.getElemental(type));
+                    }
+                }
             }
 
             // ==== STEP 6: Apply % more multipliers (to all damage) ====
             float allDmgPct = attackerStats.getAllDamagePercent();
             float dmgMult = attackerStats.getDamageMultiplier();
+            if (tb != null) { tb.allDamagePercent(allDmgPct); tb.damageMultiplier(dmgMult); }
             applyMoreMultipliers(dist, attackerStats);
+            if (tb != null) {
+                tb.physAfterMore(dist.getPhysical());
+                for (ElementType type : ElementType.values()) {
+                    tb.elemAfterMore(type, dist.getElemental(type));
+                }
+            }
             if (traceEnabled) {
                 LOGGER.at(Level.FINE).log("[CALC] Step 6 - %% More: allDmg%%=%.1f×, multiplier=%.1f× → phys=%.1f, totalElem=%.1f",
                     1f + allDmgPct / 100f, 1f + dmgMult / 100f, dist.getPhysical(), dist.getTotalElemental());
             }
 
-            // ==== STEP 7: Apply conditional multiplier ====
-            // Combines realm damage, execute, vs frozen/shocked, low life bonuses
+            // ==== STEP 7: Apply attack type multiplier + conditional multiplier ====
+            if (attackTypeMultiplier != 1.0f) {
+                dist.applyMultiplier(attackTypeMultiplier);
+            }
             if (conditionalMultiplier != 1.0f) {
                 dist.applyMultiplier(conditionalMultiplier);
+            }
+            if (tb != null) {
+                tb.physAfterConditionals(dist.getPhysical());
+                for (ElementType type : ElementType.values()) {
+                    tb.elemAfterConditional(type, dist.getElemental(type));
+                }
             }
             if (traceEnabled) {
                 LOGGER.at(Level.FINE).log("[CALC] Step 7 - Conditional: ×%.2f → phys=%.1f, totalElem=%.1f",
@@ -281,26 +425,33 @@ public class RPGDamageCalculator {
             }
 
             // ==== STEP 8: Roll crit ONCE - applies to ALL damage (skip for DOT) ====
-            // Critical strike now happens AFTER all scaling, so it multiplies BOTH
-            // physical AND elemental damage equally (including flat elemental)
             if (!isDOT) {
-                float critChance = attackerStats.getCriticalChance();
+                float critCh = attackerStats.getCriticalChance();
+                float critMultRaw = attackerStats.getCriticalMultiplier();
+                if (tb != null) { tb.critChance(critCh); tb.critMultiplierRaw(critMultRaw); }
                 CritResult crit = rollCrit(attackerStats);
                 wasCritical = crit.wasCritical();
+                if (tb != null) tb.wasCritical(wasCritical);
                 if (wasCritical) {
                     critMultiplier = crit.multiplier();
                     dist.applyMultiplier(critMultiplier);
+                    if (tb != null) tb.critMultiplierApplied(critMultiplier);
+                }
+                if (tb != null) {
+                    tb.physAfterCrit(dist.getPhysical());
+                    for (ElementType type : ElementType.values()) {
+                        tb.elemAfterCrit(type, dist.getElemental(type));
+                    }
                 }
                 if (traceEnabled) {
                     LOGGER.at(Level.FINE).log("[CALC] Step 8 - Crit roll: chance=%.1f%%, result=%s ×%.2f → phys=%.1f, totalElem=%.1f",
-                        critChance, wasCritical ? "CRIT" : "NO CRIT", wasCritical ? critMultiplier : 1f,
+                        critCh, wasCritical ? "CRIT" : "NO CRIT", wasCritical ? critMultiplier : 1f,
                         dist.getPhysical(), dist.getTotalElemental());
                 }
             }
         }
 
         // ==== STEP 9: Apply defenses per type ====
-        // Capture pre-defense values AFTER crit but BEFORE defenses (for accurate combat log)
         float physBefore = dist.getPhysical();
         float preDefenseTotal = physBefore;
         EnumMap<ElementType, Float> preDefenseElemental = new EnumMap<>(ElementType.class);
@@ -308,19 +459,21 @@ public class RPGDamageCalculator {
             float elemBefore = dist.getElemental(type);
             preDefenseElemental.put(type, elemBefore);
             preDefenseTotal += elemBefore;
+            if (tb != null) tb.elemBeforeResist(type, elemBefore);
         }
+        if (tb != null) tb.physBeforeArmor(physBefore);
 
         armorReduction = applyDefenses(
             dist, defenderStats, defenderElemental,
-            attackerStats, attackerElemental, resistanceReductions
+            attackerStats, attackerElemental, resistanceReductions, attackType, attackerLevel, tb
         );
 
         if (traceEnabled) {
             LOGGER.at(Level.FINE).log("[CALC] Step 9 - Defenses:");
             float armor = defenderStats != null ? defenderStats.getArmor() : 0f;
             float armorPen = attackerStats != null ? attackerStats.getArmorPenetration() : 0f;
-            LOGGER.at(Level.FINE).log("[CALC]   Armor: %.1f, pen=%.1f%%, reduction=%.1f%%, phys %.1f→%.1f",
-                armor, armorPen, armorReduction, physBefore, dist.getPhysical());
+            LOGGER.at(Level.FINE).log("[CALC]   Armor: %.1f, pen=%.1f%%, reduction=%.1f%%, phys %.1f→%.1f (vs Lv%d)",
+                armor, armorPen, armorReduction, physBefore, dist.getPhysical(), attackerLevel);
             float physResist = defenderStats != null ? defenderStats.getPhysicalResistance() : 0f;
             LOGGER.at(Level.FINE).log("[CALC]   Phys Resist: %.1f%%", physResist);
             LOGGER.at(Level.FINE).log("[CALC]   Fire Resist: %.1f%%, fire %.1f→%.1f",
@@ -334,28 +487,24 @@ public class RPGDamageCalculator {
         }
 
         // ==== STEP 10: Add true damage (bypasses all defenses) ====
-        // Added LAST so it's not affected by any defenses
         if (attackerStats != null) {
             float trueDmg = attackerStats.getTrueDamage();
             if (trueDmg > 0) {
                 dist.addTrueDamage(trueDmg);
-                preDefenseTotal += trueDmg; // Include in pre-defense total for combat log
-                if (traceEnabled) {
-                    LOGGER.at(Level.FINE).log("[CALC] Step 10 - True damage: +%.1f (bypasses defenses)", trueDmg);
-                }
+                preDefenseTotal += trueDmg;
+            }
+            if (tb != null) tb.trueDamage(trueDmg);
+            if (traceEnabled && trueDmg > 0) {
+                LOGGER.at(Level.FINE).log("[CALC] Step 10 - True damage: +%.1f (bypasses defenses)", trueDmg);
             }
         }
 
         // Determine primary damage type for indicator color
         DamageType damageType = dist.getPrimaryDamageType();
 
-        // Calculate total for logging
-        float total = dist.getPhysical() + dist.getTrueDamage();
-        for (ElementType type : ElementType.values()) {
-            total += dist.getElemental(type);
-        }
-
         if (traceEnabled) {
+            float total = dist.getPhysical() + dist.getTrueDamage();
+            for (ElementType type : ElementType.values()) total += dist.getElemental(type);
             LOGGER.at(Level.FINE).log("[CALC] ════ CALC RESULT: total=%.1f, type=%s, crit=%s ════",
                 total, damageType, wasCritical);
         }
@@ -409,7 +558,10 @@ public class RPGDamageCalculator {
         @Nonnull AttackType attackType,
         float conditionalMultiplier,
         @Nullable ConditionalResult conditionalResult,
-        float attackTypeMultiplier
+        float attackTypeMultiplier,
+        @Nullable ElementType spellElement,
+        int attackerLevel,
+        boolean projectileSpell
     ) {
         DamageTrace.Builder tb = DamageTrace.builder();
         tb.weaponBaseDamage(baseDamage);
@@ -418,282 +570,13 @@ public class RPGDamageCalculator {
         tb.isMobStats(attackerStats != null && attackerStats.isMobStats());
         tb.conditionals(conditionalResult != null ? conditionalResult : ConditionalResult.NONE);
 
-        // Initialize damage distribution
-        DamageDistribution dist = new DamageDistribution();
-        dist.setPhysical(baseDamage);
-
-        // Track defense breakdown
-        float armorReduction = 0f;
-        EnumMap<ElementType, Float> resistanceReductions = new EnumMap<>(ElementType.class);
-        for (ElementType type : ElementType.values()) {
-            resistanceReductions.put(type, 0f);
-        }
-
-        boolean wasCritical = false;
-        float critMultiplier = 1.0f;
-
-        if (attackerStats != null) {
-            // ==== STEP 1: Flat physical damage ====
-            float beforeFlat = dist.getPhysical();
-            tb.physBeforeFlat(beforeFlat);
-            float flatPhys = attackerStats.getPhysicalDamage();
-            float flatMelee = (attackType == AttackType.MELEE) ? attackerStats.getMeleeDamage() : 0f;
-            tb.flatPhysFromStats(flatPhys);
-            tb.flatMelee(flatMelee);
-            applyFlatDamage(dist, attackerStats, attackType);
-            tb.physAfterFlat(dist.getPhysical());
-
-            // ==== STEP 2: Flat elemental damage ====
-            if (attackerElemental != null) {
-                for (ElementType type : ElementType.values()) {
-                    float flat = (float) attackerElemental.getFlatDamage(type);
-                    if (flat > 0) {
-                        tb.flatElemental(type, flat);
-                    }
-                }
-                addFlatElemental(dist, attackerElemental);
-            }
-
-            // ==== STEP 3: Damage conversion ====
-            float physBeforeConv = dist.getPhysical();
-            tb.physBeforeConversion(physBeforeConv);
-            float fireConv = attackerStats.getFireConversion();
-            float waterConv = attackerStats.getWaterConversion();
-            float lightConv = attackerStats.getLightningConversion();
-            float earthConv = attackerStats.getEarthConversion();
-            float windConv = attackerStats.getWindConversion();
-            float voidConv = attackerStats.getVoidConversion();
-            float totalConv = fireConv + waterConv + lightConv + earthConv + windConv + voidConv;
-            float scale = totalConv > 100f ? 100f / totalConv : 1f;
-            tb.scaleFactor(scale);
-            tb.conversionPercent(ElementType.FIRE, fireConv);
-            tb.conversionPercent(ElementType.WATER, waterConv);
-            tb.conversionPercent(ElementType.LIGHTNING, lightConv);
-            tb.conversionPercent(ElementType.EARTH, earthConv);
-            tb.conversionPercent(ElementType.WIND, windConv);
-            tb.conversionPercent(ElementType.VOID, voidConv);
-
-            // Capture pre-conversion elemental for each type to calculate converted amounts
-            EnumMap<ElementType, Float> elemBefore = new EnumMap<>(ElementType.class);
-            for (ElementType type : ElementType.values()) {
-                elemBefore.put(type, dist.getElemental(type));
-            }
-            applyConversion(dist, attackerStats);
-            tb.physAfterConversion(dist.getPhysical());
-            for (ElementType type : ElementType.values()) {
-                float converted = dist.getElemental(type) - elemBefore.get(type);
-                if (converted > 0) {
-                    tb.convertedAmount(type, converted);
-                }
-            }
-
-            // ==== STEP 4: % Increased physical ====
-            float physPct = attackerStats.getPhysicalDamagePercent();
-            float atkTypePct = switch (attackType) {
-                case MELEE -> attackerStats.getMeleeDamagePercent();
-                case PROJECTILE -> attackerStats.getProjectileDamagePercent();
-                case AREA, UNKNOWN -> 0f;
-            };
-            float dmgPct = attackerStats.getDamagePercent();
-            float totalPct = physPct + atkTypePct + dmgPct;
-            tb.physDmgPercent(physPct);
-            tb.attackTypePercent(atkTypePct);
-            tb.globalDmgPercent(dmgPct);
-            tb.totalIncreasedPercent(totalPct);
-            applyPercentIncreased(dist, attackerStats, attackType);
-            tb.physAfterIncreased(dist.getPhysical());
-
-            // ==== STEP 5: Elemental modifiers ====
-            if (attackerElemental != null) {
-                for (ElementType type : ElementType.values()) {
-                    float pctInc = (float) attackerElemental.getPercentDamage(type);
-                    float pctMore = (float) attackerElemental.getMultiplierDamage(type);
-                    tb.elemPercentInc(type, pctInc);
-                    tb.elemPercentMore(type, pctMore);
-                }
-                applyElementalModifiers(dist, attackerElemental);
-                for (ElementType type : ElementType.values()) {
-                    tb.elemAfterMod(type, dist.getElemental(type));
-                }
-            }
-
-            // ==== STEP 6: % More multipliers ====
-            float allDmgPct = attackerStats.getAllDamagePercent();
-            float dmgMult = attackerStats.getDamageMultiplier();
-            tb.allDamagePercent(allDmgPct);
-            tb.damageMultiplier(dmgMult);
-            applyMoreMultipliers(dist, attackerStats);
-            tb.physAfterMore(dist.getPhysical());
-            for (ElementType type : ElementType.values()) {
-                tb.elemAfterMore(type, dist.getElemental(type));
-            }
-
-            // ==== STEP 7: Attack type multiplier + Conditional multipliers ====
-            if (attackTypeMultiplier != 1.0f) {
-                dist.applyMultiplier(attackTypeMultiplier);
-            }
-            if (conditionalMultiplier != 1.0f) {
-                dist.applyMultiplier(conditionalMultiplier);
-            }
-            // Capture after both attack type and conditionals (always)
-            tb.physAfterConditionals(dist.getPhysical());
-            for (ElementType type : ElementType.values()) {
-                tb.elemAfterConditional(type, dist.getElemental(type));
-            }
-
-            // ==== STEP 8: Critical strike ====
-            float critCh = attackerStats.getCriticalChance();
-            float critMultRaw = attackerStats.getCriticalMultiplier();
-            tb.critChance(critCh);
-            tb.critMultiplierRaw(critMultRaw);
-            CritResult crit = rollCrit(attackerStats);
-            wasCritical = crit.wasCritical();
-            tb.wasCritical(wasCritical);
-            if (wasCritical) {
-                critMultiplier = crit.multiplier();
-                dist.applyMultiplier(critMultiplier);
-                tb.critMultiplierApplied(critMultiplier);
-            }
-            // Capture after crit (always, even if no crit)
-            tb.physAfterCrit(dist.getPhysical());
-            for (ElementType type : ElementType.values()) {
-                tb.elemAfterCrit(type, dist.getElemental(type));
-            }
-        }
-
-        // ==== STEP 9: Defenses ====
-        float physBefore = dist.getPhysical();
-        float preDefenseTotal = physBefore;
-        EnumMap<ElementType, Float> preDefenseElemental = new EnumMap<>(ElementType.class);
-        for (ElementType type : ElementType.values()) {
-            float elemBefore = dist.getElemental(type);
-            preDefenseElemental.put(type, elemBefore);
-            preDefenseTotal += elemBefore;
-            tb.elemBeforeResist(type, elemBefore);
-        }
-        tb.physBeforeArmor(physBefore);
-
-        // Apply defenses and capture detailed armor result
-        armorReduction = applyDefensesTraced(
-            dist, defenderStats, defenderElemental,
-            attackerStats, attackerElemental, resistanceReductions, tb
-        );
-
-        // ==== STEP 10: True damage ====
-        if (attackerStats != null) {
-            float trueDmg = attackerStats.getTrueDamage();
-            if (trueDmg > 0) {
-                dist.addTrueDamage(trueDmg);
-                preDefenseTotal += trueDmg;
-            }
-            tb.trueDamage(trueDmg);
-        }
-
-        // Determine primary damage type
-        DamageType damageType = dist.getPrimaryDamageType();
-
-        // Build the DamageBreakdown
-        DamageBreakdown breakdown = DamageBreakdown.builder()
-            .physicalDamage(dist.getPhysical())
-            .elementalDamage(new EnumMap<>(dist.getElementalMap()))
-            .trueDamage(dist.getTrueDamage())
-            .preDefenseDamage(preDefenseTotal)
-            .preDefenseElemental(preDefenseElemental)
-            .wasCritical(wasCritical)
-            .critMultiplier(wasCritical ? critMultiplier : 1.0f)
-            .armorReduction(armorReduction)
-            .resistanceReduction(ElementType.FIRE, resistanceReductions.getOrDefault(ElementType.FIRE, 0f))
-            .resistanceReduction(ElementType.WATER, resistanceReductions.getOrDefault(ElementType.WATER, 0f))
-            .resistanceReduction(ElementType.LIGHTNING, resistanceReductions.getOrDefault(ElementType.LIGHTNING, 0f))
-            .resistanceReduction(ElementType.EARTH, resistanceReductions.getOrDefault(ElementType.EARTH, 0f))
-            .resistanceReduction(ElementType.WIND, resistanceReductions.getOrDefault(ElementType.WIND, 0f))
-            .resistanceReduction(ElementType.VOID, resistanceReductions.getOrDefault(ElementType.VOID, 0f))
-            .damageType(damageType)
-            .attackType(attackType)
-            .build();
+        DamageBreakdown breakdown = calculatePipeline(baseDamage, attackerStats, attackerElemental,
+            defenderStats, defenderElemental, attackType, false, conditionalMultiplier,
+            false, spellElement, attackerLevel, projectileSpell,
+            tb, attackTypeMultiplier);
 
         tb.breakdown(breakdown);
         return tb.build();
-    }
-
-    /**
-     * Applies defenses with detailed trace capture.
-     *
-     * <p>Same logic as {@link #applyDefenses} but also populates the trace builder
-     * with armor details, physical resistance, and per-element resistance values.
-     *
-     * @return Armor reduction percentage for death recap
-     */
-    private float applyDefensesTraced(
-        @Nonnull DamageDistribution dist,
-        @Nullable ComputedStats defenderStats,
-        @Nullable ElementalStats defenderElemental,
-        @Nullable ComputedStats attackerStats,
-        @Nullable ElementalStats attackerElemental,
-        @Nonnull EnumMap<ElementType, Float> resistanceReductions,
-        @Nonnull DamageTrace.Builder tb
-    ) {
-        float armorReduction = 0f;
-
-        if (defenderStats == null) {
-            return armorReduction;
-        }
-
-        // Apply armor to physical damage
-        float physDamage = dist.getPhysical();
-        if (physDamage > 0) {
-            float armorPen = attackerStats != null ? attackerStats.getArmorPenetration() : 0f;
-            tb.armorPenPercent(armorPen);
-
-            CombatCalculator.ArmorResult armorResult = combatCalculator.calculateDefenderReduction(
-                physDamage, defenderStats, armorPen
-            );
-            dist.setPhysical(armorResult.finalDamage());
-            armorReduction = armorResult.reductionPercent();
-
-            tb.defenderArmor(armorResult.armorValue());
-            tb.armorPercent(defenderStats.getArmorPercent());
-            tb.effectiveArmor(armorResult.effectiveArmor());
-            tb.armorReductionPercent(armorReduction);
-            tb.physAfterArmor(armorResult.finalDamage());
-
-            // Physical resistance after armor
-            float physResist = defenderStats.getPhysicalResistance();
-            tb.physResistPercent(physResist);
-            if (physResist > 0 && dist.getPhysical() > 0) {
-                float cappedResist = Math.min(physResist, 75f); // MAX_RESISTANCE_CAP
-                dist.applyPhysicalMultiplier(1f - cappedResist / 100f);
-            }
-            tb.physAfterResist(dist.getPhysical());
-        }
-
-        // Apply elemental resistances
-        ElementalStats defElem = defenderElemental != null ? defenderElemental : new ElementalStats();
-        for (ElementType type : ElementType.values()) {
-            float elemDamage = dist.getElemental(type);
-            double rawResist = defElem.getResistance(type);
-            double penetration = attackerElemental != null ? attackerElemental.getPenetration(type) : 0;
-
-            tb.defenderRawResist(type, (float) rawResist);
-            tb.attackerPen(type, (float) penetration);
-
-            if (elemDamage <= 0 || Float.isNaN(elemDamage)) {
-                tb.effectiveResist(type, 0f);
-                tb.elemAfterResist(type, 0f);
-                continue;
-            }
-
-            double effectiveResist = ElementalCalculator.getEffectiveResistance(rawResist, penetration);
-            float finalDamage = (float) (elemDamage * (1.0 - effectiveResist / 100.0));
-
-            dist.setElemental(type, finalDamage);
-            resistanceReductions.put(type, (float) effectiveResist);
-
-            tb.effectiveResist(type, (float) effectiveResist);
-            tb.elemAfterResist(type, finalDamage);
-        }
-
-        return armorReduction;
     }
 
     /**
@@ -710,7 +593,8 @@ public class RPGDamageCalculator {
         float baseDamage,
         @Nullable ComputedStats defenderStats,
         @Nullable ElementalStats defenderElemental,
-        @Nullable ElementType damageElement
+        @Nullable ElementType damageElement,
+        int attackerLevel
     ) {
         DamageDistribution dist = new DamageDistribution();
 
@@ -731,7 +615,7 @@ public class RPGDamageCalculator {
 
         // Apply defenses
         EnumMap<ElementType, Float> resistanceReductions = new EnumMap<>(ElementType.class);
-        float armorReduction = applyDefenses(dist, defenderStats, defenderElemental, null, null, resistanceReductions);
+        float armorReduction = applyDefenses(dist, defenderStats, defenderElemental, null, null, resistanceReductions, AttackType.UNKNOWN, attackerLevel, null);
 
         DamageType damageType = DamageType.fromElement(damageElement);
 
@@ -747,6 +631,219 @@ public class RPGDamageCalculator {
             .damageType(damageType)
             .attackType(AttackType.UNKNOWN)
             .build();
+    }
+
+    // ==================== Average Damage Estimation ====================
+
+    /**
+     * Estimates average damage per hit for display purposes (Stats page, tooltips).
+     *
+     * <p>Runs the EXACT same pipeline as {@link #calculate} (steps 1-7) but:
+     * <ul>
+     *   <li>Uses expected crit (probability × bonus) instead of RNG rolling</li>
+     *   <li>Passes null defender (no defenses applied — shows raw output)</li>
+     *   <li>Uses no conditional multiplier (situational, not static)</li>
+     *   <li>Includes true damage (added after the pipeline)</li>
+     * </ul>
+     *
+     * <p>This method exists so display code never reimplements the damage formula.
+     * If the pipeline changes, this method automatically reflects the change.
+     *
+     * @param stats The player's computed stats
+     * @return Average damage estimate with breakdown details
+     */
+    @Nonnull
+    public DamageEstimate estimateAverageDamage(@Nonnull ComputedStats stats) {
+        float baseDamage = stats.getWeaponBaseDamage();
+        ElementalStats elemental = stats.toElementalStats();
+
+        // Detect weapon type from equipped item for accurate attack type
+        WeaponType weaponType = WeaponType.fromItemIdOrUnknown(stats.getWeaponItemId());
+        boolean isSpell = weaponType.isMagic();
+        boolean isProjectile = weaponType.isRanged();
+        AttackType attackType = isSpell ? AttackType.SPELL
+            : isProjectile ? AttackType.PROJECTILE
+            : AttackType.MELEE;
+
+        // For spells, use fixed element from weapon or fall back to dominant attribute
+        ElementType spellElement = null;
+        if (isSpell) {
+            ElementType fixedElement = stats.getWeaponSpellElement();
+            spellElement = fixedElement != null ? fixedElement : findDominantSpellElement(elemental);
+        }
+
+        // Create damage distribution — matches real pipeline initialization (line 168-174)
+        // Spells place weapon implicit into the element slot, not physical
+        DamageDistribution dist = new DamageDistribution();
+        if (isSpell) {
+            dist.setElemental(spellElement, baseDamage);
+        } else {
+            dist.setPhysical(baseDamage);
+        }
+
+        // Step 1: Flat damage — applyFlatDamage handles spell/melee/projectile internally
+        // For spells: adds getSpellDamage() flat to spell element slot
+        // For melee: adds physicalDamage + meleeDamage
+        // For projectile: adds physicalDamage only (no meleeDamage)
+        applyFlatDamage(dist, stats, attackType, spellElement);
+
+        // Step 2: Flat elemental
+        if (elemental.hasAnyElementalDamage()) {
+            addFlatElemental(dist, elemental);
+        }
+
+        // Step 3: Conversion (physical → elemental)
+        if (!isSpell) {
+            applyConversion(dist, stats);
+        }
+
+        // Step 4: % Increased
+        if (isSpell) {
+            float spellPct = stats.getSpellDamagePercent();
+            float dmgPct = stats.getDamagePercent();
+            float totalPct = spellPct + dmgPct;
+            if (totalPct != 0f) {
+                dist.applyElementalPercentIncrease(spellElement, totalPct);
+            }
+        } else {
+            applyPercentIncreased(dist, stats, attackType);
+        }
+
+        // Step 5: Elemental modifiers (per-element % inc + % more)
+        applyElementalModifiers(dist, elemental);
+
+        // Step 6: % More multipliers
+        applyMoreMultipliers(dist, stats);
+
+        // No step 7 (conditionals — situational, not included in average)
+
+        // Capture pre-crit total (physical + elemental, no true damage yet)
+        float preCritTotal = dist.getPhysical() + dist.getTotalElemental();
+
+        // Step 8: Expected crit (replaces RNG roll)
+        float critChance = stats.getCriticalChance();
+        float critMultRaw = stats.getCriticalMultiplier();
+        float expectedCritMult;
+        if (critChance >= 100f) {
+            // Guaranteed crit — use full multiplier
+            expectedCritMult = Math.max(1f, critMultRaw / 100f);
+        } else if (critChance > 0) {
+            expectedCritMult = 1f + (critChance / 100f) * (Math.max(100f, critMultRaw) / 100f - 1f);
+        } else {
+            expectedCritMult = 1f;
+        }
+        float afterCrit = preCritTotal * expectedCritMult;
+
+        // Step 10: True damage (bypasses everything, added last)
+        float trueDamage = stats.getTrueDamage();
+        float totalAverage = afterCrit + trueDamage;
+
+        // Breakdown for tooltip display — matches what applyFlatDamage() actually does
+        float flatPhys = isSpell ? 0f : stats.getPhysicalDamage();
+        float flatMelee = (attackType == AttackType.MELEE) ? stats.getMeleeDamage() : 0f;
+        float flatSpell = isSpell ? stats.getSpellDamage() : 0f;
+        float flatElemental = 0f;
+        for (ElementType type : ElementType.values()) {
+            flatElemental += (float) elemental.getFlatDamage(type);
+        }
+        float baseTotal = baseDamage + flatPhys + flatMelee + flatSpell + flatElemental;
+
+        // % Increased pool — matches applyPercentIncreased() logic exactly
+        float totalIncreasedPct;
+        if (isSpell) {
+            totalIncreasedPct = stats.getSpellDamagePercent() + stats.getDamagePercent();
+        } else {
+            totalIncreasedPct = stats.getPhysicalDamagePercent()
+                + switch (attackType) {
+                    case MELEE -> stats.getMeleeDamagePercent();
+                    case PROJECTILE -> stats.getProjectileDamagePercent();
+                    default -> 0f;
+                }
+                + stats.getDamagePercent();
+        }
+        float increasedMult = 1f + totalIncreasedPct / 100f;
+
+        // % More
+        float allDmgPct = stats.getAllDamagePercent();
+        float dmgMult = stats.getDamageMultiplier();
+        float moreMult = (1f + allDmgPct / 100f) * (1f + dmgMult / 100f);
+
+        // Conversion total
+        float totalConvPct = stats.getFireConversion() + stats.getWaterConversion()
+            + stats.getLightningConversion() + stats.getEarthConversion()
+            + stats.getWindConversion() + stats.getVoidConversion();
+
+        return new DamageEstimate(
+            totalAverage,
+            baseDamage,
+            flatPhys,
+            flatMelee,
+            flatSpell,
+            flatElemental,
+            baseTotal,
+            totalIncreasedPct,
+            increasedMult,
+            allDmgPct,
+            dmgMult,
+            moreMult,
+            critChance,
+            critMultRaw,
+            expectedCritMult,
+            totalConvPct,
+            dist.getTotalElemental(),
+            trueDamage,
+            isSpell
+        );
+    }
+
+    /**
+     * Finds the dominant spell element from ElementalStats (highest flat damage).
+     * Falls back to WATER (the spell attribute) if no flat elemental damage exists,
+     * then to FIRE as last resort.
+     */
+    @Nonnull
+    private ElementType findDominantSpellElement(@Nonnull ElementalStats elemental) {
+        ElementType best = null;
+        double bestVal = 0;
+        for (ElementType type : ElementType.values()) {
+            double flat = elemental.getFlatDamage(type);
+            if (flat > bestVal) {
+                bestVal = flat;
+                best = type;
+            }
+        }
+        // Fallback: WATER is the spell attribute, so most spell builds are water-aligned
+        return best != null ? best : ElementType.WATER;
+    }
+
+    /**
+     * Immutable result of {@link #estimateAverageDamage} for display/tooltip use.
+     */
+    public record DamageEstimate(
+        float avgDamagePerHit,
+        float weaponBase,
+        float flatPhysical,
+        float flatMelee,
+        float flatSpell,
+        float flatElemental,
+        float baseTotal,
+        float totalIncreasedPct,
+        float increasedMult,
+        float allDamagePct,
+        float damageMultiplier,
+        float moreMult,
+        float critChance,
+        float critMultRaw,
+        float expectedCritMult,
+        float conversionPct,
+        float elementalAfterMods,
+        float trueDamage,
+        boolean isSpell
+    ) {
+        public static final DamageEstimate ZERO = new DamageEstimate(
+            0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, 100f, 1f,
+            0f, 0f, 0f, false
+        );
     }
 
     // ==================== Internal Calculation Steps ====================
@@ -765,7 +862,8 @@ public class RPGDamageCalculator {
     private void applyFlatDamage(
         @Nonnull DamageDistribution dist,
         @Nonnull ComputedStats stats,
-        @Nonnull AttackType attackType
+        @Nonnull AttackType attackType,
+        @Nullable ElementType spellElement
     ) {
         // Skip flat damage for mobs - their damage is already calculated via weighted formula
         // and uses vanilla attack damage as base. Adding flat damage would cause stacking.
@@ -774,22 +872,27 @@ public class RPGDamageCalculator {
             return;
         }
 
-        // Flat physical damage (from STR)
-        float flatPhys = stats.getPhysicalDamage();
-        if (flatPhys > 0) {
-            dist.addPhysical(flatPhys);
-        }
+        if (attackType == AttackType.SPELL && spellElement != null) {
+            // Flat spell damage — added to the spell's element slot
+            float flatSpell = stats.getSpellDamage();
+            if (flatSpell > 0) {
+                dist.addElemental(spellElement, flatSpell);
+            }
+        } else {
+            // Flat physical damage (from STR)
+            float flatPhys = stats.getPhysicalDamage();
+            if (flatPhys > 0) {
+                dist.addPhysical(flatPhys);
+            }
 
-        // Flat melee damage (only for melee attacks)
-        if (attackType == AttackType.MELEE) {
-            float flatMelee = stats.getMeleeDamage();
-            if (flatMelee > 0) {
-                dist.addPhysical(flatMelee);
+            // Flat melee damage (only for melee attacks)
+            if (attackType == AttackType.MELEE) {
+                float flatMelee = stats.getMeleeDamage();
+                if (flatMelee > 0) {
+                    dist.addPhysical(flatMelee);
+                }
             }
         }
-
-        // Spell damage would be added here if we have spell attacks
-        // Currently handled as elemental flat damage
     }
 
     /**
@@ -810,10 +913,11 @@ public class RPGDamageCalculator {
         totalPercent += stats.getPhysicalDamagePercent();
 
         // Attack type-specific percent
+        // Note: SPELL is handled separately in calculate() — never reaches here
         totalPercent += switch (attackType) {
             case MELEE -> stats.getMeleeDamagePercent();
             case PROJECTILE -> stats.getProjectileDamagePercent();
-            case AREA, UNKNOWN -> 0f;
+            case AREA, SPELL, UNKNOWN -> 0f;
         };
 
         // Global damage percent (allDamagePercent is separate multiplier layer in old code)
@@ -996,6 +1100,7 @@ public class RPGDamageCalculator {
      * <p>Applies armor to physical, resistances to elemental. True damage is added
      * separately AFTER this step and bypasses all defenses.
      *
+     * @param tb Optional trace builder for death recap detail (null = no recording)
      * @return Armor reduction percentage for death recap
      */
     private float applyDefenses(
@@ -1004,7 +1109,10 @@ public class RPGDamageCalculator {
         @Nullable ElementalStats defenderElemental,
         @Nullable ComputedStats attackerStats,
         @Nullable ElementalStats attackerElemental,
-        @Nonnull EnumMap<ElementType, Float> resistanceReductions
+        @Nonnull EnumMap<ElementType, Float> resistanceReductions,
+        @Nonnull AttackType attackType,
+        int attackerLevel,
+        @Nullable DamageTrace.Builder tb
     ) {
         float armorReduction = 0f;
 
@@ -1016,38 +1124,67 @@ public class RPGDamageCalculator {
         float physDamage = dist.getPhysical();
         if (physDamage > 0) {
             float armorPen = attackerStats != null ? attackerStats.getArmorPenetration() : 0f;
+            if (tb != null) tb.armorPenPercent(armorPen);
+
             CombatCalculator.ArmorResult armorResult = combatCalculator.calculateDefenderReduction(
-                physDamage, defenderStats, armorPen
+                physDamage, defenderStats, armorPen, attackerLevel
             );
             dist.setPhysical(armorResult.finalDamage());
             armorReduction = armorResult.reductionPercent();
 
+            if (tb != null) {
+                tb.defenderArmor(armorResult.armorValue());
+                tb.armorPercent(defenderStats.getArmorPercent());
+                tb.effectiveArmor(armorResult.effectiveArmor());
+                tb.armorReductionPercent(armorReduction);
+                tb.physAfterArmor(armorResult.finalDamage());
+            }
+
             // Apply physical resistance after armor
             float physResist = defenderStats.getPhysicalResistance();
+            if (tb != null) tb.physResistPercent(physResist);
             if (physResist > 0 && dist.getPhysical() > 0) {
                 float cappedResist = Math.min(physResist, MAX_RESISTANCE_CAP);
                 dist.applyPhysicalMultiplier(1f - cappedResist / 100f);
             }
+            if (tb != null) tb.physAfterResist(dist.getPhysical());
         }
+
+        // Spell penetration: additional penetration for all elements on spell attacks
+        float spellPen = (attackType == AttackType.SPELL && attackerStats != null)
+            ? attackerStats.getSpellPenetration() : 0f;
 
         // Apply elemental resistances
         ElementalStats defElem = defenderElemental != null ? defenderElemental : new ElementalStats();
         for (ElementType type : ElementType.values()) {
             float elemDamage = dist.getElemental(type);
-            if (elemDamage <= 0 || Float.isNaN(elemDamage)) continue;
+            double rawResist = defElem.getResistance(type);
+            double penetration = (attackerElemental != null ? attackerElemental.getPenetration(type) : 0) + spellPen;
 
-            double resistance = defElem.getResistance(type);
-            double penetration = attackerElemental != null ? attackerElemental.getPenetration(type) : 0;
+            if (tb != null) {
+                tb.defenderRawResist(type, (float) rawResist);
+                tb.attackerPen(type, (float) penetration);
+            }
 
-            // Use ElementalCalculator for proper resistance application
-            double effectiveResist = ElementalCalculator.getEffectiveResistance(resistance, penetration);
+            if (elemDamage <= 0 || Float.isNaN(elemDamage)) {
+                if (tb != null) {
+                    tb.effectiveResist(type, 0f);
+                    tb.elemAfterResist(type, 0f);
+                }
+                continue;
+            }
+
+            double effectiveResist = ElementalCalculator.getEffectiveResistance(rawResist, penetration);
             float finalDamage = (float) (elemDamage * (1.0 - effectiveResist / 100.0));
 
             dist.setElemental(type, finalDamage);
             resistanceReductions.put(type, (float) effectiveResist);
-        }
 
-        // True damage is not affected by defenses (already in dist.trueDamage)
+            if (tb != null) {
+                tb.effectiveResist(type, (float) effectiveResist);
+                tb.elemAfterResist(type, finalDamage);
+            }
+        }
 
         return armorReduction;
     }
@@ -1072,7 +1209,8 @@ public class RPGDamageCalculator {
         @Nullable ComputedStats defenderStats,
         @Nullable ElementalStats defenderElemental,
         @Nonnull AttackType attackType,
-        boolean forceCrit
+        boolean forceCrit,
+        int attackerLevel
     ) {
         // Initialize damage distribution
         DamageDistribution dist = new DamageDistribution();
@@ -1086,8 +1224,8 @@ public class RPGDamageCalculator {
         float critMultiplier = 1.0f;
 
         if (attackerStats != null) {
-            // STEP 1: Flat physical damage
-            applyFlatDamage(dist, attackerStats, attackType);
+            // STEP 1: Flat physical damage (test helper — no spell support)
+            applyFlatDamage(dist, attackerStats, attackType, null);
 
             // STEP 2: Flat elemental damage (added early so it benefits from modifiers + crit)
             if (attackerElemental != null) {
@@ -1129,7 +1267,7 @@ public class RPGDamageCalculator {
         }
 
         armorReduction = applyDefenses(dist, defenderStats, defenderElemental,
-            attackerStats, attackerElemental, resistanceReductions);
+            attackerStats, attackerElemental, resistanceReductions, attackType, attackerLevel, null);
 
         // STEP 10: True damage added AFTER defenses (bypasses them)
         if (attackerStats != null) {

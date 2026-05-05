@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.sanctum.ui;
 
 import au.ellie.hyui.builders.HudBuilder;
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.builders.HyUIStyle;
 import au.ellie.hyui.builders.LabelBuilder;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -9,6 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
 import io.github.larsonix.trailoforbis.skilltree.model.SkillTreeData;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
+import io.github.larsonix.trailoforbis.ui.hud.HudRefreshHelper;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -17,35 +19,32 @@ import java.util.UUID;
  * Builds the persistent skill point allocation HUD shown in the Skill Sanctum.
  *
  * <p>Displays a decorated container at the bottom-left of the screen with
- * three labels spaced evenly (space-evenly pattern via flex spacers):
+ * four labels spaced evenly (space-evenly pattern via flex spacers):
  * <pre>
- *    Unallocated : #     Allocated : #     Total : #
+ *    Unallocated : #     Allocated : #     Total : #     Refunds : #
  * </pre>
  *
+ * <p>The refund label dynamically changes color: yellow when points are available,
+ * red when depleted (0 remaining).
+ *
  * <p>Updates are event-driven: {@link SkillPointHudManager} calls
- * {@code hud.triggerRefresh()} when nodes are allocated, deallocated, or respecced.
- * A slow failsafe refresh (every {@value SYNC_INTERVAL_MS}ms) catches admin commands
- * that bypass the event system.
+ * {@link HudRefreshHelper#safeRefreshWithToggle} when nodes are allocated,
+ * deallocated, or respecced. No periodic timer — all visual updates go through
+ * the centralized safe refresh path to prevent stale {@code Set} command crashes.
  *
  * @see SkillPointHudManager
  */
 public class SkillPointHud {
 
     // ═══════════════════════════════════════════════════════════════════
-    // CONSTANTS - SYNC
-    // ═══════════════════════════════════════════════════════════════════
-
-    /** Failsafe sync interval for admin commands that bypass skill tree events. */
-    private static final int SYNC_INTERVAL_MS = 5000;
-
-    // ═══════════════════════════════════════════════════════════════════
     // CONSTANTS - LAYOUT
     // ═══════════════════════════════════════════════════════════════════
 
-    private static final int CONTAINER_WIDTH = 400;
+    private static final int CONTAINER_WIDTH = 460;
     private static final int CONTAINER_HEIGHT = 70;
-    private static final int BOTTOM_MARGIN = 40;
-    private static final int LEFT_MARGIN = 80;
+    private static final int BOTTOM_MARGIN = 70;
+    private static final int LEFT_MARGIN = 25;
+    private static final float LABEL_FONT_SIZE = 13.0f;
 
     // ═══════════════════════════════════════════════════════════════════
     // ELEMENT IDS
@@ -54,6 +53,16 @@ public class SkillPointHud {
     private static final String ID_UNALLOCATED = "sp-unallocated";
     private static final String ID_ALLOCATED = "sp-allocated";
     private static final String ID_TOTAL = "sp-total";
+    private static final String ID_REFUNDS = "sp-refunds";
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CONSTANTS - COLORS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** Yellow/gold — refund points available (limited resource, use wisely). */
+    private static final String COLOR_REFUND_AVAILABLE = RPGStyles.TEXT_WARNING;
+    /** Red — refund points depleted (can't deallocate). */
+    private static final String COLOR_REFUND_DEPLETED = RPGStyles.NEGATIVE;
 
     // ═══════════════════════════════════════════════════════════════════
     // PUBLIC API
@@ -63,8 +72,7 @@ public class SkillPointHud {
      * Creates and shows the skill point HUD for a player in the sanctum.
      *
      * <p>The refresh callback reads current skill tree data and only pushes
-     * updates when values actually change, avoiding redundant packets on
-     * failsafe ticks.
+     * updates when values actually change, avoiding redundant rerender packets.
      *
      * @param player           The player to show the HUD to
      * @param store            The entity store
@@ -85,28 +93,31 @@ public class SkillPointHud {
         int unallocated = data.getSkillPoints();
         int allocated = skillTreeManager.calculateFullRespecCost(playerId);
         int total = unallocated + allocated;
+        int refunds = data.getSkillRefundPoints();
 
         // Cached state to skip redundant updates on no-change ticks.
         int[] displayUnallocated = { unallocated };
         int[] displayAllocated = { allocated };
         int[] displayTotal = { total };
+        int[] displayRefunds = { refunds };
 
-        String html = buildHtml(unallocated, allocated, total);
+        String html = buildHtml(unallocated, allocated, total, refunds);
 
         return HudBuilder.hudForPlayer(player)
             .fromHtml(html)
-            .withRefreshRate(SYNC_INTERVAL_MS)
             .onRefresh(hud -> {
                 SkillTreeData current = skillTreeManager.getSkillTreeData(playerId);
                 int curUnallocated = current.getSkillPoints();
                 int curAllocated = skillTreeManager.calculateFullRespecCost(playerId);
                 int curTotal = curUnallocated + curAllocated;
+                int curRefunds = current.getSkillRefundPoints();
 
                 boolean unallocatedChanged = curUnallocated != displayUnallocated[0];
                 boolean allocatedChanged = curAllocated != displayAllocated[0];
                 boolean totalChanged = curTotal != displayTotal[0];
+                boolean refundsChanged = curRefunds != displayRefunds[0];
 
-                if (!unallocatedChanged && !allocatedChanged && !totalChanged) {
+                if (!unallocatedChanged && !allocatedChanged && !totalChanged && !refundsChanged) {
                     return;
                 }
 
@@ -127,6 +138,21 @@ public class SkillPointHud {
                     hud.getById(ID_TOTAL, LabelBuilder.class).ifPresent(label ->
                         label.withText("Total : " + curTotal));
                 }
+
+                if (refundsChanged) {
+                    displayRefunds[0] = curRefunds;
+                    hud.getById(ID_REFUNDS, LabelBuilder.class).ifPresent(label -> {
+                        label.withText("Refunds : " + curRefunds);
+                        // Dynamic color: yellow when available, red when depleted.
+                        // Must include fontSize — withStyle() replaces the entire style object,
+                        // so omitting fontSize would lose the font-size: 13 from the HTML template.
+                        String color = curRefunds > 0 ? COLOR_REFUND_AVAILABLE : COLOR_REFUND_DEPLETED;
+                        label.withStyle(new HyUIStyle()
+                            .setTextColor(color)
+                            .setFontSize(LABEL_FONT_SIZE)
+                            .setRenderBold(true));
+                    });
+                }
             })
             .show();
     }
@@ -141,8 +167,12 @@ public class SkillPointHud {
      * <p>Layout: full-screen root with Bottom stacking, inner container positioned
      * at bottom-left via margins. Uses a compact {@code decorated-container} for the
      * vanilla Hytale container background with "Skill Points" title bar.
+     *
+     * <p>Four labels evenly spaced: Unallocated (green), Allocated (cyan),
+     * Total (white), Refunds (yellow/red depending on availability).
      */
-    private static String buildHtml(int unallocated, int allocated, int total) {
+    private static String buildHtml(int unallocated, int allocated, int total, int refunds) {
+        String refundColor = refunds > 0 ? COLOR_REFUND_AVAILABLE : COLOR_REFUND_DEPLETED;
         return """
             <div style="anchor-horizontal: 0; anchor-vertical: 0; layout-mode: Bottom;">
                 <div style="layout-mode: Left; margin-bottom: %d; margin-left: %d;">
@@ -157,6 +187,8 @@ public class SkillPointHud {
                                 <div style="flex-weight: 1;"></div>
                                 <p id="%s" style="font-size: 13; font-weight: bold; color: %s;">Total : %d</p>
                                 <div style="flex-weight: 1;"></div>
+                                <p id="%s" style="font-size: 13; font-weight: bold; color: %s;">Refunds : %d</p>
+                                <div style="flex-weight: 1;"></div>
                             </div>
                         </div>
                     </div>
@@ -167,7 +199,8 @@ public class SkillPointHud {
                 CONTAINER_WIDTH, CONTAINER_HEIGHT,
                 ID_UNALLOCATED, RPGStyles.POSITIVE, unallocated,
                 ID_ALLOCATED, RPGStyles.TEXT_INFO, allocated,
-                ID_TOTAL, RPGStyles.TEXT_PRIMARY, total);
+                ID_TOTAL, RPGStyles.TEXT_PRIMARY, total,
+                ID_REFUNDS, refundColor, refunds);
     }
 
     private SkillPointHud() {}

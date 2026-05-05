@@ -11,6 +11,7 @@ import io.github.larsonix.trailoforbis.config.RPGConfig;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.database.repository.PlayerDataRepository;
 import io.github.larsonix.trailoforbis.gear.stats.GearBonusProvider;
+import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
 import io.github.larsonix.trailoforbis.skilltree.calculation.AggregatedModifiers;
@@ -88,6 +89,13 @@ public class StatBreakdownCalculator {
         BaseStats vanillaStats = statProvider.getBaseStats(playerId);
         float equipmentArmor = getEquipmentArmor(playerId);
 
+        // Get player level (matches AttributeManager.recalculateStatsInternal)
+        int playerLevel = 1;
+        Optional<LevelingService> levelingOpt = ServiceRegistry.get(LevelingService.class);
+        if (levelingOpt.isPresent()) {
+            playerLevel = levelingOpt.get().getLevel(playerId);
+        }
+
         // Create zero-attribute clone for base snapshot
         PlayerData zeroData = realData.toBuilder()
             .fire(0).water(0).lightning(0).earth(0).wind(0).voidAttr(0)
@@ -95,11 +103,11 @@ public class StatBreakdownCalculator {
 
         // === STEP 1: BASE SNAPSHOT ===
         // Vanilla stats + equipment armor, zero attribute points
-        ComputedStats base = calculator.calculateStats(zeroData, vanillaStats, equipmentArmor);
+        ComputedStats base = calculator.calculateStats(zeroData, vanillaStats, equipmentArmor, playerLevel);
 
         // === STEP 2: AFTER ATTRIBUTES SNAPSHOT ===
         // Real attribute point grants applied
-        ComputedStats afterAttributes = calculator.calculateStats(realData, vanillaStats, equipmentArmor);
+        ComputedStats afterAttributes = calculator.calculateStats(realData, vanillaStats, equipmentArmor, playerLevel);
 
         // === STEP 3: AFTER SKILL TREE SNAPSHOT ===
         ComputedStats afterSkillTree = afterAttributes;
@@ -117,11 +125,6 @@ public class StatBreakdownCalculator {
                 }
             }
         }
-
-        // === STEP 3.5: CONSOLIDATE PERCENT RESOURCE MODIFIERS ===
-        // Fold maxHealthPercent, maxManaPercent, etc. into actual resource values
-        // (must happen before gear bonuses which layer on top)
-        afterSkillTree.consolidateResourcePercents();
 
         // === STEP 4: AFTER GEAR SNAPSHOT ===
         // CRITICAL: deep copy before gear mutation (gear applies in-place)
@@ -143,6 +146,22 @@ public class StatBreakdownCalculator {
                 afterConditionals = combiner.combine(afterGear, condBuilder.build());
             }
         }
+
+        // === STEP 6: RETURN UNCONSOLIDATED SNAPSHOTS ===
+        // Snapshots are stored WITHOUT consolidation so the consumer can decompose
+        // each source's contribution into flat, percent, and multiplier layers.
+        //
+        // For resource stats (HP, mana, etc.) the ARPG formula is:
+        //   Final = (base + flat) × (1 + percent/100) × multiplierProduct
+        //
+        // The consumer extracts:
+        //   - Flat per source:  delta on the raw field (e.g., getMaxHealth())
+        //   - Percent per source: delta on the accumulator (e.g., getMaxHealthPercent())
+        //   - Multiplier per source: ratio of multiplierProduct between snapshots
+        //   - Final value: from the real ComputedStats (already consolidated by main pipeline)
+        //
+        // For non-resource stats (armor, crit, etc.), the raw field IS the final value
+        // since these stats don't go through consolidateResourcePercents().
 
         return new StatBreakdownResult(base, afterAttributes, afterSkillTree, afterGear, afterConditionals);
     }

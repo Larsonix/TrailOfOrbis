@@ -411,6 +411,6 @@ class CombatTextProfileResolverTest {
     // ── Helper ───────────────────────────────────────────────────────────
 
     private static CombatTextProfile profile(String id, Color color) {
-        return CombatTextProfile.unregistered(id, color, 68f, 0.4f, 2.0f, DEFAULT_ANIM);
+        return CombatTextProfile.of(id, color, 68f, 0.4f, 2.0f, DEFAULT_ANIM);
     }
 }

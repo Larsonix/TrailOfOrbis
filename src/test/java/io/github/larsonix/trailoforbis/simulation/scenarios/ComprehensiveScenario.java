@@ -10,6 +10,8 @@ import io.github.larsonix.trailoforbis.leveling.formula.EffortBasedFormula;
 import io.github.larsonix.trailoforbis.leveling.formula.EffortCurve;
 import io.github.larsonix.trailoforbis.leveling.formula.LevelFormula;
 import io.github.larsonix.trailoforbis.leveling.formula.MobXpEstimator;
+import io.github.larsonix.trailoforbis.mobs.model.MobStats;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatProfile;
@@ -74,6 +76,8 @@ public final class ComprehensiveScenario {
     private final MobHpFormula hpFormula;
     private final MobStatPoolConfig mobConfig;
     private final LevelingConfig levelingConfig;
+    @javax.annotation.Nullable
+    private final MobStatFactory mobFactory;
 
     public ComprehensiveScenario(
             @Nonnull StatPipeline pipeline,
@@ -82,6 +86,17 @@ public final class ComprehensiveScenario {
             @Nonnull MobStatPoolConfig mobConfig,
             @Nonnull LevelingConfig levelingConfig,
             @Nonnull io.github.larsonix.trailoforbis.simulation.core.AvoidanceModel avoidanceModel) {
+        this(pipeline, buildFactory, archetypes, mobConfig, levelingConfig, avoidanceModel, null);
+    }
+
+    public ComprehensiveScenario(
+            @Nonnull StatPipeline pipeline,
+            @Nonnull BuildFactory buildFactory,
+            @Nonnull List<BuildArchetype> archetypes,
+            @Nonnull MobStatPoolConfig mobConfig,
+            @Nonnull LevelingConfig levelingConfig,
+            @Nonnull io.github.larsonix.trailoforbis.simulation.core.AvoidanceModel avoidanceModel,
+            @javax.annotation.Nullable MobStatFactory mobFactory) {
         this.pipeline = pipeline;
         this.buildFactory = buildFactory;
         this.archetypes = archetypes;
@@ -90,6 +105,7 @@ public final class ComprehensiveScenario {
         this.hpFormula = new MobHpFormula(mobConfig);
         this.mobConfig = mobConfig;
         this.levelingConfig = levelingConfig;
+        this.mobFactory = mobFactory;
     }
 
     public void run(@Nonnull Path outputDir) throws IOException {
@@ -110,8 +126,13 @@ public final class ComprehensiveScenario {
         System.out.println("  [5/6] Computing XP economy...");
         writeXpEconomy(outputDir);
 
-        System.out.println("  [6/6] Scanning for balance flags...");
+        System.out.println("  [6/7] Scanning for balance flags...");
         writeBalanceFlags(outputDir);
+
+        if (mobFactory != null) {
+            System.out.println("  [7/7] Running generator A/B comparison (Dirichlet vs Template)...");
+            writeGeneratorComparison(outputDir);
+        }
     }
 
     // =========================================================================
@@ -202,9 +223,9 @@ public final class ComprehensiveScenario {
                 for (int c = 0; c < classes.length; c++) {
                     MobStatProfile p;
                     if (mults[c] == 1.0) {
-                        p = mobGenerator.generate(level, 0, BASE_SEED + level);
+                        p = mobGenerator.generateDeterministic(level, 0);
                     } else {
-                        p = mobGenerator.generateSpecial(level, 0, mults[c], BASE_SEED + level);
+                        p = mobGenerator.generateDeterministic(level, 0).withBossMultiplier(mults[c]);
                     }
 
                     boolean isBoss = mults[c] == BOSS_MULT;
@@ -264,9 +285,9 @@ public final class ComprehensiveScenario {
                             long seed = BASE_SEED + level * 1000L + s;
                             MobStatProfile mobProfile;
                             if (mults[c] == 1.0) {
-                                mobProfile = mobGenerator.generate(level, 0, seed);
+                                mobProfile = mobGenerator.generateDeterministic(level, 0);
                             } else {
-                                mobProfile = mobGenerator.generateSpecial(level, 0, mults[c], seed);
+                                mobProfile = mobGenerator.generateDeterministic(level, 0).withBossMultiplier(mults[c]);
                             }
                             ComputedStats mobSt = hpFormula.toActualCombatStats(mobProfile, isBoss, isElite);
                             double concurrent = CombatSimulator.estimateConcurrentMobs(level);
@@ -330,7 +351,7 @@ public final class ComprehensiveScenario {
 
             for (int level = 1; level <= MAX_LEVEL; level++) {
                 // Get hostile mob damage for armor calculation
-                MobStatProfile mobProfile = mobGenerator.generate(level, 0, BASE_SEED + level);
+                MobStatProfile mobProfile = mobGenerator.generateDeterministic(level, 0);
                 float mobDmg = (float) mobProfile.physicalDamage();
 
                 for (BuildArchetype arch : archetypes) {
@@ -400,9 +421,9 @@ public final class ComprehensiveScenario {
                 long cumulativeXp = formula.getXpForLevel(level);
 
                 // Mob stats at this level
-                MobStatProfile hostile = mobGenerator.generate(level, 0, BASE_SEED + level);
-                MobStatProfile elite = mobGenerator.generateSpecial(level, 0, ELITE_MULT, BASE_SEED + level);
-                MobStatProfile boss = mobGenerator.generateSpecial(level, 0, BOSS_MULT, BASE_SEED + level);
+                MobStatProfile hostile = mobGenerator.generateDeterministic(level, 0);
+                MobStatProfile elite = mobGenerator.generateDeterministic(level, 0).withBossMultiplier(ELITE_MULT);
+                MobStatProfile boss = mobGenerator.generateDeterministic(level, 0).withBossMultiplier(BOSS_MULT);
 
                 double pool = hostile.totalPool();
 
@@ -464,7 +485,7 @@ public final class ComprehensiveScenario {
                     for (int s = 0; s < MOB_SAMPLES; s++) {
                         long seed = BASE_SEED + level * 1000L + s;
 
-                        MobStatProfile hostileP = mobGenerator.generate(level, 0, seed);
+                        MobStatProfile hostileP = mobGenerator.generateDeterministic(level, 0);
                         ComputedStats hostileS = hpFormula.toActualCombatStats(hostileP, false, false);
                         double concurrent = CombatSimulator.estimateConcurrentMobs(level);
                         CombatResult rH = combatSim.simulate(playerStats, hostileS, COMBAT_ITERATIONS, concurrent);
@@ -474,7 +495,7 @@ public final class ComprehensiveScenario {
                         sumHostileMobDPS += rH.mobDPS();
                         if (rH.playerWins()) hostileWins++;
 
-                        MobStatProfile eliteP = mobGenerator.generateSpecial(level, 0, ELITE_MULT, seed);
+                        MobStatProfile eliteP = mobGenerator.generateDeterministic(level, 0).withBossMultiplier(ELITE_MULT);
                         ComputedStats eliteS = hpFormula.toActualCombatStats(eliteP, false, true);
                         CombatResult rE = combatSim.simulate(playerStats, eliteS, COMBAT_ITERATIONS, concurrent);
                         sumEliteSurv += Math.min(rE.survivability(), 100.0);
@@ -559,5 +580,108 @@ public final class ComprehensiveScenario {
                 mobConfig.getProgressiveScalingMinFactor());
 
         return new EffortBasedFormula(curve, estimator, formulaConfig.getMaxLevel());
+    }
+
+    // =========================================================================
+    // 7. GENERATOR COMPARISON — A/B test old Dirichlet vs new Template + Noise
+    // =========================================================================
+
+    private void writeGeneratorComparison(@Nonnull Path outputDir) throws IOException {
+        Path csv = outputDir.resolve("generator_comparison.csv");
+        try (PrintWriter w = new PrintWriter(Files.newBufferedWriter(csv))) {
+            w.println("level,"
+                    + "old_raw_hp,new_raw_hp,hp_ratio,"
+                    + "old_actual_hp,new_actual_hp,actual_hp_ratio,"
+                    + "old_raw_dmg,new_raw_dmg,dmg_ratio,"
+                    + "old_actual_dmg,new_actual_dmg,actual_dmg_ratio,"
+                    + "old_armor,new_armor,"
+                    + "old_dodge,new_evasion,"
+                    + "old_crit,new_crit,"
+                    + "new_archetype,"
+                    + "ttk_deviation_flag");
+
+            // Use a balanced build for TTK comparison
+            BuildArchetype refBuild = archetypes.stream()
+                    .filter(a -> a.name().equalsIgnoreCase("BALANCED") || a.name().equalsIgnoreCase("MELEE"))
+                    .findFirst()
+                    .orElse(archetypes.getFirst());
+
+            int flags = 0;
+
+            for (int level = 1; level <= MAX_LEVEL; level++) {
+                // Old generator: average over many seeds to smooth Dirichlet variance
+                // Use 100 samples (not MOB_SAMPLES=20) for fairer comparison against deterministic Template
+                final int COMPARISON_SAMPLES = 100;
+                double oldHpSum = 0, oldDmgSum = 0, oldArmorSum = 0, oldDodgeSum = 0, oldCritSum = 0;
+                double oldActualHpSum = 0, oldActualDmgSum = 0;
+
+                for (int s = 0; s < COMPARISON_SAMPLES; s++) {
+                    long seed = BASE_SEED + level * 1000L + s;
+                    MobStatProfile oldProfile = mobGenerator.generateDeterministic(level, 0);
+                    oldHpSum += oldProfile.maxHealth();
+                    oldDmgSum += oldProfile.physicalDamage();
+                    oldArmorSum += oldProfile.armor();
+                    oldDodgeSum += oldProfile.dodgeChance();
+                    oldCritSum += oldProfile.criticalChance();
+                    oldActualHpSum += hpFormula.calculateActualHP(oldProfile, false);
+                    oldActualDmgSum += hpFormula.calculateActualDamage(oldProfile, false, false);
+                }
+
+                double oldHp = oldHpSum / COMPARISON_SAMPLES;
+                double oldDmg = oldDmgSum / COMPARISON_SAMPLES;
+                double oldArmor = oldArmorSum / COMPARISON_SAMPLES;
+                double oldDodge = oldDodgeSum / COMPARISON_SAMPLES;
+                double oldCrit = oldCritSum / COMPARISON_SAMPLES;
+                double oldActualHp = oldActualHpSum / COMPARISON_SAMPLES;
+                double oldActualDmg = oldActualDmgSum / COMPARISON_SAMPLES;
+
+                // New factory: single seed is fine (deterministic template, noise is small)
+                long newSeed = BASE_SEED + level;
+                MobStats newStats = mobFactory.generate(
+                        level, 0, null, java.util.Set.of(),
+                        null, newSeed);
+
+                double newHp = newStats.maxHealth();
+                double newDmg = newStats.physicalDamage();
+                double newArmor = newStats.armor();
+                double newEvasion = newStats.evasion();
+                double newCrit = newStats.criticalChance();
+                double newActualHp = hpFormula.calculateActualHP(newStats, false);
+                double newActualDmg = hpFormula.calculateActualDamage(newStats, false, false);
+
+                double hpRatio = oldHp > 0 ? newHp / oldHp : 1.0;
+                double actualHpRatio = oldActualHp > 0 ? newActualHp / oldActualHp : 1.0;
+                double dmgRatio = oldDmg > 0 ? newDmg / oldDmg : 1.0;
+                double actualDmgRatio = oldActualDmg > 0 ? newActualDmg / oldActualDmg : 1.0;
+
+                // Flag if TTK deviation exceeds 30% (HP ratio is a proxy for TTK ratio)
+                boolean flagged = Math.abs(actualHpRatio - 1.0) > 0.30;
+                if (flagged) flags++;
+
+                w.printf("%d,"
+                        + "%.1f,%.1f,%.3f,"
+                        + "%.1f,%.1f,%.3f,"
+                        + "%.1f,%.1f,%.3f,"
+                        + "%.1f,%.1f,%.3f,"
+                        + "%.1f,%.1f,"
+                        + "%.1f,%.1f,"
+                        + "%.1f,%.1f,"
+                        + "%s,"
+                        + "%s%n",
+                        level,
+                        oldHp, newHp, hpRatio,
+                        oldActualHp, newActualHp, actualHpRatio,
+                        oldDmg, newDmg, dmgRatio,
+                        oldActualDmg, newActualDmg, actualDmgRatio,
+                        oldArmor, newArmor,
+                        oldDodge, newEvasion,
+                        oldCrit, newCrit,
+                        "WARRIOR", // default archetype for null roleName
+                        flagged ? "FLAGGED" : "OK");
+            }
+
+            System.out.printf("    Generator comparison: %d/%d levels flagged (>30%% HP deviation)%n",
+                    flags, MAX_LEVEL);
+        }
     }
 }

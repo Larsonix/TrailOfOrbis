@@ -47,14 +47,16 @@ class StatMappingTest {
     }
 
     @Test
-    @DisplayName("apply - percent max health multiplies value")
-    void apply_PercentMaxHealth_MultipliesValue() {
+    @DisplayName("apply - percent max health adds to percent accumulator")
+    void apply_PercentMaxHealth_AddsToAccumulator() {
         ComputedStats stats = new ComputedStats();
         stats.setMaxHealth(100);
 
         StatMapping.apply(stats, "max_health", 50.0, StatType.PERCENT);
 
-        assertEquals(150, stats.getMaxHealth(), 0.01);  // 100 * (1 + 0.5)
+        // Percent adds to accumulator, NOT multiplied into base
+        assertEquals(100, stats.getMaxHealth(), 0.01);  // Base unchanged
+        assertEquals(50, stats.getMaxHealthPercent(), 0.01);  // Accumulated for consolidation
     }
 
     @Test

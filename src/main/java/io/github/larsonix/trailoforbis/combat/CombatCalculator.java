@@ -11,19 +11,29 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>This class contains all the math for combat calculations, making it
  * fully unit-testable without requiring Hytale server runtime.
  *
- * <p><b>PoE-Inspired Damage Formula:</b>
+ * <p><b>Damage Formula:</b>
  * <pre>
  * FinalDamage = (BaseDamage + FlatBonus) * (1 + Sum(%Increases)/100) * CritMultiplier
  * AfterArmor = FinalDamage * (1 - min(ArmorReduction, 0.9))
  * </pre>
+ *
+ * <p><b>Level-Scaled Armor Formula:</b>
+ * <pre>
+ * Reduction = EffectiveArmor / (EffectiveArmor + levelScale * AttackerLevel + baseConstant)
+ * </pre>
+ * Armor gives consistent % reduction regardless of hit size. Higher-level attackers
+ * reduce armor effectiveness naturally.
  */
 public class CombatCalculator {
 
     /** Default maximum armor damage reduction (90% cap) */
     public static final float DEFAULT_MAX_ARMOR_REDUCTION = 0.9f;
 
-    /** Default armor formula divisor (PoE standard) */
-    public static final float DEFAULT_ARMOR_FORMULA_DIVISOR = 10.0f;
+    /** Default level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant) */
+    public static final float DEFAULT_ARMOR_LEVEL_SCALE = 9.0f;
+
+    /** Default base constant in armor formula — floor for level-0 behavior */
+    public static final float DEFAULT_ARMOR_BASE_CONSTANT = 50.0f;
 
     /**
      * Default minimum armor effectiveness after penetration (50% floor).
@@ -37,13 +47,33 @@ public class CombatCalculator {
     /** Maximum armor damage reduction (configurable, defaults to 90%) */
     private float maxArmorReduction = DEFAULT_MAX_ARMOR_REDUCTION;
 
-    /** Armor formula divisor: armor / (armor + divisor * damage) */
-    private float armorFormulaDivisor = DEFAULT_ARMOR_FORMULA_DIVISOR;
+    /** Level scale: armor / (armor + levelScale * attackerLevel + baseConstant) */
+    private float armorLevelScale = DEFAULT_ARMOR_LEVEL_SCALE;
+
+    /** Base constant: floor in the denominator for low-level behavior */
+    private float armorBaseConstant = DEFAULT_ARMOR_BASE_CONSTANT;
 
     /** Minimum armor effectiveness after penetration (configurable, defaults to 50%) */
     private float minArmorEffectiveness = DEFAULT_MIN_ARMOR_EFFECTIVENESS;
 
     public CombatCalculator() {
+    }
+
+    /**
+     * Computes armor damage reduction percentage for display purposes.
+     *
+     * <p>Uses the canonical level-scaled formula with default constants.
+     * All UI display should call this instead of reimplementing the formula.
+     *
+     * @param armor The defender's effective armor value
+     * @param attackerLevel The attacker level (use player level for "vs same-level" display)
+     * @return Reduction percentage (0.0 to 90.0)
+     */
+    public static float estimateArmorReduction(float armor, int attackerLevel) {
+        if (armor <= 0) return 0f;
+        int level = Math.max(1, attackerLevel);
+        float reduction = armor / (armor + DEFAULT_ARMOR_LEVEL_SCALE * level + DEFAULT_ARMOR_BASE_CONSTANT);
+        return Math.min(reduction, DEFAULT_MAX_ARMOR_REDUCTION) * 100f;
     }
 
     /**
@@ -57,11 +87,13 @@ public class CombatCalculator {
      * Creates a CombatCalculator with custom armor settings.
      *
      * @param maxArmorReduction Maximum armor reduction (0.0 to 1.0)
-     * @param armorFormulaDivisor Divisor in armor formula (must be positive)
+     * @param armorLevelScale Level scale in armor formula (must be positive)
+     * @param armorBaseConstant Base constant in armor formula (must be non-negative)
      */
-    public CombatCalculator(float maxArmorReduction, float armorFormulaDivisor) {
+    public CombatCalculator(float maxArmorReduction, float armorLevelScale, float armorBaseConstant) {
         this.maxArmorReduction = Math.max(0f, Math.min(1f, maxArmorReduction));
-        this.armorFormulaDivisor = Math.max(0.01f, armorFormulaDivisor);
+        this.armorLevelScale = Math.max(0.01f, armorLevelScale);
+        this.armorBaseConstant = Math.max(0f, armorBaseConstant);
     }
 
     /**
@@ -79,14 +111,25 @@ public class CombatCalculator {
     }
 
     /**
-     * @param armorFormulaDivisor Divisor in armor formula (must be positive)
+     * @param armorLevelScale Level scale in armor formula (must be positive)
      */
-    public void setArmorFormulaDivisor(float armorFormulaDivisor) {
-        this.armorFormulaDivisor = Math.max(0.01f, armorFormulaDivisor);
+    public void setArmorLevelScale(float armorLevelScale) {
+        this.armorLevelScale = Math.max(0.01f, armorLevelScale);
     }
 
-    public float getArmorFormulaDivisor() {
-        return armorFormulaDivisor;
+    public float getArmorLevelScale() {
+        return armorLevelScale;
+    }
+
+    /**
+     * @param armorBaseConstant Base constant in armor formula (must be non-negative)
+     */
+    public void setArmorBaseConstant(float armorBaseConstant) {
+        this.armorBaseConstant = Math.max(0f, armorBaseConstant);
+    }
+
+    public float getArmorBaseConstant() {
+        return armorBaseConstant;
     }
 
     /**
@@ -233,7 +276,7 @@ public class CombatCalculator {
         return switch (attackType) {
             case MELEE -> stats.getMeleeDamagePercent();
             case PROJECTILE -> stats.getProjectileDamagePercent();
-            case AREA, UNKNOWN -> 0f;
+            case AREA, SPELL, UNKNOWN -> 0f;
         };
     }
 
@@ -290,42 +333,28 @@ public class CombatCalculator {
     }
 
     /**
-     * Calculates defender armor reduction using PoE-inspired formula.
+     * Calculates defender armor reduction using level-scaled formula.
      *
      * <p><b>Formula:</b>
      * <pre>
-     * EffectiveArmor = Armor * (1 - ArmorPenetration / 100)
-     * Reduction = EffectiveArmor / (EffectiveArmor + divisor * Damage)
+     * EffectiveArmor = Armor * max(minEffectiveness, 1 - ArmorPenetration / 100)
+     * Reduction = EffectiveArmor / (EffectiveArmor + levelScale * AttackerLevel + baseConstant)
      * FinalDamage = Damage * (1 - min(Reduction, maxReduction))
      * </pre>
      *
-     * <p>This formula has diminishing returns:
-     * <ul>
-     *   <li>Low damage + high armor = high reduction</li>
-     *   <li>High damage + low armor = low reduction</li>
-     *   <li>Armor scales better against small hits</li>
-     *   <li>Armor penetration reduces effective armor before calculation</li>
-     * </ul>
-     *
-     * @param damage The incoming damage
-     * @param defenderStats The defender's computed stats
-     * @return Full armor reduction breakdown
-     */
-    @Nonnull
-    public ArmorResult calculateDefenderReduction(float damage, @Nonnull ComputedStats defenderStats) {
-        return calculateDefenderReduction(damage, defenderStats, 0f);
-    }
-
-    /**
-     * Calculates defender armor reduction with attacker's armor penetration.
+     * <p>Unlike the old hit-size-dependent formula, this gives consistent % reduction
+     * regardless of incoming damage. Higher-level attackers naturally reduce armor
+     * effectiveness.
      *
      * @param damage The incoming damage
      * @param defenderStats The defender's computed stats
      * @param armorPenetration The attacker's armor penetration percentage (0-100)
+     * @param attackerLevel The attacker's level (mob level or player level)
      * @return Full armor reduction breakdown
      */
     @Nonnull
-    public ArmorResult calculateDefenderReduction(float damage, @Nonnull ComputedStats defenderStats, float armorPenetration) {
+    public ArmorResult calculateDefenderReduction(float damage, @Nonnull ComputedStats defenderStats,
+                                                   float armorPenetration, int attackerLevel) {
         float baseArmor = defenderStats.getArmor();
 
         // Apply armor percent bonus: armor * (1 + armorPercent / 100)
@@ -345,8 +374,9 @@ public class CombatCalculator {
         float effectiveness = Math.max(minArmorEffectiveness, 1.0f - penFactor);
         float effectiveArmor = armor * effectiveness;
 
-        // PoE armor formula: Reduction = EffectiveArmor / (EffectiveArmor + divisor * Damage)
-        float reduction = effectiveArmor / (effectiveArmor + armorFormulaDivisor * damage);
+        // Level-scaled armor formula: Reduction = EffectiveArmor / (EffectiveArmor + levelScale * AttackerLevel + baseConstant)
+        int clampedLevel = Math.max(1, attackerLevel);
+        float reduction = effectiveArmor / (effectiveArmor + armorLevelScale * clampedLevel + armorBaseConstant);
 
         // Cap at maxArmorReduction (default 90%)
         reduction = Math.min(reduction, maxArmorReduction);

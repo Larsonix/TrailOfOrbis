@@ -3,6 +3,8 @@ package io.github.larsonix.trailoforbis.sanctum.ui;
 import au.ellie.hyui.builders.HyUIHud;
 import com.hypixel.hytale.logger.HytaleLogger;
 
+import io.github.larsonix.trailoforbis.ui.hud.HudToggleService;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Map;
@@ -53,9 +55,15 @@ public class SkillNodeHudManager {
      */
     private final Map<UUID, Long> lastOpenTimes = new ConcurrentHashMap<>();
 
+    @Nullable private HudToggleService hudToggleService;
+
     // ═══════════════════════════════════════════════════════════════════
     // PUBLIC API
     // ═══════════════════════════════════════════════════════════════════
+
+    public void setHudToggleService(@Nullable HudToggleService service) {
+        this.hudToggleService = service;
+    }
 
     /**
      * Checks if a player is on HUD-open cooldown.
@@ -89,6 +97,7 @@ public class SkillNodeHudManager {
         activeHuds.put(playerUuid, hud);
         activeNodeIds.put(playerUuid, nodeId);
         lastOpenTimes.put(playerUuid, System.currentTimeMillis());
+        if (hudToggleService != null) hudToggleService.applyToggleState(playerUuid, hud);
         LOGGER.atFine().log("Registered skill node HUD for player %s, node=%s",
             playerUuid.toString().substring(0, 8), nodeId);
     }

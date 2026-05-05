@@ -13,12 +13,14 @@ import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.gear.loot.DiscoveredItem;
 import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator.EquipmentSlot;
+import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.util.MessageColors;
 
 import javax.annotation.Nonnull;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Shows statistics about discovered loot items.
@@ -114,6 +116,30 @@ public class TooAdminLootStatsCommand extends AbstractPlayerCommand {
                         slot.name().toLowerCase(), weight, pct))
                         .color(MessageColors.GRAY));
             }
+        }
+
+        // Availability matrix — what can drop at each rarity
+        sender.sendMessage(Message.empty());
+        sender.sendMessage(Message.raw("Availability Matrix (rarity -> categories) :").color(MessageColors.GOLD));
+
+        Set<GearRarity> availableRarities = registry.getAvailableRarities();
+        for (GearRarity rarity : GearRarity.values()) {
+            Set<EquipmentSlot> raritySlots = registry.getAvailableSlotsForRarity(rarity);
+            if (raritySlots.isEmpty()) {
+                sender.sendMessage(Message.raw(String.format("  %s : (none)", rarity.name()))
+                        .color(MessageColors.GRAY));
+                continue;
+            }
+
+            int totalCats = 0;
+            for (EquipmentSlot slot : raritySlots) {
+                totalCats += registry.getAvailableCategoriesForRaritySlot(rarity, slot).size();
+            }
+
+            String color = availableRarities.contains(rarity) ? rarity.getHexColor() : MessageColors.GRAY;
+            sender.sendMessage(Message.raw(String.format("  %s : %d slots, %d categories",
+                    rarity.name(), raritySlots.size(), totalCats))
+                    .color(color));
         }
     }
 

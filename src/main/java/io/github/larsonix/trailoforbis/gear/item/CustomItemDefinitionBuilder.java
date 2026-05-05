@@ -280,15 +280,26 @@ public final class CustomItemDefinitionBuilder {
         // Clear weapon modifiers if present (unlikely for maps/stones)
         if (definition.weapon != null) {
             definition.weapon.statModifiers = null;
+            definition.weapon.entityStatsToClear = null;
         }
 
         // Clear armor modifiers if present (unlikely for maps/stones)
         if (definition.armor != null) {
             definition.armor.statModifiers = null;
+            definition.armor.baseDamageResistance = 0;
             definition.armor.damageResistance = null;
             definition.armor.damageEnhancement = null;
             definition.armor.damageClassEnhancement = null;
         }
+
+        // Clear utility modifiers if present
+        if (definition.utility != null) {
+            definition.utility.statModifiers = null;
+            definition.utility.entityStatsToClear = null;
+        }
+
+        // Durability: custom items (maps, stones) are permanent — hide the native bar.
+        definition.durability = 0;
 
         // NOTE: We intentionally keep definition.interactions from the base item.
         // Clearing it causes client crashes (IndexOutOfRangeException).

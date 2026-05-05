@@ -1,5 +1,9 @@
 # Player Stats & Combat Calculations Reference
 
+> **SUPERSEDED**: This document is from pre-1.0.0 and contains outdated values.
+> See `docs/reference/stat-pipeline.md` for the current stat system.
+> See `docs/reference/ailment-dot-system.md` for the current ailment/DOT system.
+
 This document covers player attribute system, stat calculation, and combat formulas.
 
 ## 1. Base Player Stats

@@ -4,13 +4,13 @@ The Hytale client ships structured data files (`.ui`, `.xaml`, `.lang`, textures
 
 ## Extraction & Indexes
 
-**Extracted to**: `/home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/`
+**Extracted to**: `<hytale-decompiled>/ClientData/`
 
 Run `~/tools/decompile-hytale.sh` (includes client extraction) or extract manually:
 ```bash
 # Manual extraction
 cp -r "/mnt/c/.../Hytale/install/release/package/game/latest/Client/Data/"* \
-      ~/work/Hytale-Decompiled-Full-Game/ClientData/
+      <hytale-decompiled>/ClientData/
 
 # Re-index only
 ~/tools/index-hytale-client.sh
@@ -26,7 +26,7 @@ cp -r "/mnt/c/.../Hytale/install/release/package/game/latest/Client/Data/"* \
 | `CLIENT_FILE_TREE.md` | ~4K | Directory structure with file counts | Quick overview |
 | `CLIENT_UI_SUMMARY.md` | ~100K | Element IDs, variables, layouts per .ui file | `grep -A 10 "## CombatText" CLIENT_UI_SUMMARY.md` |
 
-All indexes are in `/home/larsonix/work/Hytale-Decompiled-Full-Game/.index/`.
+All indexes are in `<hytale-decompiled>/.index/`.
 
 ## File Formats
 
@@ -214,23 +214,23 @@ The `.xaml` files are the more modern system and contain the design tokens (colo
 
 ```bash
 # Find a client .ui file by name
-grep "CombatText" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_UI_INDEX.txt
+grep "CombatText" <hytale-decompiled>/.index/CLIENT_UI_INDEX.txt
 
 # Find a XAML file
-grep "Colors" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_XAML_INDEX.txt
+grep "Colors" <hytale-decompiled>/.index/CLIENT_XAML_INDEX.txt
 
 # Search localization strings
-grep "damage" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_LANG_INDEX.txt
+grep "damage" <hytale-decompiled>/.index/CLIENT_LANG_INDEX.txt
 
 # Get element IDs from a .ui file
-grep -A 15 "## ItemTooltip" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_UI_SUMMARY.md
+grep -A 15 "## ItemTooltip" <hytale-decompiled>/.index/CLIENT_UI_SUMMARY.md
 
 # Read a client .ui file directly
-cat /home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/Game/Interface/InGame/EntityUI/CombatText.ui
+cat <hytale-decompiled>/ClientData/Game/Interface/InGame/EntityUI/CombatText.ui
 
 # List all HUD .ui files
-grep "Hud" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_UI_INDEX.txt
+grep "Hud" <hytale-decompiled>/.index/CLIENT_UI_INDEX.txt
 
 # Search for a color in the design system
-grep "Red" /home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/Game/UI/DesignSystem/Colors.xaml
+grep "Red" <hytale-decompiled>/ClientData/Game/UI/DesignSystem/Colors.xaml
 ```

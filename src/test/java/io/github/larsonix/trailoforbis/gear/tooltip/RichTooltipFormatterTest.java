@@ -53,7 +53,7 @@ class RichTooltipFormatterTest {
         balanceConfig = TestConfigFactory.createDefaultBalanceConfig();
         modifierConfig = TestConfigFactory.createDefaultModifierConfig();
         requirementCalculator = new RequirementCalculator(balanceConfig, modifierConfig);
-        formatter = new RichTooltipFormatter(modifierConfig, requirementCalculator, attributeManager);
+        formatter = new RichTooltipFormatter(modifierConfig, balanceConfig, requirementCalculator, attributeManager);
 
         // Register mock LevelingService for level requirement tests
         ServiceRegistry.register(LevelingService.class, levelingService);
@@ -77,42 +77,49 @@ class RichTooltipFormatterTest {
         @DisplayName("accepts valid dependencies")
         void acceptsValidDependencies() {
             assertDoesNotThrow(() ->
-                    new RichTooltipFormatter(modifierConfig, requirementCalculator, attributeManager));
+                    new RichTooltipFormatter(modifierConfig, balanceConfig, requirementCalculator, attributeManager));
         }
 
         @Test
         @DisplayName("accepts valid dependencies with config")
         void acceptsValidDependenciesWithConfig() {
             assertDoesNotThrow(() ->
-                    new RichTooltipFormatter(modifierConfig, requirementCalculator, attributeManager, TooltipConfig.defaults()));
+                    new RichTooltipFormatter(modifierConfig, balanceConfig, requirementCalculator, attributeManager, TooltipConfig.defaults()));
         }
 
         @Test
         @DisplayName("throws for null modifier config")
         void throwsForNullModifierConfig() {
             assertThrows(NullPointerException.class, () ->
-                    new RichTooltipFormatter(null, requirementCalculator, attributeManager));
+                    new RichTooltipFormatter(null, balanceConfig, requirementCalculator, attributeManager));
+        }
+
+        @Test
+        @DisplayName("throws for null balance config")
+        void throwsForNullBalanceConfig() {
+            assertThrows(NullPointerException.class, () ->
+                    new RichTooltipFormatter(modifierConfig, null, requirementCalculator, attributeManager));
         }
 
         @Test
         @DisplayName("throws for null requirement calculator")
         void throwsForNullRequirementCalculator() {
             assertThrows(NullPointerException.class, () ->
-                    new RichTooltipFormatter(modifierConfig, null, attributeManager));
+                    new RichTooltipFormatter(modifierConfig, balanceConfig, null, attributeManager));
         }
 
         @Test
         @DisplayName("throws for null attribute manager")
         void throwsForNullAttributeManager() {
             assertThrows(NullPointerException.class, () ->
-                    new RichTooltipFormatter(modifierConfig, requirementCalculator, null));
+                    new RichTooltipFormatter(modifierConfig, balanceConfig, requirementCalculator, null));
         }
 
         @Test
         @DisplayName("throws for null tooltip config")
         void throwsForNullTooltipConfig() {
             assertThrows(NullPointerException.class, () ->
-                    new RichTooltipFormatter(modifierConfig, requirementCalculator, attributeManager, null));
+                    new RichTooltipFormatter(modifierConfig, balanceConfig, requirementCalculator, attributeManager, null));
         }
     }
 
@@ -561,7 +568,7 @@ class RichTooltipFormatterTest {
                     .build();
 
             RichTooltipFormatter configuredFormatter = new RichTooltipFormatter(
-                    modifierConfig, requirementCalculator, attributeManager, config);
+                    modifierConfig, balanceConfig, requirementCalculator, attributeManager, config);
 
             GearData gearData = createSimpleGearData(GearRarity.EPIC);
 

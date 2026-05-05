@@ -25,7 +25,7 @@ import java.util.logging.Level;
 /**
  * Detects new items in the player's inventory and sends pickup notifications.
  *
- * <p>This listener handles <b>notifications only</b> (chat messages, guide milestones).
+ * <p>This listener handles <b>notifications only</b> (toast notifications, guide milestones).
  * Item definition sync is handled separately by {@code ImmediateItemSyncHandler} which
  * runs before this handler in the event chain.
  *
@@ -94,13 +94,15 @@ public final class UnifiedPickupListener {
         }
 
         // Extract new items from the transaction and send notifications
-        processTransaction(playerRef, event.getTransaction());
+        processTransaction(playerRef, changedContainer, event.getTransaction());
     }
 
     /**
      * Processes the transaction to find newly added items and trigger notifications.
      */
-    private void processTransaction(@Nonnull PlayerRef playerRef, Transaction transaction) {
+    private void processTransaction(@Nonnull PlayerRef playerRef,
+                                    @Nonnull ItemContainer container,
+                                    Transaction transaction) {
         if (transaction == null) {
             return;
         }
@@ -108,27 +110,40 @@ public final class UnifiedPickupListener {
         // ItemStackTransaction wraps multiple slot transactions (e.g., addItemStack → pickup)
         if (transaction instanceof ItemStackTransaction ist) {
             for (ItemStackSlotTransaction slotTx : ist.getSlotTransactions()) {
-                handleSlotAddition(playerRef, slotTx);
+                handleSlotAddition(playerRef, container, slotTx);
             }
             return;
         }
 
         // Single slot transaction (e.g., setItemStackForSlot → crafting, conversion)
         if (transaction instanceof SlotTransaction slotTx) {
-            handleSlotAddition(playerRef, slotTx);
+            handleSlotAddition(playerRef, container, slotTx);
         }
     }
 
     /**
      * Checks if a slot transaction represents an item addition and handles it.
+     *
+     * <p>Verifies the item is still in the container before notifying. This prevents
+     * phantom notifications for items ejected by the loot filter — the filter runs
+     * before this handler (via {@code addFirstHandler()}) and removes blocked items
+     * from the container, but the immutable transaction snapshot still shows the ADD.
      */
-    private void handleSlotAddition(@Nonnull PlayerRef playerRef, @Nonnull SlotTransaction slotTx) {
+    private void handleSlotAddition(@Nonnull PlayerRef playerRef,
+                                    @Nonnull ItemContainer container,
+                                    @Nonnull SlotTransaction slotTx) {
         if (!slotTx.succeeded()) {
             return;
         }
 
         ItemStack after = slotTx.getSlotAfter();
         if (ItemStack.isEmpty(after)) {
+            return;
+        }
+
+        // Verify item is still in the container (may have been ejected by loot filter)
+        ItemStack currentInSlot = container.getItemStack(slotTx.getSlot());
+        if (ItemStack.isEmpty(currentInSlot)) {
             return;
         }
 
@@ -156,8 +171,11 @@ public final class UnifiedPickupListener {
     }
 
     private boolean isEquipmentContainer(@Nonnull Inventory inventory, @Nonnull ItemContainer container) {
+        // Only skip armor and utility — NOT hotbar.
+        // Ground pickups of weapons/tools go to hotbar via getContainerForItemPickup(),
+        // so we must process hotbar changes to send pickup toasts.
+        // Matches LootFilterInventoryHandler's container scope.
         return container == inventory.getArmor()
-                || container == inventory.getHotbar()
                 || container == inventory.getUtility();
     }
 

@@ -332,7 +332,13 @@ public class AnimationSpeedSyncManager {
     }
 
     /**
-     * Sends Remove + AddOrUpdate with the vanilla baseline to restore animations.
+     * Restores vanilla baseline animations by sending AddOrUpdate with unmodified data.
+     *
+     * <p>Uses AddOrUpdate ONLY — no Remove. The Remove packet temporarily strips the
+     * animation set from the client's registry, causing the client to log "Missing
+     * playerAnimationsId" for every item referencing that set during the gap between
+     * Remove and AddOrUpdate processing. AddOrUpdate alone replaces the existing entry
+     * atomically on the client — no gap, no warnings.
      */
     private void restoreAnimations(PlayerRef playerRef, String animSetId) {
         try {
@@ -347,7 +353,6 @@ public class AnimationSpeedSyncManager {
             Map<String, ItemPlayerAnimations> baselineMap = Map.of(animSetId, baseline);
 
             PacketHandler connection = playerRef.getPacketHandler();
-            connection.write(new UpdateItemPlayerAnimations(UpdateType.Remove, baselineMap));
             connection.write(new UpdateItemPlayerAnimations(UpdateType.AddOrUpdate, baselineMap));
 
             LOGGER.atFine().log("Restored vanilla animations for set %s on %s",
@@ -467,13 +472,16 @@ public class AnimationSpeedSyncManager {
     private static boolean isAttackAnimation(String name, ItemAnimation anim) {
         String lower = name.toLowerCase();
 
-        // Exclude non-combat animations
+        // Exclude non-combat animations and weapon state animations.
+        // "reload" is excluded because ranged weapon reload timing must match server
+        // interaction timing exactly — speeding up the animation desyncs the client
+        // from the server's ammo-stat-driven reload loop (causes infinite reload).
         if (lower.contains("idle") || lower.contains("walk") || lower.contains("run")
                 || lower.contains("sprint") || lower.contains("jump") || lower.contains("fall")
                 || lower.contains("swim") || lower.contains("equip") || lower.contains("hold")
                 || lower.contains("block") || lower.contains("climb") || lower.contains("fly")
                 || lower.contains("fluid") || lower.contains("interact") || lower.contains("mantle")
-                || lower.contains("slide") || lower.contains("crouch")) {
+                || lower.contains("slide") || lower.contains("crouch") || lower.contains("reload")) {
             return false;
         }
 
@@ -484,7 +492,7 @@ public class AnimationSpeedSyncManager {
                 || lower.contains("combo") || lower.contains("shoot") || lower.contains("cast")
                 || lower.contains("lunge") || lower.contains("pounce") || lower.contains("flurry")
                 || lower.contains("razor") || lower.contains("kick") || lower.contains("throw")
-                || lower.contains("guard") || lower.contains("mine") || lower.contains("reload")
+                || lower.contains("guard") || lower.contains("mine")
                 || lower.contains("dash") || lower.contains("backflip")) {
             return true;
         }

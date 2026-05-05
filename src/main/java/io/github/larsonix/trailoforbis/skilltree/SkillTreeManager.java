@@ -13,8 +13,11 @@ import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeConfig;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeSettings;
 import io.github.larsonix.trailoforbis.skilltree.model.SkillTreeData;
 import io.github.larsonix.trailoforbis.skilltree.repository.SkillTreeRepository;
+import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyNodeCalculator;
+import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyProgress;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.concurrent.ConcurrentHashMap;
@@ -413,6 +416,27 @@ public class SkillTreeManager implements SkillTreeService {
         return treeConfig.getNodes().values();
     }
 
+    /**
+     * Calculates the synergy progress for a given node and player.
+     *
+     * <p>Returns a snapshot showing current node count, bonus value,
+     * and what's needed for the next increment. Used by the sanctum UI
+     * to display live progress on synergy node tooltips.
+     *
+     * @param playerId The player whose allocation to evaluate
+     * @param node     The synergy node to calculate progress for
+     * @return Progress snapshot, or null if the node has no synergy or config isn't loaded
+     */
+    @Nullable
+    public SynergyProgress getSynergyProgress(@Nonnull UUID playerId, @Nonnull SkillNode node) {
+        if (!node.hasSynergy() || treeConfig == null) {
+            return null;
+        }
+        Set<String> allocated = getAllocatedNodes(playerId);
+        SynergyNodeCalculator calculator = new SynergyNodeCalculator(treeConfig);
+        return calculator.calculateProgress(node, node.getSynergy(), allocated);
+    }
+
     @Override
     public void grantSkillPoints(@Nonnull UUID playerId, int points) {
         synchronized (getLock(playerId)) {
@@ -519,6 +543,26 @@ public class SkillTreeManager implements SkillTreeService {
             // Fire respec event for other systems to react (e.g., sanctum visual update)
             int pointsRefunded = updated.getSkillPoints() - pointsBeforeReset;
             eventDispatcher.dispatchRespec(playerId, clearedNodes, pointsRefunded, -1); // -1 = admin reset (unlimited)
+        }
+    }
+
+    @Override
+    public void fullReset(@Nonnull UUID playerId, int startingPoints) {
+        synchronized (getLock(playerId)) {
+            SkillTreeData data = getSkillTreeData(playerId);
+
+            SkillTreeData reset = data.toBuilder()
+                .allocatedNodes(Set.of(ORIGIN_NODE_ID))
+                .skillPoints(startingPoints)
+                .totalPointsEarned(startingPoints)
+                .respecs(0)
+                .skillRefundPoints(10)
+                .build();
+
+            repository.save(reset);
+            invalidatePlayerStats(playerId);
+
+            LOGGER.at(Level.INFO).log("Full reset skill tree for %s: %d starting points", playerId, startingPoints);
         }
     }
 
@@ -648,5 +692,20 @@ public class SkillTreeManager implements SkillTreeService {
     @Override
     public void unregisterRespecListener(@Nonnull SkillTreeEvents.RespecListener listener) {
         eventDispatcher.unregisterRespecListener(listener);
+    }
+
+    @Override
+    public void registerRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener) {
+        eventDispatcher.registerRefundPointsChangedListener(listener);
+    }
+
+    @Override
+    public void unregisterRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener) {
+        eventDispatcher.unregisterRefundPointsChangedListener(listener);
+    }
+
+    @Override
+    public void notifyRefundPointsChanged(@Nonnull UUID playerId, int newRefundPoints) {
+        eventDispatcher.dispatchRefundPointsChanged(playerId, newRefundPoints);
     }
 }

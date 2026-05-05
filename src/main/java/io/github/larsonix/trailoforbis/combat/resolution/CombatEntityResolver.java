@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.compat.HytaleAPICompat;
@@ -93,10 +94,12 @@ public class CombatEntityResolver {
     /**
      * Gets the defender's UUID from the damage event context.
      *
+     * <p>Works for both players (via {@link PlayerRef}) and mobs (via {@link UUIDComponent}).
+     *
      * @param index The entity index in the archetype chunk
      * @param archetypeChunk The archetype chunk containing the defender
      * @param store The entity store
-     * @return The defender's UUID, or null if not a player
+     * @return The defender's UUID, or null if not resolvable
      */
     @Nullable
     public UUID getDefenderUuid(
@@ -109,8 +112,19 @@ public class CombatEntityResolver {
             return null;
         }
 
+        // Players: use PlayerRef UUID (authoritative for player identity)
         PlayerRef playerRef = store.getComponent(defenderRef, PlayerRef.getComponentType());
-        return playerRef != null ? playerRef.getUuid() : null;
+        if (playerRef != null) {
+            return playerRef.getUuid();
+        }
+
+        // Mobs: use UUIDComponent (Hytale assigns a UUID to every entity)
+        UUIDComponent uuidComponent = store.getComponent(defenderRef, UUIDComponent.getComponentType());
+        if (uuidComponent != null) {
+            return uuidComponent.getUuid();
+        }
+
+        return null;
     }
 
     /**
@@ -240,6 +254,33 @@ public class CombatEntityResolver {
             }
         }
         return -1f;
+    }
+
+    /**
+     * Gets the defender's UUID ONLY if they are a player.
+     * Returns null for mobs and non-entity defenders.
+     * Use this for skill tree/conditional triggers that only apply to players.
+     *
+     * @param index The entity index in the archetype chunk
+     * @param archetypeChunk The archetype chunk containing the defender
+     * @param store The entity store
+     * @return The defender's UUID if they are a player, null otherwise
+     */
+    @Nullable
+    public UUID getDefenderPlayerUuid(
+        int index,
+        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
+        @Nonnull Store<EntityStore> store
+    ) {
+        Ref<EntityStore> defenderRef = archetypeChunk.getReferenceTo(index);
+        if (defenderRef == null || !defenderRef.isValid()) {
+            return null;
+        }
+
+        PlayerRef playerRef = store.getComponent(defenderRef, PlayerRef.getComponentType());
+
+        // Only return UUID for actual players
+        return playerRef != null ? playerRef.getUuid() : null;
     }
 
     /**

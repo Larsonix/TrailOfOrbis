@@ -26,6 +26,17 @@ import javax.annotation.Nullable;
  */
 public class DamageTypeClassifier {
 
+    /** RPG DOT damage cause IDs (must match JSON asset filenames in Server/Entity/Damage/) */
+    public static final String CAUSE_RPG_BURN_DOT = "Rpg_Burn_Dot";
+    public static final String CAUSE_RPG_POISON_DOT = "Rpg_Poison_Dot";
+
+    /**
+     * Checks if a damage cause ID is one of our RPG DOT causes.
+     */
+    public static boolean isRpgDotCause(@Nullable String causeId) {
+        return CAUSE_RPG_BURN_DOT.equals(causeId) || CAUSE_RPG_POISON_DOT.equals(causeId);
+    }
+
     /**
      * Gets the DamageCause from a Damage object using the non-deprecated API.
      *
@@ -222,7 +233,12 @@ public class DamageTypeClassifier {
         if (id == null) {
             return false;
         }
-        // Check for common DOT cause IDs (case-insensitive)
+        // RPG DOT causes (our custom damage types)
+        if (isRpgDotCause(id)) {
+            return true;
+        }
+
+        // Vanilla DOT cause IDs (case-insensitive)
         String idLower = id.toLowerCase();
         return idLower.contains("burning") ||
                idLower.contains("poison") ||
@@ -230,8 +246,8 @@ public class DamageTypeClassifier {
                idLower.contains("bleed") ||
                idLower.contains("freezing") ||
                idLower.contains("frost") ||
-               idLower.contains("fire") ||   // Fire damage over time
-               idLower.contains("shock") ||  // Shock DOT
+               idLower.contains("fire") ||
+               idLower.contains("shock") ||
                idLower.contains("dot") ||
                idLower.contains("over_time");
     }
@@ -287,6 +303,16 @@ public class DamageTypeClassifier {
         if (id == null) {
             return null;
         }
+
+        // RPG DOT causes (exact match, fast path)
+        if (CAUSE_RPG_BURN_DOT.equals(id)) {
+            return ElementType.FIRE;
+        }
+        if (CAUSE_RPG_POISON_DOT.equals(id)) {
+            return ElementType.VOID;
+        }
+
+        // Vanilla DOT causes (string matching)
         String idLower = id.toLowerCase();
 
         if (idLower.contains("burning") || idLower.contains("fire")) {

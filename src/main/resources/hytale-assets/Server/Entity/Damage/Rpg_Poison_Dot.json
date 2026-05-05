@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG poison DOT - dark purple for tick damage, no durability loss",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": false,
+  "StaminaLoss": false,
+  "DamageTextColor": "#8822AA"
+}

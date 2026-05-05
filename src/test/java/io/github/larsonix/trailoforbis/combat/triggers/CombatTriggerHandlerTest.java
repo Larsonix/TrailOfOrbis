@@ -143,7 +143,7 @@ public class CombatTriggerHandlerTest {
         @Test
         @DisplayName("No trigger when defender UUID is null")
         void fireWhenHitTrigger_nullDefender_noTrigger() {
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(null);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(null);
 
             handler.fireWhenHitTrigger(0, archetypeChunk, store);
 
@@ -154,11 +154,11 @@ public class CombatTriggerHandlerTest {
         @DisplayName("Calls resolver to get defender UUID")
         void fireWhenHitTrigger_callsResolver() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
 
             handler.fireWhenHitTrigger(0, archetypeChunk, store);
 
-            verify(entityResolver).getDefenderUuid(0, archetypeChunk, store);
+            verify(entityResolver).getDefenderPlayerUuid(0, archetypeChunk, store);
         }
     }
 
@@ -171,7 +171,7 @@ public class CombatTriggerHandlerTest {
         @Test
         @DisplayName("No trigger when defender UUID is null")
         void fireOnEvadeTrigger_nullDefender_noTrigger() {
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(null);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(null);
 
             handler.fireOnEvadeTrigger(0, archetypeChunk, store);
 
@@ -182,11 +182,11 @@ public class CombatTriggerHandlerTest {
         @DisplayName("Calls resolver to get defender UUID")
         void fireOnEvadeTrigger_callsResolver() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
 
             handler.fireOnEvadeTrigger(0, archetypeChunk, store);
 
-            verify(entityResolver).getDefenderUuid(0, archetypeChunk, store);
+            verify(entityResolver).getDefenderPlayerUuid(0, archetypeChunk, store);
         }
     }
 
@@ -199,7 +199,7 @@ public class CombatTriggerHandlerTest {
         @Test
         @DisplayName("No trigger when defender UUID is null")
         void fireOnBlockTrigger_nullDefender_noTrigger() {
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(null);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(null);
 
             handler.fireOnBlockTrigger(0, archetypeChunk, store);
 
@@ -210,11 +210,11 @@ public class CombatTriggerHandlerTest {
         @DisplayName("Calls resolver to get defender UUID")
         void fireOnBlockTrigger_callsResolver() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(0, archetypeChunk, store)).thenReturn(defenderUuid);
 
             handler.fireOnBlockTrigger(0, archetypeChunk, store);
 
-            verify(entityResolver).getDefenderUuid(0, archetypeChunk, store);
+            verify(entityResolver).getDefenderPlayerUuid(0, archetypeChunk, store);
         }
     }
 
@@ -257,7 +257,7 @@ public class CombatTriggerHandlerTest {
         @DisplayName("WHEN_HIT does not throw with null system")
         void fireWhenHitTrigger_nullSystem_noException() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
 
             assertDoesNotThrow(() ->
                 handlerWithNullSystem.fireWhenHitTrigger(0, archetypeChunk, store)
@@ -268,7 +268,7 @@ public class CombatTriggerHandlerTest {
         @DisplayName("ON_EVADE does not throw with null system")
         void fireOnEvadeTrigger_nullSystem_noException() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
 
             assertDoesNotThrow(() ->
                 handlerWithNullSystem.fireOnEvadeTrigger(0, archetypeChunk, store)
@@ -279,7 +279,7 @@ public class CombatTriggerHandlerTest {
         @DisplayName("ON_BLOCK does not throw with null system")
         void fireOnBlockTrigger_nullSystem_noException() {
             UUID defenderUuid = UUID.randomUUID();
-            when(entityResolver.getDefenderUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
+            when(entityResolver.getDefenderPlayerUuid(anyInt(), any(), any())).thenReturn(defenderUuid);
 
             assertDoesNotThrow(() ->
                 handlerWithNullSystem.fireOnBlockTrigger(0, archetypeChunk, store)

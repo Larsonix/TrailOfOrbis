@@ -1,5 +1,5 @@
 # Trail of Orbis Main Configuration
-# Version: 1.0.2
+# Version: 1.0.6
 
 # General Settings
 debugMode: false
@@ -73,8 +73,11 @@ attributes:
     # +flat mana per point
     maxMana: 1.5
 
-    # +flat barrier (energy shield) per point
-    energyShield: 2.0
+    # +% max energy shield per point (scales flat ES from gear/tree)
+    energyShieldPercent: 0.5
+
+    # +flat energy shield regen per second per point
+    energyShieldRegen: 0.2
 
     # +mana/s regen per point
     manaRegen: 0.15
@@ -144,11 +147,11 @@ attributes:
 
   # Stats granted per point of VOID (Life Devourer)
   voidGrants:
-    # +% life steal per point
-    lifeSteal: 0.05
+    # +% life steal per point (capped at 15% max HP/s — PoE-style leech cap)
+    lifeSteal: 0.2
 
     # +% of hit dealt as true damage per point
-    percentHitAsTrueDamage: 0.05
+    percentHitAsTrueDamage: 0.1
 
     # +% damage over time per point
     dotDamagePercent: 0.3
@@ -257,7 +260,9 @@ combat:
     interactionTimeShiftEnabled: true
 
 # Armor System Configuration
-# Uses Path of Exile formula: reduction = armor / (armor + formulaDivisor * damage)
+# Level-scaled formula: reduction = armor / (armor + levelScale * attackerLevel + baseConstant)
+# Armor gives consistent % reduction regardless of hit size. Higher-level attackers
+# naturally reduce armor effectiveness.
 # Total armor = Equipment armor + element bonuses (EARTH)
 armor:
   # Whether to include vanilla equipment armor in total armor calculation
@@ -269,13 +274,19 @@ armor:
   equipmentArmorMultiplier: 1.0
 
   # Maximum damage reduction from armor (0.0 to 1.0)
-  # 0.90 = 90% cap (matches PoE), prevents armor from trivializing damage
+  # 0.90 = 90% cap, prevents armor from trivializing damage
   maxReduction: 0.90
 
-  # Divisor in armor formula: armor / (armor + divisor * damage)
-  # Lower = armor more effective, Higher = armor less effective vs big hits
-  # Default 10.0 matches Path of Exile
-  formulaDivisor: 10.0
+  # Level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant)
+  # Controls how much each attacker level increases armor demand.
+  # Higher = armor less effective per level. Lower = armor more effective.
+  # With 9.0, a tank (~950 armor) gets ~50% reduction vs same-level mobs at level 100.
+  levelScale: 9.0
+
+  # Base constant in armor formula — floor for level-0 behavior.
+  # Ensures meaningful scaling even at level 1 (denominator never drops below this + levelScale).
+  # With 50.0 and levelScale 9.0, level 1 denominator = 59, so 27 armor → 31% reduction.
+  baseConstant: 50.0
 
   # Minimum armor effectiveness after penetration (0.0 to 1.0)
   # This is a FLOOR - armor penetration cannot reduce effective armor below this fraction.

@@ -7,14 +7,11 @@ import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import io.github.larsonix.trailoforbis.elemental.ElementType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.EnumMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -35,20 +32,23 @@ public final class CombatFeedbackService {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     // ── Particle IDs ─────────────────────────────────────────────────
-    private static final String PARTICLE_IMPACT_BLADE = "Combat/Sword/Basic/Impact_Blade_01";
-    private static final String PARTICLE_IMPACT_CRITICAL = "Combat/Impact/Critical/Impact_Critical";
-    private static final String PARTICLE_IMPACT_FIRE = "Combat/Impact/Misc/Fire/Impact_Fire";
-    private static final String PARTICLE_IMPACT_ICE = "Combat/Impact/Misc/Ice/Impact_Ice";
-    private static final String PARTICLE_IMPACT_VOID = "Combat/Impact/Misc/Void/VoidImpact";
-    private static final String PARTICLE_IMPACT_LIGHTNING = "Weapon/Lightning_Sword/Lightning_Sword";
-    private static final String PARTICLE_IMPACT_EARTH = "Block/Stone/Block_Hit_Stone";
-    private static final String PARTICLE_IMPACT_WIND = "Combat/Impact/Misc/Feathers_Black/Impact_Feathers_Black";
-    private static final String PARTICLE_SHIELD_BASH = "Combat/Shield/Bash/Impact_Shield_Bash";
-    private static final String PARTICLE_SWORD_BASH = "Combat/Sword/Bash/Impact_Sword_Bash";
-    private static final String PARTICLE_HEAL = "Status_Effect/Heal/Effect_Heal";
+    // NOTE: Most combat particles are defined in Hytale's decompiled Assets.zip but are
+    // NOT shipped in the live client build. Referencing them causes "Could not find particle
+    // system settings" warnings on every hit (903+ per session). Only particles confirmed
+    // to exist in the live client are kept here.
+    //
+    // Disabled particles (exist in Assets.zip, not in live client):
+    //   Combat/Sword/Basic/Impact_Blade_01, Combat/Impact/Critical/Impact_Critical,
+    //   Combat/Impact/Misc/Fire/Impact_Fire, Combat/Impact/Misc/Ice/Impact_Ice,
+    //   Combat/Impact/Misc/Void/VoidImpact, Status_Effect/Heal/Effect_Heal,
+    //   Weapon/Lightning_Sword/Lightning_Sword,
+    //   Combat/Shield/Bash/Impact_Shield_Bash, Combat/Sword/Bash/Impact_Sword_Bash
 
     // ── Sound IDs ────────────────────────────────────────────────────
     private static final String SOUND_SHIELD_BLOCK = "SFX_Metal_Hit";
+    private static final String SOUND_PARRY = "SFX_Sword_T1_Block_Local";
+    private static final String SOUND_DODGE = "SFX_Player_Roll";
+    private static final String SOUND_MISS = "SFX_Light_Melee_T1_Swing";
 
     // ── Rate Limiting ────────────────────────────────────────────────
     // Uses Ref identity (hashCode) as key to avoid UUID allocation per hit.
@@ -60,25 +60,25 @@ public final class CombatFeedbackService {
 
     // ── Cached Sound Indexes ─────────────────────────────────────────
     private int shieldBlockSoundIndex;
+    private int parrySoundIndex;
+    private int dodgeSoundIndex;
+    private int missSoundIndex;
 
     // ── Elemental Particle Mapping ───────────────────────────────────
-    private static final EnumMap<ElementType, String> ELEMENT_PARTICLES = new EnumMap<>(ElementType.class);
-    static {
-        ELEMENT_PARTICLES.put(ElementType.FIRE, PARTICLE_IMPACT_FIRE);
-        ELEMENT_PARTICLES.put(ElementType.WATER, PARTICLE_IMPACT_ICE);
-        ELEMENT_PARTICLES.put(ElementType.VOID, PARTICLE_IMPACT_VOID);
-        ELEMENT_PARTICLES.put(ElementType.LIGHTNING, PARTICLE_IMPACT_LIGHTNING);
-        ELEMENT_PARTICLES.put(ElementType.EARTH, PARTICLE_IMPACT_EARTH);
-        ELEMENT_PARTICLES.put(ElementType.WIND, PARTICLE_IMPACT_WIND);
-    }
+    // Disabled — all elemental impact particles are missing from the live client.
+    // Re-enable when Hytale ships these particles or when we create custom ones.
+    // private static final EnumMap<ElementType, String> ELEMENT_PARTICLES = new EnumMap<>(ElementType.class);
 
     /**
      * Initializes cached sound indexes. Must be called after asset maps are loaded.
      */
     public void init() {
         shieldBlockSoundIndex = resolveSoundIndex(SOUND_SHIELD_BLOCK, "shield block");
-        LOGGER.atInfo().log("CombatFeedbackService initialized (shield=%d)",
-                shieldBlockSoundIndex);
+        parrySoundIndex = resolveSoundIndex(SOUND_PARRY, "parry");
+        dodgeSoundIndex = resolveSoundIndex(SOUND_DODGE, "dodge");
+        missSoundIndex = resolveSoundIndex(SOUND_MISS, "miss");
+        LOGGER.atInfo().log("CombatFeedbackService initialized (block=%d, parry=%d, dodge=%d, miss=%d)",
+                shieldBlockSoundIndex, parrySoundIndex, dodgeSoundIndex, missSoundIndex);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -105,53 +105,21 @@ public final class CombatFeedbackService {
             @Nonnull Ref<EntityStore> defenderRef,
             @Nonnull DamageBreakdown breakdown,
             float rpgDamage) {
-
-        if (rpgDamage <= 0) {
-            return;
-        }
-
-        // Get defender position
-        Vector3d position = getEntityPosition(store, defenderRef);
-        if (position == null) {
-            return;
-        }
-
-        // Rate-limit per defender entity
-        if (!canSpawnParticle(defenderRef.hashCode())) {
-            return;
-        }
-
-        try {
-            // 1. Basic blade impact (restores vanilla on-hit feedback)
-            spawnParticle(PARTICLE_IMPACT_BLADE, position, store);
-
-            // 2. Critical hit overlay
-            if (breakdown.wasCritical()) {
-                spawnParticle(PARTICLE_IMPACT_CRITICAL, position, store);
-            }
-
-            // 3. Elemental impact for the dominant element
-            ElementType dominantElement = findDominantElement(breakdown.elementalDamage());
-            if (dominantElement != null) {
-                String elementParticle = ELEMENT_PARTICLES.get(dominantElement);
-                if (elementParticle != null) {
-                    spawnParticle(elementParticle, position, store);
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to spawn damage particles: %s", e.getMessage());
-        }
+        // All combat impact particles (Impact_Blade_01, Impact_Critical, elemental impacts,
+        // Effect_Heal) are defined in Hytale's decompiled Assets.zip but NOT shipped in the
+        // live client build. Re-enable when Hytale ships these particles or when we create
+        // custom replacements.
     }
 
     /**
      * Called when damage is avoided (dodged, blocked, parried, missed).
      *
-     * <p>Spawns avoidance-specific particles and sounds:
+     * <p>Plays avoidance-specific sounds:
      * <ul>
-     *   <li>BLOCKED: shield bash particles + shield block sound</li>
-     *   <li>PARRIED: sword bash particles (parry reflect visual)</li>
-     *   <li>DODGED: no particles (dodge is absence of contact)</li>
-     *   <li>MISSED: no particles (miss is absence of contact)</li>
+     *   <li>BLOCKED: shield impact sound</li>
+     *   <li>PARRIED: sword block sound</li>
+     *   <li>DODGED: dodge/roll sound</li>
+     *   <li>MISSED: swing whiff sound</li>
      * </ul>
      *
      * @param store The entity store
@@ -162,12 +130,6 @@ public final class CombatFeedbackService {
             @Nonnull Store<EntityStore> store,
             @Nonnull Ref<EntityStore> defenderRef,
             @Nonnull DamageBreakdown.AvoidanceReason reason) {
-
-        // Dodge and miss are absence of contact — no visual feedback needed
-        if (reason == DamageBreakdown.AvoidanceReason.DODGED
-                || reason == DamageBreakdown.AvoidanceReason.MISSED) {
-            return;
-        }
 
         Vector3d position = getEntityPosition(store, defenderRef);
         if (position == null) {
@@ -181,21 +143,20 @@ public final class CombatFeedbackService {
         try {
             switch (reason) {
                 case BLOCKED -> {
-                    spawnParticle(PARTICLE_SHIELD_BASH, position, store);
-                    // 3D sound at defender position so nearby players hear it
-                    if (shieldBlockSoundIndex != 0) {
-                        SoundUtil.playSoundEvent3d(
-                                shieldBlockSoundIndex, SoundCategory.SFX,
-                                position, store);
-                    }
+                    playSound(shieldBlockSoundIndex, position, store);
                 }
                 case PARRIED -> {
-                    spawnParticle(PARTICLE_SWORD_BASH, position, store);
+                    playSound(parrySoundIndex, position, store);
                 }
-                default -> {} // DODGED, MISSED handled above
+                case DODGED -> {
+                    playSound(dodgeSoundIndex, position, store);
+                }
+                case MISSED -> {
+                    playSound(missSoundIndex, position, store);
+                }
             }
         } catch (Exception e) {
-            LOGGER.atFine().log("Failed to spawn avoidance particles: %s", e.getMessage());
+            LOGGER.atFine().log("Failed to spawn avoidance feedback: %s", e.getMessage());
         }
     }
 
@@ -211,25 +172,8 @@ public final class CombatFeedbackService {
     public void onRecovery(
             @Nonnull Store<EntityStore> store,
             @Nonnull Ref<EntityStore> attackerRef) {
-
-        if (attackerRef == null || !attackerRef.isValid()) {
-            return;
-        }
-
-        Vector3d position = getEntityPosition(store, attackerRef);
-        if (position == null) {
-            return;
-        }
-
-        if (!canSpawnParticle(attackerRef.hashCode())) {
-            return;
-        }
-
-        try {
-            spawnParticle(PARTICLE_HEAL, position, store);
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to spawn recovery particles: %s", e.getMessage());
-        }
+        // Heal particle disabled — Status_Effect/Heal/Effect_Heal is missing
+        // from Hytale's live client.
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -280,28 +224,11 @@ public final class CombatFeedbackService {
         return pos != null ? new Vector3d(pos.x, pos.y, pos.z) : null;
     }
 
-    private void spawnParticle(@Nonnull String particleId, @Nonnull Vector3d position,
-                                @Nonnull Store<EntityStore> store) {
-        ParticleUtil.spawnParticleEffect(particleId, position, store);
-    }
-
-    /**
-     * @return The element with the highest damage, or null if no elemental damage
-     */
-    @Nullable
-    private ElementType findDominantElement(@Nonnull EnumMap<ElementType, Float> elementalDamage) {
-        ElementType dominant = null;
-        float maxDamage = 0f;
-
-        for (var entry : elementalDamage.entrySet()) {
-            float dmg = entry.getValue();
-            if (dmg > maxDamage) {
-                maxDamage = dmg;
-                dominant = entry.getKey();
-            }
+    private void playSound(int soundIndex, @Nonnull Vector3d position,
+                           @Nonnull Store<EntityStore> store) {
+        if (soundIndex != 0) {
+            SoundUtil.playSoundEvent3d(soundIndex, SoundCategory.SFX, position, store);
         }
-
-        return dominant;
     }
 
     private static int resolveSoundIndex(@Nonnull String soundId, @Nonnull String description) {

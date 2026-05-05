@@ -108,6 +108,7 @@ public class GuideManager {
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
         playerStates.remove(playerId);
+        forgivenPlayers.remove(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -408,9 +409,15 @@ public class GuideManager {
         }
     }
 
+    /** Sentinel milestone ID stored in DB when a player permanently loses guide access. */
+    private static final String PERMANENTLY_BANNED_ID = "guide_permanently_banned";
+
     /**
      * Called when the player presses "I know what I'm doing" on the WELCOME popup.
      * Marks ALL milestones as completed so no future popups ever show.
+     *
+     * <p>If the player has already apologized once (via {@code /too sorry}) and
+     * skips again, they are permanently banned from guides.
      */
     private void onSkipAllGuides(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef) {
         PlayerGuideState state = playerStates.get(playerId);
@@ -426,19 +433,81 @@ public class GuideManager {
             }
         }
 
-        playerRef.sendMessage(
-            com.hypixel.hytale.server.core.Message.empty()
-                .insert(com.hypixel.hytale.server.core.Message.raw("[Guide] ").color("#FFD700").bold(true))
-                .insert(com.hypixel.hytale.server.core.Message.raw(
-                    "Alright, no more popups. If you've never played this mod before, "
-                    + "you just made a terrible decision. But hey, ").color("#D0DCEA"))
-                .insert(com.hypixel.hytale.server.core.Message.raw("/voile").color("#55FFFF").bold(true))
-                .insert(com.hypixel.hytale.server.core.Message.raw(
-                    " is always there when you inevitably need it. Good luck.").color("#D0DCEA"))
-        );
+        if (hasBeenForgiven(playerId)) {
+            // Second skip — permanently ban from guides
+            repository.markCompleted(playerId, PERMANENTLY_BANNED_ID);
+            if (state != null) {
+                state.markCompleted(PERMANENTLY_BANNED_ID);
+            }
+            clearForgiven(playerId);
 
-        LOGGER.atInfo().log("Player %s skipped all guide milestones",
-            playerId.toString().substring(0, 8));
+            playerRef.sendMessage(
+                com.hypixel.hytale.server.core.Message.empty()
+                    .insert(com.hypixel.hytale.server.core.Message.raw("[Guide] ").color("#FFD700").bold(true))
+                    .insert(com.hypixel.hytale.server.core.Message.raw(
+                        "You apologized. I forgave you. I re-enabled everything. "
+                        + "And you skipped it ").color("#FF6666"))
+                    .insert(com.hypixel.hytale.server.core.Message.raw("again").color("#FF4444").bold(true))
+                    .insert(com.hypixel.hytale.server.core.Message.raw(
+                        ". We're done. Guides are gone forever. "
+                        + "You're on your own.").color("#FF6666"))
+            );
+
+            LOGGER.atInfo().log("Player %s permanently banned from guides (repeat offender)",
+                playerId.toString().substring(0, 8));
+        } else {
+            playerRef.sendMessage(
+                com.hypixel.hytale.server.core.Message.empty()
+                    .insert(com.hypixel.hytale.server.core.Message.raw("[Guide] ").color("#FFD700").bold(true))
+                    .insert(com.hypixel.hytale.server.core.Message.raw(
+                        "Alright, no more popups. If you've never played this mod before, "
+                        + "you just made a terrible decision. But hey, ").color("#D0DCEA"))
+                    .insert(com.hypixel.hytale.server.core.Message.raw("/voile").color("#55FFFF").bold(true))
+                    .insert(com.hypixel.hytale.server.core.Message.raw(
+                        " is always there when you inevitably need it.").color("#D0DCEA"))
+            );
+            playerRef.sendMessage(
+                com.hypixel.hytale.server.core.Message.empty()
+                    .insert(com.hypixel.hytale.server.core.Message.raw("[Guide] ").color("#FFD700").bold(true))
+                    .insert(com.hypixel.hytale.server.core.Message.raw(
+                        "If you ever feel some remorse about your choice, or get your ass kicked, "
+                        + "apologise, and I may help you: ").color("#96A9BE"))
+                    .insert(com.hypixel.hytale.server.core.Message.raw("/too sorry").color("#55FFFF").bold(true))
+            );
+
+            LOGGER.atInfo().log("Player %s skipped all guide milestones",
+                playerId.toString().substring(0, 8));
+        }
+    }
+
+    /**
+     * Checks if a player is permanently banned from guides (skipped twice).
+     */
+    public boolean isGuidePermanentlyBanned(@Nonnull UUID playerId) {
+        PlayerGuideState state = playerStates.get(playerId);
+        if (state != null) {
+            return state.isCompleted(PERMANENTLY_BANNED_ID);
+        }
+        return repository.isCompleted(playerId, PERMANENTLY_BANNED_ID);
+    }
+
+    // Tracks players who have been forgiven via /too sorry (in-memory, persists until skip or disconnect)
+    private final Set<UUID> forgivenPlayers = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Marks a player as having been forgiven (called from /too sorry on successful apology).
+     * If they skip guides again after this, they get permanently banned.
+     */
+    public void markForgiven(@Nonnull UUID playerId) {
+        forgivenPlayers.add(playerId);
+    }
+
+    private boolean hasBeenForgiven(@Nonnull UUID playerId) {
+        return forgivenPlayers.contains(playerId);
+    }
+
+    private void clearForgiven(@Nonnull UUID playerId) {
+        forgivenPlayers.remove(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -497,6 +566,22 @@ public class GuideManager {
         if (state != null) {
             state.removeMilestone(milestoneId);
         }
+    }
+
+    /**
+     * Resets ALL milestones for a player, re-enabling guide popups.
+     * Called when a player apologizes for skipping the guides.
+     */
+    public void resetAllMilestones(@Nonnull UUID playerId) {
+        repository.deleteAllMilestones(playerId);
+        PlayerGuideState state = playerStates.get(playerId);
+        if (state != null) {
+            for (GuideMilestone milestone : GuideMilestone.values()) {
+                state.removeMilestone(milestone.getId());
+            }
+        }
+        LOGGER.atInfo().log("Reset all guide milestones for %s",
+            playerId.toString().substring(0, 8));
     }
 
     // ═══════════════════════════════════════════════════════════════════

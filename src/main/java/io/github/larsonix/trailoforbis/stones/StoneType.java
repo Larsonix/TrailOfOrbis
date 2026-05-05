@@ -98,7 +98,7 @@ public enum StoneType {
      */
     ORBISIAN_BLESSING(
         "Orbisian Blessing",
-        "Randomises the quality of an item",
+        "Randomises the quality of an item (1-100)",
         ItemTargetType.BOTH,
         GearRarity.UNCOMMON,
         false
@@ -133,7 +133,7 @@ public enum StoneType {
      */
     GAIAS_GIFT(
         "Gaia's Gift",
-        "Adds a new random modifier to an item",
+        "Adds a random modifier if the item has open slots for its rarity",
         ItemTargetType.BOTH,
         GearRarity.UNCOMMON,
         false
@@ -213,7 +213,7 @@ public enum StoneType {
      */
     CARTOGRAPHERS_POLISH(
         "Cartographer's Polish",
-        "Improves the quality of a map",
+        "Improves map quality (+5% unidentified, +1-5% identified, max 100%)",
         ItemTargetType.MAP_ONLY,
         GearRarity.UNCOMMON,
         false
@@ -263,7 +263,7 @@ public enum StoneType {
      */
     TRANSMUTATION_CRYSTAL(
         "Transmutation Crystal",
-        "Removes one modifier and adds a new one",
+        "Removes one unlocked modifier and adds a new one",
         ItemTargetType.BOTH,
         GearRarity.RARE,
         false

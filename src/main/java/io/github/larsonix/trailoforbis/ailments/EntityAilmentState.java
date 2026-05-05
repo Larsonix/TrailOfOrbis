@@ -264,6 +264,26 @@ public class EntityAilmentState {
     }
 
     /**
+     * Ticks all poison stack durations and removes expired stacks.
+     * Called by AilmentTickSystem after DOT damage has been dispatched.
+     *
+     * @param dt Delta time in seconds
+     */
+    public void tickPoisonStacks(float dt) {
+        if (poisonStacks.isEmpty()) return;
+
+        List<AilmentState> updatedStacks = new ArrayList<>();
+        for (AilmentState stack : poisonStacks) {
+            AilmentState updated = stack.afterTick(dt);
+            if (!updated.isExpired()) {
+                updatedStacks.add(updated);
+            }
+        }
+        poisonStacks.clear();
+        poisonStacks.addAll(updatedStacks);
+    }
+
+    /**
      * Removes all damage-over-time ailments (Burn and Poison), keeping non-DoT
      * ailments (Freeze, Shock) intact. Used by the DETONATE_DOT_ON_CRIT mechanic.
      */

@@ -64,13 +64,17 @@ distance_scaling:
   # Default: 0 (scaling starts from origin)
   scaling_start: 0.0
 
-  # Bonus stat pool points per block of distance
-  # Higher values = faster difficulty increase with distance
-  # Default: 0.5 (500 pool at 1000 blocks)
+  # (Legacy — no longer used for pool calculation. Kept for backward compat.)
   pool_per_block: 0.5
 
-  # Maximum bonus pool from distance (0 = no cap)
-  # Use this to cap difficulty for extreme distances
+  # Bonus stat pool per mob level.
+  # Both overworld and realm mobs use: bonusPool = mobLevel * pool_per_level
+  # This ensures consistent difficulty between overworld and realm content.
+  # Default: 2.0
+  pool_per_level: 2.0
+
+  # Maximum bonus pool (0 = no cap)
+  # Use this to cap difficulty for extreme levels
   # Default: 0 (unlimited)
   max_bonus_pool: 0.0
 

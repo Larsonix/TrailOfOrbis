@@ -97,17 +97,33 @@ public class EnergyShieldTracker {
     }
 
     /**
+     * Resets the regen delay timer without absorbing any damage.
+     *
+     * <p>Called when a player takes damage to HP (shield depleted or bypassed).
+     * This ensures the regen delay restarts on ANY incoming hit, not just hits
+     * absorbed by the shield. Without this, the shield would start regenerating
+     * prematurely while the player is still taking HP damage.
+     *
+     * @param uuid The player's UUID
+     */
+    public void recordHit(@Nonnull UUID uuid) {
+        shields.computeIfPresent(uuid, (key, state) ->
+            new ShieldState(state.currentShield(), System.currentTimeMillis()));
+    }
+
+    /**
      * Updates the shield for regeneration tick.
      *
      * <p>Only regenerates if enough time has passed since the last hit.
-     * Shield regenerates at a rate proportional to max shield per second.
+     * Shield regenerates at the stat-driven rate from ComputedStats.
      *
      * @param uuid The player's UUID
      * @param maxShield The player's maximum energy shield from ComputedStats
-     * @param regenPerSecond Shield regen amount per second (typically a fraction of maxShield)
+     * @param regenPerSecond Shield regen amount per second from energyShieldRegen stat
+     * @param playerRegenDelayMs Per-player regen delay in milliseconds from energyShieldRegenDelay stat
      * @param dt Delta time in seconds
      */
-    public void tickRegen(@Nonnull UUID uuid, float maxShield, float regenPerSecond, float dt) {
+    public void tickRegen(@Nonnull UUID uuid, float maxShield, float regenPerSecond, long playerRegenDelayMs, float dt) {
         if (maxShield <= 0 || regenPerSecond <= 0) {
             shields.remove(uuid);
             return;
@@ -127,7 +143,7 @@ public class EnergyShieldTracker {
             }
 
             long timeSinceHit = System.currentTimeMillis() - state.lastHitTimeMs();
-            if (state.lastHitTimeMs() > 0 && timeSinceHit < regenDelayMs) {
+            if (state.lastHitTimeMs() > 0 && timeSinceHit < playerRegenDelayMs) {
                 return state;
             }
 

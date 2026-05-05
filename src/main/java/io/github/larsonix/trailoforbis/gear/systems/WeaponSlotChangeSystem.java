@@ -15,9 +15,10 @@ import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncManager;
-import io.github.larsonix.trailoforbis.database.repository.PlayerDataRepository;
+import io.github.larsonix.trailoforbis.gear.GearManager;
+import io.github.larsonix.trailoforbis.gear.GearService;
+import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 import io.github.larsonix.trailoforbis.gear.util.EquipmentSectionIds;
-import io.github.larsonix.trailoforbis.systems.StatsApplicationSystem;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;
@@ -25,20 +26,21 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * ECS event system that triggers stat recalculation when a player switches
- * weapon (hotbar) or utility (offhand) slots.
+ * ECS event system that triggers stat recalculation when a player switches hotbar slots.
  *
  * <p>This system listens for {@link SwitchActiveSlotEvent} and recalculates
- * player stats when the active slot changes in:
- * <ul>
- *   <li>Hotbar (section ID -1) - weapon/tool switching</li>
- *   <li>Utility (section ID -5) - offhand item switching</li>
- * </ul>
+ * player stats when the active slot changes in the hotbar (section ID -1).
  *
- * <p>The stat recalculation picks up any stat modifiers from the newly
- * equipped weapon/utility item and applies them to the player's ECS components.
+ * <p><b>IMPORTANT:</b> Utility (offhand) slot switches are intentionally excluded.
+ * Hytale fires {@code SwitchActiveSlotEvent} via synchronous {@code store.invoke()}
+ * <i>before</i> updating the inventory's active slot field. Reading
+ * {@code inventory.getUtilityItem()} during this event returns the OLD item,
+ * causing stale stat calculations. Utility slot tracking is handled by
+ * {@link HotbarSlotTrackingSystem} which uses tick-based polling and always
+ * reads the correct post-update state.
  *
  * @see EquipmentSectionIds
+ * @see HotbarSlotTrackingSystem (handles both hotbar AND utility slot changes)
  * @see io.github.larsonix.trailoforbis.listeners.EquipmentChangeListener
  */
 public class WeaponSlotChangeSystem extends EntityEventSystem<EntityStore, SwitchActiveSlotEvent> {
@@ -66,9 +68,13 @@ public class WeaponSlotChangeSystem extends EntityEventSystem<EntityStore, Switc
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull SwitchActiveSlotEvent event
     ) {
-        // Only handle hotbar and utility section switches
+        // Only handle hotbar section switches.
+        // Utility (offhand) is excluded: SwitchActiveSlotEvent fires BEFORE the
+        // inventory's activeUtilitySlot is updated, so reading the utility item
+        // here returns stale data. Utility tracking is handled by
+        // HotbarSlotTrackingSystem's tick-based approach which reads post-update state.
         int sectionId = event.getInventorySectionId();
-        if (sectionId != EquipmentSectionIds.HOTBAR && sectionId != EquipmentSectionIds.UTILITY) {
+        if (sectionId != EquipmentSectionIds.HOTBAR) {
             return;
         }
 
@@ -111,6 +117,19 @@ public class WeaponSlotChangeSystem extends EntityEventSystem<EntityStore, Switc
         // Sync animation speed to match new attack speed stat
         ServiceRegistry.get(AnimationSpeedSyncManager.class)
                 .ifPresent(m -> m.syncAnimationSpeed(uuid));
+
+        // Mark gear tooltips dirty so requirement colors update on the next flush.
+        // The tooltipRefreshCallback covers stat-change cases, but switching between
+        // two items with identical stats (or two empty slots) won't trigger it.
+        // Explicit dirty-marking ensures tooltips always reflect the active slot.
+        ServiceRegistry.get(GearService.class).ifPresent(svc -> {
+            if (svc instanceof GearManager mgr) {
+                ItemSyncCoordinator coordinator = mgr.getSyncCoordinator();
+                if (coordinator != null) {
+                    coordinator.markEquipmentDirty(uuid);
+                }
+            }
+        });
 
         LOGGER.at(Level.FINE).log("Recalculated stats for %s after %s slot change",
                 uuid, sectionName);

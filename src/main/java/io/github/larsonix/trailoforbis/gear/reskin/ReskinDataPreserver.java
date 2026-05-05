@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import javax.annotation.Nonnull;
@@ -57,7 +58,21 @@ public final class ReskinDataPreserver {
 
     private final ConcurrentHashMap<UUID, CachedReskinData> cache = new ConcurrentHashMap<>();
 
+    /** Tracks which players currently have reskin translations active (workbench open). */
+    private final Set<UUID> reskinTooltipActive = ConcurrentHashMap.newKeySet();
+
+    /** Optional — set after initialization if crafting preview is available. */
+    @Nullable private CraftingPreviewService craftingPreviewService;
+
     public ReskinDataPreserver() {
+    }
+
+    /**
+     * Wires the crafting preview service for tooltip swapping when
+     * the Builder's Workbench opens/closes.
+     */
+    public void setCraftingPreviewService(@Nullable CraftingPreviewService service) {
+        this.craftingPreviewService = service;
     }
 
     /**
@@ -88,7 +103,37 @@ public final class ReskinDataPreserver {
 
         // Check if player has a StructuralCrafting window open
         if (!hasStructuralCraftingWindow(player)) {
+            // Fallback: if reskin tooltips were active but window is now closed
+            // (covers edge cases where the close event didn't fire)
+            if (craftingPreviewService != null && reskinTooltipActive.remove(playerId)) {
+                craftingPreviewService.restoreVanillaDefinitions(playerRef);
+            }
             return; // Not a workbench event — silent skip (very frequent)
+        }
+
+        // Tooltip swap: on first detection of workbench, send modified definitions
+        // (with rpg.crafting.* keys) + reskin translations, then register close event.
+        // Under window-scoped architecture, base items aren't modified until a crafting
+        // window opens — so we must send definitions first, then overlay reskin text.
+        if (craftingPreviewService != null && reskinTooltipActive.add(playerId)) {
+            int playerLevel = io.github.larsonix.trailoforbis.api.ServiceRegistry
+                    .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
+                    .map(ls -> ls.getLevel(playerId))
+                    .orElse(1);
+            craftingPreviewService.syncToPlayer(playerRef, playerLevel);
+            craftingPreviewService.sendReskinPreview(playerRef);
+
+            Window workbenchWindow = findStructuralCraftingWindow(player);
+            if (workbenchWindow != null) {
+                final PlayerRef capturedRef = playerRef;
+                final UUID pid = playerId;
+                workbenchWindow.registerCloseEvent(closeEvent -> {
+                    reskinTooltipActive.remove(pid);
+                    if (craftingPreviewService != null && capturedRef.isValid()) {
+                        craftingPreviewService.restoreVanillaDefinitions(capturedRef);
+                    }
+                });
+            }
         }
 
         // Guide milestone: first time opening Builder's Workbench
@@ -113,6 +158,7 @@ public final class ReskinDataPreserver {
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
         cache.remove(playerId);
+        reskinTooltipActive.remove(playerId);
     }
 
     /**

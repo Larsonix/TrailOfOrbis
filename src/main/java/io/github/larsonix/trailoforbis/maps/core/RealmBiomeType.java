@@ -180,6 +180,19 @@ public enum RealmBiomeType {
         return this == VOLCANO || this == SWAMP || this == VOID || this == CORRUPTED;
     }
 
+    /**
+     * Underground biomes with solid ceilings made of terrain materials.
+     *
+     * <p>Terrain scans must start near floor level (baseY + 1) for these biomes.
+     * Starting higher (baseY + 30) would hit the ceiling first — the ceiling is
+     * made of the same terrain materials as the floor (Rock_Stone, Rock_Sandstone),
+     * so the scan would find clearance at the ceiling's underside and return a
+     * mid-air position instead of the cave floor.
+     */
+    public boolean isCeilingBiome() {
+        return this == CAVERNS || this == FROZEN_CRYPTS || this == SAND_TOMBS;
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // STATIC UTILITIES
     // ═══════════════════════════════════════════════════════════════════

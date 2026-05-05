@@ -225,3 +225,31 @@ Sending `UpdateItems` or `UpdateTranslations` packets between `DrainPlayerFromWo
 - `addItemStack()` returns `ItemStackTransaction` (NOT `SlotTransaction`) — must handle both transaction types
 - Container operations (`removeItemStackFromSlot`) are safe inside systems (not store ops)
 
+---
+
+## ECS Component Add/Remove for Temporary Effects (2026-05-04)
+
+**What failed**: Using `store.addComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE)` and `store.removeComponent(ref, Invulnerable.getComponentType())` for temporary spawn invincibility.
+
+**How it failed**: `removeComponent()` causes **archetype migration** — the entity is physically extracted from one ArchetypeChunk, component stripped, then inserted into a different ArchetypeChunk. A second `removeComponent()` call on an already-removed component (from a 500ms verification retry) extracts the entity again with no archetype change, corrupting internal chunk indices. Every Hytale subsystem accessing the player entity then crashes with `IndexOutOfBoundsException: Index out of range: 0` at `ArchetypeChunk.getComponent()`, killing the entire realm world thread.
+
+**Conditions**: Any `store.addComponent()` / `store.removeComponent()` pair where the component might be removed twice (retry logic, concurrent events, safety nets). Single add+remove likely works, but the failure mode is catastrophic (world crash, not just an exception).
+
+**Working approach**: `EffectControllerComponent.setInvulnerable(true/false)` — simple boolean property mutation on an existing component. Zero archetype migration, zero ECS corruption risk. Hytale's vanilla damage pipeline checks `isInvulnerable()` in `DamageSystems.java:1430`. For our RPGDamageSystem, also check `effectController.isInvulnerable()` alongside the archetype `Invulnerable` component check.
+
+**General rule**: For temporary boolean-like effects on entities, prefer property mutation on existing components over adding/removing marker components. Reserve `addComponent`/`removeComponent` for components that must exist for ECS system queries (e.g., `BurnComponent` for `BurnTickSystem`).
+
+## Timestamp Acceleration on Ammo-Based Reload Chains (2026-05-04)
+
+**What failed**: `InteractionTimeShiftSystem` accelerating crossbow Primary chains that contain an ammo reload loop (`Repeat:-1` of `Simple` interactions, RunTime 0.3s each).
+
+**How it failed**: Crossbow reload runs as part of the Primary chain (when ammo check fails, chain falls through to `Root_Common_StatAmmoReload_Entry`). The system advances `InteractionEntry.timestamp` each tick, making `getTimeInSeconds()` return inflated values. Reload iterations complete faster than the `ApplyEffect` stat modifier (Ammo +1) can process, so ammo never reaches 100% — infinite reload loop.
+
+**Also failed**: `AnimationSpeedSyncManager` patching `"reload"` animations sped up the client reload animation, desyncing client expectations from server timing. Both bugs stacked: server iterations too fast + client animation too fast = permanent visual reload loop.
+
+**Why bows are NOT affected**: Bows use `ChargingInteraction` which reads from `InteractionEntry.simulationTimestamp`. Our system only modifies `InteractionEntry.timestamp` (the server path). Hytale maintains two separate timestamps in each entry — server tick uses one, client simulation uses the other. Charging progress is computed from `simulationTimestamp`, so our acceleration is invisible to charging interactions.
+
+**Working approach**: Detect ammo-reload chains via `chain.getInitialRootInteraction().getId()` containing weapon-type keywords ("Crossbow", "Handgun", "Rifle"). Skip both timestamp acceleration and cooldown tracking for these chains. Exclude `"reload"` from animation speed patching (move to exclusion list in `isAttackAnimation()`).
+
+**General rule**: `InteractionEntry.setTimestamp()` acceleration only works safely on short-lived attack chains (`Simple` interactions that complete in < 1s). Long-running chains with `Repeat` loops, stat modifiers, or ammo systems break because the cumulative timestamp shift causes iteration-level desync. For ranged weapons: let vanilla timing run unmodified.
+

@@ -79,7 +79,8 @@ public class ConfigManagerTest {
         assertNotNull(waterGrants);
         assertEquals(0.5f, waterGrants.getSpellDamagePercent(), 0.001f);
         assertEquals(1.5f, waterGrants.getMaxMana(), 0.001f);
-        assertEquals(2.0f, waterGrants.getEnergyShield(), 0.001f);
+        assertEquals(0.5f, waterGrants.getEnergyShieldPercent(), 0.001f);
+        assertEquals(0.2f, waterGrants.getEnergyShieldRegen(), 0.001f);
         assertEquals(0.15f, waterGrants.getManaRegen(), 0.001f);
         assertEquals(0.1f, waterGrants.getFreezeChance(), 0.001f);
 

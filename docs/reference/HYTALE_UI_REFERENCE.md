@@ -6,7 +6,7 @@ Complete reference for Hytale's inventory, container, and panel UI styling. Use 
 
 All UI files located at:
 ```
-/home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Common/UI/
+<hytale-decompiled>/Assets/Common/UI/
 ├── Custom/
 │   ├── Common.ui (master constants and styles)
 │   ├── Common/

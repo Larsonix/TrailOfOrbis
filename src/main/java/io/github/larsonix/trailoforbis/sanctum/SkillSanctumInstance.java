@@ -27,6 +27,8 @@ import com.hypixel.hytale.protocol.ItemWithAllMetadata;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.instance.RealmPortalManager;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
@@ -178,12 +180,14 @@ public class SkillSanctumInstance {
      */
     private boolean componentResyncDone = false;
 
+
     /**
-     * Timestamp (ms) when a deferred visual refresh should execute, or 0 if none pending.
-     * Set by inventory change events to re-send visual components after UpdateItems packets
-     * reset client-side rendering of node entities.
+     * Timestamp of last periodic visual keep-alive resync.
      */
-    private long visualRefreshAt;
+    private long lastVisualKeepAliveAt = 0;
+
+    /** Interval between periodic visual keep-alive resyncs (ms). */
+    private static final long VISUAL_KEEPALIVE_INTERVAL_MS = 500;
 
     /**
      * Whether the delayed (safety-net) component resync has been performed.
@@ -1024,6 +1028,10 @@ public class SkillSanctumInstance {
 
         world.execute(() -> {
             try {
+                // Suppress nearby portals on the return world to prevent the client crash
+                // caused by two JoinWorld packets in rapid succession (sanctum exit → portal auto-teleport).
+                suppressNearbyPortalsOnReturnWorld();
+
                 Store<EntityStore> store = world.getEntityStore().getStore();
 
                 // Tier 1: Try normal exit via InstancesPlugin (uses stored return point)
@@ -1094,6 +1102,44 @@ public class SkillSanctumInstance {
         Teleport teleport = Teleport.createForPlayer(targetWorld, returnPoint);
         store.addComponent(entityRef, Teleport.getComponentType(), teleport);
         return true;
+    }
+
+    /**
+     * Suppresses active realm portals near the player's return point.
+     *
+     * <p>This prevents a Hytale client crash (NullReferenceException) caused by
+     * receiving two JoinWorld packets within ~2 seconds. The crash occurs when a
+     * player exits the sanctum near an active portal — the vanilla
+     * {@code EnterPortalInteraction}'s 3-second guard passes but the client's
+     * chunk pipeline hasn't stabilized from the first world transition.
+     *
+     * <p>Portals are reactivated after the player's {@code PlayerReadyEvent} + 3s buffer,
+     * or after a 15s safety timeout (whichever comes first).
+     */
+    private void suppressNearbyPortalsOnReturnWorld() {
+        // Determine the return world
+        World returnWorld = null;
+        if (ultimateReturnWorldId != null) {
+            returnWorld = Universe.get().getWorld(ultimateReturnWorldId);
+        }
+        if (returnWorld == null) {
+            returnWorld = Universe.get().getDefaultWorld();
+        }
+        if (returnWorld == null || !returnWorld.isAlive()) {
+            return;
+        }
+
+        RealmsManager realmsManager = manager.getPlugin().getRealmsManager();
+        if (realmsManager == null) {
+            return;
+        }
+
+        RealmPortalManager portalManager = realmsManager.getPortalManager();
+        Vector3d returnPos = returnPoint.getPosition();
+        World targetWorld = returnWorld;
+
+        targetWorld.execute(() -> portalManager.suppressPortalsNear(
+                targetWorld, returnPos, playerId, 15.0));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2189,11 +2235,82 @@ public class SkillSanctumInstance {
      * Called by the spawner when all entities have been created and registered.
      * This enables nameplate visibility ticking.
      */
+    /**
+     * Delay in milliseconds before forcing a client-side resync of all entity data.
+     * Gives the client time to finish processing the initial flood of ~970 entities
+     * before we trigger a re-send that forces nameplate position recalculation.
+     */
+    private static final long ENTITY_RESYNC_DELAY_MS = 3000;
+
     void markSpawningComplete() {
         nodesSpawned = true;
-        LOGGER.atInfo().log("Spawning complete for sanctum %s - %d nodes registered",
-            playerId, nodeEntities.size());
+        LOGGER.atInfo().log("Spawning complete for sanctum %s - %d nodes, %d subtitles registered",
+            playerId, nodeEntities.size(), subtitleEntities.size());
+
+        // Schedule a delayed resync of all entity Item+Scale data.
+        // The Hytale client intermittently miscalculates nameplate Y positions when
+        // receiving ~970 item entities in rapid succession. By re-sending the Item
+        // ComponentUpdate after the client has finished processing the initial flood,
+        // we force the client to recalculate nameplate positions with all data in place.
+        scheduleEntityResync();
     }
+
+    /**
+     * Forces the client to reprocess all node and subtitle entities by touching
+     * their ItemComponent (triggering a new Item+Scale ComponentUpdate).
+     *
+     * <p>This works around a Hytale client bug where nameplate positions are
+     * miscalculated for ~30% of entities when many item entities arrive rapidly.
+     */
+    private void scheduleEntityResync() {
+        World world = getSanctumWorld();
+        if (world == null || !world.isAlive()) return;
+
+        // Use a timer to delay the resync
+        new java.util.Timer("sanctum-resync-" + playerId.toString().substring(0, 8), true)
+            .schedule(new java.util.TimerTask() {
+                @Override
+                public void run() {
+                    if (!active || !nodesSpawned) return;
+                    World w = getSanctumWorld();
+                    if (w == null || !w.isAlive()) return;
+
+                    w.execute(() -> {
+                        Store<EntityStore> store = w.getEntityStore().getStore();
+                        int resynced = 0;
+
+                        // Resync all node entities (main orbs)
+                        for (Ref<EntityStore> nodeRef : nodeEntities.values()) {
+                            if (nodeRef != null && nodeRef.isValid()) {
+                                ItemComponent item = store.getComponent(nodeRef, ItemComponent.getComponentType());
+                                if (item != null) {
+                                    // Re-set the same item — triggers isNetworkOutdated,
+                                    // causing ItemSystems.TrackerSystem to re-send Item+Scale
+                                    item.setItemStack(item.getItemStack());
+                                    resynced++;
+                                }
+                            }
+                        }
+
+                        // Resync all subtitle entities
+                        for (Ref<EntityStore> subRef : subtitleEntities.values()) {
+                            if (subRef != null && subRef.isValid()) {
+                                ItemComponent item = store.getComponent(subRef, ItemComponent.getComponentType());
+                                if (item != null) {
+                                    item.setItemStack(item.getItemStack());
+                                    resynced++;
+                                }
+                            }
+                        }
+
+                        LOGGER.atInfo().log("Entity resync complete for sanctum %s — %d entities re-sent",
+                            playerId.toString().substring(0, 8), resynced);
+                    });
+                }
+            }, ENTITY_RESYNC_DELAY_MS);
+    }
+
+
 
     /**
      * Gets all node IDs that have spawned entities.
@@ -2261,33 +2378,34 @@ public class SkillSanctumInstance {
     }
 
     /**
-     * Schedules a deferred visual component resync ~200ms from now.
+     * Periodic visual keep-alive: re-flags all visual components on node entities.
      *
-     * <p>Called when an inventory change is detected for a player in the sanctum.
-     * The delay ensures this runs AFTER the debounced UpdateItems packet (100ms debounce
-     * + network RTT) that causes the visual reset.
-     */
-    public void scheduleVisualRefresh() {
-        this.visualRefreshAt = System.currentTimeMillis() + 200;
-    }
-
-    /**
-     * Checks if a deferred visual refresh is due and executes it.
+     * <p>Hytale's engine resets client-side item entity visuals (scale, model, light)
+     * during certain player actions (hotbar scroll, combat interactions, blocking).
+     * The exact mechanism is internal to the engine and cannot be prevented from the server.
      *
-     * <p>Called from the tick loop. When the scheduled time arrives, resyncs all
-     * visual components on the world thread to correct the client-side reset
-     * caused by UpdateItems packets.
+     * <p>Instead of trying to detect every individual corruption event (whack-a-mole),
+     * this method runs periodically ({@value #VISUAL_KEEPALIVE_INTERVAL_MS}ms) and
+     * re-asserts the correct values. Each setter re-flags {@code isNetworkOutdated},
+     * causing the entity tracker to re-send the component to the client on the next tick.
+     *
+     * <p>Cost is negligible: re-flagging ~485 scales + ~485 items + ~100 lights every 500ms.
+     * The entity tracker only sends packets for components where the flag was consumed,
+     * so no redundant network traffic occurs if the client already has the correct values.
      *
      * @implNote Must be called from the world thread.
      */
-    public void tickVisualRefresh() {
-        if (visualRefreshAt == 0 || !active || !nodesSpawned) return;
-        if (System.currentTimeMillis() < visualRefreshAt) return;
+    public void tickVisualKeepAlive() {
+        if (!active || !nodesSpawned) return;
 
-        visualRefreshAt = 0;
+        long now = System.currentTimeMillis();
+        if (now - lastVisualKeepAliveAt < VISUAL_KEEPALIVE_INTERVAL_MS) return;
+        lastVisualKeepAliveAt = now;
+
         World world = getSanctumWorld();
         if (world == null || !world.isAlive()) return;
-        resyncAllVisualComponents(world, "InventoryChange");
+
+        resyncAllVisualComponents(world, "KeepAlive");
     }
 
     /**
@@ -2337,8 +2455,34 @@ public class SkillSanctumInstance {
             }
         }
 
-        LOGGER.atInfo().log("Component resync %s for sanctum %s: %d scales, %d items, %d lights",
-            phase, playerId, scaleCount, itemCount, lightCount);
+        // Resync all subtitle entities (description nametags above node orbs)
+        int subtitleCount = 0;
+        for (Ref<EntityStore> ref : subtitleEntities.values()) {
+            if (ref == null || !ref.isValid()) continue;
+
+            EntityScaleComponent scale = store.getComponent(ref, EntityScaleComponent.getComponentType());
+            if (scale != null) {
+                scale.setScale(scale.getScale());
+            }
+
+            ItemComponent item = store.getComponent(ref, ItemComponent.getComponentType());
+            if (item != null) {
+                item.setItemStack(item.getItemStack());
+            }
+
+            Nameplate nameplate = store.getComponent(ref, Nameplate.getComponentType());
+            if (nameplate != null) {
+                nameplate.setText(nameplate.getText());
+            }
+
+            subtitleCount++;
+        }
+
+        // Only log initial phases — KeepAlive fires every 500ms
+        if (!"KeepAlive".equals(phase)) {
+            LOGGER.atInfo().log("Component resync %s for sanctum %s: %d scales, %d items, %d lights, %d subtitles",
+                phase, playerId, scaleCount, itemCount, lightCount, subtitleCount);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -153,6 +153,54 @@ public final class TestConfigFactory {
         return createBalanceConfigWithRarities(rarityConfigs);
     }
 
+    /**
+     * Creates a default balance config with a custom ImplicitDamageConfig.
+     * Used by migration tests that need enabled implicit validation.
+     */
+    public static GearBalanceConfig createBalanceConfigWithImplicitDamage(
+            GearBalanceConfig.ImplicitDamageConfig implicitDamage) {
+        Map<GearRarity, RarityConfig> rarityConfigs = new EnumMap<>(GearRarity.class);
+        rarityConfigs.put(GearRarity.COMMON, new RarityConfig(0.3, 1, 0, 1, 0, 1, 64.0));
+        rarityConfigs.put(GearRarity.UNCOMMON, new RarityConfig(0.5, 2, 0, 1, 0, 2, 16.0));
+        rarityConfigs.put(GearRarity.RARE, new RarityConfig(0.8, 3, 1, 2, 1, 2, 4.0));
+        rarityConfigs.put(GearRarity.EPIC, new RarityConfig(1.2, 4, 1, 2, 1, 2, 1.0));
+        rarityConfigs.put(GearRarity.LEGENDARY, new RarityConfig(1.7, 4, 2, 2, 2, 2, 0.25));
+        rarityConfigs.put(GearRarity.MYTHIC, new RarityConfig(2.3, 4, 2, 2, 2, 2, 0.0625, 0.75));
+        rarityConfigs.put(GearRarity.UNIQUE, new RarityConfig(2.8, 6, 2, 3, 2, 3, 0.016, 0.80));
+
+        Map<String, Double> slotWeights = Map.of(
+            "weapon", 0.25, "chest", 0.20, "legs", 0.15,
+            "head", 0.15, "hands", 0.10, "feet", 0.10, "shield", 0.05
+        );
+
+        QualityDropDistribution dist = new QualityDropDistribution(
+            0.15, 0.25, 0.10, 0.30, 0.195, 0.005
+        );
+        QualityConfig quality = new QualityConfig(50, 1, 100, 101, dist);
+
+        Map<GearRarity, Double> attrMults = new EnumMap<>(GearRarity.class);
+        for (GearRarity r : GearRarity.values()) {
+            attrMults.put(r, 1.0);
+        }
+
+        return new GearBalanceConfig(
+            0.5,
+            slotWeights,
+            0.02,
+            rarityConfigs,
+            quality,
+            new AttributeRequirementsConfig(0.5, 10, attrMults),
+            new ModifierScalingConfig(0.01, 0.3, Map.of("common", 100, "rare", 10)),
+            new LootConfig(0.5, 0.01, new DistanceScalingConfig(true, 100, 2.0), Map.of()),
+            new StoneDropConfig(0.1, Map.of("quality_stone", 50, "modifier_stone", 30)),
+            ExponentialScalingConfig.DISABLED,
+            implicitDamage,
+            ImplicitDefenseConfig.DISABLED,
+            VanillaWeaponProfilesConfig.DISABLED,
+            LevelBlendingConfig.DISABLED
+        );
+    }
+
     // =========================================================================
     // MODIFIER CONFIG
     // =========================================================================

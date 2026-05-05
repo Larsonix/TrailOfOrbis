@@ -3,6 +3,7 @@ package io.github.larsonix.trailoforbis.stones.ui;
 import com.hypixel.hytale.server.core.Message;
 
 import io.github.larsonix.trailoforbis.gear.model.GearData;
+import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipStyles;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
@@ -25,6 +26,10 @@ import java.util.Map;
  * each change as a colored {@link Message} line. The caller provides the
  * stone type (for the header prefix) and both the before and after item states.
  *
+ * <p>Modifier values are quality-adjusted to match the tooltip display:
+ * {@code displayValue = rawValue * qualityMultiplier}. This ensures the
+ * numbers in chat feedback match exactly what the player sees on the item.
+ *
  * <p>All formatting uses the project's standard color constants from
  * {@link RPGStyles} and {@link TooltipStyles}.
  */
@@ -37,6 +42,100 @@ public final class StoneResultMessageBuilder {
     private static final String COLOR_VALUE = "#FFFFFF";     // White — values
     private static final String COLOR_ARROW = "#888888";     // Gray — arrows
     private static final String COLOR_RARITY_UP = "#FFD700"; // Gold — rarity upgrade
+
+    /**
+     * Display name overrides for stats whose auto-formatted name is misleading.
+     *
+     * <p>Must match {@code RichTooltipFormatter.STAT_DISPLAY_OVERRIDES} exactly
+     * so chat feedback uses the same stat names as item tooltips.
+     */
+    private static final Map<String, String> STAT_DISPLAY_OVERRIDES = Map.of(
+        "stamina_regen_start_delay", "Stamina Recovery Speed",
+        "energy_shield_regen_delay", "ES Regen Delay"
+    );
+
+    /**
+     * Compact notification content for toast display.
+     *
+     * @param primary Stone name in rarity color (bold)
+     * @param secondary Compact diff summary (first change + count of additional changes)
+     */
+    public record NotificationContent(@Nonnull Message primary, @Nonnull Message secondary) {}
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NOTIFICATION BUILDERS (toast display)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Builds compact notification content for a successful stone application.
+     *
+     * <p>Primary: stone display name in rarity color, bold.
+     * Secondary: first diff line (most important change), with "(+N more)"
+     * appended if there were additional changes. Falls back to the legacy
+     * message if no diff could be computed.
+     *
+     * @param stoneType The stone that was applied
+     * @param before The item state before the stone
+     * @param after The item state after the stone (null falls back to legacy message)
+     * @param legacyMessage Fallback message if diff can't be computed
+     * @return Notification content ready for NotificationUtil
+     */
+    @Nonnull
+    public static NotificationContent buildNotification(
+            @Nonnull StoneType stoneType,
+            @Nonnull ModifiableItem before,
+            @Nullable ModifiableItem after,
+            @Nonnull String legacyMessage) {
+
+        Message primary = Message.raw(stoneType.getDisplayName())
+            .color(stoneType.getHexColor())
+            .bold(true);
+
+        if (after == null) {
+            return new NotificationContent(primary, Message.raw(legacyMessage).color(COLOR_VALUE));
+        }
+
+        List<Message> lines = computeDiffLines(before, after);
+
+        if (lines.isEmpty()) {
+            return new NotificationContent(primary, Message.raw(legacyMessage).color(COLOR_VALUE));
+        }
+
+        Message secondary = lines.get(0);
+        if (lines.size() > 1) {
+            secondary = secondary
+                .insert(Message.raw(" (+" + (lines.size() - 1) + " more)").color(COLOR_LABEL));
+        }
+
+        return new NotificationContent(primary, secondary);
+    }
+
+    /**
+     * Builds compact notification content for a failed stone application.
+     *
+     * <p>Primary: stone display name in rarity color, bold.
+     * Secondary: failure reason in red.
+     *
+     * @param stoneType The stone that failed
+     * @param failureMessage Why it failed
+     * @return Notification content ready for NotificationUtil
+     */
+    @Nonnull
+    public static NotificationContent buildFailureNotification(
+            @Nonnull StoneType stoneType,
+            @Nonnull String failureMessage) {
+
+        Message primary = Message.raw(stoneType.getDisplayName())
+            .color(stoneType.getHexColor())
+            .bold(true);
+        Message secondary = Message.raw(failureMessage).color(COLOR_REMOVED);
+
+        return new NotificationContent(primary, secondary);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CHAT MESSAGE BUILDER (legacy — kept for chat log detail if needed)
+    // ═══════════════════════════════════════════════════════════════════
 
     /**
      * Builds a rich message describing what a stone changed.
@@ -100,6 +199,13 @@ public final class StoneResultMessageBuilder {
 
         List<Message> lines = new ArrayList<>();
 
+        // Quality multiplier for modifier value display.
+        // Gear: quality/100 + 0.5 (range 0.51-1.51). Maps: 1.0 (no quality scaling on modifiers).
+        // Uses the AFTER state so values match the updated tooltip.
+        double qualityMultiplier = (after instanceof GearData gearAfter)
+            ? gearAfter.qualityMultiplier()
+            : 1.0;
+
         // 1. Corruption change (show first — it's the most dramatic)
         if (!before.corrupted() && after.corrupted()) {
             lines.add(Message.raw("Corrupted !").color(COLOR_REMOVED).bold(true));
@@ -145,7 +251,7 @@ public final class StoneResultMessageBuilder {
             }
         }
 
-        // 8. Gear-specific: implicit damage change
+        // 8. Gear-specific: implicit damage change (no quality adjustment — implicits are fixed base stats)
         if (before instanceof GearData beforeGear && after instanceof GearData afterGear) {
             if (beforeGear.hasWeaponImplicit() && afterGear.hasWeaponImplicit()) {
                 int oldVal = beforeGear.implicit().rolledValueAsInt();
@@ -168,7 +274,7 @@ public final class StoneResultMessageBuilder {
         }
 
         // 9. Modifier diff (added, removed, value changes, lock changes)
-        computeModifierDiff(before.modifiers(), after.modifiers(), lines);
+        computeModifierDiff(before.modifiers(), after.modifiers(), qualityMultiplier, lines);
 
         return lines;
     }
@@ -183,10 +289,13 @@ public final class StoneResultMessageBuilder {
      * <p>Matching strategy: match by modifier ID. If an ID exists in both before
      * and after, check for value/lock changes. If only in before, it was removed.
      * If only in after, it was added.
+     *
+     * @param qualityMultiplier Quality adjustment for display values (gear: 0.51-1.51, maps: 1.0)
      */
     private static void computeModifierDiff(
             @Nonnull List<? extends ItemModifier> beforeMods,
             @Nonnull List<? extends ItemModifier> afterMods,
+            double qualityMultiplier,
             @Nonnull List<Message> lines) {
 
         // Index after mods by ID for O(1) lookup
@@ -204,21 +313,21 @@ public final class StoneResultMessageBuilder {
 
             if (afterMod == null) {
                 // Modifier was removed
-                lines.add(buildModifierRemoved(beforeMod));
+                lines.add(buildModifierRemoved(beforeMod, qualityMultiplier));
             } else {
                 unmatchedAfter.remove(beforeMod.id());
 
-                // Check value change
+                // Check value change (raw comparison — any real change should be reported)
                 if (Math.abs(beforeMod.getValue() - afterMod.getValue()) > 0.001) {
-                    lines.add(buildModifierValueChange(beforeMod, afterMod));
+                    lines.add(buildModifierValueChange(beforeMod, afterMod, qualityMultiplier));
                 }
 
                 // Check lock state change
                 if (beforeMod.isLocked() != afterMod.isLocked()) {
                     if (afterMod.isLocked()) {
-                        lines.add(buildModifierLocked(afterMod));
+                        lines.add(buildModifierLocked(afterMod, qualityMultiplier));
                     } else {
-                        lines.add(buildModifierUnlocked(afterMod));
+                        lines.add(buildModifierUnlocked(afterMod, qualityMultiplier));
                     }
                 }
             }
@@ -226,7 +335,7 @@ public final class StoneResultMessageBuilder {
 
         // Remaining unmatched after mods = newly added
         for (ItemModifier addedMod : unmatchedAfter.values()) {
-            lines.add(buildModifierAdded(addedMod));
+            lines.add(buildModifierAdded(addedMod, qualityMultiplier));
         }
     }
 
@@ -262,18 +371,18 @@ public final class StoneResultMessageBuilder {
      * Builds "Added : +X.X StatName" in green.
      */
     @Nonnull
-    private static Message buildModifierAdded(@Nonnull ItemModifier mod) {
+    private static Message buildModifierAdded(@Nonnull ItemModifier mod, double qualityMultiplier) {
         return Message.raw("Added : ").color(COLOR_LABEL)
-            .insert(Message.raw(formatModifierValue(mod)).color(COLOR_ADDED));
+            .insert(Message.raw(formatModifierValue(mod, qualityMultiplier)).color(COLOR_ADDED));
     }
 
     /**
      * Builds "Removed : +X.X StatName" in red.
      */
     @Nonnull
-    private static Message buildModifierRemoved(@Nonnull ItemModifier mod) {
+    private static Message buildModifierRemoved(@Nonnull ItemModifier mod, double qualityMultiplier) {
         return Message.raw("Removed : ").color(COLOR_LABEL)
-            .insert(Message.raw(formatModifierValue(mod)).color(COLOR_REMOVED));
+            .insert(Message.raw(formatModifierValue(mod, qualityMultiplier)).color(COLOR_REMOVED));
     }
 
     /**
@@ -282,28 +391,29 @@ public final class StoneResultMessageBuilder {
     @Nonnull
     private static Message buildModifierValueChange(
             @Nonnull ItemModifier before,
-            @Nonnull ItemModifier after) {
-        return Message.raw(formatModifierValue(before)).color(COLOR_VALUE)
+            @Nonnull ItemModifier after,
+            double qualityMultiplier) {
+        return Message.raw(formatModifierValue(before, qualityMultiplier)).color(COLOR_VALUE)
             .insert(Message.raw(" -> ").color(COLOR_ARROW))
-            .insert(Message.raw(formatModifierValue(after)).color(COLOR_ADDED));
+            .insert(Message.raw(formatModifierValue(after, qualityMultiplier)).color(COLOR_ADDED));
     }
 
     /**
      * Builds "Locked : +X.X StatName" in teal.
      */
     @Nonnull
-    private static Message buildModifierLocked(@Nonnull ItemModifier mod) {
+    private static Message buildModifierLocked(@Nonnull ItemModifier mod, double qualityMultiplier) {
         return Message.raw("Locked : ").color(COLOR_LABEL)
-            .insert(Message.raw(formatModifierValue(mod)).color(TooltipStyles.LOCKED_MODIFIER));
+            .insert(Message.raw(formatModifierValue(mod, qualityMultiplier)).color(TooltipStyles.LOCKED_MODIFIER));
     }
 
     /**
      * Builds "Unlocked : +X.X StatName" in green.
      */
     @Nonnull
-    private static Message buildModifierUnlocked(@Nonnull ItemModifier mod) {
+    private static Message buildModifierUnlocked(@Nonnull ItemModifier mod, double qualityMultiplier) {
         return Message.raw("Unlocked : ").color(COLOR_LABEL)
-            .insert(Message.raw(formatModifierValue(mod)).color(COLOR_ADDED));
+            .insert(Message.raw(formatModifierValue(mod, qualityMultiplier)).color(COLOR_ADDED));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -311,30 +421,94 @@ public final class StoneResultMessageBuilder {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Formats a modifier as "+X.X StatName" or "+X.X% StatName".
+     * Formats a modifier as "+X.X StatName" or "+X.X% StatName" with quality adjustment.
      *
-     * <p>Uses the modifier's own {@link ItemModifier#formatForTooltip()} if
-     * available, otherwise builds from value + displayName.
+     * <p>The displayed value matches the item tooltip exactly:
+     * {@code displayValue = rawValue * qualityMultiplier}. For gear modifiers,
+     * the stat name is derived from {@code statId} (matching the tooltip's format)
+     * rather than the thematic display name (e.g., "Physical Damage" not "Sharp").
+     *
+     * <p>Formatting mirrors {@code RichTooltipFormatter.formatModifierValue()} to
+     * ensure identical number display between chat feedback and item tooltips.
+     *
+     * @param mod The modifier to format
+     * @param qualityMultiplier Quality adjustment (gear: 0.51-1.51, maps: 1.0)
      */
     @Nonnull
-    private static String formatModifierValue(@Nonnull ItemModifier mod) {
-        double value = mod.getValue();
+    private static String formatModifierValue(@Nonnull ItemModifier mod, double qualityMultiplier) {
+        double value = mod.getValue() * qualityMultiplier;
         String sign = value >= 0 ? "+" : "";
-        String displayName = mod.displayName();
+        String displayName = getModifierDisplayName(mod);
 
         if (mod.isPercent()) {
             // Percent modifier: "+10.5% Attack Speed"
-            if (Math.abs(value) >= 100 || Math.abs(value - Math.round(value)) < 0.05) {
+            // Matches RichTooltipFormatter: integer for >=100, one decimal otherwise
+            if (Math.abs(value) >= 100) {
                 return sign + Math.round(value) + "% " + displayName;
             }
             return sign + String.format("%.1f", value) + "% " + displayName;
         } else {
             // Flat modifier: "+25 Physical Damage"
+            // Matches RichTooltipFormatter: integer if close to round, one decimal otherwise
             if (Math.abs(value - Math.round(value)) < 0.05) {
                 return sign + Math.round(value) + " " + displayName;
             }
             return sign + String.format("%.1f", value) + " " + displayName;
         }
+    }
+
+    /**
+     * Gets the display name for a modifier, matching the tooltip's format.
+     *
+     * <p>For gear modifiers: uses statId converted to Title Case (e.g., "physical_damage"
+     * -> "Physical Damage"), with overrides for misleading names. Strips "_percent" suffix
+     * from percent modifiers to avoid redundancy like "+2.4% Physical Damage Percent".
+     *
+     * <p>For other modifiers (realm maps): uses the modifier's own display name as-is,
+     * since map modifier display names are already player-facing labels.
+     */
+    @Nonnull
+    private static String getModifierDisplayName(@Nonnull ItemModifier mod) {
+        if (mod instanceof GearModifier gearMod) {
+            String statId = gearMod.statId();
+
+            // Check display overrides first (matches RichTooltipFormatter)
+            String override = STAT_DISPLAY_OVERRIDES.get(statId.toLowerCase());
+            if (override != null) {
+                return override;
+            }
+
+            // Strip "_percent" suffix for percent modifiers (avoids "Physical Damage Percent")
+            if (gearMod.isPercent() && statId.endsWith("_percent")) {
+                statId = statId.substring(0, statId.length() - "_percent".length());
+            }
+
+            return formatStatId(statId);
+        }
+
+        return mod.displayName();
+    }
+
+    /**
+     * Formats a stat ID as a human-readable display name.
+     *
+     * <p>Converts snake_case to Title Case: "physical_damage" -> "Physical Damage".
+     * Matches the same logic in {@code RichTooltipFormatter.formatStatId()}.
+     */
+    @Nonnull
+    private static String formatStatId(@Nonnull String statId) {
+        String[] parts = statId.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!sb.isEmpty()) sb.append(" ");
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                if (part.length() > 1) {
+                    sb.append(part.substring(1).toLowerCase());
+                }
+            }
+        }
+        return sb.toString();
     }
 
     private StoneResultMessageBuilder() {

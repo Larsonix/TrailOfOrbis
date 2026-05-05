@@ -9,10 +9,13 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Synchronizes player level display with PartyPro's custom HUD text fields.
+ * Synchronizes player level and location display with PartyPro's custom HUD text fields.
  *
- * <p>When a player levels up or joins, their level is shown in the party HUD
- * so all party members can see each other's levels.
+ * <p>Uses per-slot API methods to prevent clobbering:
+ * <ul>
+ *   <li>Slot 1: Player level (e.g., "Lv.42")</li>
+ *   <li>Slot 2: Player location (e.g., "Overworld", "Desert Lv.60", "Skill Sanctum")</li>
+ * </ul>
  */
 public class PartyHudSync implements PartyChangeListener {
 
@@ -20,47 +23,95 @@ public class PartyHudSync implements PartyChangeListener {
 
     private final PartyBridge bridge;
     private final LevelingService levelingService;
-    private final PartyConfig.HudConfig config;
+    private final PartyConfig.HudConfig hudConfig;
+    private final PartyConfig.LocationConfig locationConfig;
 
     public PartyHudSync(@Nonnull PartyBridge bridge,
                          @Nonnull LevelingService levelingService,
-                         @Nonnull PartyConfig.HudConfig config) {
+                         @Nonnull PartyConfig.HudConfig hudConfig,
+                         @Nonnull PartyConfig.LocationConfig locationConfig) {
         this.bridge = bridge;
         this.levelingService = levelingService;
-        this.config = config;
+        this.hudConfig = hudConfig;
+        this.locationConfig = locationConfig;
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LEVEL DISPLAY (slot 1)
+    // ═══════════════════════════════════════════════════════════════════
 
     /**
      * Updates the level display for a player in the party HUD.
+     * Uses per-slot method to preserve the location text in the other slot.
      */
     public void updateLevel(@Nonnull UUID playerId, int level) {
         if (!bridge.isAvailable()) return;
 
-        String formatted = config.getLevelFormat().replace("{level}", String.valueOf(level));
-        if (config.getLevelSlot() == 1) {
-            bridge.setCustomText(playerId, formatted, null);
+        String formatted = hudConfig.getLevelFormat().replace("{level}", String.valueOf(level));
+        if (hudConfig.getLevelSlot() == 1) {
+            bridge.setCustomText1(playerId, formatted);
         } else {
-            bridge.setCustomText(playerId, null, formatted);
+            bridge.setCustomText2(playerId, formatted);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LOCATION DISPLAY (slot 2)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Updates the location display for a player in the party HUD.
+     * Uses per-slot method to preserve the level text in the other slot.
+     */
+    public void updateLocation(@Nonnull UUID playerId, @Nonnull String locationText) {
+        if (!bridge.isAvailable() || !locationConfig.isEnabled()) return;
+
+        if (locationConfig.getLocationSlot() == 1) {
+            bridge.setCustomText1(playerId, locationText);
+        } else {
+            bridge.setCustomText2(playerId, locationText);
         }
     }
 
     /**
-     * Clears the HUD data for a disconnecting player.
+     * Sets the player's location to the overworld default.
+     */
+    public void setOverworld(@Nonnull UUID playerId) {
+        updateLocation(playerId, locationConfig.getOverworldText());
+    }
+
+    /**
+     * Sets the player's location to a realm.
+     */
+    public void setRealm(@Nonnull UUID playerId, @Nonnull String biomeName, int realmLevel) {
+        updateLocation(playerId, locationConfig.formatRealm(biomeName, realmLevel));
+    }
+
+    /**
+     * Sets the player's location to the skill sanctum.
+     */
+    public void setSanctum(@Nonnull UUID playerId) {
+        updateLocation(playerId, locationConfig.getSanctumText());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CLEANUP
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Clears all HUD data for a disconnecting player.
      */
     public void clearPlayer(@Nonnull UUID playerId) {
         if (!bridge.isAvailable()) return;
         bridge.clearCustomText(playerId);
     }
 
-    /**
-     * Shuts down the HUD sync.
-     */
     public void shutdown() {
         // No persistent state to clean up
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // PartyChangeListener — react to party changes
+    // PartyChangeListener — react to party membership changes
     // ═══════════════════════════════════════════════════════════════════
 
     @Override

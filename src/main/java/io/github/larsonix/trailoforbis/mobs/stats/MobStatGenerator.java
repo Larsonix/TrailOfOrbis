@@ -136,6 +136,39 @@ public class MobStatGenerator {
         return statConfig.finalize(poolShare);
     }
 
+    /**
+     * Generates a deterministic reference mob using the MEAN of the Dirichlet distribution.
+     *
+     * <p>Instead of random sampling, each stat gets its expected share:
+     * {@code share_i = (alpha_i / sum(alpha)) × totalPool}
+     *
+     * <p>This produces the "average" mob at a given level — no outliers, fully reproducible.
+     * Used by balance simulation to eliminate noise from random stat rolls.
+     */
+    @Nonnull
+    public MobStatProfile generateDeterministic(int mobLevel, double distanceBonus) {
+        double scalingFactor = config.calculateScalingFactor(mobLevel);
+        double effectiveLevel = (LevelScaling.getMultiplier(mobLevel) - 1.0)
+                * LevelScaling.getTransitionLevel() + 1.0;
+        double levelPool = effectiveLevel * config.getPointsPerLevel() * scalingFactor;
+        double expMultiplier = LevelScaling.getMultiplier(mobLevel);
+        double totalPool = (levelPool + distanceBonus) * expMultiplier;
+
+        // Compute alpha-weighted mean shares (deterministic Dirichlet mean)
+        double totalAlpha = 0;
+        for (MobStatType type : MobStatType.values()) {
+            totalAlpha += config.getStatConfig(type).getAlphaWeight();
+        }
+
+        Map<MobStatType, Double> shares = new java.util.EnumMap<>(MobStatType.class);
+        for (MobStatType type : MobStatType.values()) {
+            double alpha = config.getStatConfig(type).getAlphaWeight();
+            shares.put(type, (alpha / totalAlpha) * totalPool);
+        }
+
+        return applyConversionFactors(mobLevel, totalPool, shares, 0L);
+    }
+
     @Nonnull
     public MobStatProfile getBaseStats(int mobLevel) {
         Random random = new Random(0);

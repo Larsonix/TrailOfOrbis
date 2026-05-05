@@ -60,6 +60,17 @@ public final class StatMapBridge {
     }
 
     /**
+     * Removes the RPG mana modifier from a player's EntityStatMap.
+     *
+     * <p>Called when entering Creative mode to cleanly revert mana to vanilla base.
+     *
+     * @param statMap The entity stat map
+     */
+    public static void removeManaModifier(@Nonnull EntityStatMap statMap) {
+        statMap.removeModifier(DefaultEntityStatTypes.getMana(), MANA_MODIFIER_ID);
+    }
+
+    /**
      * Applies select ComputedStats fields to the player's EntityStatMap.
      *
      * <p><b>MUST be called on the world thread.</b>

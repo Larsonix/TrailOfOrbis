@@ -22,8 +22,10 @@ import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.api.services.SkillTreeService;
 import io.github.larsonix.trailoforbis.stones.StoneType;
 import io.github.larsonix.trailoforbis.stones.StoneUtils;
-import io.github.larsonix.trailoforbis.ui.RPGStyles;
+
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -124,17 +126,21 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
             ServiceRegistry.get(SkillTreeService.class).ifPresent(service -> {
                 var data = service.getSkillTreeData(playerId);
                 if (data != null) {
+                    int newRefundTotal = data.getSkillRefundPoints() + consumed;
                     var updated = data.toBuilder()
-                        .skillRefundPoints(data.getSkillRefundPoints() + consumed)
+                        .skillRefundPoints(newRefundTotal)
                         .build();
                     plugin.getSkillTreeManager().saveData(updated);
 
-                    playerRef.sendMessage(
-                        Message.raw("[").color(RPGStyles.TITLE_GOLD)
-                            .insert(Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()))
-                            .insert(Message.raw("] ").color(RPGStyles.TITLE_GOLD))
-                            .insert(Message.raw("+" + consumed + " Skill Refund Point" + (consumed > 1 ? "s" : "")
-                                + " (" + (data.getSkillRefundPoints() + consumed) + " total)").color(RPGStyles.POSITIVE)));
+                    // Notify listeners (e.g., SkillPointHud) so the display updates immediately
+                    service.notifyRefundPointsChanged(playerId, newRefundTotal);
+
+                    NotificationUtil.sendNotification(
+                        playerRef.getPacketHandler(),
+                        Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+                        Message.raw("+" + consumed + " Skill Refund Point" + (consumed > 1 ? "s" : "")
+                            + " (" + newRefundTotal + " total)").color("#55FF55"),
+                        NotificationStyle.Success);
                 }
             });
         } else if (stoneType == StoneType.ORB_OF_REALIGNMENT) {
@@ -142,12 +148,12 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
                 service.modifyAttributeRefundPoints(playerId, consumed);
                 int newTotal = service.getAttributeRefundPoints(playerId);
 
-                playerRef.sendMessage(
-                    Message.raw("[").color(RPGStyles.TITLE_GOLD)
-                        .insert(Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()))
-                        .insert(Message.raw("] ").color(RPGStyles.TITLE_GOLD))
-                        .insert(Message.raw("+" + consumed + " Attribute Refund Point" + (consumed > 1 ? "s" : "")
-                            + " (" + newTotal + " total)").color(RPGStyles.POSITIVE)));
+                NotificationUtil.sendNotification(
+                    playerRef.getPacketHandler(),
+                    Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+                    Message.raw("+" + consumed + " Attribute Refund Point" + (consumed > 1 ? "s" : "")
+                        + " (" + newTotal + " total)").color("#55FF55"),
+                    NotificationStyle.Success);
             });
         }
 

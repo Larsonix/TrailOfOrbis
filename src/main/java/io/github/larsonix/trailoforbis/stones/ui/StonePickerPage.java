@@ -14,12 +14,14 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.gear.GearManager;
@@ -793,7 +795,7 @@ public class StonePickerPage {
             builder.addEventListener("apply-btn", CustomUIEventBindingType.Activating,
                 (data, ctx) -> {
                     if (selectedIndex < 0 || selectedIndex >= compatibleItems.size()) {
-                        sendErrorMessage("Select an item first");
+                        sendWarningNotification("Select an item first");
                         return;
                     }
                     applyInProgress = true;
@@ -849,7 +851,7 @@ public class StonePickerPage {
     private void applyStoneToItem(CompatibleItemScanner.ScannedItem selectedItem) {
         Ref<EntityStore> ref = player.getReference();
         if (ref == null || !ref.isValid()) {
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
@@ -857,14 +859,14 @@ public class StonePickerPage {
         Player playerEntity = freshStore.getComponent(ref, Player.getComponentType());
         if (playerEntity == null) {
             LOGGER.atWarning().log("Cannot apply stone - Player entity not found");
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
         Inventory inventory = playerEntity.getInventory();
         if (inventory == null) {
             LOGGER.atWarning().log("Cannot apply stone - Inventory is null");
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
@@ -880,16 +882,30 @@ public class StonePickerPage {
         );
 
         if (result.success()) {
-            // Build rich diff message showing exactly what changed
-            Message richMessage = StoneResultMessageBuilder.build(
+            // Toast notification with the modified item's 3D model
+            var notif = StoneResultMessageBuilder.buildNotification(
                 stoneType, selectedItem.data(), result.modifiedData(), result.message());
-            player.sendMessage(richMessage);
+            ItemStack updatedItem = result.updatedTargetItem();
+
+            if (updatedItem != null) {
+                NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    notif.primary(),
+                    notif.secondary(),
+                    updatedItem.toPacket(),
+                    NotificationStyle.Success);
+            } else {
+                NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    notif.primary(),
+                    notif.secondary(),
+                    NotificationStyle.Success);
+            }
 
             // Defer tooltip resync to next tick — if sent immediately, the client
             // receives UpdateTranslations while the item slot is still "hot" (just
             // hovered/double-clicked), causing the tooltip to flash on the game screen
             // after the page closes.
-            ItemStack updatedItem = result.updatedTargetItem();
             ModifiableItem originalData = selectedItem.data();
             World world = playerEntity.getWorld();
             if (world != null) {
@@ -898,7 +914,14 @@ public class StonePickerPage {
                 resyncModifiedItem(updatedItem, originalData);
             }
         } else {
-            sendErrorMessage(result.message());
+            // Failure notification — no item icon, warning style
+            var notif = StoneResultMessageBuilder.buildFailureNotification(
+                stoneType, result.message());
+            NotificationUtil.sendNotification(
+                player.getPacketHandler(),
+                notif.primary(),
+                notif.secondary(),
+                NotificationStyle.Warning);
         }
 
         plugin.getUIManager().closePage(player.getUuid());
@@ -937,24 +960,23 @@ public class StonePickerPage {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // MESSAGES
+    // NOTIFICATIONS
     // ═══════════════════════════════════════════════════════════════════
 
-    private void sendSuccessMessage(String message) {
-        Message msg = Message.raw("[")
-            .color(RPGStyles.TITLE_GOLD)
-            .insert(Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()))
-            .insert(Message.raw("] ").color(RPGStyles.TITLE_GOLD))
-            .insert(Message.raw(message).color(RPGStyles.POSITIVE));
-
-        player.sendMessage(msg);
-    }
-
-    private void sendErrorMessage(String message) {
-        Message msg = Message.raw("[Stones] ").color(RPGStyles.TITLE_GOLD)
-            .insert(Message.raw(message).color(RPGStyles.NEGATIVE));
-
-        player.sendMessage(msg);
+    /**
+     * Sends a warning-style toast notification for validation errors and failures.
+     *
+     * <p>Used for pre-application errors (no selection, player ref invalid, etc.)
+     * where there is no before/after diff to compute. Stone application failures
+     * (wrong rarity, max modifiers, etc.) go through
+     * {@link StoneResultMessageBuilder#buildFailureNotification} instead.
+     */
+    private void sendWarningNotification(String message) {
+        NotificationUtil.sendNotification(
+            player.getPacketHandler(),
+            Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+            Message.raw(message).color("#FF5555"),
+            NotificationStyle.Warning);
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -4,6 +4,7 @@ import io.github.larsonix.trailoforbis.config.RPGConfig;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 import io.github.larsonix.trailoforbis.simulation.gear.VirtualGearFactory;
+import io.github.larsonix.trailoforbis.simulation.gear.VirtualGearFactory.WeaponCategory;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeRegion;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeConfig;
@@ -44,7 +45,10 @@ public final class BuildFactory {
     public VirtualBuild create(@Nonnull BuildArchetype archetype, int level) {
         PlayerData playerData = createPlayerData(archetype, level);
         SkillTreeData skillTreeData = createSkillTreeData(archetype, level);
-        GearBonuses gearBonuses = gearFactory.generateForLevel(level);
+        // Derive weapon category from primary element (WATER→staff, WIND→bow, others→sword)
+        String primaryElement = archetype.getElementRatios().keySet().iterator().next();
+        WeaponCategory weaponCategory = WeaponCategory.fromPrimaryElement(primaryElement);
+        GearBonuses gearBonuses = gearFactory.generateForLevel(level, weaponCategory);
         return new VirtualBuild(archetype, level, playerData, skillTreeData, gearBonuses);
     }
 

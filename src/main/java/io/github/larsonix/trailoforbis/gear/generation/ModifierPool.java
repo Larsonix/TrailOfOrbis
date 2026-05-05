@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.gear.generation;
 
+import io.github.larsonix.trailoforbis.attributes.AttributeType;
 import io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig.RarityConfig;
@@ -13,6 +14,7 @@ import io.github.larsonix.trailoforbis.gear.model.ModifierType;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 
@@ -39,6 +41,10 @@ public final class ModifierPool {
     private final GearBalanceConfig balanceConfig;
     private final EquipmentStatConfig equipmentStatConfig;
     private final Random random;
+
+    /** Temporary element affinity for the current roll batch. Set/cleared by GearGenerator. */
+    @Nullable
+    private AttributeType elementAffinity;
 
     /**
      * Creates a ModifierPool with the given configs and random source.
@@ -93,6 +99,20 @@ public final class ModifierPool {
     @Deprecated
     public ModifierPool(ModifierConfig modifierConfig, GearBalanceConfig balanceConfig) {
         this(modifierConfig, balanceConfig, EquipmentStatConfig.unrestricted(), new Random());
+    }
+
+    /**
+     * Sets element affinity for the next modifier roll batch.
+     * Matching modifiers get 2x weight during selection.
+     * Call {@link #clearElementAffinity()} after rolling.
+     */
+    public void setElementAffinity(@Nullable AttributeType affinity) {
+        this.elementAffinity = affinity;
+    }
+
+    /** Clears element affinity after a weapon's modifier batch is complete. */
+    public void clearElementAffinity() {
+        this.elementAffinity = null;
     }
 
     /**
@@ -264,8 +284,10 @@ public final class ModifierPool {
                 break;
             }
 
-            // Roll one modifier
-            ModifierDefinition selected = selectWeighted(remaining);
+            // Roll one modifier (with element affinity bias if set)
+            ModifierDefinition selected = elementAffinity != null
+                    ? selectWeightedWithAffinity(remaining, elementAffinity)
+                    : selectWeighted(remaining);
             selectedIds.add(selected.id());
 
             // Calculate value
@@ -287,6 +309,83 @@ public final class ModifierPool {
             LOGGER.atWarning().log(
                     "Could only roll %d/%d %s modifiers for slot=%s, equipmentType=%s (pool exhausted)",
                     result.size(), count, type, slot, equipmentType);
+        }
+
+        return List.copyOf(result);
+    }
+
+    /**
+     * Rolls modifiers with full two-stage filtering, excluded IDs, and explicit Random.
+     *
+     * <p>Used by stone operations via {@link GearModifierRoller} to ensure equipment-type
+     * restrictions are applied even when modifiers are rolled outside the initial generation path.
+     *
+     * @param type PREFIX or SUFFIX
+     * @param count Number of modifiers to roll
+     * @param itemLevel Item level for value scaling
+     * @param slot Gear slot for Stage 1 filtering
+     * @param rarity Rarity for value adjustments
+     * @param equipmentType Equipment type for Stage 2 filtering (nullable)
+     * @param excludedIds Modifier IDs to exclude (already on the item)
+     * @param rng Explicit random source
+     * @return List of unique modifiers
+     */
+    public List<GearModifier> rollModifiersExcluding(
+            @Nonnull ModifierType type,
+            int count,
+            int itemLevel,
+            @Nonnull String slot,
+            @Nonnull GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Set<String> excludedIds,
+            @Nonnull Random rng
+    ) {
+        if (count <= 0) return List.of();
+
+        // Stage 1: Slot filtering
+        List<ModifierDefinition> available = type == ModifierType.PREFIX
+                ? modifierConfig.prefixesForSlot(slot)
+                : modifierConfig.suffixesForSlot(slot);
+
+        if (available.isEmpty()) return List.of();
+
+        // Stage 2: Equipment type filtering
+        if (equipmentType != null) {
+            Set<String> allowedIds = type == ModifierType.PREFIX
+                    ? equipmentStatConfig.getAllowedPrefixes(equipmentType)
+                    : equipmentStatConfig.getAllowedSuffixes(equipmentType);
+
+            if (!allowedIds.isEmpty()) {
+                available = available.stream()
+                        .filter(mod -> allowedIds.contains(mod.id().toLowerCase()))
+                        .toList();
+            }
+        }
+
+        // Stage 3: Exclude already-present modifiers
+        available = available.stream()
+                .filter(def -> !excludedIds.contains(def.id()))
+                .toList();
+
+        if (available.isEmpty()) return List.of();
+
+        // Roll
+        Set<String> selectedIds = new HashSet<>(excludedIds);
+        List<GearModifier> result = new ArrayList<>();
+
+        for (int i = 0; i < count && !available.isEmpty(); i++) {
+            List<ModifierDefinition> remaining = available.stream()
+                    .filter(m -> !selectedIds.contains(m.id()))
+                    .toList();
+            if (remaining.isEmpty()) break;
+
+            ModifierDefinition selected = selectWeighted(remaining, rng);
+            selectedIds.add(selected.id());
+            double value = calculateValue(selected, itemLevel, rarity, rng);
+
+            result.add(GearModifier.of(
+                    selected.id(), selected.displayName(), type,
+                    selected.stat(), selected.statType().name().toLowerCase(), value));
         }
 
         return List.copyOf(result);
@@ -321,6 +420,50 @@ public final class ModifierPool {
 
         // Fallback (should never reach)
         return candidates.get(candidates.size() - 1);
+    }
+
+    /** Overload with explicit Random for stone operations. */
+    ModifierDefinition selectWeighted(List<ModifierDefinition> candidates, Random rng) {
+        if (candidates.size() == 1) return candidates.get(0);
+        int totalWeight = candidates.stream().mapToInt(ModifierDefinition::weight).sum();
+        int roll = rng.nextInt(totalWeight);
+        int cumulative = 0;
+        for (ModifierDefinition mod : candidates) {
+            cumulative += mod.weight();
+            if (roll < cumulative) return mod;
+        }
+        return candidates.get(candidates.size() - 1);
+    }
+
+    /**
+     * Selects with element affinity — modifiers matching the element get 2x weight.
+     *
+     * <p>Used for elemental weapons (fire staff, void wand) so they're more likely
+     * to roll modifiers that synergize with their element. Non-matching modifiers
+     * still have their normal weight — affinity is a bias, not a filter.
+     */
+    ModifierDefinition selectWeightedWithAffinity(List<ModifierDefinition> candidates, @Nullable AttributeType affinity) {
+        if (candidates.size() == 1 || affinity == null) {
+            return selectWeighted(candidates);
+        }
+
+        // Calculate total weight with 2x boost for matching element
+        int totalWeight = 0;
+        for (ModifierDefinition mod : candidates) {
+            totalWeight += getAffinityWeight(mod, affinity);
+        }
+
+        int roll = random.nextInt(totalWeight);
+        int cumulative = 0;
+        for (ModifierDefinition mod : candidates) {
+            cumulative += getAffinityWeight(mod, affinity);
+            if (roll < cumulative) return mod;
+        }
+        return candidates.get(candidates.size() - 1);
+    }
+
+    private int getAffinityWeight(ModifierDefinition mod, AttributeType affinity) {
+        return mod.requiredAttribute() == affinity ? mod.weight() * 2 : mod.weight();
     }
 
     /**
@@ -380,6 +523,28 @@ public final class ModifierPool {
         double finalValue = baseValue * varianceFactor;
 
         // Ensure minimum is at least effectiveMin after variance
+        return Math.max(effectiveMin * (1 - rollVariance), finalValue);
+    }
+
+    /** Overload with explicit Random for stone operations. */
+    double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity, Random rng) {
+        RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
+        double rollVariance = balanceConfig.modifierScaling().rollVariance();
+        ValueRange baseRange = definition.calculateRange(itemLevel);
+        double expMultiplier = balanceConfig.exponentialScaling().calculateMultiplier(itemLevel);
+        double scaledMin = baseRange.min() * expMultiplier;
+        double scaledMax = baseRange.max() * expMultiplier;
+        double extendedMax = scaledMax * rarityConfig.statMultiplier();
+        double effectiveMin = scaledMin;
+        double effectiveMax = extendedMax;
+        double rollFactor = rng.nextDouble();
+        if (rarityConfig.minRollPercentile() > 0) {
+            double minPercentile = rarityConfig.minRollPercentile();
+            rollFactor = minPercentile + (rollFactor * (1.0 - minPercentile));
+        }
+        double baseValue = effectiveMin + (effectiveMax - effectiveMin) * rollFactor;
+        double varianceFactor = 1.0 + ((rng.nextDouble() * 2 - 1) * rollVariance);
+        double finalValue = baseValue * varianceFactor;
         return Math.max(effectiveMin * (1 - rollVariance), finalValue);
     }
 

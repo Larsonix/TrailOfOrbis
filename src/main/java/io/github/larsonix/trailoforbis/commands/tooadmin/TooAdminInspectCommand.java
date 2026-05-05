@@ -19,6 +19,7 @@ import io.github.larsonix.trailoforbis.commands.admin.AdminCommandHelper;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.database.repository.PlayerDataRepository;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;
@@ -120,33 +121,65 @@ public final class TooAdminInspectCommand extends AbstractPlayerCommand {
         if (stats != null) {
             sender.sendMessage(Message.raw("--- Computed Stats ---").color(MessageColors.GOLD));
 
+            // Resources
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Max Health : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.0f", stats.getMaxHealth())).color(MessageColors.ERROR)));
+                .insert(Message.raw(NumberFormatter.flat(stats.getMaxHealth())).color(MessageColors.ERROR))
+                .insert(Message.raw("  Regen : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.regen(stats.getHealthRegen())).color(MessageColors.GRAY)));
 
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Max Mana : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.0f", stats.getMaxMana())).color(MessageColors.BLUE)));
+                .insert(Message.raw(NumberFormatter.flat(stats.getMaxMana())).color(MessageColors.BLUE))
+                .insert(Message.raw("  Regen : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.regen(stats.getManaRegen())).color(MessageColors.GRAY)));
 
+            // Energy Shield
+            if (stats.getEnergyShield() > 0) {
+                sender.sendMessage(Message.empty()
+                    .insert(Message.raw("  E. Shield : ").color(MessageColors.GRAY))
+                    .insert(Message.raw(NumberFormatter.flat(stats.getEnergyShield())).color(MessageColors.LIGHT_BLUE))
+                    .insert(Message.raw("  Regen : ").color(MessageColors.GRAY))
+                    .insert(Message.raw(NumberFormatter.regen(stats.getEnergyShieldRegen())).color(MessageColors.GRAY))
+                    .insert(Message.raw("  Delay : ").color(MessageColors.GRAY))
+                    .insert(Message.raw(NumberFormatter.time(stats.getEnergyShieldRegenDelay())).color(MessageColors.GRAY)));
+            }
+
+            // Stamina recovery speed
+            if (stats.getStaminaRegenStartDelay() != 0) {
+                sender.sendMessage(Message.empty()
+                    .insert(Message.raw("  Stamina Recovery : ").color(MessageColors.GRAY))
+                    .insert(Message.raw(NumberFormatter.signedPercent(stats.getStaminaRegenStartDelay())).color(MessageColors.WHITE)));
+            }
+
+            // Offense
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Phys Damage : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("+%.0f%%", stats.getPhysicalDamagePercent())).color(MessageColors.WHITE)));
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getPhysicalDamagePercent())).color(MessageColors.WHITE)));
 
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Spell Damage : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("+%.0f%%", stats.getSpellDamagePercent())).color(MessageColors.WHITE)));
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getSpellDamagePercent())).color(MessageColors.WHITE)));
 
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Crit Chance : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.1f%%", stats.getCriticalChance())).color(MessageColors.WARNING)));
+                .insert(Message.raw(NumberFormatter.percent(stats.getCriticalChance())).color(MessageColors.WARNING)));
 
-            sender.sendMessage(Message.empty()
-                .insert(Message.raw("  Move Speed : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("+%.0f%%", stats.getMovementSpeedPercent())).color(MessageColors.INFO)));
-
+            // Defense
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Armor : ").color(MessageColors.GRAY))
-                .insert(Message.raw(String.format("%.0f", stats.getArmor())).color(MessageColors.WHITE)));
+                .insert(Message.raw(NumberFormatter.flat(stats.getArmor())).color(MessageColors.WHITE)));
+
+            if (stats.getEvasion() > 0) {
+                sender.sendMessage(Message.empty()
+                    .insert(Message.raw("  Evasion : ").color(MessageColors.GRAY))
+                    .insert(Message.raw(NumberFormatter.flat(stats.getEvasion())).color(MessageColors.WHITE)));
+            }
+
+            // Movement
+            sender.sendMessage(Message.empty()
+                .insert(Message.raw("  Move Speed : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.signedPercent(stats.getMovementSpeedPercent())).color(MessageColors.INFO)));
         }
 
         sender.sendMessage(Message.raw("--- End Profile ---").color(MessageColors.GOLD));

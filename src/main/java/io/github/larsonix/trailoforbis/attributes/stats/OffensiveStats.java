@@ -1,6 +1,9 @@
 package io.github.larsonix.trailoforbis.attributes.stats;
 
+import io.github.larsonix.trailoforbis.elemental.ElementType;
+
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Objects;
 
 /**
@@ -223,10 +226,21 @@ public final class OffensiveStats {
     private boolean holdingRpgGear;
 
     /**
+     * The fixed element of the equipped spell weapon (staff/wand).
+     *
+     * <p>Set from the weapon's implicit damageType at stat calculation time.
+     * Determines which elemental slot the weapon's base damage enters during combat.
+     * Null for physical weapons or legacy staves with "spell_damage" type (those
+     * fall back to resolving from player's dominant attribute).
+     */
+    @Nullable
+    private ElementType weaponSpellElement;
+
+    /**
      * Creates a new OffensiveStats with all values initialized to 0.
      */
     public OffensiveStats() {
-        // All fields default to 0
+        // All fields default to 0/null
     }
 
     /**
@@ -301,6 +315,7 @@ public final class OffensiveStats {
         this.weaponBaseDamage = builder.weaponBaseDamage;
         this.weaponItemId = builder.weaponItemId;
         this.holdingRpgGear = builder.holdingRpgGear;
+        this.weaponSpellElement = builder.weaponSpellElement;
     }
 
     // ==================== Getters ====================
@@ -880,6 +895,17 @@ public final class OffensiveStats {
         this.holdingRpgGear = holdingRpgGear;
     }
 
+    /** Gets the fixed spell element of the equipped weapon. Null for physical or legacy spell weapons. */
+    @Nullable
+    public ElementType getWeaponSpellElement() {
+        return weaponSpellElement;
+    }
+
+    /** Sets the fixed spell element from the weapon's implicit damage type. */
+    public void setWeaponSpellElement(@Nullable ElementType weaponSpellElement) {
+        this.weaponSpellElement = weaponSpellElement;
+    }
+
     // ==================== Utility Methods ====================
 
     /** Creates a copy of this OffensiveStats. */
@@ -960,6 +986,7 @@ public final class OffensiveStats {
         weaponBaseDamage = 0;
         weaponItemId = null;
         holdingRpgGear = false;
+        weaponSpellElement = null;
     }
 
     // ==================== Builder ====================
@@ -1037,7 +1064,8 @@ public final class OffensiveStats {
             .castSpeed(castSpeed)
             .weaponBaseDamage(weaponBaseDamage)
             .weaponItemId(weaponItemId)
-            .holdingRpgGear(holdingRpgGear);
+            .holdingRpgGear(holdingRpgGear)
+            .weaponSpellElement(weaponSpellElement);
     }
 
     public static final class Builder {
@@ -1109,6 +1137,7 @@ public final class OffensiveStats {
         private float weaponBaseDamage;
         private String weaponItemId;
         private boolean holdingRpgGear;
+        @Nullable private ElementType weaponSpellElement;
 
         private Builder() {}
 
@@ -1449,6 +1478,11 @@ public final class OffensiveStats {
 
         public Builder holdingRpgGear(boolean value) {
             this.holdingRpgGear = value;
+            return this;
+        }
+
+        public Builder weaponSpellElement(@Nullable ElementType value) {
+            this.weaponSpellElement = value;
             return this;
         }
 

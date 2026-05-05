@@ -9,8 +9,14 @@ import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.compat.HexcodeMetadataInjector;
 import io.github.larsonix.trailoforbis.compat.HexcodeMetadataInjector.HexBookData;
 import io.github.larsonix.trailoforbis.compat.HexcodeMetadataInjector.HexStaffData;
+import io.github.larsonix.trailoforbis.elemental.ElementType;
+import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
+import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig.RarityConfig;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
+import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.ModifierDefinition;
+import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.ValueRange;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
+import io.github.larsonix.trailoforbis.ui.RPGStyles;
 import io.github.larsonix.trailoforbis.gear.equipment.RequirementCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
@@ -41,6 +47,7 @@ import java.util.*;
 public final class RichTooltipFormatter {
 
     private final ModifierConfig modifierConfig;
+    private final GearBalanceConfig balanceConfig;
     private final RequirementCalculator requirementCalculator;
     private final AttributeManager attributeManager;
     private final TooltipConfig tooltipConfig;
@@ -49,30 +56,35 @@ public final class RichTooltipFormatter {
      * Creates a RichTooltipFormatter with default configuration.
      *
      * @param modifierConfig The modifier configuration
+     * @param balanceConfig The gear balance configuration (for modifier range computation)
      * @param requirementCalculator The requirement calculator
      * @param attributeManager The attribute manager
      */
     public RichTooltipFormatter(
             @Nonnull ModifierConfig modifierConfig,
+            @Nonnull GearBalanceConfig balanceConfig,
             @Nonnull RequirementCalculator requirementCalculator,
             @Nonnull AttributeManager attributeManager) {
-        this(modifierConfig, requirementCalculator, attributeManager, TooltipConfig.defaults());
+        this(modifierConfig, balanceConfig, requirementCalculator, attributeManager, TooltipConfig.defaults());
     }
 
     /**
      * Creates a RichTooltipFormatter with custom configuration.
      *
      * @param modifierConfig The modifier configuration
+     * @param balanceConfig The gear balance configuration (for modifier range computation)
      * @param requirementCalculator The requirement calculator
      * @param attributeManager The attribute manager
      * @param tooltipConfig The tooltip configuration
      */
     public RichTooltipFormatter(
             @Nonnull ModifierConfig modifierConfig,
+            @Nonnull GearBalanceConfig balanceConfig,
             @Nonnull RequirementCalculator requirementCalculator,
             @Nonnull AttributeManager attributeManager,
             @Nonnull TooltipConfig tooltipConfig) {
         this.modifierConfig = Objects.requireNonNull(modifierConfig, "modifierConfig cannot be null");
+        this.balanceConfig = Objects.requireNonNull(balanceConfig, "balanceConfig cannot be null");
         this.requirementCalculator = Objects.requireNonNull(requirementCalculator, "requirementCalculator cannot be null");
         this.attributeManager = Objects.requireNonNull(attributeManager, "attributeManager cannot be null");
         this.tooltipConfig = Objects.requireNonNull(tooltipConfig, "tooltipConfig cannot be null");
@@ -268,19 +280,60 @@ public final class RichTooltipFormatter {
      */
     @Nonnull
     public Message buildImplicitSection(@Nonnull WeaponImplicit implicit) {
-        // Format: "175 Physical Damage [153-198]"
-        int rolledValue = implicit.rolledValueAsInt();
-        int minValue = implicit.minValueAsInt();
-        int maxValue = implicit.maxValueAsInt();
-        String damageTypeName = implicit.damageTypeDisplayName();
+        // Non-damage implicits (mana_regen, block_chance, etc.) may have small values
+        // that need decimal display instead of integer rounding.
+        // All damage types (physical, elemental) use integer display.
+        boolean isDamageType = implicit.isPhysicalDamage() || implicit.isSpellDamage()
+                || implicit.hasFixedElement();
+        boolean useDecimals = !isDamageType && implicit.maxValue() < 50;
 
-        // Build: value in green, stat name in white, range in gray
-        return Message.raw("\n" + rolledValue + " ")
+        String valueStr, rangeStr;
+        if (useDecimals) {
+            valueStr = String.format("%.1f", implicit.rolledValue());
+            rangeStr = String.format("[%.1f-%.1f]", implicit.minValue(), implicit.maxValue());
+        } else {
+            valueStr = String.valueOf(implicit.rolledValueAsInt());
+            rangeStr = "[" + implicit.minValueAsInt() + "-" + implicit.maxValueAsInt() + "]";
+        }
+
+        // Determine display name and color:
+        // - With Hexcode: element-specific staves show "Spell Damage" (player picks element via spells)
+        // - Without Hexcode: show the actual element ("Fire Damage" in fire-red)
+        ElementType element = implicit.getSpellElement();
+        String damageTypeName;
+        String nameColor;
+        if (element != null && HexcodeCompat.isLoaded()) {
+            damageTypeName = "Spell Damage";
+            nameColor = TooltipStyles.VALUE_WHITE;
+        } else if (element != null) {
+            damageTypeName = implicit.damageTypeDisplayName();
+            nameColor = getElementColor(element);
+        } else {
+            damageTypeName = implicit.damageTypeDisplayName();
+            nameColor = TooltipStyles.VALUE_WHITE;
+        }
+
+        // Build: value in green, stat name in element/white, range in gray
+        return Message.raw("\n" + valueStr + " ")
                 .color(TooltipStyles.POSITIVE_MODIFIER)
                 .insert(Message.raw(damageTypeName + " ")
-                        .color(TooltipStyles.VALUE_WHITE))
-                .insert(Message.raw("[" + minValue + "-" + maxValue + "]")
+                        .color(nameColor))
+                .insert(Message.raw(rangeStr)
                         .color(TooltipStyles.LABEL_GRAY));
+    }
+
+    /**
+     * Maps an element type to its tooltip hex color.
+     */
+    private String getElementColor(@Nonnull ElementType element) {
+        return switch (element) {
+            case FIRE -> RPGStyles.ELEMENT_FIRE;
+            case WATER -> RPGStyles.ELEMENT_WATER;
+            case LIGHTNING -> RPGStyles.ELEMENT_LIGHTNING;
+            case EARTH -> RPGStyles.ELEMENT_EARTH;
+            case WIND -> RPGStyles.ELEMENT_WIND;
+            case VOID -> RPGStyles.ELEMENT_VOID;
+        };
     }
 
     /**
@@ -337,10 +390,12 @@ public final class RichTooltipFormatter {
     public Message buildModifiersSection(@Nonnull GearData gearData) {
         Message section = Message.empty();
         double qualityMult = gearData.qualityMultiplier();
+        int itemLevel = gearData.level();
+        GearRarity rarity = gearData.rarity();
 
         // Prefix zone
         for (GearModifier mod : gearData.prefixes()) {
-            section = section.insert(buildModifierLine(mod, qualityMult));
+            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity));
         }
 
         // Separator between prefix and suffix zones
@@ -348,7 +403,7 @@ public final class RichTooltipFormatter {
 
         // Suffix zone
         for (GearModifier mod : gearData.suffixes()) {
-            section = section.insert(buildModifierLine(mod, qualityMult));
+            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity));
         }
 
         return section;
@@ -364,29 +419,40 @@ public final class RichTooltipFormatter {
     }
 
     /**
-     * Builds a single modifier line with quality adjustment and split coloring.
+     * Builds a single modifier line with quality adjustment, roll range, and split coloring.
      *
-     * <p>Format: "+25.5 Physical Damage" where the value part (+25.5) is colored
-     * green/red/teal and the stat name (Physical Damage) is white.
+     * <p>Format: "+25.5 Physical Damage [18-32]" where the value part (+25.5) is colored
+     * green/red/teal, the stat name (Physical Damage) is white, and the range is gray.
      *
      * <p>Locked modifiers use teal for the value and append " [Locked]" in gray italic.
      *
      * @param modifier The modifier to format
      * @param qualityMultiplier The quality multiplier (quality / 50.0)
+     * @param itemLevel The current item level (for range computation)
+     * @param rarity The current gear rarity (for range computation)
      */
     @Nonnull
-    public Message buildModifierLine(@Nonnull GearModifier modifier, double qualityMultiplier) {
+    public Message buildModifierLine(@Nonnull GearModifier modifier, double qualityMultiplier,
+                                     int itemLevel, @Nonnull GearRarity rarity) {
         double adjustedValue = modifier.value() * qualityMultiplier;
+        boolean lowerIsBetter = TooltipStyles.isLowerBetter(modifier.statId());
         String sign = adjustedValue >= 0 ? "+" : "";
         String valueStr = formatModifierValue(modifier, qualityMultiplier);
         String displayName = getModifierDisplayName(modifier);
-        String valueColor = TooltipStyles.getModifierValueColor(adjustedValue, modifier.locked());
+        String valueColor = TooltipStyles.getModifierValueColor(adjustedValue, modifier.locked(), lowerIsBetter);
 
         // Value part in green/red/teal, stat name in white
         Message line = Message.raw("\n" + sign + valueStr + " ")
                 .color(valueColor)
                 .insert(Message.raw(displayName)
                         .color(TooltipStyles.VALUE_WHITE));
+
+        // Append roll range in gray brackets (dynamically computed from current level/rarity)
+        String rangeStr = computeModifierRangeString(modifier, qualityMultiplier, itemLevel, rarity);
+        if (rangeStr != null) {
+            line = line.insert(Message.raw(" " + rangeStr)
+                    .color(TooltipStyles.LABEL_GRAY));
+        }
 
         // Append locked indicator
         if (modifier.locked()) {
@@ -396,6 +462,102 @@ public final class RichTooltipFormatter {
         }
 
         return line;
+    }
+
+    /**
+     * Legacy overload without range computation (for external callers that don't have gear context).
+     */
+    @Nonnull
+    public Message buildModifierLine(@Nonnull GearModifier modifier, double qualityMultiplier) {
+        return buildModifierLine(modifier, qualityMultiplier, 0, GearRarity.COMMON);
+    }
+
+    /**
+     * Computes the display range string for a modifier at the given gear state.
+     *
+     * <p>The range represents the TRUE boundaries a reroll would produce, including
+     * roll variance and quality adjustment. Returns null if the definition is not found.
+     *
+     * <p>Formula mirrors {@code ModifierPool.calculateValue()} / {@code GearModifierRoller.calculateValue()}:
+     * <pre>
+     * baseRange = definition.calculateRange(itemLevel)
+     * scaledMin = baseRange.min * expMultiplier
+     * scaledMax = baseRange.max * expMultiplier * rarityStatMultiplier
+     * trueMin = min(scaledMin, scaledMax) * (1 - rollVariance)   // variance floor
+     * trueMax = max(scaledMin, scaledMax) * (1 + rollVariance)   // variance ceiling
+     * Display: [trueMin * qualityMult, trueMax * qualityMult]
+     * </pre>
+     *
+     * <p>Note: For low rarities (stat_multiplier < 1.0), scaledMax can be less than
+     * scaledMin. We use Math.min/max to handle this correctly.
+     */
+    @Nullable
+    private String computeModifierRangeString(
+            @Nonnull GearModifier modifier,
+            double qualityMultiplier,
+            int itemLevel,
+            @Nonnull GearRarity rarity) {
+
+        if (itemLevel <= 0) {
+            return null; // No level context available
+        }
+
+        // Look up the modifier definition
+        Optional<ModifierDefinition> optDef = modifierConfig.getModifier(modifier.id(), modifier.type());
+        if (optDef.isEmpty()) {
+            return null; // Unknown modifier — graceful degradation
+        }
+
+        ModifierDefinition definition = optDef.get();
+        RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
+        double rollVariance = balanceConfig.modifierScaling().rollVariance();
+
+        // Calculate effective range (mirrors ModifierPool/GearModifierRoller formula exactly)
+        ValueRange baseRange = definition.calculateRange(itemLevel);
+        double expMultiplier = balanceConfig.exponentialScaling().calculateMultiplier(itemLevel);
+        double scaledMin = baseRange.min() * expMultiplier;
+        double scaledMax = baseRange.max() * expMultiplier * rarityConfig.statMultiplier();
+
+        // The generation formula always uses scaledMin as "effectiveMin" and applies:
+        //   floor = effectiveMin * (1-rv)     ← minimum possible value
+        //   ceiling = max(scaledMin, scaledMax) * (1+rv)  ← maximum possible value
+        // For low rarities (stat_multiplier < 1.0), scaledMax < scaledMin. In that case,
+        // the highest rollable value comes from rollFactor=0 (baseValue=scaledMin) with
+        // max positive variance, not from scaledMax.
+        double trueMin = scaledMin * (1.0 - rollVariance);
+        double trueMax = Math.max(scaledMin, scaledMax) * (1.0 + rollVariance);
+
+        // Apply quality multiplier (matches displayed value calculation)
+        double displayMin = trueMin * qualityMultiplier;
+        double displayMax = trueMax * qualityMultiplier;
+
+        // Format the range string
+        return formatRangeString(displayMin, displayMax, modifier.isPercent());
+    }
+
+    /**
+     * Formats a min-max range as a bracket string.
+     *
+     * <p>Uses integer formatting for large values, one-decimal for small.
+     * Percent modifiers include the % symbol.
+     */
+    @Nonnull
+    private String formatRangeString(double min, double max, boolean isPercent) {
+        String minStr;
+        String maxStr;
+        String suffix = isPercent ? "%" : "";
+
+        if (Math.abs(min) >= 10 && Math.abs(max) >= 10) {
+            // Large values: integers
+            minStr = String.valueOf((int) Math.round(min));
+            maxStr = String.valueOf((int) Math.round(max));
+        } else {
+            // Small values: one decimal
+            minStr = String.format("%.1f", min);
+            maxStr = String.format("%.1f", max);
+        }
+
+        return "[" + minStr + suffix + "-" + maxStr + suffix + "]";
     }
 
     /**
@@ -617,8 +779,27 @@ public final class RichTooltipFormatter {
      * the modifier's thematic name (e.g., "Heavy") for clarity.
      */
     @Nonnull
+    /**
+     * Display name overrides for stats whose auto-formatted name is misleading.
+     *
+     * <p>Some stats have internal names that don't match player-facing semantics:
+     * {@code stamina_regen_start_delay} auto-formats to "Stamina Regen Start Delay"
+     * (sounds bad when positive), but the stat actually means "% faster recovery"
+     * (positive = good). The override makes the tooltip clear.
+     */
+    private static final java.util.Map<String, String> STAT_DISPLAY_OVERRIDES = java.util.Map.of(
+        "stamina_regen_start_delay", "Stamina Recovery Speed",
+        "energy_shield_regen_delay", "ES Regen Delay"
+    );
+
     private String getModifierDisplayName(@Nonnull GearModifier modifier) {
         String statId = modifier.statId();
+
+        // Check display overrides first
+        String override = STAT_DISPLAY_OVERRIDES.get(statId.toLowerCase());
+        if (override != null) {
+            return override;
+        }
 
         // For percent modifiers, strip the "_percent" suffix if present
         // to avoid redundancy like "+2.4% Physical Damage Percent"

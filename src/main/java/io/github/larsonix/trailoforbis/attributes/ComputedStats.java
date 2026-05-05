@@ -8,6 +8,10 @@ import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -74,6 +78,22 @@ public final class ComputedStats {
     private final boolean mobStats;
 
     /**
+     * Per-stat "more" multiplier products for the ARPG formula.
+     *
+     * <p>Each entry is a chained multiplier product: e.g., two sources of 20% and 10% more
+     * produce {@code 1.2 × 1.1 = 1.32}. Applied as the final tier in:
+     * <pre>
+     * Final = (Base + ALL_FLAT) × (1 + ALL_PERCENT/100) × multiplierProduct
+     * </pre>
+     *
+     * <p>Keys use the ComputedStats field name (e.g., "maxHealth", "maxMana").
+     * Default product is 1.0 (no entry = no multiplier). Applied in
+     * {@link #consolidateResourcePercents()} for resource stats. Damage stat
+     * multipliers use dedicated fields (damageMultiplier, allDamagePercent).
+     */
+    private final Map<String, Float> multiplierProducts;
+
+    /**
      * Creates a ComputedStats with all default values (0.0f).
      */
     public ComputedStats() {
@@ -83,6 +103,7 @@ public final class ComputedStats {
         this.movement = new MovementStats();
         this.elemental = new ElementalStats();
         this.mobStats = false;
+        this.multiplierProducts = Map.of();
     }
 
     private ComputedStats(Builder builder) {
@@ -94,6 +115,9 @@ public final class ComputedStats {
         this.experienceGainPercent = builder.experienceGainPercent;
         this.manaAsDamageBuffer = builder.manaAsDamageBuffer;
         this.mobStats = builder.mobStats;
+        this.multiplierProducts = builder.multiplierProducts.isEmpty()
+            ? Map.of()
+            : Collections.unmodifiableMap(new HashMap<>(builder.multiplierProducts));
     }
 
     // ==================== Sub-Object Accessors ====================
@@ -143,6 +167,24 @@ public final class ComputedStats {
     /** Returns the Mind over Matter percentage (damage taken from mana). */
     public float getManaAsDamageBuffer() {
         return manaAsDamageBuffer;
+    }
+
+    /**
+     * Gets the "more" multiplier product for a given stat field.
+     *
+     * @param fieldName The ComputedStats field name (e.g., "maxHealth")
+     * @return The chained multiplier product, or 1.0 if none
+     */
+    public float getMultiplierProduct(@Nonnull String fieldName) {
+        return multiplierProducts.getOrDefault(fieldName, 1.0f);
+    }
+
+    /**
+     * Gets the full multiplier products map (read-only).
+     */
+    @Nonnull
+    public Map<String, Float> getMultiplierProducts() {
+        return multiplierProducts;
     }
 
     /** Sets the Mind over Matter percentage. */
@@ -204,8 +246,24 @@ public final class ComputedStats {
         return resource.getSignatureEnergyRegen();
     }
 
+    public float getEnergyShieldRegen() {
+        return resource.getEnergyShieldRegen();
+    }
+
+    public float getEnergyShieldRegenDelay() {
+        return resource.getEnergyShieldRegenDelay();
+    }
+
     public float getHealthRegenPercent() {
         return resource.getHealthRegenPercent();
+    }
+
+    public float getEnergyShieldRegenPercent() {
+        return resource.getEnergyShieldRegenPercent();
+    }
+
+    public float getManaRegenPercent() {
+        return resource.getManaRegenPercent();
     }
 
     // New resource field getters
@@ -215,6 +273,10 @@ public final class ComputedStats {
 
     public float getMaxManaPercent() {
         return resource.getMaxManaPercent();
+    }
+
+    public float getMaxOxygenPercent() {
+        return resource.getMaxOxygenPercent();
     }
 
     public float getManaCostPercent() {
@@ -548,6 +610,17 @@ public final class ComputedStats {
         return offensive.isHoldingRpgGear();
     }
 
+    /**
+     * Gets the fixed spell element of the equipped weapon.
+     *
+     * <p>Non-null for staves/wands with an element-specific implicit (e.g., "fire_damage").
+     * Null for physical weapons, legacy "spell_damage" staves, or no weapon.
+     */
+    @Nullable
+    public ElementType getWeaponSpellElement() {
+        return offensive.getWeaponSpellElement();
+    }
+
     // ==================== Defensive Delegate Getters ====================
 
     public float getArmor() {
@@ -564,6 +637,10 @@ public final class ComputedStats {
 
     public float getEnergyShield() {
         return defensive.getEnergyShield();
+    }
+
+    public float getEnergyShieldPercent() {
+        return defensive.getEnergyShieldPercent();
     }
 
     public float getPassiveBlockChance() {
@@ -851,35 +928,62 @@ public final class ComputedStats {
     /**
      * Folds percent resource modifiers into actual resource values.
      *
-     * <p>The attribute system and skill tree store percent bonuses as separate fields
-     * (e.g., {@code maxHealthPercent = 25.0} means +25% max HP). This method applies
-     * those percent bonuses to the base resource values so all consumers (ECS, combat,
-     * UI) see the correct effective values.
+     * <p>All percent bonuses from attributes, skill tree, gear, and conditionals are
+     * accumulated additively into percent fields (e.g., {@code maxHealthPercent}).
+     * This method applies them as a single multiplication — the PoE "increased" formula:
+     * {@code finalValue = baseValue × (1 + totalPercent / 100)}.
      *
      * <p>The percent fields are preserved for display purposes (stat breakdowns, tooltips).
      *
-     * <p><b>Call timing:</b> After skill tree modifiers, before gear bonuses — so gear's
-     * flat/percent bonuses correctly layer on top of the percent-adjusted base.
+     * <p><b>Call timing:</b> After ALL sources (attributes, skill tree, gear, conditionals)
+     * have deposited their percent bonuses. This is the single point of truth for
+     * resource percent application — no other stage should multiply resources by percent.
      */
     public void consolidateResourcePercents() {
-        float healthPct = getMaxHealthPercent();
-        if (healthPct != 0f) {
-            setMaxHealth(getMaxHealth() * (1f + healthPct / 100f));
-        }
+        // Resources: base × (1 + percent/100) × multiplierProduct
+        consolidateResource("maxHealth", this::getMaxHealth, this::setMaxHealth, getMaxHealthPercent());
+        consolidateResource("maxMana", this::getMaxMana, this::setMaxMana, getMaxManaPercent());
+        consolidateResource("maxStamina", this::getMaxStamina, this::setMaxStamina, getMaxStaminaPercent());
+        consolidateResource("maxOxygen", this::getMaxOxygen, this::setMaxOxygen, getMaxOxygenPercent());
+        consolidateResource("maxSignatureEnergy", this::getMaxSignatureEnergy, this::setMaxSignatureEnergy,
+                getSignatureEnergyMaxPercent());
 
-        float manaPct = getMaxManaPercent();
-        if (manaPct != 0f) {
-            setMaxMana(getMaxMana() * (1f + manaPct / 100f));
-        }
+        // Defense
+        consolidateResource("energyShield", this::getEnergyShield, this::setEnergyShield, getEnergyShieldPercent());
 
-        float staminaPct = getMaxStaminaPercent();
-        if (staminaPct != 0f) {
-            setMaxStamina(getMaxStamina() * (1f + staminaPct / 100f));
-        }
+        // Regen rates: base × (1 + percent/100) × multiplierProduct
+        consolidateResource("healthRegen", this::getHealthRegen, this::setHealthRegen, getHealthRegenPercent());
+        consolidateResource("staminaRegen", this::getStaminaRegen, this::setStaminaRegen, getStaminaRegenPercent());
+        consolidateResource("manaRegen", this::getManaRegen, this::setManaRegen, getManaRegenPercent());
+        consolidateResource("energyShieldRegen", this::getEnergyShieldRegen, this::setEnergyShieldRegen, getEnergyShieldRegenPercent());
+    }
 
-        float sigEnergyPct = getSignatureEnergyMaxPercent();
-        if (sigEnergyPct != 0f) {
-            setMaxSignatureEnergy(getMaxSignatureEnergy() * (1f + sigEnergyPct / 100f));
+    /**
+     * Applies the full ARPG formula to a resource stat:
+     * {@code final = base × (1 + percent/100) × multiplierProduct}
+     *
+     * <p>The percent and multiplier steps are only applied when they have a non-default
+     * value (percent != 0, multiplier != 1.0) to avoid unnecessary floating-point drift.
+     */
+    private void consolidateResource(String fieldName,
+                                      java.util.function.Supplier<Float> baseGet,
+                                      java.util.function.Consumer<Double> baseSet,
+                                      float percent) {
+        float base = baseGet.get();
+        float multiplier = multiplierProducts.getOrDefault(fieldName, 1.0f);
+
+        boolean hasPercent = percent != 0f;
+        boolean hasMultiplier = Math.abs(multiplier - 1.0f) > 0.0001f;
+
+        if (hasPercent || hasMultiplier) {
+            float result = base;
+            if (hasPercent) {
+                result *= (1f + percent / 100f);
+            }
+            if (hasMultiplier) {
+                result *= multiplier;
+            }
+            baseSet.accept((double) result);
         }
     }
 
@@ -899,6 +1003,10 @@ public final class ComputedStats {
 
     public void setMaxOxygen(double value) {
         resource.setMaxOxygen((float) value);
+    }
+
+    public void setMaxOxygenPercent(double value) {
+        resource.setMaxOxygenPercent((float) value);
     }
 
     public void setMaxSignatureEnergy(double value) {
@@ -925,8 +1033,24 @@ public final class ComputedStats {
         resource.setSignatureEnergyRegen((float) value);
     }
 
+    public void setEnergyShieldRegen(double value) {
+        resource.setEnergyShieldRegen((float) value);
+    }
+
+    public void setEnergyShieldRegenDelay(double value) {
+        resource.setEnergyShieldRegenDelay((float) value);
+    }
+
     public void setHealthRegenPercent(double value) {
         resource.setHealthRegenPercent((float) value);
+    }
+
+    public void setEnergyShieldRegenPercent(double value) {
+        resource.setEnergyShieldRegenPercent((float) value);
+    }
+
+    public void setManaRegenPercent(double value) {
+        resource.setManaRegenPercent((float) value);
     }
 
     public void setSignatureEnergyMaxPercent(double value) {
@@ -939,6 +1063,14 @@ public final class ComputedStats {
 
     public void setManaOnKill(double value) {
         resource.setManaOnKill((float) value);
+    }
+
+    public void setMaxHealthPercent(double value) {
+        resource.setMaxHealthPercent((float) value);
+    }
+
+    public void setMaxManaPercent(double value) {
+        resource.setMaxManaPercent((float) value);
     }
 
     public void setMaxStaminaPercent(double value) {
@@ -1213,6 +1345,11 @@ public final class ComputedStats {
         offensive.setHoldingRpgGear(holding);
     }
 
+    /** Sets the fixed spell element from the weapon's implicit damage type. */
+    public void setWeaponSpellElement(@Nullable ElementType element) {
+        offensive.setWeaponSpellElement(element);
+    }
+
     // ==================== Defensive Delegate Setters ====================
 
     public void setArmor(double value) {
@@ -1229,6 +1366,10 @@ public final class ComputedStats {
 
     public void setEnergyShield(double value) {
         defensive.setEnergyShield((float) value);
+    }
+
+    public void setEnergyShieldPercent(double value) {
+        defensive.setEnergyShieldPercent((float) value);
     }
 
     public void setPassiveBlockChance(double value) {
@@ -1505,13 +1646,18 @@ public final class ComputedStats {
             .maxMana(resource.getMaxMana())
             .maxStamina(resource.getMaxStamina())
             .maxOxygen(resource.getMaxOxygen())
+            .maxOxygenPercent(resource.getMaxOxygenPercent())
             .maxSignatureEnergy(resource.getMaxSignatureEnergy())
             .healthRegen(resource.getHealthRegen())
             .manaRegen(resource.getManaRegen())
             .staminaRegen(resource.getStaminaRegen())
             .oxygenRegen(resource.getOxygenRegen())
             .signatureEnergyRegen(resource.getSignatureEnergyRegen())
+            .energyShieldRegen(resource.getEnergyShieldRegen())
+            .energyShieldRegenDelay(resource.getEnergyShieldRegenDelay())
             .healthRegenPercent(resource.getHealthRegenPercent())
+            .energyShieldRegenPercent(resource.getEnergyShieldRegenPercent())
+            .manaRegenPercent(resource.getManaRegenPercent())
             .maxHealthPercent(resource.getMaxHealthPercent())
             .maxManaPercent(resource.getMaxManaPercent())
             .manaCostPercent(resource.getManaCostPercent())
@@ -1590,11 +1736,13 @@ public final class ComputedStats {
             .weaponBaseDamage(offensive.getWeaponBaseDamage())
             .weaponItemId(offensive.getWeaponItemId())
             .holdingRpgGear(offensive.isHoldingRpgGear())
+            .weaponSpellElement(offensive.getWeaponSpellElement())
             // Defensive
             .armor(defensive.getArmor())
             .armorPercent(defensive.getArmorPercent())
             .evasion(defensive.getEvasion())
             .energyShield(defensive.getEnergyShield())
+            .energyShieldPercent(defensive.getEnergyShieldPercent())
             .passiveBlockChance(defensive.getPassiveBlockChance())
             .parryChance(defensive.getParryChance())
             .knockbackResistance(defensive.getKnockbackResistance())
@@ -1636,7 +1784,9 @@ public final class ComputedStats {
             .experienceGainPercent(experienceGainPercent)
             .manaAsDamageBuffer(manaAsDamageBuffer)
             // Mob flag
-            .mobStats(mobStats);
+            .mobStats(mobStats)
+            // Multiplier products
+            .multiplierProducts(multiplierProducts);
     }
 
     /** Creates a deep copy of this ComputedStats instance. */
@@ -1707,6 +1857,7 @@ public final class ComputedStats {
         private float experienceGainPercent;
         private float manaAsDamageBuffer;
         private boolean mobStats;
+        private final Map<String, Float> multiplierProducts = new HashMap<>();
 
         private Builder() {}
 
@@ -1740,6 +1891,11 @@ public final class ComputedStats {
             return this;
         }
 
+        public Builder maxOxygenPercent(float value) {
+            resource.maxOxygenPercent(value);
+            return this;
+        }
+
         public Builder maxSignatureEnergy(float value) {
             resource.maxSignatureEnergy(value);
             return this;
@@ -1770,8 +1926,28 @@ public final class ComputedStats {
             return this;
         }
 
+        public Builder energyShieldRegen(float value) {
+            resource.energyShieldRegen(value);
+            return this;
+        }
+
+        public Builder energyShieldRegenDelay(float value) {
+            resource.energyShieldRegenDelay(value);
+            return this;
+        }
+
         public Builder healthRegenPercent(float value) {
             resource.healthRegenPercent(value);
+            return this;
+        }
+
+        public Builder energyShieldRegenPercent(float value) {
+            resource.energyShieldRegenPercent(value);
+            return this;
+        }
+
+        public Builder manaRegenPercent(float value) {
+            resource.manaRegenPercent(value);
             return this;
         }
 
@@ -1974,6 +2150,11 @@ public final class ComputedStats {
             return this;
         }
 
+        public Builder energyShieldPercent(float value) {
+            defensive.energyShieldPercent(value);
+            return this;
+        }
+
         public Builder passiveBlockChance(float value) {
             defensive.passiveBlockChance(value);
             return this;
@@ -2089,6 +2270,30 @@ public final class ComputedStats {
          */
         public Builder mobStats(boolean value) {
             this.mobStats = value;
+            return this;
+        }
+
+        /**
+         * Chains a "more" multiplier for a stat.
+         *
+         * <p>Multiple calls for the same field multiply together (PoE "more" semantics):
+         * {@code chainMultiplier("maxHealth", 20)} then {@code chainMultiplier("maxHealth", 10)}
+         * produces a product of {@code 1.2 × 1.1 = 1.32}.
+         *
+         * @param fieldName The ComputedStats field name (e.g., "maxHealth")
+         * @param morePercent The "more" percentage (e.g., 20 for "20% more")
+         * @return This builder
+         */
+        public Builder chainMultiplier(@Nonnull String fieldName, float morePercent) {
+            multiplierProducts.merge(fieldName, 1f + morePercent / 100f, (a, b) -> a * b);
+            return this;
+        }
+
+        /**
+         * Sets the full multiplier products map (for toBuilder() copy).
+         */
+        Builder multiplierProducts(@Nonnull Map<String, Float> products) {
+            this.multiplierProducts.putAll(products);
             return this;
         }
 
@@ -2392,6 +2597,11 @@ public final class ComputedStats {
 
         public Builder holdingRpgGear(boolean value) {
             offensive.holdingRpgGear(value);
+            return this;
+        }
+
+        public Builder weaponSpellElement(@Nullable ElementType value) {
+            offensive.weaponSpellElement(value);
             return this;
         }
 

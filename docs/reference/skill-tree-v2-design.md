@@ -575,7 +575,7 @@ Each octant's 4 clusters distribute the 15 available stats (5 per neighbor):
 |---|------|------|-----------|-------|-----|
 | 1 | Quicksilver Reflexes | `BRANCH_COUNT` | 3 | +1% Attack Speed | 10% |
 | 2 | Precision Training | `BRANCH_COUNT` | 3 | +0.5% Crit Chance | 5% |
-| 3 | Blitz Protocol | `BRANCH_COUNT` | 3 | +2% Movement Speed | 20% |
+| 3 | Burst Protocol | `BRANCH_COUNT` | 3 | +2% Movement Speed | 20% |
 | 4 | Shadow Step | `BRANCH_COUNT` | 3 | +1% Dodge Chance | 10% |
 
 **Synergy Hub**: "Nexus of Striker" — +3% Fire Damage, +3% Wind Damage, +3% Lightning Damage

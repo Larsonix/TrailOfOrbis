@@ -17,7 +17,7 @@ Hytale uses MSDF (Multi-channel Signed Distance Field) bitmap font atlases. Each
 | NotoMono Regular | `Fonts/NotoMono-Regular.json` | 480 | U+0020 - U+2044 | Monospace (console) |
 | Lexend Bold | `Fonts/Lexend-Bold.json` | 216 | U+0020 - U+2044 | Headings |
 
-**Location**: `/home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/Shared/`
+**Location**: `<hytale-decompiled>/ClientData/Shared/`
 
 ### What's Supported
 
@@ -70,7 +70,7 @@ Use these ASCII alternatives in all player-facing text:
 # Check if a character exists in the main chat font
 python3 -c "
 import json
-with open('/home/larsonix/work/Hytale-Decompiled-Full-Game/ClientData/Shared/NunitoSans-VariableFontGlyphs.json') as f:
+with open('<hytale-decompiled>/ClientData/Shared/NunitoSans-VariableFontGlyphs.json') as f:
     data = json.load(f)
 char = 'YOUR_CHAR_HERE'
 code = ord(char)

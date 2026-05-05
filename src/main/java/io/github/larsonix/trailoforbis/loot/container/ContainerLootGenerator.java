@@ -556,6 +556,14 @@ public final class ContainerLootGenerator {
      */
     @Nonnull
     private GearRarity rollRarityFromWeights(@Nonnull Map<String, Integer> weights, double rarityBonus) {
+        // Get available rarities from the loot registry's availability matrix.
+        // Only roll rarities that actually have skins — prevents silent drop loss.
+        Set<GearRarity> availableRarities = null;
+        DynamicLootRegistry registry = lootGenerator.getDynamicRegistry();
+        if (registry != null && registry.isDiscovered()) {
+            availableRarities = registry.getAvailableRarities();
+        }
+
         // Calculate total weight with bonus adjustment
         GearRarity[] rarities = GearRarity.values();
         double[] adjustedWeights = new double[rarities.length];
@@ -563,6 +571,13 @@ public final class ContainerLootGenerator {
 
         for (int i = 0; i < rarities.length; i++) {
             GearRarity rarity = rarities[i];
+
+            // Skip rarities that have no items in the availability matrix
+            if (availableRarities != null && !availableRarities.contains(rarity)) {
+                adjustedWeights[i] = 0;
+                continue;
+            }
+
             String key = rarity.name().toLowerCase();
             int baseWeight = weights.getOrDefault(key, 0);
 

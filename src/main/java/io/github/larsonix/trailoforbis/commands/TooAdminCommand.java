@@ -11,6 +11,7 @@ import io.github.larsonix.trailoforbis.commands.tooadmin.map.TooAdminMapCommand;
 import io.github.larsonix.trailoforbis.commands.tooadmin.realm.TooAdminRealmCommand;
 import io.github.larsonix.trailoforbis.commands.tooadmin.sanctum.TooAdminSanctumCommand;
 import io.github.larsonix.trailoforbis.commands.tooadmin.skilltree.TooAdminSkillTreeCommand;
+import io.github.larsonix.trailoforbis.commands.tooadmin.stats.TooAdminStatsCommand;
 import io.github.larsonix.trailoforbis.commands.tooadmin.stone.TooAdminStoneCommand;
 
 /**
@@ -29,8 +30,9 @@ import io.github.larsonix.trailoforbis.commands.tooadmin.stone.TooAdminStoneComm
  *   <li>/tooadmin attr &lt;add|remove|set&gt; &lt;player&gt; &lt;type&gt; &lt;amount&gt; - Attribute management</li>
  *   <li>/tooadmin skillpoints &lt;add|remove|set&gt; &lt;player&gt; &lt;amount&gt; - Skill points</li>
  *   <li>/tooadmin skilltree - Skill tree admin collection</li>
- *   <li>/tooadmin reset &lt;player&gt; - Full player reset</li>
- *   <li>/tooadmin resetconfirm &lt;player&gt; - Confirm reset</li>
+ *   <li>/tooadmin reset &lt;player&gt; - Attribute reset (confirmation stage)</li>
+ *   <li>/tooadmin resetconfirm &lt;player&gt; - Confirm attribute reset</li>
+ *   <li>/tooadmin fullreset &lt;player&gt; - Reset ALL progression to starting state</li>
  *   <li>/tooadmin realm - Realm admin collection</li>
  *   <li>/tooadmin sanctum - Sanctum admin collection</li>
  *   <li>/tooadmin gear - Gear admin collection</li>
@@ -57,6 +59,7 @@ public final class TooAdminCommand extends AbstractCommandCollection {
         this.addSubCommand(new TooAdminSkillPointsCommand(plugin));
         this.addSubCommand(new TooAdminResetCommand(plugin));
         this.addSubCommand(new TooAdminResetConfirmCommand(plugin));
+        this.addSubCommand(new TooAdminFullResetCommand(plugin));
         this.addSubCommand(new TooAdminGuideCommand(plugin));
 
         // Subcommand collections
@@ -69,7 +72,9 @@ public final class TooAdminCommand extends AbstractCommandCollection {
         this.addSubCommand(new TooAdminLootCommand(plugin));
         this.addSubCommand(new TooAdminEntityCommand(plugin));
         this.addSubCommand(new TooAdminGiveCommand(plugin));
+        this.addSubCommand(new TooAdminStatsCommand(plugin));
         this.addSubCommand(new TooAdminTestColorCommand());
+        this.addSubCommand(new TooAdminTestAtkSpdCommand(plugin));
 
         this.requirePermission("too.admin");
     }

@@ -14,6 +14,12 @@ max_resistance_cap: 75
 # this cap limits our contribution only.
 max_damage_amplification: 2.0
 
+# Multiplier applied to hex spell base damage before RPG scaling.
+# Hex spells have their own base damage that stacks with staff implicit,
+# then gets amplified by all spell scaling stats. This prevents double-scaling.
+# 1.0 = no reduction, 0.5 = halved hex base. Staff implicit is unaffected.
+spell_base_multiplier: 0.5
+
 # Maps source ID -> { type: DamageType, element: ElementType }
 # DamageType: PHYSICAL, MAGIC, FIRE, WATER, LIGHTNING, EARTH, WIND, VOID
 # ElementType: FIRE, WATER, LIGHTNING, EARTH, WIND, VOID (or null for none)

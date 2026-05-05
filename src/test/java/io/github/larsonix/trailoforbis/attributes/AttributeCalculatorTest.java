@@ -124,8 +124,14 @@ public class AttributeCalculatorTest {
         // Max Mana: 0 base + (50 * 1.5) = 75
         assertEquals(75f, stats.getMaxMana(), 0.01f);
 
-        // Energy Shield (barrier): 50 * 2.0 = 100
-        assertEquals(100f, stats.getEnergyShield(), 0.01f);
+        // Energy Shield %: 50 * 0.5 = 25%
+        assertEquals(25f, stats.getEnergyShieldPercent(), 0.01f);
+
+        // Energy Shield Regen: 50 * 0.2 = 10
+        assertEquals(10f, stats.getEnergyShieldRegen(), 0.01f);
+
+        // Energy Shield Regen Delay: base 3.0s
+        assertEquals(3.0f, stats.getEnergyShieldRegenDelay(), 0.01f);
 
         // Mana Regen: 50 * 0.15 = 7.5
         assertEquals(7.5f, stats.getManaRegen(), 0.01f);
@@ -341,10 +347,11 @@ public class AttributeCalculatorTest {
         assertEquals(30f, stats.getChargedAttackDamagePercent(), 0.01f);
         assertEquals(210f, stats.getCriticalMultiplier(), 0.01f);
 
-        // WATER: spellDmg=100*0.5=50, mana=100*1.5=150, barrier=100*2.0=200
+        // WATER: spellDmg=100*0.5=50, mana=100*1.5=150, ES%=100*0.5=50, ESregen=100*0.2=20
         assertEquals(50f, stats.getSpellDamagePercent(), 0.01f);
         assertEquals(150f, stats.getMaxMana(), 0.01f);
-        assertEquals(200f, stats.getEnergyShield(), 0.01f);
+        assertEquals(50f, stats.getEnergyShieldPercent(), 0.01f);
+        assertEquals(20f, stats.getEnergyShieldRegen(), 0.01f);
 
         // LIGHTNING: atkSpd=100*0.3=30, moveSpd=100*0.15=15
         assertEquals(30f, stats.getAttackSpeedPercent(), 0.01f);

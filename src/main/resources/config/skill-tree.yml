@@ -4897,7 +4897,7 @@ nodes:
       cap: 5.0
     modifiers: []
   striker_synergy_3:
-    name: Blitz Protocol
+    name: Burst Protocol
     description: Per 3 Striker nodes, +2.0% Movement Speed (max +20.0%)
     region: STRIKER
     tier: 5

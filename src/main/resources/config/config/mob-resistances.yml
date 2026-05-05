@@ -1,0 +1,76 @@
+# =============================================================================
+# Mob Resistance Profiles
+# =============================================================================
+# Three-layer resolution: element → faction → per-role override.
+# Resistance values are percentages: positive = resist, negative = weakness.
+# Caps: max 75%, min -25%.
+
+# Layer 1: Element-based profiles (universal default)
+# Every mob's detected element determines a base resistance profile.
+# Mobs with no detected element get the PHYSICAL profile (all neutral).
+element_profiles:
+  PHYSICAL:
+    resistances: { fire: 0, water: 0, lightning: 0, earth: 0, wind: 0, void: 0 }
+    ailment_bonuses: {}
+  FIRE:
+    resistances: { fire: 40, water: -20, lightning: 0, earth: 10, wind: -10, void: 0 }
+    ailment_bonuses: { burn_threshold: 50 }
+  WATER:
+    resistances: { fire: -10, water: 40, lightning: -20, earth: 0, wind: 10, void: 0 }
+    ailment_bonuses: { freeze_threshold: 50 }
+  LIGHTNING:
+    resistances: { fire: 0, water: -10, lightning: 40, earth: -20, wind: 10, void: 0 }
+    ailment_bonuses: { shock_threshold: 50 }
+  EARTH:
+    resistances: { fire: 10, water: 0, lightning: -10, earth: 40, wind: -20, void: 0 }
+    ailment_bonuses: {}
+  WIND:
+    resistances: { fire: -10, water: 10, lightning: 0, earth: -10, wind: 40, void: 0 }
+    ailment_bonuses: {}
+  VOID:
+    resistances: { fire: -10, water: -10, lightning: -10, earth: -10, wind: -10, void: 50 }
+    ailment_bonuses: { poison_threshold: 50 }
+
+# Layer 2: Faction profiles (optional overlay, replaces element profile)
+# Known Hytale factions get thematic overrides. Faction REPLACES element profile.
+faction_profiles:
+  trork:
+    detection: { groups: [Trork] }
+    resistances: { fire: 0, water: 0, lightning: -15, earth: 35, wind: 0, void: 0 }
+    physical_resistance: 10
+    ailment_bonuses: {}
+  outlander:
+    detection: { groups: [Outlander] }
+    resistances: { fire: 0, water: 0, lightning: 0, earth: 0, wind: 0, void: -15 }
+    physical_resistance: 10
+    ailment_bonuses: {}
+  feran:
+    detection: { groups: [Feran] }
+    resistances: { fire: -20, water: 0, lightning: 10, earth: 0, wind: 30, void: 0 }
+    ailment_bonuses: { freeze_threshold: 30 }
+  kweebec:
+    detection: { groups: [Kweebec] }
+    resistances: { fire: -25, water: 20, lightning: 0, earth: 25, wind: 0, void: -15 }
+    ailment_bonuses: {}
+  scarak:
+    detection: { groups: [Scarak] }
+    resistances: { fire: 10, water: -20, lightning: 25, earth: 0, wind: 0, void: 0 }
+    ailment_bonuses: { shock_threshold: 30 }
+  void:
+    detection: { groups: [Void] }
+    resistances: { fire: -10, water: -10, lightning: -10, earth: -10, wind: -10, void: 50 }
+    ailment_bonuses: { poison_threshold: 50 }
+  undead:
+    detection: { groups: [Undead], keywords: [undead, skeleton, zombie, wraith, ghost, lich] }
+    resistances: { fire: -20, water: 0, lightning: -15, earth: 15, wind: 0, void: 20 }
+    ailment_bonuses: { poison: immune }
+
+# Layer 3: Per-role overrides (highest priority)
+# Explicit resistance values for specific mob role names.
+overrides: {}
+
+# Global settings
+settings:
+  max_resistance: 75
+  min_resistance: -25
+  penetration_floor: 0

@@ -42,6 +42,98 @@ public final class GearConfigLoader {
     private static final String TOOLTIP_CONFIG_FILE = "tooltip.yml";
     private static final String EQUIPMENT_STATS_CONFIG_FILE = "equipment-stats.yml";
 
+    /**
+     * Authoritative stat → required attribute mappings.
+     *
+     * <p>These override whatever the user's YAML config says, ensuring existing
+     * installs get corrected requirements on update without needing to delete
+     * their config files. The mapping follows a single rule: "the element that
+     * grants the stat owns the requirement."
+     *
+     * <p>Stats not in this map keep whatever the YAML specifies (or null).
+     */
+    private static final Map<String, AttributeType> STAT_REQUIREMENT_OVERRIDES = Map.ofEntries(
+            // FIRE — Glass Cannon: phys dmg, charged atk, crit mult, burn, ignite
+            Map.entry("physical_damage", AttributeType.FIRE),
+            Map.entry("physical_damage_percent", AttributeType.FIRE),
+            Map.entry("melee_damage_percent", AttributeType.FIRE),
+            Map.entry("crit_multiplier", AttributeType.FIRE),
+            Map.entry("armor_penetration", AttributeType.FIRE),
+            Map.entry("fire_damage", AttributeType.FIRE),
+            Map.entry("ignite_chance", AttributeType.FIRE),
+            Map.entry("burn_damage", AttributeType.FIRE),
+            Map.entry("burn_damage_percent", AttributeType.FIRE),
+            Map.entry("charged_attack_damage_percent", AttributeType.FIRE),
+            Map.entry("thorns_damage", AttributeType.FIRE),
+            Map.entry("thorns_damage_percent", AttributeType.FIRE),
+            Map.entry("damage_at_low_life", AttributeType.FIRE),
+            Map.entry("execute_damage_percent", AttributeType.FIRE),
+            Map.entry("max_stamina", AttributeType.FIRE),
+            Map.entry("max_stamina_percent", AttributeType.FIRE),
+
+            // WATER — Arcane Mage: spell dmg, mana, ES, mana regen, freeze
+            Map.entry("water_damage", AttributeType.WATER),
+            Map.entry("freeze_chance", AttributeType.WATER),
+            Map.entry("freeze_damage", AttributeType.WATER),
+            Map.entry("frost_damage_percent", AttributeType.WATER),
+
+            // LIGHTNING — Storm Blitz: atk speed, move speed, crit chance, stam regen, shock
+            Map.entry("crit_chance", AttributeType.LIGHTNING),
+            Map.entry("attack_speed_percent", AttributeType.LIGHTNING),
+            Map.entry("movement_speed_percent", AttributeType.LIGHTNING),
+            Map.entry("walk_speed_percent", AttributeType.LIGHTNING),
+            Map.entry("sprint_speed_bonus", AttributeType.LIGHTNING),
+            Map.entry("climb_speed_bonus", AttributeType.LIGHTNING),
+            Map.entry("lightning_damage", AttributeType.LIGHTNING),
+            Map.entry("shock_chance", AttributeType.LIGHTNING),
+            Map.entry("shock_damage", AttributeType.LIGHTNING),
+            Map.entry("shock_damage_percent", AttributeType.LIGHTNING),
+            Map.entry("stamina_regen", AttributeType.LIGHTNING),
+            Map.entry("stamina_regen_percent", AttributeType.LIGHTNING),
+            Map.entry("stamina_regen_start_delay", AttributeType.LIGHTNING),
+            Map.entry("cast_speed", AttributeType.LIGHTNING),
+
+            // EARTH — Iron Fortress: max HP, armor, HP regen, block, KB resist
+            Map.entry("max_health", AttributeType.EARTH),
+            Map.entry("max_health_percent", AttributeType.EARTH),
+            Map.entry("armor", AttributeType.EARTH),
+            Map.entry("armor_percent", AttributeType.EARTH),
+            Map.entry("block_chance", AttributeType.EARTH),
+            Map.entry("block_damage_reduction", AttributeType.EARTH),
+            Map.entry("knockback_resistance", AttributeType.EARTH),
+            Map.entry("earth_damage", AttributeType.EARTH),
+            Map.entry("earth_damage_percent", AttributeType.EARTH),
+
+            // WIND — Ghost Ranger: evasion, accuracy, proj dmg, jump, proj speed
+            Map.entry("projectile_damage_percent", AttributeType.WIND),
+            Map.entry("evasion", AttributeType.WIND),
+            Map.entry("dodge_chance", AttributeType.WIND),
+            Map.entry("accuracy", AttributeType.WIND),
+            Map.entry("accuracy_percent", AttributeType.WIND),
+            Map.entry("projectile_speed_percent", AttributeType.WIND),
+            Map.entry("projectile_gravity_percent", AttributeType.WIND),
+            Map.entry("jump_force_bonus", AttributeType.WIND),
+            Map.entry("crouch_speed_percent", AttributeType.WIND),
+            Map.entry("parry_chance", AttributeType.WIND),
+            Map.entry("wind_damage", AttributeType.WIND),
+            Map.entry("wind_damage_percent", AttributeType.WIND),
+            Map.entry("draw_accuracy", AttributeType.WIND),
+
+            // VOID — Life Devourer: life steal, true dmg, DoT, mana/kill, effect duration
+            Map.entry("life_leech", AttributeType.VOID),
+            Map.entry("life_steal", AttributeType.VOID),
+            Map.entry("void_damage", AttributeType.VOID),
+            Map.entry("dot_damage_percent", AttributeType.VOID),
+            Map.entry("spell_damage", AttributeType.VOID),
+            Map.entry("spell_damage_percent", AttributeType.VOID),
+            Map.entry("spell_penetration", AttributeType.VOID),
+            Map.entry("mana_leech", AttributeType.VOID),
+            Map.entry("mana_steal", AttributeType.VOID),
+            Map.entry("mana_cost_reduction", AttributeType.VOID),
+            Map.entry("poison_damage", AttributeType.VOID),
+            Map.entry("status_effect_chance", AttributeType.VOID)
+    );
+
     private final Yaml yaml = new Yaml();
     private final Path configDirectory;
 
@@ -540,6 +632,7 @@ public final class GearConfigLoader {
         return new LevelBlendingConfig(enabled, pullFactor, maxOffset, variance);
     }
 
+    @SuppressWarnings("unchecked")
     private ImplicitDamageConfig parseImplicitDamageConfig(
             Map<String, Object> data,
             ConfigContext ctx
@@ -550,11 +643,24 @@ public final class GearConfigLoader {
         double scaleFactor = ctx.getDouble(data, "scale_factor");
         double twoHandedMultiplier = ctx.getDouble(data, "two_handed_multiplier");
 
-        LOGGER.at(Level.FINE).log(
-                "Parsed implicit damage config: enabled=%s, base=%.1f-%.1f, scale=%.1f, 2H=%.1fx",
-                enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier);
+        // Spellbook implicit (mana_regen) — optional, defaults to reasonable values
+        double spellbookBaseMin = 0.1;
+        double spellbookBaseMax = 0.3;
+        double spellbookScaleFactor = 3.0;
+        if (data.containsKey("spellbook")) {
+            Map<String, Object> sb = (Map<String, Object>) data.get("spellbook");
+            spellbookBaseMin = ctx.getDouble(sb, "base_min");
+            spellbookBaseMax = ctx.getDouble(sb, "base_max");
+            spellbookScaleFactor = ctx.getDouble(sb, "scale_factor");
+        }
 
-        return new ImplicitDamageConfig(enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier);
+        LOGGER.at(Level.FINE).log(
+                "Parsed implicit damage config: enabled=%s, base=%.1f-%.1f, scale=%.1f, 2H=%.1fx, spellbook=%.2f-%.2f(s%.1f)",
+                enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier,
+                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor);
+
+        return new ImplicitDamageConfig(enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier,
+                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor);
     }
 
     @SuppressWarnings("unchecked")
@@ -855,7 +961,7 @@ public final class GearConfigLoader {
         double scalePerLevel = ctx.getDouble(data, "scale_per_level");
         int weight = ctx.getInt(data, "weight");
 
-        // Optional: required attribute
+        // Parse required attribute from YAML first (validates the value)
         AttributeType requiredAttr = null;
         if (data.containsKey("required_attribute")) {
             String attrName = ctx.getString(data, "required_attribute");
@@ -864,6 +970,12 @@ public final class GearConfigLoader {
                 throw new ConfigurationException(
                     "Invalid required_attribute '" + attrName + "' for modifier " + id);
             }
+        }
+        // Authoritative override: ensures existing installs get corrected mappings
+        // even if their YAML has the old wrong value (or is missing the key entirely)
+        AttributeType override = STAT_REQUIREMENT_OVERRIDES.get(stat.toLowerCase());
+        if (override != null) {
+            requiredAttr = override;
         }
 
         // Optional: allowed slots

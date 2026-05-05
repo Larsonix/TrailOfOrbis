@@ -3,9 +3,11 @@ package io.github.larsonix.trailoforbis.compat.party;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.universe.world.World;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.leveling.xp.XpSource;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.PlayerWorldCache;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -105,7 +107,7 @@ public class PartyIntegrationManager {
             return;
         }
 
-        LOGGER.at(Level.INFO).log("Party mod not ready, retrying in %dms (%d retries left)",
+        LOGGER.at(Level.FINE).log("Party mod not ready, retrying in %dms (%d retries left)",
             delayMs, retriesLeft);
 
         retryTask = HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
@@ -126,10 +128,12 @@ public class PartyIntegrationManager {
         }
 
         // Initialize HUD sync
-        if (config.getHud().isEnabled()) {
-            hudSync = new PartyHudSync(bridge, levelingService, config.getHud());
+        if (config.getHud().isEnabled() || config.getLocation().isEnabled()) {
+            hudSync = new PartyHudSync(bridge, levelingService, config.getHud(), config.getLocation());
             bridge.registerEventListener(hudSync);
-            LOGGER.at(Level.INFO).log("Party HUD sync enabled (format: %s)", config.getHud().getLevelFormat());
+            LOGGER.at(Level.INFO).log("Party HUD sync enabled (level: %s, location: %s)",
+                config.getHud().isEnabled() ? config.getHud().getLevelFormat() : "OFF",
+                config.getLocation().isEnabled() ? "ON" : "OFF");
         }
 
         LOGGER.at(Level.INFO).log("Party integration fully active — XP sharing: %s, PvP protection: %s, Realm co-op: %s",
@@ -182,8 +186,17 @@ public class PartyIntegrationManager {
         }
 
         List<UUID> onlineMembers = bridge.getOnlinePartyMembers(killerUuid);
+
+        // Filter to same world — party members in different worlds/instances don't get XP
+        World killerWorld = PlayerWorldCache.getPlayerWorld(killerUuid).orElse(null);
+        if (killerWorld != null) {
+            onlineMembers = onlineMembers.stream()
+                .filter(id -> killerWorld.equals(PlayerWorldCache.getPlayerWorld(id).orElse(null)))
+                .toList();
+        }
+
         if (onlineMembers.size() <= 1) {
-            // Solo or only member online
+            // Solo or only member in this world
             levelingService.addXp(killerUuid, xp, XpSource.MOB_KILL);
             return false;
         }
@@ -287,6 +300,41 @@ public class PartyIntegrationManager {
     public void clearHud(@Nonnull UUID playerId) {
         if (hudSync != null) {
             hudSync.clearPlayer(playerId);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LOCATION TRACKING
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Sets the player's location to a realm biome in the party HUD.
+     *
+     * @param playerId The player entering the realm
+     * @param biomeName The biome display name (e.g., "Desert")
+     * @param realmLevel The realm level
+     */
+    public void updateHudRealm(@Nonnull UUID playerId, @Nonnull String biomeName, int realmLevel) {
+        if (hudSync != null) {
+            hudSync.setRealm(playerId, biomeName, realmLevel);
+        }
+    }
+
+    /**
+     * Sets the player's location to the skill sanctum in the party HUD.
+     */
+    public void updateHudSanctum(@Nonnull UUID playerId) {
+        if (hudSync != null) {
+            hudSync.setSanctum(playerId);
+        }
+    }
+
+    /**
+     * Sets the player's location to the overworld in the party HUD.
+     */
+    public void updateHudOverworld(@Nonnull UUID playerId) {
+        if (hudSync != null) {
+            hudSync.setOverworld(playerId);
         }
     }
 }

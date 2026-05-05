@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
+import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.classification.MobClassificationService;
 import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
 import io.github.larsonix.trailoforbis.mobs.spawn.component.RPGSpawnedMarker;
@@ -80,6 +81,12 @@ public class RPGSpawnManager {
      */
     private final Map<Long, AtomicInteger> spawnedPerChunk = new ConcurrentHashMap<>();
 
+    /** Interval in milliseconds between automatic chunk tracking clears. */
+    private static final long CHUNK_CLEAR_INTERVAL_MS = 60_000;
+
+    /** Last time chunk tracking was cleared. */
+    private long lastChunkClearTime = System.currentTimeMillis();
+
     private boolean initialized = false;
 
     /**
@@ -108,9 +115,16 @@ public class RPGSpawnManager {
         this.config = config;
         this.modifiers = new ArrayList<>();
 
-        // Default spawn offset values (can be made configurable later)
-        this.spawnOffsetRadius = 250.0;
-        this.spawnOffsetMinDistance = 50.0;
+        // Read spawn offset values from MobScalingConfig instead of hardcoding
+        MobScalingConfig scalingConfig = plugin.getConfigManager().getMobScalingConfig();
+        if (scalingConfig != null) {
+            MobScalingConfig.SpawnMultiplierConfig spawnMultConfig = scalingConfig.getSpawnMultiplier();
+            this.spawnOffsetRadius = spawnMultConfig.getSpawnOffsetRadius();
+            this.spawnOffsetMinDistance = spawnMultConfig.getSpawnOffsetMinDistance();
+        } else {
+            this.spawnOffsetRadius = 250.0;
+            this.spawnOffsetMinDistance = 50.0;
+        }
 
         // Register weight modifiers in order
         modifiers.add(new ClassBasedWeightModifier(config));
@@ -246,6 +260,13 @@ public class RPGSpawnManager {
      * @return true if a spawn was processed, false if queue was empty
      */
     public boolean processOneSpawn(@Nonnull Store<EntityStore> store) {
+        // Periodic auto-clear of chunk tracking to prevent permanent spawn blocking
+        long now = System.currentTimeMillis();
+        if (now - lastChunkClearTime >= CHUNK_CLEAR_INTERVAL_MS) {
+            spawnedPerChunk.clear();
+            lastChunkClearTime = now;
+        }
+
         PendingSpawn pending = pendingSpawns.poll();
         if (pending == null) {
             return false;

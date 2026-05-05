@@ -56,8 +56,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                10f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // 10 + 5 = 15
             assertEquals(15f, result.totalDamage(), 0.1f, "Base + flat should equal 15");
@@ -76,11 +75,9 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown melee = calculator.calculateWithForcedCrit(
-                20f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                20f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
             DamageBreakdown projectile = calculator.calculateWithForcedCrit(
-                20f, attackerStats, null, null, null, AttackType.PROJECTILE, false
-            );
+                20f, attackerStats, null, null, null, AttackType.PROJECTILE, false, 1);
 
             assertEquals(30f, melee.totalDamage(), 0.1f, "Melee should include melee flat damage");
             assertEquals(20f, projectile.totalDamage(), 0.1f, "Projectile should NOT include melee flat damage");
@@ -122,8 +119,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attackerStats, null, null, null, AttackType.MELEE, true
-            );
+                10f, attackerStats, null, null, null, AttackType.MELEE, true, 1);
 
             assertEquals(15f, result.totalDamage(), 0.1f);
             assertTrue(result.wasCritical());
@@ -158,8 +154,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                10f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(10f, result.totalDamage(), 0.1f);
             assertFalse(result.wasCritical());
@@ -182,8 +177,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // After conversion: 50 phys + 50 fire = 100 total
             assertEquals(100f, result.totalDamage(), 0.1f);
@@ -202,8 +196,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // After conversion: 0 phys + 50 fire + 50 cold = 100 total
             assertEquals(100f, result.totalDamage(), 0.1f);
@@ -225,8 +218,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // Total conversion capped at 100%, scaled proportionally: 50% fire + 50% cold
             assertEquals(100f, result.totalDamage(), 1f, "Total damage should remain 100");
@@ -250,8 +242,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // Allow 1% tolerance due to floating point
             assertEquals(30f, result.getElementalDamage(ElementType.FIRE), 1f);
@@ -272,8 +263,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(100f, result.totalDamage(), 0.1f);
             assertEquals(50f, result.physicalDamage(), 0.1f);
@@ -297,8 +287,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                120f, attackerStats, null, null, null, AttackType.MELEE, false
-            );
+                120f, attackerStats, null, null, null, AttackType.MELEE, false, 1);
 
             // 120% total scaled to 100%: each element gets ~16.67% of 120 = 20 damage
             assertEquals(120f, result.totalDamage(), 1f);
@@ -334,8 +323,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setFlatDamage(ElementType.FIRE, 20.0); // +20 flat fire
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false, 1);
 
             // Flat fire added first: 20 fire
             // Then 100 phys converted to fire: 20 + 100 = 120 fire
@@ -358,8 +346,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setFlatDamage(ElementType.LIGHTNING, 20.0);
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                50f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false
-            );
+                50f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false, 1);
 
             // 50 phys + 10 fire + 15 cold + 20 lightning = 95
             assertEquals(95f, result.totalDamage(), 0.1f);
@@ -388,8 +375,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setFlatDamage(ElementType.FIRE, 50.0);
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true
-            );
+                0f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true, 1);
 
             // 50 fire × 2.0 crit = 100 fire
             assertEquals(100f, result.getElementalDamage(ElementType.FIRE), 0.1f,
@@ -411,8 +397,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setFlatDamage(ElementType.FIRE, 100.0);
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true
-            );
+                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true, 1);
 
             // 100 phys × 1.5 = 150 phys
             // 100 fire × 1.5 = 150 fire
@@ -432,8 +417,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, null, null, null, AttackType.MELEE, true
-            );
+                100f, attackerStats, null, null, null, AttackType.MELEE, true, 1);
 
             // 100 phys → 100 fire (conversion), then × 2.0 crit = 200 fire
             assertEquals(0f, result.physicalDamage(), 0.1f);
@@ -455,8 +439,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setPercentDamage(ElementType.FIRE, 100.0); // +100% fire damage
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false
-            );
+                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, false, 1);
 
             // 100 phys → 100 fire (conversion) → 200 fire (+100% fire damage)
             assertEquals(200f, result.getElementalDamage(ElementType.FIRE), 0.1f,
@@ -479,8 +462,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setPercentDamage(ElementType.FIRE, 50.0);  // +50% fire damage
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true
-            );
+                100f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true, 1);
 
             // Step 1: 100 base + 50 flat phys = 150 phys
             // Step 2: +25 flat fire = 25 fire
@@ -513,8 +495,7 @@ public class RPGDamageCalculatorTest {
             attackerElemental.setFlatDamage(ElementType.VOID, 10.0);
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true
-            );
+                0f, attackerStats, attackerElemental, null, null, AttackType.MELEE, true, 1);
 
             // Each element × 1.5 crit
             assertEquals(30f, result.getElementalDamage(ElementType.FIRE), 0.1f);
@@ -545,11 +526,10 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attackerStats, null, defenderStats, null, AttackType.MELEE, false
-            );
+                10f, attackerStats, null, defenderStats, null, AttackType.MELEE, false, 1);
 
-            // PoE formula: 100 / (100 + 10*10) = 100/200 = 50% reduction
-            assertEquals(5f, result.totalDamage(), 0.1f, "50% of 10 = 5 damage");
+            // Level-scaled: 100 / (100 + 9*1 + 50) = 100/159 = 62.89% reduction
+            assertEquals(3.71f, result.totalDamage(), 0.1f, "62.9% reduction of 10 = 3.71 damage");
             assertTrue(result.armorReduction() > 0, "Armor reduction should be recorded");
         }
 
@@ -567,12 +547,11 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attackerStats, null, defenderStats, null, AttackType.MELEE, false
-            );
+                10f, attackerStats, null, defenderStats, null, AttackType.MELEE, false, 1);
 
-            // Armor: 10 * 50% = 5
-            // Phys resist: 5 * 50% = 2.5
-            assertEquals(2.5f, result.totalDamage(), 0.1f, "Armor then phys resist should stack");
+            // Armor: 100/(100+9+50)=62.89% → 10 * 0.3711 = 3.71
+            // Phys resist: 3.71 * 50% = 1.855
+            assertEquals(1.86f, result.totalDamage(), 0.1f, "Armor then phys resist should stack");
         }
 
         @Test
@@ -595,8 +574,7 @@ public class RPGDamageCalculatorTest {
             ComputedStats defenderStats = ComputedStats.builder().build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attackerStats, attackerElemental, defenderStats, defenderElemental, AttackType.MELEE, false
-            );
+                0f, attackerStats, attackerElemental, defenderStats, defenderElemental, AttackType.MELEE, false, 1);
 
             // Fire: 100 * (1 - 75/100) = 25
             // Cold: 100 * (1 - 50/100) = 50
@@ -620,8 +598,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attackerStats, null, defenderStats, null, AttackType.MELEE, false
-            );
+                0f, attackerStats, null, defenderStats, null, AttackType.MELEE, false, 1);
 
             // True damage should be unaffected by armor/resist
             assertEquals(50f, result.trueDamage(), 0.1f, "True damage should bypass defenses");
@@ -645,7 +622,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateDOT(
-                100f, defenderStats, defenderElemental, ElementType.FIRE
+                100f, defenderStats, defenderElemental, ElementType.FIRE, 1
             );
 
             // Fire DOT with 50% resist: 100 * 0.5 = 50
@@ -661,7 +638,7 @@ public class RPGDamageCalculatorTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateDOT(
-                100f, defenderStats, null, null // null element = physical DOT
+                100f, defenderStats, null, null, 1 // null element = physical DOT
             );
 
             // Physical DOT with 50% resist: 100 * 0.5 = 50
@@ -698,8 +675,7 @@ public class RPGDamageCalculatorTest {
             defenderElemental.setResistance(ElementType.FIRE, 25.0); // 25% fire resist
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attackerStats, attackerElemental, defenderStats, defenderElemental, AttackType.MELEE, true
-            );
+                100f, attackerStats, attackerElemental, defenderStats, defenderElemental, AttackType.MELEE, true, 1);
 
             // NEW Calculation order (crit applies to ALL damage):
             // 1. Base: 100

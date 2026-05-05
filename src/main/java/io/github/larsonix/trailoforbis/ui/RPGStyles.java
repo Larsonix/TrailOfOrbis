@@ -1,11 +1,15 @@
 package io.github.larsonix.trailoforbis.ui;
 
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
+
 /**
  * Shared style definitions for all RPG UI pages and HUDs.
  *
  * <p>Provides consistent colors and formatting across stats, attributes,
  * skill tree, sanctum, realm, and stone UI elements following vanilla
  * Hytale's visual design language with brighter, more readable colors.
+ *
+ * <p>Format methods delegate to {@link NumberFormatter} for consistency.
  */
 public final class RPGStyles {
 
@@ -120,37 +124,24 @@ public final class RPGStyles {
     }
 
     /**
-     * Formats a number with up to 2 decimal places.
-     * Trailing zeros are trimmed for clean display (6.30 → "6.3", 6.00 → "6").
+     * Formats a number with up to 2 decimal places, trimming trailing zeros.
+     * Delegates to {@link NumberFormatter#trimmed(float)}.
      *
      * @param value The value to format
      * @return Formatted string
      */
     public static String formatNumber(float value) {
-        // Whole numbers (no decimals)
-        if (value == (int) value) {
-            return String.valueOf((int) value);
-        }
-
-        // Format with 2 decimal places
-        String formatted = String.format("%.2f", value);
-
-        // Trim trailing zeros: "6.30" → "6.3", "6.00" → "6"
-        if (formatted.contains(".")) {
-            formatted = formatted.replaceAll("0+$", "");  // Remove trailing zeros
-            formatted = formatted.replaceAll("\\.$", ""); // Remove trailing dot
-        }
-
-        return formatted;
+        return NumberFormatter.trimmed(value);
     }
 
     /**
      * Formats a flat value (no sign prefix, just the number).
+     * Delegates to {@link NumberFormatter#trimmed(float)}.
      *
      * @param value The value to format
      * @return Formatted string
      */
     public static String formatFlat(float value) {
-        return formatNumber(value);
+        return NumberFormatter.trimmed(value);
     }
 }

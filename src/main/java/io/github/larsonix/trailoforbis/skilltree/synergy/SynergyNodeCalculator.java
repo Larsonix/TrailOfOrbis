@@ -46,6 +46,78 @@ public class SynergyNodeCalculator {
     }
 
     /**
+     * Calculates the progress snapshot for a single synergy node.
+     *
+     * <p>This is used by the UI to display live progress information like
+     * "15 nodes → +10% | Next at 18" alongside the synergy description.
+     *
+     * @param node             The synergy node to calculate progress for
+     * @param synergy          The synergy configuration (primary or additional)
+     * @param allocatedNodeIds Set of currently allocated node IDs
+     * @return Progress snapshot, or null if the synergy has no valid bonus config
+     */
+    @Nullable
+    public SynergyProgress calculateProgress(@Nonnull SkillNode node, @Nonnull SynergyConfig synergy,
+                                             @Nonnull Set<String> allocatedNodeIds) {
+        if (synergy.getBonus() == null) {
+            return null;
+        }
+
+        AllocationContext context = buildAllocationContext(allocatedNodeIds);
+        int count = getRelevantCount(synergy, node, context);
+        int perCount = synergy.getPerCount();
+        int increments = count > 0 ? count / perCount : 0;
+
+        double bonusValue = synergy.getBonus().getValue();
+        double totalBonus = increments * bonusValue;
+        double cap = synergy.hasCap() ? synergy.getCap() : 0.0;
+        boolean capped = synergy.hasCap() && totalBonus >= cap;
+        if (capped) {
+            totalBonus = cap;
+        }
+
+        // Calculate next threshold (count needed for next increment)
+        int nextThreshold = 0;
+        if (!capped && perCount > 0) {
+            nextThreshold = (increments + 1) * perCount;
+        }
+
+        String countLabel = buildCountLabel(synergy, node);
+
+        return new SynergyProgress(count, perCount, increments, totalBonus, cap, capped, nextThreshold, countLabel);
+    }
+
+    /**
+     * Builds a human-readable label for what's being counted.
+     */
+    @Nonnull
+    private String buildCountLabel(@Nonnull SynergyConfig synergy, @Nonnull SkillNode node) {
+        return switch (synergy.getType()) {
+            case ELEMENTAL_COUNT -> {
+                SkillTreeRegion element = synergy.getElementRegion();
+                if (element == SkillTreeRegion.CORE && synergy.getElement() == null) {
+                    element = node.getSkillTreeRegion();
+                }
+                yield element.getDisplayName() + " nodes";
+            }
+            case STAT_COUNT -> {
+                String statType = synergy.getStatType();
+                yield statType != null ? statType.toLowerCase().replace("_", " ") + " nodes" : "nodes";
+            }
+            case BRANCH_COUNT -> node.getSkillTreeRegion().getDisplayName() + " nodes";
+            case TIER_COUNT -> {
+                String tier = synergy.getTier();
+                if (tier == null || tier.isBlank() || tier.equalsIgnoreCase("ANY")) {
+                    yield "notables/keystones";
+                } else {
+                    yield tier.toLowerCase() + "s";
+                }
+            }
+            case TOTAL_COUNT -> "total nodes";
+        };
+    }
+
+    /**
      * Calculates synergy bonus modifiers for all synergy nodes a player has allocated.
      *
      * @param allocatedNodeIds Set of allocated node IDs

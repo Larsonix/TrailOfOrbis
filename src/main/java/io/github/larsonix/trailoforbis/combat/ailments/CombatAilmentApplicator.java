@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.combat.ailments;
 
 import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -9,19 +10,27 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.ailments.AilmentCalculator;
 import io.github.larsonix.trailoforbis.ailments.AilmentEffectManager;
 import io.github.larsonix.trailoforbis.ailments.AilmentImmunityTracker;
+import io.github.larsonix.trailoforbis.ailments.AilmentState;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentType;
+import io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent;
+import io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.resolution.CombatEntityResolver;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -164,7 +173,7 @@ public class CombatAilmentApplicator {
         float defenderMaxHealth
     ) {
         return tryApplyAilments(index, archetypeChunk, store, damage,
-            attackerElemental, attackerStats, defenderMaxHealth, null);
+            attackerElemental, attackerStats, defenderMaxHealth, null, null);
     }
 
     /**
@@ -189,13 +198,20 @@ public class CombatAilmentApplicator {
         @Nullable ElementalStats attackerElemental,
         @Nullable ComputedStats attackerStats,
         float defenderMaxHealth,
-        @Nullable ComputedStats defenderStats
+        @Nullable ComputedStats defenderStats,
+        @Nullable CommandBuffer<EntityStore> commandBuffer
     ) {
         if (attackerElemental == null) {
             return AilmentSummary.EMPTY;
         }
 
         if (ailmentTracker == null || ailmentCalculator == null) {
+            return AilmentSummary.EMPTY;
+        }
+
+        // Check realm AILMENT_IMMUNE_MONSTERS — mobs in this realm cannot be ailmented
+        Ref<EntityStore> ailmentTarget = archetypeChunk.getReferenceTo(index);
+        if (ailmentTarget != null && isDefenderAilmentImmune(store, ailmentTarget)) {
             return AilmentSummary.EMPTY;
         }
 
@@ -256,7 +272,16 @@ public class CombatAilmentApplicator {
                 boolean applied = ailmentTracker.applyAilment(defenderUuid, result.ailmentState());
 
                 if (applied) {
-                    AilmentType type = result.ailmentState().type();
+                    AilmentState appliedState = result.ailmentState();
+                    AilmentType type = appliedState.type();
+
+                    // Add/update ECS component for DOT-type ailments (drives tick systems)
+                    if (commandBuffer != null && (type == AilmentType.BURN || type == AilmentType.POISON)) {
+                        Ref<EntityStore> defenderRef = archetypeChunk.getReferenceTo(index);
+                        if (defenderRef != null && defenderRef.isValid()) {
+                            addDotComponent(commandBuffer, defenderRef, store, appliedState);
+                        }
+                    }
                     LOGGER.at(Level.FINE).log("Applied %s to %s (%.1f %s dmg -> %.1f magnitude, %.1fs)",
                         type.getDisplayName(),
                         defenderUuid.toString().substring(0, 8),
@@ -328,5 +353,71 @@ public class CombatAilmentApplicator {
      */
     public boolean isAvailable() {
         return ailmentTracker != null && ailmentCalculator != null;
+    }
+
+    /**
+     * Checks if the defender mob is in a realm with AILMENT_IMMUNE_MONSTERS.
+     */
+    private boolean isDefenderAilmentImmune(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> defenderRef) {
+        RealmMobComponent realmMob = store.getComponent(defenderRef, RealmMobComponent.getComponentType());
+        if (realmMob == null || realmMob.getRealmId() == null) {
+            return false;
+        }
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (rpg == null) {
+            return false;
+        }
+        RealmsManager rm = rpg.getRealmsManager();
+        if (rm == null) {
+            return false;
+        }
+        Optional<RealmInstance> realmOpt = rm.getRealm(realmMob.getRealmId());
+        return realmOpt.isPresent()
+            && realmOpt.get().getMapData().hasModifier(RealmModifierType.AILMENT_IMMUNE_MONSTERS);
+    }
+
+    /**
+     * Adds or updates the ECS DOT component on the defender entity.
+     *
+     * <p>For Burn: creates or refreshes {@link RpgBurnComponent}.
+     * For Poison: creates or adds stack to {@link RpgPoisonComponent}.
+     */
+    private void addDotComponent(
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull Ref<EntityStore> defenderRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull AilmentState ailmentState) {
+
+        if (ailmentState.type() == AilmentType.BURN) {
+            if (RpgBurnComponent.TYPE == null) return;
+
+            RpgBurnComponent existing = store.getComponent(defenderRef, RpgBurnComponent.TYPE);
+            if (existing != null) {
+                // Refresh existing burn (non-stacking: takes stronger DPS)
+                existing.refresh(ailmentState.magnitude(), ailmentState.remainingDuration(), ailmentState.sourceUuid());
+            } else {
+                // New burn
+                RpgBurnComponent burn = new RpgBurnComponent(
+                    ailmentState.magnitude(), ailmentState.remainingDuration(), ailmentState.sourceUuid());
+                commandBuffer.addComponent(defenderRef, RpgBurnComponent.TYPE, burn);
+            }
+        } else if (ailmentState.type() == AilmentType.POISON) {
+            if (RpgPoisonComponent.TYPE == null) return;
+
+            RpgPoisonComponent existing = store.getComponent(defenderRef, RpgPoisonComponent.TYPE);
+            if (existing != null) {
+                // Add stack to existing poison
+                existing.addStack(
+                    ailmentState.magnitude(), ailmentState.remainingDuration(),
+                    ailmentState.sourceUuid(), 10);
+            } else {
+                // New poison component with first stack
+                RpgPoisonComponent poison = new RpgPoisonComponent();
+                poison.addStack(
+                    ailmentState.magnitude(), ailmentState.remainingDuration(),
+                    ailmentState.sourceUuid(), 10);
+                commandBuffer.addComponent(defenderRef, RpgPoisonComponent.TYPE, poison);
+            }
+        }
     }
 }

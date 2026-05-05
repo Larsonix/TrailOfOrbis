@@ -6,6 +6,11 @@ import io.github.larsonix.trailoforbis.gear.model.EquipmentType.ArmorSlot;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.ItemArmorSlot;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon;
+import com.hypixel.hytale.server.core.asset.type.itemsound.config.ItemSoundSet;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 import javax.annotation.Nonnull;
@@ -75,9 +80,16 @@ public final class EquipmentTypeResolver {
     /**
      * Resolves equipment type from item ID and slot.
      *
-     * @param itemId e.g., "Weapon_Sword_Iron"
-     * @param slot "weapon", "head", "chest", "legs", or "hands"
-     * @return null if not resolvable
+     * <p>Resolution uses two layers:
+     * <ol>
+     *   <li><b>Name matching</b>: Fast keyword-based detection from item ID</li>
+     *   <li><b>Hytale asset API</b>: Definitive lookup via Item.getWeapon()/getArmor()
+     *       when name matching fails. Works for ALL items regardless of naming convention.</li>
+     * </ol>
+     *
+     * @param itemId e.g., "Weapon_Sword_Iron" or "CyclopsHelmPurple"
+     * @param slot "weapon", "head", "chest", "legs", or "hands" (hint from caller)
+     * @return The equipment type, or null if truly unresolvable
      */
     @Nullable
     public EquipmentType resolve(@Nullable String itemId, @Nullable String slot) {
@@ -85,7 +97,38 @@ public final class EquipmentTypeResolver {
             return null;
         }
 
-        // Check if it's a weapon
+        // Layer 1: Name-based resolution (fast, handles standard naming conventions)
+        EquipmentType fromName = resolveFromName(itemId, slot);
+        if (fromName != null && fromName != EquipmentType.UNKNOWN_WEAPON && fromName != EquipmentType.UNKNOWN_ARMOR) {
+            return fromName;
+        }
+
+        // Layer 2: Hytale asset API (definitive, handles ALL items including modded)
+        EquipmentType fromAsset = resolveFromHytaleAsset(itemId);
+        if (fromAsset != null) {
+            return fromAsset;
+        }
+
+        // Return whatever name-based got (may be UNKNOWN_WEAPON/UNKNOWN_ARMOR)
+        return fromName;
+    }
+
+    /**
+     * Fast name-based resolution from item ID patterns.
+     */
+    @Nullable
+    private EquipmentType resolveFromName(@Nonnull String itemId, @Nonnull String slot) {
+        // Try weapon type from item ID FIRST — weapons in offhand slots (spellbooks)
+        // must be classified by their weapon type, not by the slot string.
+        Optional<WeaponType> weaponType = WeaponType.fromItemId(itemId);
+        if (weaponType.isPresent()) {
+            EquipmentType result = EquipmentType.resolve(weaponType.get(), null, null);
+            LOGGER.atFine().log("Resolved weapon %s → %s → %s (slot=%s)",
+                    itemId, weaponType.get(), result, slot);
+            return result;
+        }
+
+        // Check if it's a weapon slot (for items not matching any WeaponType)
         if ("weapon".equalsIgnoreCase(slot)) {
             return resolveWeapon(itemId);
         }
@@ -101,8 +144,92 @@ public final class EquipmentTypeResolver {
             return EquipmentType.SHIELD;
         }
 
-        LOGGER.atFine().log("Could not resolve equipment type for itemId=%s, slot=%s", itemId, slot);
         return null;
+    }
+
+    /**
+     * Definitive resolution using Hytale's Item asset system.
+     * Reads the actual item definition to determine weapon/armor status and slot.
+     * Works for ALL items regardless of naming convention (modded items included).
+     */
+    @Nullable
+    private EquipmentType resolveFromHytaleAsset(@Nonnull String itemId) {
+        try {
+            Item item = Item.getAssetMap().getAsset(itemId);
+            if (item == null || item == Item.UNKNOWN) {
+                return null;
+            }
+
+            // Check weapon
+            ItemWeapon weapon = item.getWeapon();
+            if (weapon != null) {
+                // It's definitively a weapon — try to get specific type from name
+                Optional<WeaponType> weaponType = WeaponType.fromItemId(itemId);
+                if (weaponType.isPresent() && weaponType.get() != WeaponType.UNKNOWN) {
+                    return EquipmentType.resolve(weaponType.get(), null, null);
+                }
+                // Can't determine specific weapon type — return UNKNOWN_WEAPON
+                // (but at least we KNOW it's a weapon, not armor)
+                return EquipmentType.UNKNOWN_WEAPON;
+            }
+
+            // Check armor
+            ItemArmor armor = item.getArmor();
+            if (armor != null) {
+                ArmorSlot slot = hytaleSlotToArmorSlot(armor.getArmorSlot());
+                ArmorMaterial material = resolveArmorMaterial(item, itemId);
+                EquipmentType result = EquipmentType.resolve(null, material, slot);
+                LOGGER.atFine().log("Asset-resolved armor %s → %s + %s → %s",
+                        itemId, material, slot, result);
+                return result;
+            }
+
+            // Check shield (weapon with shield-like properties in offhand)
+            if (itemId.toLowerCase().contains("shield")) {
+                return EquipmentType.SHIELD;
+            }
+
+        } catch (Exception e) {
+            LOGGER.atFine().log("Asset resolution failed for %s: %s", itemId, e.getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Converts Hytale's ItemArmorSlot enum to our ArmorSlot.
+     */
+    @Nonnull
+    private ArmorSlot hytaleSlotToArmorSlot(@Nonnull ItemArmorSlot hytaleSlot) {
+        return switch (hytaleSlot) {
+            case Head -> ArmorSlot.HEAD;
+            case Chest -> ArmorSlot.CHEST;
+            case Legs -> ArmorSlot.LEGS;
+            case Hands -> ArmorSlot.HANDS;
+        };
+    }
+
+    /**
+     * Resolves armor material using ItemSoundSet first, then name fallback.
+     * Same approach as DynamicLootRegistry.classifyArmorMaterial.
+     */
+    @Nonnull
+    private ArmorMaterial resolveArmorMaterial(@Nonnull Item item, @Nonnull String itemId) {
+        try {
+            int soundSetIndex = item.getItemSoundSetIndex();
+            ItemSoundSet soundSet = ItemSoundSet.getAssetMap().getAsset(soundSetIndex);
+            if (soundSet != null) {
+                Optional<ArmorMaterial> fromSoundSet = ArmorMaterial.fromSoundSetId(soundSet.getId());
+                if (fromSoundSet.isPresent()) {
+                    return fromSoundSet.get();
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.atFine().log("SoundSet lookup failed for %s: %s", itemId, e.getMessage());
+        }
+
+        // Fallback to name-based
+        return ArmorMaterial.fromItemIdOrSpecial(itemId);
     }
 
     /**

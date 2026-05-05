@@ -127,7 +127,7 @@ public class CombatTextColorConfig {
         @Nonnull ProfileSettings defaults
     ) {
         ProfileSettings settings = parseProfileSettings(yaml, defaults);
-        return CombatTextProfile.unregistered(
+        return CombatTextProfile.of(
             id,
             settings.color,
             settings.fontSize,

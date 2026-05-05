@@ -1,0 +1,8 @@
+{
+  "$Comment": "RPG burn DOT - darker orange for tick damage, no durability loss",
+  "Parent": "Physical",
+  "Inherits": "Physical",
+  "DurabilityLoss": false,
+  "StaminaLoss": false,
+  "DamageTextColor": "#CC5500"
+}

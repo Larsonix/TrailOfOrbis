@@ -16,6 +16,8 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.spawn.ISpawnProvider;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import io.github.larsonix.trailoforbis.api.ServiceRegistry;
+import io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager;
 import io.github.larsonix.trailoforbis.maps.api.RealmsService;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.compat.HexcodePedestalPlacer;
@@ -164,6 +166,9 @@ public class RealmsManager implements RealmsService {
     /** HUD manager for combat and victory HUDs. */
     private final RealmHudManager hudManager;
 
+    /** Spawn protection for realm entry invincibility until first movement. */
+    private final RealmSpawnProtection spawnProtection;
+
     /** Victory portal manager for spawning exit portals. */
     private final VictoryPortalManager victoryPortalManager;
 
@@ -246,6 +251,7 @@ public class RealmsManager implements RealmsService {
         this.portalManager = new RealmPortalManager();
         this.mapGenerator = new RealmMapGenerator(config, modifierConfig);
         this.hudManager = new RealmHudManager();
+        this.spawnProtection = new RealmSpawnProtection();
         this.victoryPortalManager = new VictoryPortalManager();
         this.victoryEmoteHelper = new EmoteCelebrationHelper(
             config.getVictoryEmoteId(), "realm-victory");
@@ -453,6 +459,9 @@ public class RealmsManager implements RealmsService {
 
         // Remove all HUDs
         hudManager.removeAllHuds();
+
+        // Clear spawn protections
+        spawnProtection.shutdown();
 
         // Shutdown reward chest system
         if (rewardChestManager != null) {
@@ -944,6 +953,12 @@ public class RealmsManager implements RealmsService {
         // Record the player in the realm instance
         realm.onPlayerEnter(playerId);
 
+        // Update party HUD location (skip SKILL_SANCTUM — it sets its own text)
+        if (realm.getBiome() != RealmBiomeType.SKILL_SANCTUM) {
+            ServiceRegistry.get(PartyIntegrationManager.class).ifPresent(party ->
+                party.updateHudRealm(playerId, realm.getBiome().getDisplayName(), realm.getLevel()));
+        }
+
         // Trigger the internal callback which handles tracking and spawning
         onPlayerEnterRealm(playerId, realm);
     }
@@ -999,6 +1014,13 @@ public class RealmsManager implements RealmsService {
         // already handled it, discardAllHudsForPlayer is a safe no-op.
         hudManager.discardAllHudsForPlayer(playerId);
 
+        // Clean up spawn protection (safe no-op if already revoked by movement)
+        spawnProtection.cleanup(playerId);
+
+        // Update party HUD location back to overworld
+        ServiceRegistry.get(PartyIntegrationManager.class).ifPresent(party ->
+            party.updateHudOverworld(playerId));
+
         // Trigger the standard exit cleanup (tracking, empty realm handling)
         onPlayerExitRealm(playerId, realm);
 
@@ -1046,6 +1068,9 @@ public class RealmsManager implements RealmsService {
 
         // Discard HUDs — same reasoning as handlePlayerExitedViaPortal
         hudManager.discardAllHudsForPlayer(playerId);
+
+        // Clean up spawn protection (if still active during disconnect)
+        spawnProtection.cleanup(playerId);
 
         // Trigger the standard exit cleanup (tracking, empty realm handling)
         onPlayerExitRealm(playerId, realm);
@@ -1887,6 +1912,16 @@ public class RealmsManager implements RealmsService {
     @Nonnull
     public RealmHudManager getHudManager() {
         return hudManager;
+    }
+
+    /**
+     * Gets the spawn protection manager for realm entry invincibility.
+     *
+     * @return The spawn protection manager
+     */
+    @Nonnull
+    public RealmSpawnProtection getSpawnProtection() {
+        return spawnProtection;
     }
 
     /**

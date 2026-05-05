@@ -86,7 +86,7 @@ public class CombatTriggerHandler {
         @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
         @Nonnull Store<EntityStore> store
     ) {
-        UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
+        UUID defenderUuid = entityResolver.getDefenderPlayerUuid(index, archetypeChunk, store);
         fireConditionalTrigger(defenderUuid, trigger -> trigger.onHit(defenderUuid, getSkillTreeData(defenderUuid)));
     }
 
@@ -102,7 +102,7 @@ public class CombatTriggerHandler {
         @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
         @Nonnull Store<EntityStore> store
     ) {
-        UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
+        UUID defenderUuid = entityResolver.getDefenderPlayerUuid(index, archetypeChunk, store);
         fireConditionalTrigger(defenderUuid, trigger -> trigger.onEvade(defenderUuid, getSkillTreeData(defenderUuid)));
     }
 
@@ -118,7 +118,7 @@ public class CombatTriggerHandler {
         @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
         @Nonnull Store<EntityStore> store
     ) {
-        UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
+        UUID defenderUuid = entityResolver.getDefenderPlayerUuid(index, archetypeChunk, store);
         fireConditionalTrigger(defenderUuid, trigger -> trigger.onBlock(defenderUuid, getSkillTreeData(defenderUuid)));
     }
 

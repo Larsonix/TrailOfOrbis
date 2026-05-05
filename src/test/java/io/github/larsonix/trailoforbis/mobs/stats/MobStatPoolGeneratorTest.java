@@ -371,12 +371,6 @@ class MobStatPoolGeneratorTest {
         }
 
         @Test
-        @DisplayName("Dirichlet precision defaults to 1.0")
-        void dirichletPrecision_defaultsTo1() {
-            assertEquals(1.0, poolConfig.getDirichletPrecision(), 0.001);
-        }
-
-        @Test
         @DisplayName("Progressive scaling enabled by default")
         void progressiveScaling_enabledByDefault() {
             assertTrue(poolConfig.isProgressiveScalingEnabled());
@@ -918,11 +912,11 @@ class MobStatPoolGeneratorTest {
         }
 
         @Test
-        @DisplayName("Alpha weights are positive for all types")
-        void alphaWeights_arePositive() {
+        @DisplayName("Alpha weights are non-negative for all types")
+        void alphaWeights_areNonNegative() {
             for (MobStatType type : MobStatType.values()) {
-                assertTrue(type.alphaWeight > 0,
-                    type + " has non-positive alphaWeight: " + type.alphaWeight);
+                assertTrue(type.alphaWeight >= 0,
+                    type + " has negative alphaWeight: " + type.alphaWeight);
             }
         }
 

@@ -52,6 +52,7 @@ keywords:
     - pyro
     - burn
     - scorch
+    - incandescent
 
   WATER:
     - ice
@@ -82,6 +83,8 @@ keywords:
     - boulder
     - mineral
     - cave
+    - sand
+    - shaman
 
   WIND:
     - wind
@@ -100,6 +103,9 @@ keywords:
     - corrupt
     - abyss
     - blight
+    - sorcerer
+    - cultist
+    - priest
 
 # -----------------------------------------------------------------------------
 # Explicit Role Overrides (Highest Priority)

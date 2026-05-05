@@ -131,6 +131,24 @@ public record ArmorImplicit(
         return new ArmorImplicit(newDefenseType, minValue, maxValue, rolledValue);
     }
 
+    /**
+     * Creates a new ArmorImplicit with a different range but the same roll percentile.
+     *
+     * <p>Used when an item's level changes (e.g., Threshold Stone): the range shifts
+     * to match the new level, but the quality of the original roll is preserved.
+     * A 90th-percentile roll stays at the 90th percentile of the new range.
+     *
+     * @param newMin The new minimum value
+     * @param newMax The new maximum value
+     * @return A new ArmorImplicit at the same percentile within the new range
+     */
+    @Nonnull
+    public ArmorImplicit withPreservedPercentile(double newMin, double newMax) {
+        double percentile = rollPercentile();
+        double newValue = (newMax == newMin) ? newMin : newMin + percentile * (newMax - newMin);
+        return new ArmorImplicit(defenseType, newMin, newMax, newValue);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // QUERY METHODS
     // ═══════════════════════════════════════════════════════════════════

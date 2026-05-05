@@ -11,7 +11,10 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import com.hypixel.hytale.component.ResourceType;
+
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +47,13 @@ public final class Loot4EveryoneBridge {
     private final Method playerLootSetMethod;     // setInventory(int, int, int, String, List<ItemStack>)
     private final Method playerLootResetMethod;   // resetChest(int, int, int, String)
 
+    // LootChestConfig (v1.3.6+) — nullable, graceful degradation if not available
+    @Nullable private final Object configResourceType;       // ResourceType<ChunkStore, LootChestConfig>
+    @Nullable private final Method configSetBreakable;       // setCanPlayerBreakLootChests(boolean)
+    @Nullable private final Method configSetParticles;       // setParticlesAppear(boolean)
+    @Nullable private final Method configSetParticleColor;   // setParticlesColor(String)
+    @Nullable private final Method configSetMessage;         // setMessageAppear(boolean)
+
     /**
      * Creates the bridge by resolving L4E's API via reflection.
      *
@@ -73,6 +83,31 @@ public final class Loot4EveryoneBridge {
         Class<?> playerLootClass = Class.forName("org.mimstar.plugin.components.PlayerLoot");
         playerLootSetMethod = playerLootClass.getMethod("setInventory", int.class, int.class, int.class, String.class, List.class);
         playerLootResetMethod = playerLootClass.getMethod("resetChest", int.class, int.class, int.class, String.class);
+
+        // Resolve LootChestConfig (v1.3.6+) — optional, degrades gracefully
+        Object resolvedConfigType = null;
+        Method resolvedSetBreakable = null;
+        Method resolvedSetParticles = null;
+        Method resolvedSetParticleColor = null;
+        Method resolvedSetMessage = null;
+        try {
+            Method getConfigType = l4eClass.getMethod("getLootChestConfigResourceType");
+            resolvedConfigType = getConfigType.invoke(l4eInstance);
+
+            Class<?> configClass = Class.forName("org.mimstar.plugin.resources.LootChestConfig");
+            resolvedSetBreakable = configClass.getMethod("setCanPlayerBreakLootChests", boolean.class);
+            resolvedSetParticles = configClass.getMethod("setParticlesAppear", boolean.class);
+            resolvedSetParticleColor = configClass.getMethod("setParticlesColor", String.class);
+            resolvedSetMessage = configClass.getMethod("setMessageAppear", boolean.class);
+            LOGGER.at(Level.INFO).log("L4E LootChestConfig API resolved (v1.3.6+)");
+        } catch (Exception e) {
+            LOGGER.at(Level.INFO).log("L4E LootChestConfig API not available (pre-1.3.6) — world config disabled");
+        }
+        this.configResourceType = resolvedConfigType;
+        this.configSetBreakable = resolvedSetBreakable;
+        this.configSetParticles = resolvedSetParticles;
+        this.configSetParticleColor = resolvedSetParticleColor;
+        this.configSetMessage = resolvedSetMessage;
 
         LOGGER.at(Level.INFO).log("Loot4Everyone bridge initialized — all methods cached");
     }
@@ -223,5 +258,67 @@ public final class Loot4EveryoneBridge {
             LOGGER.at(Level.FINE).log("Failed to reset L4E loot for player %s: %s",
                 playerId.toString().substring(0, 8), e.getMessage());
         }
+    }
+
+    /**
+     * Configures L4E's per-world loot chest settings for a realm world.
+     *
+     * <p>Sets break protection, particle effects, and message on the world's
+     * {@code LootChestConfig} resource. These apply to ALL L4E-managed chests
+     * in this world (which is fine for realms — one chest per realm).
+     *
+     * <p>MUST be called on the world thread, AFTER L4E's StartWorldEvent handler
+     * has fired (i.e., after the world has started). Otherwise L4E will overwrite
+     * our settings with the default world's config.
+     *
+     * <p>Degrades gracefully if L4E is pre-1.3.6 (no LootChestConfig API).
+     *
+     * @param world          The realm world
+     * @param particleColor  Hex color for chest particles (e.g. "#ffdd00ff"), or null to disable particles
+     * @return true if configuration was applied
+     */
+    @SuppressWarnings("unchecked")
+    public boolean configureRealmWorld(@Nonnull World world, @Nullable String particleColor) {
+        if (configResourceType == null || configSetBreakable == null) {
+            return false;
+        }
+
+        try {
+            Store<ChunkStore> chunkStore = world.getChunkStore().getStore();
+            Object config = chunkStore.getResource(
+                (ResourceType<ChunkStore, ?>) configResourceType);
+            if (config == null) {
+                LOGGER.at(Level.FINE).log("LootChestConfig resource not found in world %s", world.getName());
+                return false;
+            }
+
+            // Disable chest breaking in realm worlds
+            configSetBreakable.invoke(config, false);
+
+            // Configure particle effects
+            if (particleColor != null && configSetParticles != null && configSetParticleColor != null) {
+                configSetParticles.invoke(config, true);
+                configSetParticleColor.invoke(config, particleColor);
+            }
+
+            // Enable "opened" message
+            if (configSetMessage != null) {
+                configSetMessage.invoke(config, true);
+            }
+
+            LOGGER.at(Level.INFO).log("Configured L4E world settings for %s (breakable=false, particles=%s)",
+                world.getName(), particleColor != null ? particleColor : "disabled");
+            return true;
+        } catch (Exception e) {
+            LOGGER.at(Level.WARNING).log("Failed to configure L4E world settings: %s", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Whether the v1.3.6+ LootChestConfig API is available.
+     */
+    public boolean hasWorldConfigSupport() {
+        return configResourceType != null;
     }
 }

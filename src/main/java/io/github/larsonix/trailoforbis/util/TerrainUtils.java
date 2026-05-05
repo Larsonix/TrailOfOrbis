@@ -39,8 +39,9 @@ public final class TerrainUtils {
     /** Minimum Y to stop scanning at. */
     private static final int SCAN_MIN_Y = 30;
 
-    /** Default fallback Y position if ground detection fails. */
-    private static final int FALLBACK_GROUND_Y = 65;
+    /** Default fallback Y position if ground detection fails. Callers can compare
+     *  against this to detect when terrain scanning found no valid surface. */
+    public static final int FALLBACK_GROUND_Y = 65;
 
     private TerrainUtils() {
         // Utility class

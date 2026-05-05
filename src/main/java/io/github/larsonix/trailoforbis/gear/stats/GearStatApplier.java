@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.gear.stats;
 
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.StatType;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 
@@ -44,6 +45,13 @@ public final class GearStatApplier {
         // Store RPG gear flag - critical for damage path selection
         // When true, damage system uses RPG path even if weaponBaseDamage is 0
         stats.setHoldingRpgGear(bonuses.isHoldingRpgGear());
+
+        // Store spell element from weapon implicit (null for physical/legacy weapons).
+        // With Hexcode: element comes from the spell being cast, not the weapon — don't set it.
+        // This makes the combat system fall back to resolveDominantSpellElement() or hex spell element.
+        if (!HexcodeCompat.isLoaded()) {
+            stats.setWeaponSpellElement(bonuses.weaponSpellElement());
+        }
 
         if (bonuses.isEmpty()) {
             LOGGER.atFine().log("Applied weapon base damage: %.1f, itemId: %s, isRpgGear: %s (no modifier bonuses)",

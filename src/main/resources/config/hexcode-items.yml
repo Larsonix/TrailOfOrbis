@@ -21,23 +21,25 @@ enabled: true
 # weapon at a given level, only staffs whose range includes that level are
 # eligible. Ranges overlap to create smooth tier transitions.
 #
-# Staff tiers are ordered by Hexcode's material progression:
-#   Crude → Copper → Bronze → Iron → Thorium → Cobalt → Adamantite → Mithril → Onyxium
-#   Special variants (endgame): Arcane, Astral, Fire, Ice
+# Staff tiers match vanilla material level ranges from material_distances config.
+# Formula: level = 1 + floor(distance / 75). Same ranges as Weapon_Sword_X etc.
+#   Crude → Copper → Bronze → Iron → Thorium → Cobalt → Mithril → Adamantite → Onyxium
+#   Special variants (endgame): Arcane, Astral, Fire, Ice, Life
 staff_level_map:
-  Hexstaff_Basic_Crude:       { min: 1,  max: 10 }
-  Hexstaff_Basic_Copper:      { min: 5,  max: 15 }
-  Hexstaff_Basic_Bronze:      { min: 10, max: 20 }
-  Hexstaff_Basic_Iron:        { min: 15, max: 30 }
-  Hexstaff_Basic_Thorium:     { min: 25, max: 40 }
-  Hexstaff_Basic_Cobalt:      { min: 35, max: 50 }
-  Hexstaff_Basic_Adamantite:  { min: 45, max: 60 }
-  Hexstaff_Basic_Mithril:     { min: 55, max: 70 }
-  Hexstaff_Basic_Onyxium:     { min: 65, max: 80 }
+  Hexstaff_Basic_Crude:       { min: 1,  max: 5 }
+  Hexstaff_Basic_Copper:      { min: 3,  max: 10 }
+  Hexstaff_Basic_Bronze:      { min: 7,  max: 17 }
+  Hexstaff_Basic_Iron:        { min: 10, max: 21 }
+  Hexstaff_Basic_Thorium:     { min: 21, max: 34 }
+  Hexstaff_Basic_Cobalt:      { min: 27, max: 41 }
+  Hexstaff_Basic_Mithril:     { min: 34, max: 54 }
+  Hexstaff_Basic_Adamantite:  { min: 47, max: 67 }
+  Hexstaff_Basic_Onyxium:     { min: 54, max: 75 }
   Hexstaff_Special_Arcane:    { min: 70, max: 100 }
   Hexstaff_Special_Astral:    { min: 70, max: 100 }
   Hexstaff_Special_Fire:      { min: 70, max: 100 }
   Hexstaff_Special_Ice:       { min: 70, max: 100 }
+  Hexstaff_Special_Life:      { min: 70, max: 100 }
 
 # ============================================================================
 # Book Level Ranges

@@ -48,6 +48,14 @@ public final class StatPipeline {
     /**
      * Computes final ComputedStats from player build components.
      *
+     * <p>Pipeline order (matches production AttributeManager exactly):
+     * <ol>
+     *   <li>AttributeCalculator: element points → base stats (flat + percent accumulators)</li>
+     *   <li>StatsCombiner: skill tree nodes → flat added, percent accumulated</li>
+     *   <li>GearStatApplier: gear bonuses → flat added, percent accumulated</li>
+     *   <li>consolidateResourcePercents: ALL percent sources summed, applied ONCE</li>
+     * </ol>
+     *
      * @param playerData    Element attribute allocations
      * @param baseStats     Vanilla base resource values (use BaseStats.defaults())
      * @param skillTreeData Allocated skill tree nodes
@@ -68,12 +76,13 @@ public final class StatPipeline {
         AggregatedModifiers modifiers = skillTreeAggregator.aggregate(skillTreeData);
         stats = statsCombiner.combine(stats, modifiers);
 
-        // Step 3: Fold resource percent mods into base values
-        // (maxHealthPercent → maxHealth, etc.)
-        stats.consolidateResourcePercents();
-
-        // Step 4: Apply gear bonuses (flat first, then percent)
+        // Step 3: Apply gear bonuses (flat to base, percent to accumulators)
         gearApplier.apply(stats, gearBonuses);
+
+        // Step 4: Consolidate ALL resource percent accumulators — PoE "increased" formula
+        // All sources (attributes, skill tree, gear) have deposited into percent fields.
+        // Apply once: base × (1 + totalPercent/100)
+        stats.consolidateResourcePercents();
 
         return stats;
     }

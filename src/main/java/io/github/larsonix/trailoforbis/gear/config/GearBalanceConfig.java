@@ -640,11 +640,14 @@ public final class GearBalanceConfig {
             double baseMin,
             double baseMax,
             double scaleFactor,
-            double twoHandedMultiplier
+            double twoHandedMultiplier,
+            double spellbookBaseMin,
+            double spellbookBaseMax,
+            double spellbookScaleFactor
     ) {
         /** Default config with implicit damage disabled. */
         public static final ImplicitDamageConfig DISABLED =
-            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0);
+            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0, 0.1, 0.3, 3.0);
 
         /**
          * Calculates the scaled damage range for a weapon at a given level.
@@ -662,6 +665,17 @@ public final class GearBalanceConfig {
                 return new WeaponBaseRange(min * twoHandedMultiplier, max * twoHandedMultiplier);
             }
             return new WeaponBaseRange(min, max);
+        }
+
+        /**
+         * Calculates the mana_regen range for spellbooks at a given level.
+         *
+         * @param itemLevel The spellbook's item level
+         * @return The scaled mana_regen range
+         */
+        public WeaponBaseRange calculateSpellbookRange(int itemLevel) {
+            double bonus = LevelScaling.getBonusPercent(itemLevel) / 100.0 * spellbookScaleFactor;
+            return new WeaponBaseRange(spellbookBaseMin + bonus, spellbookBaseMax + bonus);
         }
     }
 
@@ -703,6 +717,15 @@ public final class GearBalanceConfig {
          */
         public MaterialDefenseConfig materialConfig(ArmorMaterial material) {
             return materials.get(material);
+        }
+
+        /**
+         * Gets the expected defense stat for a given armor material.
+         * Used by migration to verify existing items have the correct implicit type.
+         */
+        public String getStatForMaterial(ArmorMaterial material) {
+            MaterialDefenseConfig config = materials.get(material);
+            return config != null ? config.stat() : null;
         }
 
         /**

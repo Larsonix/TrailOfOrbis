@@ -180,6 +180,7 @@ public final class VanillaItemConverter {
             case MOB_DROP -> config.getSources().isMobDrops();
             case CHEST_LOOT -> config.getSources().isChestLoot();
             case CRAFTING -> config.getSources().isCrafting();
+            case INVENTORY_MIGRATION -> true; // Always enabled when conversion is globally on
         };
     }
 
@@ -189,6 +190,7 @@ public final class VanillaItemConverter {
             case MOB_DROP -> bonusConfig.getMobDrops();
             case CHEST_LOOT -> bonusConfig.getChestLoot();
             case CRAFTING -> bonusConfig.getCrafting();
+            case INVENTORY_MIGRATION -> 0.0; // Conservative — no rarity bonus for existing items
         };
     }
 
@@ -222,6 +224,8 @@ public final class VanillaItemConverter {
         /** Item found in a treasure chest */
         CHEST_LOOT,
         /** Item created through crafting */
-        CRAFTING
+        CRAFTING,
+        /** Existing item found in player inventory or world container during integrity check */
+        INVENTORY_MIGRATION
     }
 }

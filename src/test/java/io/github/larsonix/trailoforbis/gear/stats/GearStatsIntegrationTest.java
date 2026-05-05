@@ -43,7 +43,7 @@ class GearStatsIntegrationTest {
             Map.of(),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -63,7 +63,7 @@ class GearStatsIntegrationTest {
             Map.of("physical_damage", 15.0),  // Adds to percent field
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -86,13 +86,14 @@ class GearStatsIntegrationTest {
             Map.of("crit_chance", 10.0, "max_health", 20.0),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
 
-        // max_health: 100 + 50 = 150, then * 1.2 = 180
-        assertEquals(180, stats.getMaxHealth(), 0.01);
+        // max_health: flat 100 + 50 = 150, percent accumulated to maxHealthPercent
+        assertEquals(150, stats.getMaxHealth(), 0.01);
+        assertEquals(20, stats.getMaxHealthPercent(), 0.01);
         assertEquals(50, stats.getPhysicalDamage(), 0.01);
         assertEquals(15, stats.getCriticalChance(), 0.01);
     }
@@ -163,7 +164,7 @@ class GearStatsIntegrationTest {
             ),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -188,7 +189,7 @@ class GearStatsIntegrationTest {
             Map.of("block_chance", 10.0),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -212,7 +213,7 @@ class GearStatsIntegrationTest {
             Map.of(),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -272,14 +273,15 @@ class GearStatsIntegrationTest {
             ),
             175.0,  // Weapon base damage from implicit
             null,   // No weapon item ID
-            true    // Is RPG gear
+            true, null    // Is RPG gear
         );
 
         applier.apply(stats, totalBonuses);
 
-        // max_health: 100 + 20 = 120, then * 1.1 = 132
-        assertEquals(132, stats.getMaxHealth(), 0.01);
-        // armor: 30 + 50 = 80, then armor_percent applied separately
+        // max_health: flat 100 + 20 = 120, percent accumulated to maxHealthPercent
+        assertEquals(120, stats.getMaxHealth(), 0.01);
+        assertEquals(10, stats.getMaxHealthPercent(), 0.01);
+        // armor: 30 + 50 = 80, armor_percent accumulated separately
         assertEquals(80, stats.getArmor(), 0.01);
         assertEquals(10, stats.getArmorPercent(), 0.01);
         // physical_damage: 25 + 15 = 40

@@ -71,6 +71,16 @@ public enum ElementType {
     }
 
     /**
+     * Gets the damage type ID used for weapon implicits and stat routing.
+     *
+     * @return Damage type string (e.g., "fire_damage", "void_damage")
+     */
+    @Nonnull
+    public String getDamageTypeId() {
+        return name().toLowerCase() + "_damage";
+    }
+
+    /**
      * Gets the Minecraft-style color code for this element.
      *
      * @return Color code (e.g., "§c" for red)

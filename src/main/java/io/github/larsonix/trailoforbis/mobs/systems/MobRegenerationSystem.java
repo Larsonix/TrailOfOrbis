@@ -14,12 +14,17 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 import io.github.larsonix.trailoforbis.mobs.model.MobStats;
 
 import javax.annotation.Nonnull;
+import java.util.Optional;
 
 /**
  * Ticking system that handles health regeneration for scaled mobs.
@@ -135,6 +140,13 @@ public class MobRegenerationSystem extends TickingSystem<EntityStore>
             }
 
             double healthRegen = stats.healthRegen();
+
+            // Apply realm LIFE_REGEN_MONSTERS bonus (% of max HP per second)
+            if (mobRef != null) {
+                double realmRegenBonus = getRealmRegenBonus(store, mobRef);
+                healthRegen += realmRegenBonus;
+            }
+
             if (healthRegen <= 0.0) {
                 continue; // No regen stat
             }
@@ -185,5 +197,39 @@ public class MobRegenerationSystem extends TickingSystem<EntityStore>
 
         // Apply the regeneration
         statMap.setStatValue(healthStatIndex, newHealth);
+    }
+
+    /**
+     * Gets the LIFE_REGEN_MONSTERS bonus for a realm mob (HP/sec based on max health).
+     *
+     * @return Bonus HP regen per second, or 0 if not in realm with modifier
+     */
+    private double getRealmRegenBonus(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> mobRef) {
+        RealmMobComponent realmMob = store.getComponent(mobRef, RealmMobComponent.getComponentType());
+        if (realmMob == null || realmMob.getRealmId() == null) {
+            return 0.0;
+        }
+        RealmsManager rm = plugin.getRealmsManager();
+        if (rm == null) {
+            return 0.0;
+        }
+        Optional<RealmInstance> realmOpt = rm.getRealm(realmMob.getRealmId());
+        if (realmOpt.isEmpty()) {
+            return 0.0;
+        }
+        int regenPercent = realmOpt.get().getMapData().getModifierValue(RealmModifierType.LIFE_REGEN_MONSTERS);
+        if (regenPercent <= 0) {
+            return 0.0;
+        }
+        // Calculate bonus regen as % of max health per second
+        EntityStatMap statMap = store.getComponent(mobRef, statMapType);
+        if (statMap == null || healthStatIndex < 0) {
+            return 0.0;
+        }
+        EntityStatValue healthStat = statMap.get(healthStatIndex);
+        if (healthStat == null) {
+            return 0.0;
+        }
+        return healthStat.getMax() * (regenPercent / 100.0);
     }
 }

@@ -8,6 +8,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Determines gear rarity using weighted random selection.
@@ -155,6 +156,68 @@ public final class RarityRoller {
         }
 
         return adjusted;
+    }
+
+    /**
+     * Rolls a rarity constrained to a set of available rarities.
+     *
+     * <p>This is the core of the rarity-first loot system. After rolling rarity
+     * independently, the slot and category are constrained to what actually has
+     * skins. But some callers (like ContainerLootGenerator) need to roll rarity
+     * from a pre-filtered set directly — this method supports that.
+     *
+     * <p>Only rarities in the {@code available} set can be returned. Weights are
+     * taken from the same base config, adjusted by bonus, then re-normalized
+     * across only the available set.
+     *
+     * @param rarityBonus The rarity bonus (0.0 = no bonus)
+     * @param available   The set of rarities that can be rolled (must not be empty)
+     * @return The rolled rarity from the available set
+     * @throws IllegalArgumentException if available is empty
+     */
+    public GearRarity roll(double rarityBonus, Set<GearRarity> available) {
+        if (available.isEmpty()) {
+            throw new IllegalArgumentException("Available rarities set must not be empty");
+        }
+
+        // Single option — skip math
+        if (available.size() == 1) {
+            return available.iterator().next();
+        }
+
+        rarityBonus = Math.max(0, Math.min(10, rarityBonus));
+
+        Map<GearRarity, Double> adjustedWeights = calculateAdjustedWeights(rarityBonus);
+
+        // Filter to only available rarities and re-normalize
+        double totalWeight = 0;
+        for (GearRarity rarity : RARITY_ORDER) {
+            if (available.contains(rarity)) {
+                totalWeight += adjustedWeights.get(rarity);
+            }
+        }
+
+        if (totalWeight <= 0) {
+            return available.iterator().next(); // Safety fallback
+        }
+
+        double roll = random.nextDouble() * totalWeight;
+        double cumulative = 0;
+
+        for (GearRarity rarity : RARITY_ORDER) {
+            if (!available.contains(rarity)) continue;
+            cumulative += adjustedWeights.get(rarity);
+            if (roll < cumulative) {
+                return rarity;
+            }
+        }
+
+        // Fallback — return last available
+        GearRarity last = RARITY_ORDER[0];
+        for (GearRarity rarity : RARITY_ORDER) {
+            if (available.contains(rarity)) last = rarity;
+        }
+        return last;
     }
 
     /**

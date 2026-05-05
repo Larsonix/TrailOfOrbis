@@ -299,14 +299,13 @@ public class PlayerLevelCalculator {
     }
 
     /**
-     * Calculates squared distance between two points.
-     * Avoids sqrt for performance.
+     * Calculates XZ squared distance between two points (ignoring Y).
+     * Consistent with DistanceBonusCalculator which uses XZ only.
      */
     private static double distanceSquared(@Nonnull Vector3d a, @Nonnull Vector3d b) {
         double dx = a.x - b.x;
-        double dy = a.y - b.y;
         double dz = a.z - b.z;
-        return dx * dx + dy * dy + dz * dz;
+        return dx * dx + dz * dz;
     }
 
     /**

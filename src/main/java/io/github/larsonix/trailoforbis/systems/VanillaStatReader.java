@@ -36,7 +36,10 @@ public final class VanillaStatReader {
     private static final float DEFAULT_MANA = 0.0f;
     private static final float DEFAULT_STAMINA = 10.0f;
     private static final float DEFAULT_OXYGEN = 100.0f;
-    private static final float DEFAULT_SIGNATURE_ENERGY = 0.0f;
+    // Vanilla weapons provide max SignatureEnergy via weapon.statModifiers
+    // (preserved by neutralizeWeaponStats). This default is only used as a fallback
+    // when the entity stat map is unavailable during RPG base stat computation.
+    private static final float DEFAULT_SIGNATURE_ENERGY = 20.0f;
 
     // Movement defaults from MovementManager.MASTER_DEFAULT
     private static final float DEFAULT_JUMP_FORCE = 11.8f;

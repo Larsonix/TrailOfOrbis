@@ -535,7 +535,7 @@ public final class HexcodeCompat {
                 for (String fallbackId : fallbacks) {
                     baseAsset = getAssetMethod.invoke(defaultAssetMap, fallbackId);
                     if (baseAsset != null) {
-                        LOGGER.atInfo().log("[HexcodeCompat] Using fallback %s '%s' for vanilla base '%s'",
+                        LOGGER.atFine().log("[HexcodeCompat] Using fallback %s '%s' for vanilla base '%s'",
                                 assetTypeName, fallbackId, baseItemId);
                         break;
                     }
@@ -554,7 +554,7 @@ public final class HexcodeCompat {
 
             // 3. Verify via public API
             Object verified = getAssetMethod.invoke(defaultAssetMap, customItemId);
-            LOGGER.atInfo().log("[HexcodeCompat] Registered %s '%s' → '%s' [VERIFY: %s]",
+            LOGGER.atFine().log("[HexcodeCompat] Registered %s '%s' → '%s' [VERIFY: %s]",
                     assetTypeName, customItemId, baseItemId,
                     verified != null ? "FOUND" : "NULL — putAll registration failed!");
 
@@ -563,7 +563,7 @@ public final class HexcodeCompat {
             rawMapField.setAccessible(true);
             Map<?, ?> rawMap = (Map<?, ?>) rawMapField.get(defaultAssetMap);
             Object rawResult = rawMap.get(customItemId);
-            LOGGER.atInfo().log("[HexcodeCompat] RAW assetMap.get('%s')=%s, assetMap.size=%d, assetMap.class=%s",
+            LOGGER.atFine().log("[HexcodeCompat] RAW assetMap.get('%s')=%s, assetMap.size=%d, assetMap.class=%s",
                     customItemId,
                     rawResult != null ? "FOUND" : "NULL",
                     rawMap.size(),
@@ -574,7 +574,7 @@ public final class HexcodeCompat {
             chainMapField.setAccessible(true);
             Map<?, ?> chainMap = (Map<?, ?>) chainMapField.get(defaultAssetMap);
             Object chainResult = chainMap.get(customItemId);
-            LOGGER.atInfo().log("[HexcodeCompat] assetChainMap.get('%s')=%s",
+            LOGGER.atFine().log("[HexcodeCompat] assetChainMap.get('%s')=%s",
                     customItemId, chainResult != null ? "FOUND (chain len=" + ((Object[]) chainResult).length + ")" : "NULL");
 
         } catch (Exception e) {
@@ -618,7 +618,7 @@ public final class HexcodeCompat {
                             try {
                                 Method getSysId = arr[i].getClass().getMethod("getSystemId");
                                 Object sysId = getSysId.invoke(arr[i]);
-                                LOGGER.atInfo().log("[HexcodeCompat-DIAG]   particle[%d]: systemId='%s'", i, sysId);
+                                LOGGER.atFine().log("[HexcodeCompat-DIAG]   particle[%d]: systemId='%s'", i, sysId);
                             } catch (Exception ignored) {}
                         }
                     } else {
@@ -633,14 +633,14 @@ public final class HexcodeCompat {
                 }
             }
 
-            LOGGER.atInfo().log("[HexcodeCompat-DIAG] Check '%s': publicAPI=%s, rawMap=%s, mapSize=%d, particles=%s",
+            LOGGER.atFine().log("[HexcodeCompat-DIAG] Check '%s': publicAPI=%s, rawMap=%s, mapSize=%d, particles=%s",
                     itemId,
                     result != null ? "FOUND" : "NULL",
                     rawResult != null ? "FOUND" : "NULL",
                     rawMap.size(),
                     particleInfo);
         } catch (Exception e) {
-            LOGGER.atInfo().log("[HexcodeCompat-DIAG] Check '%s': ERROR %s", itemId, e.getMessage());
+            LOGGER.atFine().log("[HexcodeCompat-DIAG] Check '%s': ERROR %s", itemId, e.getMessage());
         }
     }
 

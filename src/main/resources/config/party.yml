@@ -86,3 +86,20 @@ hud:
   level_format: "Lv.{level}"
   # Which PartyPro custom text slot to use (1 or 2)
   level_slot: 1
+
+# -----------------------------------------------------------------------------
+# LOCATION TRACKING
+# -----------------------------------------------------------------------------
+# Shows each party member's current location in the party HUD.
+# Uses the other custom text slot (default: slot 2).
+
+location:
+  enabled: true
+  # Format for realm location. {biome} and {level} are replaced.
+  realm_format: "{biome} Lv.{level}"
+  # Text shown when the player is in the skill sanctum
+  sanctum_text: "Skill Sanctum"
+  # Text shown when the player is in the overworld
+  overworld_text: "Overworld"
+  # Which PartyPro custom text slot to use (1 or 2). Must differ from level_slot.
+  location_slot: 2

@@ -19,6 +19,7 @@ public class PartyConfig {
     private PvpProtectionConfig pvpProtection = new PvpProtectionConfig();
     private RealmCoopConfig realmCoop = new RealmCoopConfig();
     private HudConfig hud = new HudConfig();
+    private LocationConfig location = new LocationConfig();
 
     // ── Getters ──
 
@@ -50,6 +51,9 @@ public class PartyConfig {
 
     public HudConfig getHud() { return hud; }
     public void setHud(HudConfig v) { this.hud = v; }
+
+    public LocationConfig getLocation() { return location; }
+    public void setLocation(LocationConfig v) { this.location = v; }
 
     // ── Nested configs ──
 
@@ -170,5 +174,38 @@ public class PartyConfig {
         public int getLevelSlot() { return levelSlot; }
         public void setLevelSlot(int v) { this.levelSlot = v; }
         public void setLevel_slot(int v) { this.levelSlot = v; }
+    }
+
+    public static class LocationConfig {
+        private boolean enabled = true;
+        private String realmFormat = "{biome} Lv.{level}";
+        private String sanctumText = "Skill Sanctum";
+        private String overworldText = "Overworld";
+        private int locationSlot = 2;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean v) { this.enabled = v; }
+
+        public String getRealmFormat() { return realmFormat; }
+        public void setRealmFormat(String v) { this.realmFormat = v; }
+        public void setRealm_format(String v) { this.realmFormat = v; }
+
+        public String getSanctumText() { return sanctumText; }
+        public void setSanctumText(String v) { this.sanctumText = v; }
+        public void setSanctum_text(String v) { this.sanctumText = v; }
+
+        public String getOverworldText() { return overworldText; }
+        public void setOverworldText(String v) { this.overworldText = v; }
+        public void setOverworld_text(String v) { this.overworldText = v; }
+
+        public int getLocationSlot() { return locationSlot; }
+        public void setLocationSlot(int v) { this.locationSlot = v; }
+        public void setLocation_slot(int v) { this.locationSlot = v; }
+
+        public String formatRealm(String biomeName, int realmLevel) {
+            return realmFormat
+                .replace("{biome}", biomeName)
+                .replace("{level}", String.valueOf(realmLevel));
+        }
     }
 }

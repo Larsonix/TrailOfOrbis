@@ -9,8 +9,11 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 
+import io.github.larsonix.trailoforbis.ui.hud.HudRefreshHelper;
+import io.github.larsonix.trailoforbis.ui.hud.HudToggleService;
+
 import javax.annotation.Nonnull;
-import java.lang.reflect.Field;
+import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -36,12 +39,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * BEFORE the player leaves.
  *
  * <h2>Full Rerender Strategy</h2>
- * <p>Combat HUD refresh uses {@code resetHasBuilt()} + {@code refreshOrRerender(true, true)}
- * instead of the default diff-based {@code refreshOrRerender(false, false)}. The diff
- * approach generates {@code Set} commands referencing auto-generated {@code #HYUUIDGroupNNN}
- * element IDs. When the MultipleHUD mod rebuilds the DOM (triggered by any mod
- * adding/removing a HUD), those IDs vanish and the client crashes. The full rerender
- * approach atomically Clears + Appends — immune to DOM rebuilds.
+ * <p>Combat HUD refresh uses {@link HudRefreshHelper} which atomically Clears +
+ * Appends instead of the default diff-based {@code Set} commands. The diff approach
+ * references auto-generated {@code #HYUUIDGroupNNN} element IDs that can become
+ * stale and crash the client. See {@link HudRefreshHelper} for details.
  *
  * @see RealmCombatHud
  * @see RealmVictoryHud
@@ -50,46 +51,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RealmHudManager {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-
-    // ═══════════════════════════════════════════════════════════════════
-    // HYUI REFLECTION — reset hasBuilt to force Append instead of Set
-    // ═══════════════════════════════════════════════════════════════════
-
-    private static final Field DELEGATE_FIELD;
-    private static final Field HAS_BUILT_FIELD;
-
-    static {
-        Field df = null, hf = null;
-        try {
-            df = HyUIHud.class.getDeclaredField("delegate");
-            df.setAccessible(true);
-            hf = Class.forName("au.ellie.hyui.builders.HyUInterface").getDeclaredField("hasBuilt");
-            hf.setAccessible(true);
-        } catch (Exception e) {
-            // Will fall back to diff-based refresh if reflection fails
-        }
-        DELEGATE_FIELD = df;
-        HAS_BUILT_FIELD = hf;
-    }
-
-    /**
-     * Resets HyUI's internal {@code hasBuilt} flag so the next build generates
-     * {@code Append} commands instead of {@code Set} commands.
-     *
-     * @return true if reset succeeded, false if reflection failed
-     */
-    public static boolean resetHasBuilt(@Nonnull HyUIHud hud) {
-        if (DELEGATE_FIELD == null || HAS_BUILT_FIELD == null) {
-            return false;
-        }
-        try {
-            Object delegate = DELEGATE_FIELD.get(hud);
-            HAS_BUILT_FIELD.set(delegate, false);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════════════
     // STATE
@@ -103,6 +64,27 @@ public class RealmHudManager {
 
     /** Active defeat HUDs per player UUID. */
     private final Map<UUID, HyUIHud> defeatHuds = new ConcurrentHashMap<>();
+
+    @Nullable private HudToggleService hudToggleService;
+
+    public void setHudToggleService(@Nullable HudToggleService service) {
+        this.hudToggleService = service;
+    }
+
+    /**
+     * Applies toggle state (hide/unhide) to all active HUDs for a player.
+     * Called by the {@code /hud} command.
+     */
+    public void applyToggle(@Nonnull UUID playerId, boolean hide) {
+        applyToHud(combatHuds.get(playerId), hide);
+        applyToHud(victoryHuds.get(playerId), hide);
+        applyToHud(defeatHuds.get(playerId), hide);
+    }
+
+    private void applyToHud(@Nullable HyUIHud hud, boolean hide) {
+        if (hud == null) return;
+        if (hide) hud.hide(); else hud.unhide();
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // COMBAT HUD
@@ -158,6 +140,7 @@ public class RealmHudManager {
                 // sends commands referencing non-existent elements → client crash.
                 world.execute(() -> {
                     combatHuds.put(playerId, hud);
+                    if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
                     LOGGER.atInfo().log("Showed combat HUD for player %s in realm %s",
                         playerId.toString().substring(0, 8),
                         realm.getRealmId().toString().substring(0, 8));
@@ -206,6 +189,7 @@ public class RealmHudManager {
         try {
             HyUIHud hud = RealmVictoryHud.create(player, realm, store);
             victoryHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
             LOGGER.atFine().log("Showed victory HUD for player %s in realm %s",
                 playerId.toString().substring(0, 8),
                 realm.getRealmId().toString().substring(0, 8));
@@ -253,6 +237,7 @@ public class RealmHudManager {
         try {
             HyUIHud hud = RealmDefeatHud.create(player, realm, store);
             defeatHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
             LOGGER.atFine().log("Showed defeat HUD for player %s in realm %s",
                 playerId.toString().substring(0, 8),
                 realm.getRealmId().toString().substring(0, 8));
@@ -364,14 +349,8 @@ public class RealmHudManager {
     /**
      * Ticks all active combat HUDs. Called from the realm's world-thread tick loop.
      *
-     * <p>Uses full rerender ({@code resetHasBuilt} + {@code refreshOrRerender(true, true)})
-     * instead of diff-based {@code refreshOrRerender(false, false)}. The diff approach
-     * generates {@code Set} commands targeting auto-generated {@code #HYUUIDGroupNNN}
-     * element IDs that can vanish when the MultipleHUD mod rebuilds the DOM. The full
-     * rerender atomically Clears the HUD group and Appends fresh elements — no
-     * dependency on stale element IDs.
-     *
-     * <p>Falls back to diff-based refresh if the reflection-based reset is unavailable.
+     * <p>Uses {@link HudRefreshHelper#safeRefreshWithToggle} for atomic Clear+Append
+     * rerenders. See {@link HudRefreshHelper} for why diff-based refresh is unsafe.
      */
     public void tickCombatHuds() {
         var iterator = combatHuds.entrySet().iterator();
@@ -379,15 +358,7 @@ public class RealmHudManager {
             var entry = iterator.next();
             HyUIHud hud = entry.getValue();
             try {
-                hud.triggerRefresh();
-
-                // Full rerender: reset hasBuilt → forces Append instead of Set
-                if (resetHasBuilt(hud)) {
-                    hud.refreshOrRerender(true, true);
-                } else {
-                    // Fallback: diff-based (may crash if DOM was rebuilt by MultipleHUD)
-                    hud.refreshOrRerender(false, false);
-                }
+                HudRefreshHelper.safeRefreshWithToggle(hud, entry.getKey(), hudToggleService);
             } catch (Exception e) {
                 // Evict stale HUD to prevent repeated crash on every tick
                 iterator.remove();

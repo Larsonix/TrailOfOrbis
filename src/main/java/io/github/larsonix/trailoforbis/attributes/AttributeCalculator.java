@@ -33,6 +33,9 @@ public class AttributeCalculator {
     /** Base critical strike chance (%) */
     public static final float BASE_CRIT_CHANCE = 5.0f;
 
+    /** Base energy shield regen delay in seconds (time after hit before regen starts) */
+    public static final float BASE_ENERGY_SHIELD_REGEN_DELAY = 3.0f;
+
     /** Base critical strike multiplier (%) */
     public static final float BASE_CRIT_MULTIPLIER = 150.0f;
 
@@ -82,7 +85,7 @@ public class AttributeCalculator {
      * plus magic stats from WATER/FIRE/LIGHTNING for Hexcode integration:
      * <ul>
      *   <li>FIRE: physicalDamagePercent, chargedAttackDamagePercent, critMultiplier, burnDamagePercent, igniteChance, magicPower</li>
-     *   <li>WATER: spellDamagePercent, maxMana, energyShield, manaRegen, freezeChance, magicPower, volatilityMax</li>
+     *   <li>WATER: spellDamagePercent, maxMana, energyShieldPercent, energyShieldRegen, manaRegen, freezeChance, magicPower, volatilityMax</li>
      *   <li>LIGHTNING: attackSpeedPercent, moveSpeedPercent, critChance, staminaRegen, shockChance, castSpeed</li>
      *   <li>EARTH: maxHealthPercent, armor, healthRegen, blockChance, knockbackResistance</li>
      *   <li>WIND: evasion, accuracy, projectileDamagePercent, jumpForcePercent, projectileSpeedPercent</li>
@@ -126,7 +129,8 @@ public class AttributeCalculator {
         // WATER stats
         float spellDamagePercent = water * waterGrants.getSpellDamagePercent();
         float maxMana = baseStats.getMaxMana() + (water * waterGrants.getMaxMana());
-        float energyShield = water * waterGrants.getEnergyShield();
+        float energyShieldPercent = water * waterGrants.getEnergyShieldPercent();
+        float energyShieldRegen = water * waterGrants.getEnergyShieldRegen();
         float manaRegen = water * waterGrants.getManaRegen();
         float freezeChance = water * waterGrants.getFreezeChance();
 
@@ -185,7 +189,9 @@ public class AttributeCalculator {
 
             // ==================== Defense ====================
             .armor(armor)
-            .energyShield(energyShield)
+            .energyShieldPercent(energyShieldPercent)
+            .energyShieldRegen(energyShieldRegen)
+            .energyShieldRegenDelay(BASE_ENERGY_SHIELD_REGEN_DELAY)
             .evasion(evasion)
             .blockChance(blockChance)
             .knockbackResistance(knockbackResistance)

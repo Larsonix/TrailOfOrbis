@@ -161,32 +161,19 @@ public class GatewayUpgradeConfig {
             new TierMaterial("Ingredient_Life_Essence", 5)
         )));
 
-        // Tier 2: Gold Gateway
-        config.addTier(new GatewayTier("Gold Gateway", 30, List.of(
-            new TierMaterial("Ingredient_Bar_Gold", 12),
+        // Tier 2: Thorium Gateway (Zone 2 — Howling Sands)
+        config.addTier(new GatewayTier("Thorium Gateway", 30, List.of(
+            new TierMaterial("Ingredient_Bar_Thorium", 12),
             new TierMaterial("Ingredient_Life_Essence", 8)
         )));
 
-        // Tier 3: Cobalt Gateway
+        // Tier 3: Cobalt Gateway (Zone 3 — Whisperfrost Frontiers)
         config.addTier(new GatewayTier("Cobalt Gateway", 45, List.of(
             new TierMaterial("Ingredient_Bar_Cobalt", 10),
             new TierMaterial("Ingredient_Void_Essence", 10)
         )));
 
-        // Tier 4: Thorium Gateway
-        config.addTier(new GatewayTier("Thorium Gateway", 60, List.of(
-            new TierMaterial("Ingredient_Bar_Thorium", 10),
-            new TierMaterial("Ingredient_Life_Essence", 10),
-            new TierMaterial("Ingredient_Void_Essence", 10)
-        )));
-
-        // Tier 5: Mithril Gateway
-        config.addTier(new GatewayTier("Mithril Gateway", 80, List.of(
-            new TierMaterial("Ingredient_Bar_Mithril", 8),
-            new TierMaterial("Ingredient_Void_Essence", 15)
-        )));
-
-        // Tier 6: Adamantite Gateway (unlimited)
+        // Tier 4: Adamantite Gateway (Zone 4 — Devastated Lands, unlimited)
         config.addTier(new GatewayTier("Adamantite Gateway", -1, List.of(
             new TierMaterial("Ingredient_Bar_Adamantite", 5),
             new TierMaterial("Ingredient_Voidheart", 5)

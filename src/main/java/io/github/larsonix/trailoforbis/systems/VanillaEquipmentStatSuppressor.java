@@ -10,11 +10,17 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.GameMode;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatsSystems;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.gear.GearManager;
+import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
@@ -42,7 +48,7 @@ import java.util.Set;
  * </table>
  *
  * <h2>Performance</h2>
- * <p>For each player, iterates 6 stat indices × ~4 key checks = ~24 hash lookups per tick.
+ * <p>For each player, iterates 4 stat indices × ~4 key checks = ~16 hash lookups per tick.
  * {@code removeModifier} returns null immediately for non-existent keys. Negligible cost.
  *
  * @see EntityStatsSystems.Recalculate
@@ -66,10 +72,12 @@ public final class VanillaEquipmentStatSuppressor extends EntityTickingSystem<En
 
     private final ComponentType<EntityStore, PlayerRef> playerRefType;
     private final ComponentType<EntityStore, EntityStatMap> statMapType;
+    private final ComponentType<EntityStore, Player> playerType;
 
     public VanillaEquipmentStatSuppressor() {
         this.playerRefType = PlayerRef.getComponentType();
         this.statMapType = EntityStatMap.getComponentType();
+        this.playerType = Player.getComponentType();
     }
 
     @Nonnull
@@ -99,6 +107,31 @@ public final class VanillaEquipmentStatSuppressor extends EntityTickingSystem<En
             @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
             @Nonnull Store<EntityStore> store,
             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+
+        // Skip Creative players — Hytale manages their stats natively.
+        // Suppressing vanilla equipment modifiers in Creative removes health bonuses
+        // that Hytale expects to be there, which can cause health clamping issues.
+        Player player = archetypeChunk.getComponent(index, playerType);
+        if (player != null && player.getGameMode() == GameMode.Creative) {
+            return;
+        }
+
+        // Skip during world transitions. Each removeModifier(Predictable.SELF) sends
+        // an EntityStatUpdate prediction to the client. If the player is scrolling the
+        // hotbar while entering a portal, Hytale applies new weapon stats (Recalculate),
+        // then we remove them here — those removal packets race with JoinWorldPacket
+        // and crash the client with NullReferenceException. The stat suppression will
+        // resume normally once the player is ready in the new world.
+        PlayerRef playerRef = archetypeChunk.getComponent(index, playerRefType);
+        if (playerRef != null) {
+            GearManager gm = TrailOfOrbis.getInstance().getGearManager();
+            if (gm != null) {
+                ItemSyncCoordinator coordinator = gm.getSyncCoordinator();
+                if (coordinator != null && coordinator.isPlayerSuppressed(playerRef.getUuid())) {
+                    return;
+                }
+            }
+        }
 
         EntityStatMap statMap = archetypeChunk.getComponent(index, statMapType);
         if (statMap == null) {
@@ -148,20 +181,20 @@ public final class VanillaEquipmentStatSuppressor extends EntityTickingSystem<En
     }
 
     /**
-     * Returns all vanilla stat indices to check.
+     * Returns vanilla stat indices that equipment can actually modify.
      *
-     * <p>Covers all resource stats that equipment items can modify.
-     * Called every tick but the array is tiny (6 elements) and the indices
-     * are cached by DefaultEntityStatTypes.
+     * <p>Only includes resource stats that armor/weapon/utility items affect.
+     * SignatureEnergy (built from combat hits) and Ammo (ranged-specific)
+     * are excluded — vanilla equipment never adds modifiers to those stats,
+     * and attempting to remove modifiers from entities that lack those stat
+     * values triggers "No EntityStatValue found for index" warnings.
      */
     private static int[] getStatIndices() {
         return new int[] {
             DefaultEntityStatTypes.getHealth(),
             DefaultEntityStatTypes.getOxygen(),
             DefaultEntityStatTypes.getStamina(),
-            DefaultEntityStatTypes.getMana(),
-            DefaultEntityStatTypes.getSignatureEnergy(),
-            DefaultEntityStatTypes.getAmmo()
+            DefaultEntityStatTypes.getMana()
         };
     }
 }

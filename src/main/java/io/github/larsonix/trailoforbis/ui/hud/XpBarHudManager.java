@@ -7,7 +7,6 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingEvents;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
-import io.github.larsonix.trailoforbis.maps.ui.RealmHudManager;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,6 +14,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+// HUD toggle service for /hud command visibility toggling
 
 /**
  * Manages the persistent XP bar HUD lifecycle for all players.
@@ -27,14 +28,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * removal are performed on the world thread via {@code world.execute()}.
  *
  * <h2>Full Rerender on XP Change</h2>
- * <p>Uses {@link RealmHudManager#resetHasBuilt(HyUIHud)} +
- * {@code refreshOrRerender(true, true)} to force full Append-based rerender
- * instead of diff-based Set commands. This prevents client crashes when the
- * MultipleHUD mod rebuilds the DOM and invalidates auto-generated element IDs.
+ * <p>Uses {@link HudRefreshHelper} for safe atomic rerenders (Clear+Append)
+ * instead of diff-based Set commands that can crash clients with stale element IDs.
  *
  * @see XpBarHud
  */
-public class XpBarHudManager {
+public class XpBarHudManager implements PersistentHud {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
@@ -47,6 +46,9 @@ public class XpBarHudManager {
 
     /** The leveling service for XP/level queries. */
     private final LevelingService levelingService;
+
+    /** HUD toggle service — hides new/refreshed HUDs when player has toggled off. */
+    @Nullable private HudToggleService hudToggleService;
 
     /** Registered XP gain listener (stored for cleanup). */
     @Nullable
@@ -67,6 +69,10 @@ public class XpBarHudManager {
      */
     public XpBarHudManager(@Nonnull LevelingService levelingService) {
         this.levelingService = levelingService;
+    }
+
+    public void setHudToggleService(@Nullable HudToggleService service) {
+        this.hudToggleService = service;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -91,6 +97,7 @@ public class XpBarHudManager {
         try {
             HyUIHud hud = XpBarHud.create(playerRef, store, levelingService);
             activeHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
             LOGGER.atInfo().log("Showed XP bar HUD for player %s", playerId.toString().substring(0, 8));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to show XP bar HUD for player %s",
@@ -165,9 +172,7 @@ public class XpBarHudManager {
     /**
      * Triggers an immediate HUD refresh for a player after XP or level change.
      *
-     * <p>Uses full rerender ({@code resetHasBuilt} + {@code refreshOrRerender(true, true)})
-     * instead of diff-based Set commands. This prevents the client crash where
-     * MultipleHUD rebuilds the DOM and invalidates auto-generated element IDs.
+     * <p>Uses {@link HudRefreshHelper#safeRefreshWithToggle} for atomic Clear+Append.
      *
      * @param playerId The player's UUID
      */
@@ -178,15 +183,7 @@ public class XpBarHudManager {
         }
 
         try {
-            hud.triggerRefresh();
-
-            // Full rerender: reset hasBuilt → forces Append instead of Set
-            if (RealmHudManager.resetHasBuilt(hud)) {
-                hud.refreshOrRerender(true, true);
-            } else {
-                // Fallback: diff-based (may crash if DOM was rebuilt by MultipleHUD)
-                hud.refreshOrRerender(false, false);
-            }
+            HudRefreshHelper.safeRefreshWithToggle(hud, playerId, hudToggleService);
         } catch (Exception e) {
             LOGGER.atFine().withCause(e).log(
                 "Failed to trigger XP bar refresh for player %s", playerId.toString().substring(0, 8));
@@ -247,6 +244,12 @@ public class XpBarHudManager {
     // QUERIES
     // ═══════════════════════════════════════════════════════════════════
 
+    /** Gets the active HUD for a player, or null. */
+    @Nullable
+    public HyUIHud getHud(@Nonnull UUID playerId) {
+        return activeHuds.get(playerId);
+    }
+
     /** Checks if a player has an active XP bar HUD. */
     public boolean hasHud(@Nonnull UUID playerId) {
         return activeHuds.containsKey(playerId);
@@ -255,5 +258,41 @@ public class XpBarHudManager {
     /** Gets the count of active XP bar HUDs. */
     public int getActiveCount() {
         return activeHuds.size();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PersistentHud INTERFACE
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nonnull
+    @Override
+    public String hudName() {
+        return "xp-bar";
+    }
+
+    @Override
+    public void discardStale(@Nonnull UUID playerId) {
+        discardStaleHud(playerId);
+    }
+
+    @Override
+    public boolean isActive(@Nonnull UUID playerId) {
+        return hasHud(playerId);
+    }
+
+    @Override
+    public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                        @Nonnull Store<EntityStore> store) {
+        showHud(playerId, playerRef, store);
+    }
+
+    @Override
+    public void removeOnDisconnect(@Nonnull UUID playerId) {
+        removeHud(playerId);
+    }
+
+    @Override
+    public void shutdown() {
+        removeAllHuds();
     }
 }

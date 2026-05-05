@@ -48,7 +48,8 @@ class ImplicitDamageCalculatorTest {
     @BeforeEach
     void setUp() {
         ImplicitDamageConfig implicitConfig = new ImplicitDamageConfig(
-                true, BASE_MIN, BASE_MAX, SCALE_FACTOR, TWO_HANDED_MULTIPLIER
+                true, BASE_MIN, BASE_MAX, SCALE_FACTOR, TWO_HANDED_MULTIPLIER,
+                0.1, 0.3, 3.0  // spellbook: mana_regen
         );
 
         // ExponentialScaling is no longer used by ImplicitDamageCalculator,
@@ -130,10 +131,11 @@ class ImplicitDamageCalculatorTest {
             Random random = new Random(42);
 
             // All 1H weapons should produce identical min/max
+            // Spellbooks excluded — they use a separate mana_regen implicit
             WeaponType[] oneHandedTypes = {
                 WeaponType.SWORD, WeaponType.DAGGER, WeaponType.AXE,
                 WeaponType.MACE, WeaponType.CLAWS, WeaponType.CLUB,
-                WeaponType.WAND, WeaponType.SPELLBOOK
+                WeaponType.WAND
             };
 
             WeaponImplicit reference = calculator.calculate(WeaponType.SWORD, level, random);
@@ -266,17 +268,23 @@ class ImplicitDamageCalculatorTest {
         }
 
         @Test
-        @DisplayName("Magic weapons get 'spell_damage' type")
-        void magicWeapons_GetSpellDamageType() {
+        @DisplayName("Magic weapons get a random elemental damage type")
+        void magicWeapons_GetElementalDamageType() {
             Random random = new Random(42);
 
             WeaponImplicit staff = calculator.calculate(WeaponType.STAFF, 10, random);
-            WeaponImplicit wand = calculator.calculate(WeaponType.WAND, 10, new Random(42));
+            WeaponImplicit wand = calculator.calculate(WeaponType.WAND, 10, new Random(43));
             WeaponImplicit spellbook = calculator.calculate(WeaponType.SPELLBOOK, 10, new Random(42));
 
-            assertEquals(ImplicitDamageCalculator.SPELL_DAMAGE, staff.damageType());
-            assertEquals(ImplicitDamageCalculator.SPELL_DAMAGE, wand.damageType());
-            assertEquals(ImplicitDamageCalculator.SPELL_DAMAGE, spellbook.damageType());
+            // Staff and wand get a fixed element (one of the 6)
+            assertNotNull(staff.getSpellElement(), "Staff should have a fixed element");
+            assertNotNull(wand.getSpellElement(), "Wand should have a fixed element");
+            assertTrue(staff.damageType().endsWith("_damage"), "Staff damageType should end with _damage");
+            assertTrue(wand.damageType().endsWith("_damage"), "Wand damageType should end with _damage");
+            assertNotEquals(ImplicitDamageCalculator.PHYSICAL_DAMAGE, staff.damageType());
+            assertNotEquals(ImplicitDamageCalculator.PHYSICAL_DAMAGE, wand.damageType());
+            // Spellbook still gets mana_regen (support item)
+            assertEquals(ImplicitDamageCalculator.MANA_REGEN, spellbook.damageType());
         }
 
         @Test
@@ -384,6 +392,184 @@ class ImplicitDamageCalculatorTest {
 
             assertTrue(differentCount > 30,
                 "Reroll should produce different values (got " + differentCount + " different out of 50)");
+        }
+    }
+
+    // =========================================================================
+    // RESCALE FOR LEVEL TESTS
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Rescale For Level (Proportionality Preservation)")
+    class RescaleForLevelTests {
+
+        @Test
+        @DisplayName("Percentile is preserved when level increases")
+        void rescale_PreservesPercentile_LevelUp() {
+            // Create an implicit at level 10 with a known percentile
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 18.0  // 80th percentile
+            );
+            double originalPercentile = original.rollPercentile();
+            assertEquals(0.8, originalPercentile, 0.001);
+
+            // Rescale to level 50
+            WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SWORD, 50);
+
+            // New range should be different (higher)
+            assertTrue(rescaled.minValue() > original.minValue(),
+                "Min should increase with level");
+            assertTrue(rescaled.maxValue() > original.maxValue(),
+                "Max should increase with level");
+
+            // Percentile must be preserved
+            assertEquals(originalPercentile, rescaled.rollPercentile(), 0.001,
+                "Percentile should be preserved across level change");
+        }
+
+        @Test
+        @DisplayName("Percentile is preserved when level decreases")
+        void rescale_PreservesPercentile_LevelDown() {
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    30.0, 50.0, 35.0  // 25th percentile
+            );
+            double originalPercentile = original.rollPercentile();
+
+            WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SWORD, 1);
+
+            assertEquals(originalPercentile, rescaled.rollPercentile(), 0.001,
+                "Percentile should be preserved when level decreases");
+        }
+
+        @Test
+        @DisplayName("Minimum roll (0th percentile) stays at minimum")
+        void rescale_MinRoll_StaysAtMin() {
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 10.0  // 0th percentile (worst roll)
+            );
+
+            WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SWORD, 50);
+
+            assertEquals(rescaled.minValue(), rescaled.rolledValue(), 0.001,
+                "0th percentile roll should land at new min");
+            assertEquals(0.0, rescaled.rollPercentile(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Maximum roll (100th percentile) stays at maximum")
+        void rescale_MaxRoll_StaysAtMax() {
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 20.0  // 100th percentile (perfect roll)
+            );
+
+            WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SWORD, 50);
+
+            assertEquals(rescaled.maxValue(), rescaled.rolledValue(), 0.001,
+                "100th percentile roll should land at new max");
+            assertEquals(1.0, rescaled.rollPercentile(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Two-handed weapons use 2H range when rescaling")
+        void rescale_TwoHanded_Uses2HRange() {
+            Random random = new Random(42);
+            // Generate a 1H and 2H implicit at level 10 with same percentile
+            WeaponImplicit oneHanded = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 15.0  // 50th percentile
+            );
+            WeaponImplicit twoHanded = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    20.0, 40.0, 30.0  // 50th percentile
+            );
+
+            WeaponImplicit rescaled1H = calculator.rescaleForLevel(oneHanded, WeaponType.SWORD, 50);
+            WeaponImplicit rescaled2H = calculator.rescaleForLevel(twoHanded, WeaponType.LONGSWORD, 50);
+
+            // 2H should have exactly 2× the 1H range
+            assertEquals(rescaled1H.minValue() * TWO_HANDED_MULTIPLIER, rescaled2H.minValue(), 0.01);
+            assertEquals(rescaled1H.maxValue() * TWO_HANDED_MULTIPLIER, rescaled2H.maxValue(), 0.01);
+
+            // Both should preserve 50th percentile
+            assertEquals(0.5, rescaled1H.rollPercentile(), 0.001);
+            assertEquals(0.5, rescaled2H.rollPercentile(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Spellbook implicit uses spellbook range when rescaling")
+        void rescale_Spellbook_UsesSpellbookRange() {
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.MANA_REGEN,
+                    0.1, 0.3, 0.2  // 50th percentile
+            );
+
+            WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SPELLBOOK, 50);
+
+            assertEquals(ImplicitDamageCalculator.MANA_REGEN, rescaled.damageType(),
+                "Spellbook should keep mana_regen type");
+            assertEquals(0.5, rescaled.rollPercentile(), 0.001,
+                "Spellbook percentile should be preserved");
+        }
+
+        @Test
+        @DisplayName("Damage type is preserved across rescale")
+        void rescale_PreservesDamageType() {
+            WeaponImplicit physical = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 15.0
+            );
+            WeaponImplicit spell = WeaponImplicit.of(
+                    ImplicitDamageCalculator.SPELL_DAMAGE,
+                    10.0, 20.0, 15.0
+            );
+
+            assertEquals(ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                calculator.rescaleForLevel(physical, WeaponType.SWORD, 50).damageType());
+            assertEquals(ImplicitDamageCalculator.SPELL_DAMAGE,
+                calculator.rescaleForLevel(spell, WeaponType.STAFF, 50).damageType());
+        }
+
+        @Test
+        @DisplayName("Rescale is deterministic (no randomness)")
+        void rescale_IsDeterministic() {
+            WeaponImplicit original = WeaponImplicit.of(
+                    ImplicitDamageCalculator.PHYSICAL_DAMAGE,
+                    10.0, 20.0, 17.5
+            );
+
+            WeaponImplicit first = calculator.rescaleForLevel(original, WeaponType.SWORD, 50);
+            WeaponImplicit second = calculator.rescaleForLevel(original, WeaponType.SWORD, 50);
+
+            assertEquals(first.rolledValue(), second.rolledValue(), 0.0,
+                "Rescale must produce identical results every time (no randomness)");
+            assertEquals(first.minValue(), second.minValue(), 0.0);
+            assertEquals(first.maxValue(), second.maxValue(), 0.0);
+        }
+
+        @Test
+        @DisplayName("Rolled value is always within new range bounds")
+        void rescale_ValueAlwaysInRange() {
+            Random random = new Random();
+
+            for (int i = 0; i < 100; i++) {
+                double min = 10.0;
+                double max = 20.0;
+                double value = min + random.nextDouble() * (max - min);
+                WeaponImplicit original = WeaponImplicit.of(
+                        ImplicitDamageCalculator.PHYSICAL_DAMAGE, min, max, value);
+
+                int newLevel = 1 + random.nextInt(150);
+                WeaponImplicit rescaled = calculator.rescaleForLevel(original, WeaponType.SWORD, newLevel);
+
+                assertTrue(rescaled.rolledValue() >= rescaled.minValue() - 0.0001,
+                    "Value " + rescaled.rolledValue() + " should be >= min " + rescaled.minValue());
+                assertTrue(rescaled.rolledValue() <= rescaled.maxValue() + 0.0001,
+                    "Value " + rescaled.rolledValue() + " should be <= max " + rescaled.maxValue());
+            }
         }
     }
 

@@ -66,6 +66,17 @@ prefix-weights:
   reduced-time: 8
   reduced-healing: 10
   no-regeneration: 5
+  monsters-extra-fire: 5
+  monsters-extra-water: 5
+  monsters-extra-lightning: 5
+  monsters-extra-earth: 5
+  monsters-extra-wind: 5
+  monsters-extra-void: 5
+  player-vulnerability: 6
+  reduced-block: 8
+  armored-monsters: 10
+  ailment-immune-monsters: 4
+  life-regen-monsters: 6
 
 # ═══════════════════════════════════════════════════════════════════
 # Suffix Weights (Reward Modifiers)
@@ -80,6 +91,11 @@ suffix-weights:
   stone-drop-bonus: 8
   extra-monsters: 10
   elite-chance: 7
+  gear-quality-bonus: 10
+  drop-level-bonus: 8
+  map-discovery: 6
+  stone-rarity-bonus: 5
+  bonus-time: 10
 
 # ═══════════════════════════════════════════════════════════════════
 # Per-Modifier Settings (Level-Scaled)
@@ -190,3 +206,121 @@ modifier-settings:
     base_max: 6
     scale_per_level: 0.5
     enabled: true
+
+  # ---- NEW PREFIX MODIFIERS — Elemental ----
+
+  # Monsters deal +X% bonus Fire damage
+  monsters-extra-fire:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters deal +X% bonus Water damage
+  monsters-extra-water:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters deal +X% bonus Lightning damage
+  monsters-extra-lightning:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters deal +X% bonus Earth damage
+  monsters-extra-earth:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters deal +X% bonus Wind damage
+  monsters-extra-wind:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters deal +X% bonus Void damage
+  monsters-extra-void:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.8
+    enabled: true
+
+  # ---- NEW PREFIX MODIFIERS — Mechanical ----
+
+  # Players take +X% increased damage from all sources
+  player-vulnerability:
+    base_min: 8
+    base_max: 20
+    scale_per_level: 0.6
+    enabled: true
+
+  # Block damage reduction is X% less effective
+  reduced-block:
+    base_min: 15
+    base_max: 35
+    scale_per_level: 0.8
+    enabled: true
+
+  # Monsters have +X% armor (physical resistance)
+  armored-monsters:
+    base_min: 15
+    base_max: 40
+    scale_per_level: 1.2
+    enabled: true
+
+  # Monsters cannot be affected by ailments (binary)
+  ailment-immune-monsters:
+    min: 1
+    max: 1
+    enabled: true
+
+  # Monsters regenerate X% max HP per second
+  life-regen-monsters:
+    base_min: 1
+    base_max: 2
+    scale_per_level: 0.05
+    enabled: true
+
+  # ---- NEW SUFFIX MODIFIERS — Rewards ----
+
+  # Gear quality rolls boosted by +X
+  gear-quality-bonus:
+    base_min: 5
+    base_max: 15
+    scale_per_level: 0.5
+    enabled: true
+
+  # Gear drops at +X levels higher
+  drop-level-bonus:
+    base_min: 2
+    base_max: 5
+    scale_per_level: 0.15
+    enabled: true
+
+  # X% chance for bonus realm map on completion
+  map-discovery:
+    base_min: 3
+    base_max: 10
+    scale_per_level: 0.3
+    enabled: true
+
+  # Stones drop at +1 rarity tier (binary)
+  stone-rarity-bonus:
+    min: 1
+    max: 1
+    enabled: true
+
+  # Time limit increased by X%
+  bonus-time:
+    base_min: 10
+    base_max: 25
+    scale_per_level: 0.5
+    enabled: true
+    incompatible-with:
+      - reduced-time

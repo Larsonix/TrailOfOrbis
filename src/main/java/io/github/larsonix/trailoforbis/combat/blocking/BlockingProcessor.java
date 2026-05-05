@@ -6,8 +6,14 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.client.WieldingInteraction;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.concurrent.ThreadLocalRandom;
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -90,9 +96,15 @@ public class BlockingProcessor {
         // 3. Roll BLOCK_CHANCE for perfect block (full damage avoidance).
         // If the roll fails, the player still gets the deterministic base reduction
         // (33% weapon / 66% shield) applied later in the damage pipeline.
-        if (!blockingStats.rollBlock()) {
-            LOGGER.at(Level.FINE).log("Perfect block roll failed (chance: %.1f%%) — base reduction will apply",
-                blockingStats.blockChance());
+        // Apply realm REDUCED_BLOCK modifier — reduces effective block chance
+        float effectiveBlockChance = blockingStats.blockChance();
+        int blockReduction = getRealmBlockReduction(store, defenderRef);
+        if (blockReduction > 0) {
+            effectiveBlockChance *= (1.0f - blockReduction / 100.0f);
+        }
+        if (ThreadLocalRandom.current().nextFloat() * 100f >= effectiveBlockChance) {
+            LOGGER.at(Level.FINE).log("Perfect block roll failed (chance: %.1f%%, realm reduction: %d%%) — base reduction will apply",
+                effectiveBlockChance, blockReduction);
             return Optional.of(BlockResult.FAILED_ROLL);
         }
 
@@ -147,5 +159,30 @@ public class BlockingProcessor {
         // Apply our stamina drain reduction stat (capped at 75%)
         float reduction = stats.getEffectiveStaminaReduction();
         return baseCost * (1.0f - reduction);
+    }
+
+    /**
+     * Gets the REDUCED_BLOCK modifier value for the defender's realm.
+     *
+     * @return Block reduction percentage (0 if not in realm or no modifier)
+     */
+    private int getRealmBlockReduction(@Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> defenderRef) {
+        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+        if (rpg == null) {
+            return 0;
+        }
+        RealmsManager rm = rpg.getRealmsManager();
+        if (rm == null) {
+            return 0;
+        }
+        PlayerRef playerRef = store.getComponent(defenderRef, PlayerRef.getComponentType());
+        if (playerRef == null) {
+            return 0;
+        }
+        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(playerRef.getUuid());
+        if (realmOpt.isEmpty()) {
+            return 0;
+        }
+        return realmOpt.get().getMapData().getModifierValue(RealmModifierType.REDUCED_BLOCK);
     }
 }

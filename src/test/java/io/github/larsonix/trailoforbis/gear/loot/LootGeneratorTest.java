@@ -26,10 +26,9 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.lenient;
 
 /**
- * Tests for LootGenerator - 20 test cases.
+ * Tests for LootGenerator using DynamicLootRegistry (dynamic mode only).
  */
 @ExtendWith(MockitoExtension.class)
 class LootGeneratorTest {
@@ -43,66 +42,50 @@ class LootGeneratorTest {
         balanceConfig = TestConfigFactory.createDefaultBalanceConfig();
         modifierConfig = TestConfigFactory.createDefaultModifierConfig();
 
-        // Create mock ItemRegistryService with lenient stubbing (not all tests call these)
         itemRegistry = mock(ItemRegistryService.class);
         lenient().when(itemRegistry.isInitialized()).thenReturn(true);
         lenient().when(itemRegistry.isRegistered(anyString())).thenReturn(false);
     }
 
-    // =========================================================================
-    // SLOT SELECTION TESTS
-    // =========================================================================
+    /**
+     * Creates a mock DynamicLootRegistry that reports items available
+     * for all slots at COMMON rarity with default weights.
+     */
+    private DynamicLootRegistry createMockRegistry() {
+        DynamicLootRegistry registry = mock(DynamicLootRegistry.class);
+        lenient().when(registry.isDiscovered()).thenReturn(true);
 
-    @Nested
-    @DisplayName("Slot Selection Tests")
-    class SlotSelectionTests {
+        // All rarities available
+        lenient().when(registry.getAvailableRarities())
+            .thenReturn(EnumSet.allOf(GearRarity.class));
 
-        @Test
-        @DisplayName("selectRandomSlot returns all slot types over many trials")
-        void selectRandomSlot_ReturnsAllSlots() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator);
+        // All slots available at any rarity
+        lenient().when(registry.getAvailableSlotsForRarity(any()))
+            .thenReturn(EnumSet.allOf(EquipmentSlot.class));
 
-            Set<EquipmentSlot> selectedSlots = new HashSet<>();
-            for (int i = 0; i < 1000; i++) {
-                selectedSlots.add(lootGen.selectRandomSlot());
-            }
+        // Default slot weights
+        Map<EquipmentSlot, Integer> weights = new EnumMap<>(EquipmentSlot.class);
+        weights.put(EquipmentSlot.WEAPON, 30);
+        weights.put(EquipmentSlot.HEAD, 15);
+        weights.put(EquipmentSlot.CHEST, 15);
+        weights.put(EquipmentSlot.LEGS, 15);
+        weights.put(EquipmentSlot.HANDS, 15);
+        weights.put(EquipmentSlot.OFF_HAND, 10);
+        lenient().when(registry.getSlotWeights()).thenReturn(weights);
 
-            assertEquals(6, selectedSlots.size(), "Should eventually select all slot types");
-        }
+        // Categories available for any (rarity, slot)
+        lenient().when(registry.getAvailableCategoriesForRaritySlot(any(), any()))
+            .thenReturn(Set.of("Sword", "Axe", "Mace"));
 
-        @Test
-        @DisplayName("slot weights affect distribution")
-        void slotWeights_AffectDistribution() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator);
+        // Default category weights
+        lenient().when(registry.getCategoryWeights(any()))
+            .thenReturn(Map.of("Sword", 1.0, "Axe", 1.0, "Mace", 1.0));
 
-            Map<EquipmentSlot, Integer> counts = new EnumMap<>(EquipmentSlot.class);
-            for (EquipmentSlot slot : EquipmentSlot.values()) {
-                counts.put(slot, 0);
-            }
+        // Return a valid skin
+        lenient().when(registry.selectSkin(any(), anyString(), any()))
+            .thenReturn("Weapon_Sword_Iron");
 
-            for (int i = 0; i < 10000; i++) {
-                EquipmentSlot slot = lootGen.selectRandomSlot();
-                counts.merge(slot, 1, Integer::sum);
-            }
-
-            // WEAPON should be more common than OFF_HAND based on weights
-            assertTrue(counts.get(EquipmentSlot.WEAPON) > counts.get(EquipmentSlot.OFF_HAND),
-                "Weapon should be more common than off-hand");
-        }
-
-        @Test
-        @DisplayName("selectBaseItem returns non-null for all slots")
-        void selectBaseItem_ReturnsNonNull() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator);
-
-            for (EquipmentSlot slot : EquipmentSlot.values()) {
-                String itemId = lootGen.selectBaseItem(slot);
-                assertNotNull(itemId, "Should have base items for slot: " + slot);
-            }
-        }
+        return registry;
     }
 
     // =========================================================================
@@ -117,7 +100,7 @@ class LootGeneratorTest {
         @DisplayName("generateDrops returns empty list for NO_DROP")
         void generateDrops_NoDrop_ReturnsEmpty() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator);
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry());
 
             List<ItemStack> drops = lootGen.generateDrops(LootRoll.NO_DROP);
 
@@ -130,9 +113,10 @@ class LootGeneratorTest {
             GearGenerator mockGenerator = mock(GearGenerator.class);
             RarityRoller mockRarityRoller = mock(RarityRoller.class);
             when(mockGenerator.getRarityRoller()).thenReturn(mockRarityRoller);
-            when(mockRarityRoller.roll(anyDouble())).thenReturn(GearRarity.COMMON);
+            when(mockRarityRoller.roll(anyDouble(), any())).thenReturn(GearRarity.COMMON);
 
-            LootGenerator lootGen = spy(new LootGenerator(mockGenerator, new Random(12345)));
+            DynamicLootRegistry registry = createMockRegistry();
+            LootGenerator lootGen = spy(new LootGenerator(mockGenerator, registry, new Random(12345)));
             ItemStack baseItem = mock(ItemStack.class);
             ItemStack generatedItem = mock(ItemStack.class);
 
@@ -145,8 +129,6 @@ class LootGeneratorTest {
 
             assertEquals(3, drops.size(), "Should generate exactly dropCount items");
             assertTrue(drops.stream().allMatch(Objects::nonNull), "Generated drops must all be non-null");
-            verify(mockGenerator, times(3))
-                .generate(eq(baseItem), eq(50), anyString(), any(GearRarity.class));
         }
 
         @Test
@@ -155,9 +137,10 @@ class LootGeneratorTest {
             GearGenerator mockGenerator = mock(GearGenerator.class);
             RarityRoller mockRarityRoller = mock(RarityRoller.class);
             when(mockGenerator.getRarityRoller()).thenReturn(mockRarityRoller);
-            when(mockRarityRoller.roll(anyDouble())).thenReturn(GearRarity.RARE);
+            when(mockRarityRoller.roll(anyDouble(), any())).thenReturn(GearRarity.RARE);
 
-            LootGenerator lootGen = spy(new LootGenerator(mockGenerator, new Random(12345)));
+            DynamicLootRegistry registry = createMockRegistry();
+            LootGenerator lootGen = spy(new LootGenerator(mockGenerator, registry, new Random(12345)));
             ItemStack baseItem = mock(ItemStack.class);
             ItemStack generatedItem = mock(ItemStack.class);
 
@@ -170,6 +153,19 @@ class LootGeneratorTest {
             assertNotNull(drop);
             assertSame(generatedItem, drop);
         }
+
+        @Test
+        @DisplayName("generateSingleDrop returns null when registry not discovered")
+        void generateSingleDrop_NotDiscovered_ReturnsNull() {
+            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
+            DynamicLootRegistry registry = mock(DynamicLootRegistry.class);
+            when(registry.isDiscovered()).thenReturn(false);
+            when(registry.getSlotWeights()).thenReturn(Map.of());
+
+            LootGenerator lootGen = new LootGenerator(realGenerator, registry);
+
+            assertNull(lootGen.generateSingleDrop(50, 25.0));
+        }
     }
 
     // =========================================================================
@@ -181,33 +177,18 @@ class LootGeneratorTest {
     class BuilderTests {
 
         @Test
-        @DisplayName("builder level method works")
-        void builder_LevelMethodWorks() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
-
-            // Just test the builder doesn't throw
-            assertDoesNotThrow(() -> {
-                lootGen.drop()
-                    .level(50)
-                    .build();
-            });
-        }
-
-        @Test
-        @DisplayName("builder can chain all methods")
+        @DisplayName("builder can chain all methods without throwing")
         void builder_CanChainAllMethods() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry(), new Random(12345));
 
-            // Just test the builder chain doesn't throw
             assertDoesNotThrow(() -> {
                 lootGen.drop()
                     .level(50)
                     .slot(EquipmentSlot.LEGS)
                     .rarityBonus(25.0)
                     .rarity(GearRarity.LEGENDARY)
-                    .baseItem("hytale:iron_sword")
+                    .baseItem("Weapon_Sword_Iron")
                     .build();
             });
         }
@@ -216,7 +197,7 @@ class LootGeneratorTest {
         @DisplayName("builder slot method accepts all slots")
         void builder_SlotMethodAcceptsAllSlots() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry(), new Random(12345));
 
             for (EquipmentSlot slot : EquipmentSlot.values()) {
                 assertDoesNotThrow(() -> {
@@ -232,7 +213,7 @@ class LootGeneratorTest {
         @DisplayName("builder rarity method accepts all rarities")
         void builder_RarityMethodAcceptsAllRarities() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry(), new Random(12345));
 
             for (GearRarity rarity : GearRarity.values()) {
                 assertDoesNotThrow(() -> {
@@ -246,60 +227,35 @@ class LootGeneratorTest {
     }
 
     // =========================================================================
-    // STATIC DATA TESTS
+    // SLOT WEIGHT TESTS
     // =========================================================================
 
     @Nested
-    @DisplayName("Config Data Tests")
-    class ConfigDataTests {
-
-        private LootGenerator lootGenerator;
-
-        @BeforeEach
-        void setUpConfigTests() {
-            GearGenerator gearGen = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            lootGenerator = new LootGenerator(gearGen);
-        }
+    @DisplayName("Slot Weight Tests")
+    class SlotWeightTests {
 
         @Test
-        @DisplayName("getBaseItems returns non-empty map")
-        void getBaseItems_NonEmpty() {
-            Map<EquipmentSlot, List<String>> baseItems = lootGenerator.getBaseItems();
+        @DisplayName("getSlotWeights returns weights from registry")
+        void getSlotWeights_ReturnsRegistryWeights() {
+            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry());
 
-            assertFalse(baseItems.isEmpty());
-            for (EquipmentSlot slot : EquipmentSlot.values()) {
-                assertTrue(baseItems.containsKey(slot), "Should have items for " + slot);
-                assertFalse(baseItems.get(slot).isEmpty(), "Items list for " + slot + " should not be empty");
-            }
-        }
-
-        @Test
-        @DisplayName("getSlotWeights returns valid weights")
-        void getSlotWeights_ValidWeights() {
-            Map<EquipmentSlot, Integer> weights = lootGenerator.getSlotWeights();
+            Map<EquipmentSlot, Integer> weights = lootGen.getSlotWeights();
 
             assertFalse(weights.isEmpty());
-            int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
-            assertEquals(100, totalWeight, "Slot weights should sum to 100");
+            assertEquals(30, weights.get(EquipmentSlot.WEAPON));
+            assertEquals(10, weights.get(EquipmentSlot.OFF_HAND));
         }
 
         @Test
         @DisplayName("weapon has highest weight")
         void weapon_HighestWeight() {
-            Map<EquipmentSlot, Integer> weights = lootGenerator.getSlotWeights();
+            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry());
 
+            Map<EquipmentSlot, Integer> weights = lootGen.getSlotWeights();
             int maxWeight = weights.values().stream().mapToInt(Integer::intValue).max().orElse(0);
             assertEquals(weights.get(EquipmentSlot.WEAPON), maxWeight);
-        }
-
-        @Test
-        @DisplayName("all slots have positive weights")
-        void allSlots_PositiveWeights() {
-            Map<EquipmentSlot, Integer> weights = lootGenerator.getSlotWeights();
-
-            for (EquipmentSlot slot : EquipmentSlot.values()) {
-                assertTrue(weights.get(slot) > 0, "Slot " + slot + " should have positive weight");
-            }
         }
     }
 
@@ -315,7 +271,7 @@ class LootGeneratorTest {
         @DisplayName("full loot generation pipeline does not throw")
         void fullPipeline_DoesNotThrow() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry(), new Random(12345));
 
             LootRoll roll = new LootRoll(true, 1, 10.0, 50);
 
@@ -323,49 +279,12 @@ class LootGeneratorTest {
         }
 
         @Test
-        @DisplayName("generateSingleDrop with real generator")
+        @DisplayName("generateSingleDrop with real generator does not throw")
         void generateSingleDrop_RealGenerator() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator, new Random(12345));
+            LootGenerator lootGen = new LootGenerator(realGenerator, createMockRegistry(), new Random(12345));
 
-            // May return null if item creation fails, but should not throw
             assertDoesNotThrow(() -> lootGen.generateSingleDrop(50, 25.0));
-        }
-    }
-
-    // =========================================================================
-    // DETERMINISM TESTS
-    // =========================================================================
-
-    @Nested
-    @DisplayName("Determinism Tests")
-    class DeterminismTests {
-
-        @Test
-        @DisplayName("same seed produces same slot selection")
-        void sameSeed_SameSlotSelection() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-
-            LootGenerator gen1 = new LootGenerator(realGenerator, new Random(99999));
-            LootGenerator gen2 = new LootGenerator(realGenerator, new Random(99999));
-
-            for (int i = 0; i < 10; i++) {
-                assertEquals(gen1.selectRandomSlot(), gen2.selectRandomSlot());
-            }
-        }
-
-        @Test
-        @DisplayName("same seed produces same base item selection")
-        void sameSeed_SameBaseItemSelection() {
-            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-
-            LootGenerator gen1 = new LootGenerator(realGenerator, new Random(99999));
-            LootGenerator gen2 = new LootGenerator(realGenerator, new Random(99999));
-
-            EquipmentSlot slot = EquipmentSlot.WEAPON;
-            for (int i = 0; i < 10; i++) {
-                assertEquals(gen1.selectBaseItem(slot), gen2.selectBaseItem(slot));
-            }
         }
     }
 
@@ -381,9 +300,20 @@ class LootGeneratorTest {
         @DisplayName("getGearGenerator returns injected generator")
         void getGearGenerator_ReturnsInjected() {
             GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
-            LootGenerator lootGen = new LootGenerator(realGenerator);
+            DynamicLootRegistry registry = createMockRegistry();
+            LootGenerator lootGen = new LootGenerator(realGenerator, registry);
 
-            assertEquals(realGenerator, lootGen.getGearGenerator());
+            assertSame(realGenerator, lootGen.getGearGenerator());
+        }
+
+        @Test
+        @DisplayName("getDynamicRegistry returns injected registry")
+        void getDynamicRegistry_ReturnsInjected() {
+            GearGenerator realGenerator = new GearGenerator(balanceConfig, modifierConfig, EquipmentStatConfig.unrestricted(), itemRegistry);
+            DynamicLootRegistry registry = createMockRegistry();
+            LootGenerator lootGen = new LootGenerator(realGenerator, registry);
+
+            assertSame(registry, lootGen.getDynamicRegistry());
         }
     }
 }

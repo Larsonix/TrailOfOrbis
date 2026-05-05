@@ -8,12 +8,15 @@ import com.hypixel.hytale.server.core.inventory.InventoryChangeEvent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncManager;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.database.repository.PlayerDataRepository;
+import io.github.larsonix.trailoforbis.gear.GearManager;
+import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 import io.github.larsonix.trailoforbis.systems.StatsApplicationSystem;
 
 import java.util.Optional;
@@ -93,6 +96,21 @@ public class EquipmentChangeListener {
         if (PlayerJoinListener.isJoining(uuid)) {
             LOGGER.at(Level.FINE).log("Skipping equipment change for %s — join in progress", uuid);
             return;
+        }
+
+        // Also skip if player is mid-world-transition (suppressed). Entity-add in the
+        // new world fires InventoryChangeEvent before isJoining() is set (that happens
+        // on the 2nd ClientReady, ~1s later). Without this check, recalculateStats()
+        // fires the ECS callback → EntityStatMap modifications → EntityStatUpdate packets
+        // sent to client during JoinWorld processing → NullReferenceException.
+        // The deferred stat application in onPlayerReady will handle this correctly.
+        GearManager gearManager = TrailOfOrbis.getInstance().getGearManager();
+        if (gearManager != null) {
+            ItemSyncCoordinator coordinator = gearManager.getSyncCoordinator();
+            if (coordinator != null && coordinator.isPlayerSuppressed(uuid)) {
+                LOGGER.at(Level.FINE).log("Skipping equipment change for %s — world transition suppressed", uuid);
+                return;
+            }
         }
 
         LOGGER.at(Level.FINE).log("Equipment change detected for player %s", uuid);

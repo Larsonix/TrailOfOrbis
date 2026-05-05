@@ -65,7 +65,7 @@ public class MobXpEstimator {
     /**
      * Estimates XP from killing one same-level HOSTILE mob at the given level.
      *
-     * <p>Mirrors MobStatGenerator.generate() → MobStatsXpCalculator.calculateMobKillXp():
+     * <p>Mirrors MobStatFactory pool math → MobStatsXpCalculator.calculateMobKillXp():
      * <pre>
      * scalingFactor = progressive scaling ramp (minFactor→1.0 over softCapLevel)
      * effectiveLevel = (LevelScaling.getMultiplier(level) - 1.0) * transitionLevel + 1.0
@@ -85,7 +85,7 @@ public class MobXpEstimator {
         // Mirror MobStatPoolConfig.calculateScalingFactor()
         double scalingFactor = calculateScalingFactor(level);
 
-        // Mirror MobStatGenerator.generate() lines 32-39
+        // Mirror MobStatFactory pool math (same formula)
         double expMultiplier = LevelScaling.getMultiplier(level);
         double effectiveLevel = (expMultiplier - 1.0) * LevelScaling.getTransitionLevel() + 1.0;
         double levelPool = effectiveLevel * pointsPerLevel * scalingFactor;

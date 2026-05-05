@@ -64,6 +64,9 @@ public interface SkillTreeService {
     /** Bypasses free respec limit. */
     void adminReset(@Nonnull UUID playerId);
 
+    /** Resets skill tree to new-player state: origin only, starting points, 0 respecs, default refund points. */
+    void fullReset(@Nonnull UUID playerId, int startingPoints);
+
     /** Bypasses point check and adjacency. */
     boolean adminAllocateNode(@Nonnull UUID playerId, @Nonnull String nodeId);
 
@@ -92,4 +95,11 @@ public interface SkillTreeService {
     void unregisterNodeDeallocatedListener(@Nonnull SkillTreeEvents.NodeDeallocatedListener listener);
 
     void unregisterRespecListener(@Nonnull SkillTreeEvents.RespecListener listener);
+
+    void registerRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener);
+
+    void unregisterRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener);
+
+    /** Fires a refund points changed event. Call after externally modifying refund points. */
+    void notifyRefundPointsChanged(@Nonnull UUID playerId, int newRefundPoints);
 }

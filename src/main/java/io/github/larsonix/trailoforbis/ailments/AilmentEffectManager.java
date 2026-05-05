@@ -177,9 +177,10 @@ public class AilmentEffectManager {
     /**
      * Creates the shock visual effect (custom electric theme).
      *
-     * <p>Visuals: electric yellow tint (#1a1200 bottom, #ffee44 top),
-     * lightning sword particle effect. No screen effect or VFX (shock
-     * doesn't impair vision).
+     * <p>Visuals: electric yellow tint (#1a1200 bottom, #ffee44 top).
+     * No screen effect or VFX (shock doesn't impair vision).
+     * Lightning particle disabled — Weapon/Lightning_Sword/Lightning_Sword
+     * is missing from Hytale's live client.
      */
     private RPGEntityEffect createShockEffect() {
         String effectId = EFFECT_PREFIX + "shock";
@@ -187,8 +188,7 @@ public class AilmentEffectManager {
         RPGApplicationEffects appEffects = RPGApplicationEffects.create()
                 .withTint(
                         RPGApplicationEffects.colorFromHex("#1a1200"),
-                        RPGApplicationEffects.colorFromHex("#ffee44"))
-                .withParticles(RPGApplicationEffects.particle("Weapon/Lightning_Sword/Lightning_Sword"));
+                        RPGApplicationEffects.colorFromHex("#ffee44"));
 
         RPGEntityEffect effect = new RPGEntityEffect(effectId);
         effect.setApplicationEffects(appEffects);

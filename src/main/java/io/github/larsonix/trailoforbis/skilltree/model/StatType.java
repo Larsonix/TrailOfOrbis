@@ -180,6 +180,8 @@ public enum StatType {
         ComputedStats::getEvasion, ComputedStats.Builder::evasion),
     ENERGY_SHIELD("energyShield", "ES", "Energy Shield", false,
         ComputedStats::getEnergyShield, ComputedStats.Builder::energyShield),
+    ENERGY_SHIELD_PERCENT("energyShieldPercent", "ES", "Energy Shield", false,
+        ComputedStats::getEnergyShieldPercent, ComputedStats.Builder::energyShieldPercent),
     KNOCKBACK_RESISTANCE("knockbackResistance", "KB Res", "Knockback Resistance", true,
         ComputedStats::getKnockbackResistance, ComputedStats.Builder::knockbackResistance),
     PARRY_CHANCE("parryChance", "Parry", "Parry Chance", true,
@@ -208,6 +210,14 @@ public enum StatType {
         ComputedStats::getStaminaRegen, ComputedStats.Builder::staminaRegen),
     HEALTH_REGEN_PERCENT("healthRegenPercent", "HP Regen", "Health Regen", false,
         ComputedStats::getHealthRegenPercent, ComputedStats.Builder::healthRegenPercent),
+    MANA_REGEN_PERCENT("manaRegenPercent", "Mana Regen %", "Mana Regen", true,
+        ComputedStats::getManaRegenPercent, ComputedStats.Builder::manaRegenPercent),
+    ENERGY_SHIELD_REGEN("energyShieldRegen", "ES Regen", "Energy Shield Regen", false,
+        ComputedStats::getEnergyShieldRegen, ComputedStats.Builder::energyShieldRegen),
+    ENERGY_SHIELD_REGEN_PERCENT("energyShieldRegenPercent", "ES Regen %", "Energy Shield Regen", true,
+        ComputedStats::getEnergyShieldRegenPercent, ComputedStats.Builder::energyShieldRegenPercent),
+    ENERGY_SHIELD_REGEN_DELAY("energyShieldRegenDelay", "ES Delay", "Energy Shield Regen Delay", false,
+        ComputedStats::getEnergyShieldRegenDelay, ComputedStats.Builder::energyShieldRegenDelay),
 
     // Global Damage
     ALL_DAMAGE_PERCENT("allDamagePercent", "All DMG", "All Damage", false,

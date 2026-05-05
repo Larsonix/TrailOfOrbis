@@ -430,4 +430,4 @@ public class MyPlugin extends JavaPlugin {
 - [ECS Theory Guide](https://hytalemodding.dev/en/docs/guides/ecs/hytale-ecs-theory)
 - [Entity Component System](https://hytalemodding.dev/en/docs/guides/ecs/entity-component-system)
 - [Systems Guide](https://hytalemodding.dev/en/docs/guides/ecs/systems)
-- Codec types: `/home/larsonix/work/Hytale-Decompiled-Full-Game/ (search for codec classes in .index/CLASS_INDEX.txt)`
+- Codec types: `<hytale-decompiled>/ (search for codec classes in .index/CLASS_INDEX.txt)`

@@ -1,5 +1,5 @@
 # Trail of Orbis Main Configuration
-# Version: 1.0.2
+# Version: 1.0.6
 
 # General Settings
 debugMode: false
@@ -70,8 +70,11 @@ attributes:
     # +flat mana per point
     maxMana: 1.5
 
-    # +flat barrier (energy shield) per point
-    energyShield: 2.0
+    # +% max energy shield per point (scales flat ES from gear/tree)
+    energyShieldPercent: 0.5
+
+    # +flat energy shield regen per second per point
+    energyShieldRegen: 0.2
 
     # +mana/s regen per point
     manaRegen: 0.15
@@ -131,12 +134,18 @@ attributes:
     projectileSpeedPercent: 0.3
 
   # Stats granted per point of VOID (Life Devourer)
+  # Identity: Aggressive sustain — offense IS defense. Must heal enough through
+  # damage to survive without armor/evasion/ES. At 50 points vs L50 hostile
+  # doing ~55 DPS, need ~15+ DPS healing = 50pts × 0.3% × ~100 outgoing DPS ≈ 15.
   voidGrants:
-    # +% life steal per point
-    lifeSteal: 0.1
+    # +% life steal per point. With 15% max-HP/s cap (PoE-style), this value
+    # determines how quickly you reach the cap, not the cap itself.
+    # At 50pts: 10% steal. 200HP player → cap at 30HP/s. Reaches cap at ~300 DPS.
+    lifeSteal: 0.2
 
-    # +% of hit dealt as true damage per point
-    percentHitAsTrueDamage: 0.05
+    # +% of hit dealt as true damage per point. Bypasses armor — strong vs tanks.
+    # At 50pts: 5% true damage. On a 200DPS hit → 10 true damage added.
+    percentHitAsTrueDamage: 0.1
 
     # +% damage over time per point
     dotDamagePercent: 0.3
@@ -240,7 +249,7 @@ combat:
     interactionTimeShiftEnabled: true
 
 # Armor System Configuration
-# Uses Path of Exile formula: reduction = armor / (armor + formulaDivisor * damage)
+# Level-scaled formula: reduction = armor / (armor + levelScale * attackerLevel + baseConstant)
 # Total armor = Equipment armor + element bonuses (EARTH)
 armor:
   # Whether to include vanilla equipment armor in total armor calculation
@@ -252,24 +261,18 @@ armor:
   equipmentArmorMultiplier: 1.0
 
   # Maximum damage reduction from armor (0.0 to 1.0)
-  # 0.90 = 90% cap (matches PoE), prevents armor from trivializing damage
+  # 0.90 = 90% cap, prevents armor from trivializing damage
   maxReduction: 0.90
 
-  # Divisor in armor formula: armor / (armor + divisor * damage)
-  # Lower = armor more effective, Higher = armor less effective vs big hits
-  # Default 10.0 matches Path of Exile
-  formulaDivisor: 10.0
+  # Level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant)
+  levelScale: 9.0
+
+  # Base constant in armor formula
+  baseConstant: 50.0
 
   # Minimum armor effectiveness after penetration (0.0 to 1.0)
   # This is a FLOOR - armor penetration cannot reduce effective armor below this fraction.
   # With 0.5 (50% floor), even 100% armor pen only reduces armor to half its value.
-  # This ensures armor investment remains meaningful against high-pen enemies (Ravagers, etc.)
-  #
-  # Examples with 1000 armor and 50% floor:
-  #   0% pen  → 1000 effective armor
-  #   25% pen → 750 effective armor
-  #   50% pen → 500 effective armor (floor reached)
-  #   75% pen → 500 effective armor (capped at floor)
   #
   # Set to 0.0 to disable the floor (allow armor to be fully penetrated)
   # Set to 1.0 to make armor penetration have no effect

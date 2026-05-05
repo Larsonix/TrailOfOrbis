@@ -103,8 +103,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(110f, result.totalDamage(), 0.1f,
                 "FORMULA: 100 base + 10 flat physical = 110");
@@ -121,11 +120,9 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown melee = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
             DamageBreakdown projectile = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.PROJECTILE, false
-            );
+                100f, attacker, null, null, null, AttackType.PROJECTILE, false, 1);
 
             assertEquals(115f, melee.totalDamage(), 0.1f,
                 "FORMULA (MELEE): 100 + 10 physDmg + 5 meleeDmg = 115");
@@ -148,8 +145,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(150f, result.totalDamage(), 0.1f,
                 "FORMULA: 100 × (1 + 50/100) = 150");
@@ -166,8 +162,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             // 100 × (1 + 30/100 + 20/100) = 100 × 1.5 = 150
             assertEquals(150f, result.totalDamage(), 0.1f,
@@ -189,8 +184,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(120f, result.totalDamage(), 0.1f,
                 "FORMULA: 100 × (1 + 20/100) = 120");
@@ -207,8 +201,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             // 100 × 1.2 × 1.1 = 132
             assertEquals(132f, result.totalDamage(), 0.1f,
@@ -229,8 +222,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, true
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, true, 1);
 
             assertEquals(150f, result.totalDamage(), 0.1f,
                 "FORMULA: 100 × (150/100) = 150");
@@ -252,8 +244,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, true
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, true, 1);
 
             assertEquals(247.5f, result.totalDamage(), 0.5f,
                 "FORMULA: (100 + 10) × 1.5 × 1.5 = 247.5");
@@ -274,8 +265,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             assertEquals(50f, result.physicalDamage(), 0.1f,
                 "FORMULA: 100 × (1 - 50/100) = 50 physical");
@@ -296,8 +286,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, false
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, false, 1);
 
             // Scaled to 50% each
             assertEquals(50f, result.getElementalDamage(ElementType.FIRE), 0.5f,
@@ -314,7 +303,7 @@ class DamageFormulaDocTest {
     class DefenseTests {
 
         @Test
-        @DisplayName("Formula: Armor reduction = armor / (armor + rawDmg × 10)")
+        @DisplayName("Formula: Armor reduction = armor / (armor + levelScale × attackerLevel + baseConstant)")
         void formula_ArmorReduction() {
             ComputedStats attacker = ComputedStats.builder()
                 .criticalChance(0f)
@@ -325,13 +314,12 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                10f, attacker, null, defender, null, AttackType.MELEE, false
-            );
+                10f, attacker, null, defender, null, AttackType.MELEE, false, 1);
 
-            // Armor formula: 100 / (100 + 10*10) = 100/200 = 0.5 = 50% reduction
-            // 10 × (1 - 0.5) = 5
-            assertEquals(5f, result.totalDamage(), 0.1f,
-                "FORMULA: armor reduction = 100 / (100 + 10×10) = 50%");
+            // Armor formula: 100 / (100 + 9*1 + 50) = 100/159 = 62.89% reduction
+            // 10 × (1 - 0.6289) = 3.71
+            assertEquals(3.71f, result.totalDamage(), 0.1f,
+                "FORMULA: armor reduction = 100 / (100 + 9×1 + 50) = 62.9%");
         }
 
         @Test
@@ -349,8 +337,7 @@ class DamageFormulaDocTest {
             defenderElem.setResistance(ElementType.FIRE, 75.0); // Max resist
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attacker, attackerElem, defender, defenderElem, AttackType.MELEE, false
-            );
+                0f, attacker, attackerElem, defender, defenderElem, AttackType.MELEE, false, 1);
 
             // 100 fire × (1 - 75/100) = 100 × 0.25 = 25
             assertEquals(25f, result.getElementalDamage(ElementType.FIRE), 0.5f,
@@ -371,8 +358,7 @@ class DamageFormulaDocTest {
                 .build();
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                0f, attacker, null, defender, null, AttackType.MELEE, false
-            );
+                0f, attacker, null, defender, null, AttackType.MELEE, false, 1);
 
             assertEquals(50f, result.trueDamage(), 0.1f,
                 "FORMULA: true damage ignores armor and resistance");
@@ -416,8 +402,7 @@ class DamageFormulaDocTest {
             // Total: 148.5 + 99 + 10 = 257.5
 
             DamageBreakdown result = calculator.calculateWithForcedCrit(
-                100f, attacker, null, null, null, AttackType.MELEE, true
-            );
+                100f, attacker, null, null, null, AttackType.MELEE, true, 1);
 
             assertTrue(result.wasCritical());
             // Allow some tolerance for floating point

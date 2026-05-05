@@ -29,6 +29,7 @@ import io.github.larsonix.trailoforbis.systems.StatsApplicationSystem;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
 import io.github.larsonix.trailoforbis.ui.stats.StatsPage;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import java.util.EnumMap;
@@ -422,8 +423,8 @@ public class AttributePage {
             container.withAnchor(new HyUIAnchor().setWidth(CONTAINER_WIDTH).setHeight(height));
         });
 
-        // Rebuild page
-        ctx.updatePage(true);
+        // Rebuild page (guard against dismissed page — event can arrive after ESC)
+        ctx.getPage().ifPresent(page -> ctx.updatePage(true));
     }
 
     private int getTotalPendingPoints() {
@@ -640,39 +641,58 @@ public class AttributePage {
         return switch (type) {
             case FIRE -> {
                 var g = attrs.getFireGrants();
-                yield String.format("+%.1f%% Phys | +%.1f%% Charged Atk | +%.1f%% Crit Mult | +%.1f%% Burn | +%.1f%% Ignite",
-                    g.getPhysicalDamagePercent(), g.getChargedAttackDamagePercent(), g.getCriticalMultiplier(),
-                    g.getBurnDamagePercent(), g.getIgniteChance());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getPhysicalDamagePercent()) + "% Phys Dmg",
+                    "+" + NumberFormatter.trimmed(g.getChargedAttackDamagePercent()) + "% Charged Atk",
+                    "+" + NumberFormatter.trimmed(g.getCriticalMultiplier()) + "% Crit Mult",
+                    "+" + NumberFormatter.trimmed(g.getBurnDamagePercent()) + "% Burn",
+                    "+" + NumberFormatter.trimmed(g.getIgniteChance()) + "% Ignite");
             }
             case WATER -> {
                 var g = attrs.getWaterGrants();
-                yield String.format("+%.1f%% Spell | +%.1f Mana | +%.0f Barrier | +%.2f Mana/s | +%.1f%% Freeze",
-                    g.getSpellDamagePercent(), g.getMaxMana(), g.getEnergyShield(),
-                    g.getManaRegen(), g.getFreezeChance());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getSpellDamagePercent()) + "% Spell Dmg",
+                    "+" + NumberFormatter.trimmed(g.getMaxMana()) + " Mana",
+                    "+" + NumberFormatter.trimmed(g.getEnergyShieldPercent()) + "% ES",
+                    "+" + NumberFormatter.trimmed(g.getEnergyShieldRegen()) + " ES/s",
+                    "+" + NumberFormatter.trimmed(g.getManaRegen()) + " Mana/s",
+                    "+" + NumberFormatter.trimmed(g.getFreezeChance()) + "% Freeze");
             }
             case LIGHTNING -> {
                 var g = attrs.getLightningGrants();
-                yield String.format("+%.1f%% Atk Speed | +%.2f%% Move | +%.1f%% Crit | +%.1f Stam/s | +%.1f%% Shock",
-                    g.getAttackSpeedPercent(), g.getMoveSpeedPercent(), g.getCritChance(),
-                    g.getStaminaRegen(), g.getShockChance());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getAttackSpeedPercent()) + "% Atk Speed",
+                    "+" + NumberFormatter.trimmed(g.getMoveSpeedPercent()) + "% Move",
+                    "+" + NumberFormatter.trimmed(g.getCritChance()) + "% Crit Chance",
+                    "+" + NumberFormatter.trimmed(g.getStaminaRegen()) + " Stam/s",
+                    "+" + NumberFormatter.trimmed(g.getShockChance()) + "% Shock");
             }
             case EARTH -> {
                 var g = attrs.getEarthGrants();
-                yield String.format("+%.1f%% Max HP | +%.0f Armor | +%.1f HP/s | +%.1f%% Block | +%.1f%% KB Resist",
-                    g.getMaxHealthPercent(), g.getArmor(), g.getHealthRegen(),
-                    g.getBlockChance(), g.getKnockbackResistance());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getMaxHealthPercent()) + "% Max HP",
+                    "+" + NumberFormatter.trimmed(g.getArmor()) + " Armor",
+                    "+" + NumberFormatter.trimmed(g.getHealthRegen()) + " HP/s",
+                    "+" + NumberFormatter.trimmed(g.getBlockChance()) + "% Block",
+                    "+" + NumberFormatter.trimmed(g.getKnockbackResistance()) + "% KB Resist");
             }
             case WIND -> {
                 var g = attrs.getWindGrants();
-                yield String.format("+%.0f Eva | +%.0f Acc | +%.1f%% Proj Dmg | +%.2f%% Jump | +%.1f%% Proj Speed",
-                    g.getEvasion(), g.getAccuracy(), g.getProjectileDamagePercent(),
-                    g.getJumpForcePercent(), g.getProjectileSpeedPercent());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getEvasion()) + " Eva",
+                    "+" + NumberFormatter.trimmed(g.getAccuracy()) + " Acc",
+                    "+" + NumberFormatter.trimmed(g.getProjectileDamagePercent()) + "% Proj Dmg",
+                    "+" + NumberFormatter.trimmed(g.getJumpForcePercent()) + "% Jump",
+                    "+" + NumberFormatter.trimmed(g.getProjectileSpeedPercent()) + "% Proj Speed");
             }
             case VOID -> {
                 var g = attrs.getVoidGrants();
-                yield String.format("+%.1f%% Life Steal | +%.2f%% True Dmg | +%.1f%% DoT | +%.1f Mana/Kill | +%.1f%% Duration",
-                    g.getLifeSteal(), g.getPercentHitAsTrueDamage(), g.getDotDamagePercent(),
-                    g.getManaOnKill(), g.getStatusEffectDuration());
+                yield String.join(" | ",
+                    "+" + NumberFormatter.trimmed(g.getLifeSteal()) + "% Life Steal",
+                    "+" + NumberFormatter.trimmed(g.getPercentHitAsTrueDamage()) + "% True Dmg",
+                    "+" + NumberFormatter.trimmed(g.getDotDamagePercent()) + "% DoT",
+                    "+" + NumberFormatter.trimmed(g.getManaOnKill()) + " Mana/Kill",
+                    "+" + NumberFormatter.trimmed(g.getStatusEffectDuration()) + "% Duration");
             }
         };
     }

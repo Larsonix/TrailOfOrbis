@@ -1,6 +1,9 @@
 package io.github.larsonix.trailoforbis.gear.model;
 
+import io.github.larsonix.trailoforbis.elemental.ElementType;
+
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Objects;
 import java.util.Random;
 
@@ -125,6 +128,24 @@ public record WeaponImplicit(
         return new WeaponImplicit(newDamageType, minValue, maxValue, rolledValue);
     }
 
+    /**
+     * Creates a new WeaponImplicit with a different range but the same roll percentile.
+     *
+     * <p>Used when an item's level changes (e.g., Threshold Stone): the range shifts
+     * to match the new level, but the quality of the original roll is preserved.
+     * A 90th-percentile roll stays at the 90th percentile of the new range.
+     *
+     * @param newMin The new minimum value
+     * @param newMax The new maximum value
+     * @return A new WeaponImplicit at the same percentile within the new range
+     */
+    @Nonnull
+    public WeaponImplicit withPreservedPercentile(double newMin, double newMax) {
+        double percentile = rollPercentile();
+        double newValue = (newMax == newMin) ? newMin : newMin + percentile * (newMax - newMin);
+        return new WeaponImplicit(damageType, newMin, newMax, newValue);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // QUERY METHODS
     // ═══════════════════════════════════════════════════════════════════
@@ -188,6 +209,46 @@ public record WeaponImplicit(
      */
     public boolean isSpellDamage() {
         return "spell_damage".equals(damageType);
+    }
+
+    /**
+     * Gets the element type for this implicit, if it represents elemental damage.
+     *
+     * <p>Parses the damageType string to determine the element:
+     * <ul>
+     *   <li>"fire_damage" → FIRE</li>
+     *   <li>"water_damage" → WATER</li>
+     *   <li>"lightning_damage" → LIGHTNING</li>
+     *   <li>"earth_damage" → EARTH</li>
+     *   <li>"wind_damage" → WIND</li>
+     *   <li>"void_damage" → VOID</li>
+     *   <li>"physical_damage" → null (not elemental)</li>
+     *   <li>"spell_damage" → null (legacy, element resolved from player attributes)</li>
+     *   <li>"mana_regen" → null (not damage)</li>
+     * </ul>
+     *
+     * @return The element type, or null if this implicit is not element-specific
+     */
+    @Nullable
+    public ElementType getSpellElement() {
+        return switch (damageType) {
+            case "fire_damage" -> ElementType.FIRE;
+            case "water_damage" -> ElementType.WATER;
+            case "lightning_damage" -> ElementType.LIGHTNING;
+            case "earth_damage" -> ElementType.EARTH;
+            case "wind_damage" -> ElementType.WIND;
+            case "void_damage" -> ElementType.VOID;
+            default -> null;
+        };
+    }
+
+    /**
+     * Checks if this implicit has a fixed element (element-specific damage type).
+     *
+     * @return true if damageType maps to a specific element
+     */
+    public boolean hasFixedElement() {
+        return getSpellElement() != null;
     }
 
     /**

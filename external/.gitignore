@@ -1,0 +1,7 @@
+# Source code clones — pulled by update-externals.sh, not committed to our repo.
+# Browse locally, always re-pullable from the repo URLs in META.md.
+**/repo/
+**/repos/
+
+# API doc snapshots (can be large, re-fetchable)
+**/api-docs/

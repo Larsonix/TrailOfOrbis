@@ -7,8 +7,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.InventoryChangeEvent;
 import com.hypixel.hytale.math.vector.Transform;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
@@ -20,6 +18,8 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.sanctum.interactions.SkillNodeInteraction;
+import io.github.larsonix.trailoforbis.api.ServiceRegistry;
+import io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -114,6 +114,11 @@ public class SkillSanctumManager {
      */
     private boolean enabled;
 
+    /** Lazy-resolved sync coordinator for post-flush callbacks. */
+    @Nullable
+    private io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator cachedSyncCoordinator;
+    private boolean syncCoordinatorResolved = false;
+
     /**
      * Skill tree event listeners for forwarding to sanctum instances.
      */
@@ -173,8 +178,8 @@ public class SkillSanctumManager {
         // Register skill tree event listeners for real-time sanctum updates
         registerSkillTreeEventListeners();
 
-        // Register inventory change listener for visual refresh in sanctum
-        registerInventoryChangeListener();
+        // Sanctum visual refresh: suppression-based approach in ItemSyncCoordinator
+        // (no inventory change listener needed — flushes are prevented, not reactively recovered)
 
         // Register skill point HUD event listeners for instant refresh on allocation/respec
         skillPointHudManager.registerEventListeners();
@@ -284,46 +289,9 @@ public class SkillSanctumManager {
         LOGGER.atInfo().log("Registered skill tree event listeners for sanctum updates");
     }
 
-    /**
-     * Registers a listener for inventory changes to schedule visual refreshes.
-     *
-     * <p>When a player moves modded RPG gear in their inventory, {@code ItemSyncService.syncAllItems()}
-     * sends UpdateItems packets that cause the Hytale client to reset visual components
-     * (scale, light, item model) on nearby entities — including sanctum node orbs.
-     *
-     * <p>This listener detects inventory changes for players in active sanctums and
-     * schedules a deferred visual resync (~400ms) that re-sends the correct component
-     * values after the UpdateItems packet has already been processed by the client.
-     */
-    private void registerInventoryChangeListener() {
-        // Note: The actual registration happens in TrailOfOrbis via InventoryChangeEventSystem.
-        // The handler is registered as: system.addHandler(sanctumManager::onInventoryChange)
-        LOGGER.atInfo().log("Registered inventory change listener for sanctum visual refresh");
-    }
-
-    /**
-     * Handles inventory change events for sanctum visual refresh.
-     *
-     * <p>When a player moves modded RPG gear, UpdateItems packets reset visual
-     * components on nearby entities (including sanctum node orbs). This handler
-     * schedules a deferred visual resync after the packet is processed.
-     *
-     * @param player The player whose inventory changed
-     * @param event  The inventory change event
-     */
-    public void onInventoryChange(@Nonnull Player player, @Nonnull InventoryChangeEvent event) {
-        Ref<EntityStore> ref = player.getReference();
-        if (ref == null || !ref.isValid()) return;
-        Store<EntityStore> store = ref.getStore();
-        PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-        if (playerRef == null) return;
-
-        UUID uuid = playerRef.getUuid();
-        SkillSanctumInstance instance = activeInstances.get(uuid);
-        if (instance != null && instance.isActive()) {
-            instance.scheduleVisualRefresh();
-        }
-    }
+    // Inventory change listener for visual refresh REMOVED.
+    // Replaced by sanctum suppression in ItemSyncCoordinator — preventing flushes
+    // is cleaner than reactively recovering after each one.
 
     /**
      * Ticks all active sanctum instances for node spawning and connection block placement.
@@ -421,9 +389,11 @@ public class SkillSanctumManager {
                     catch (Exception e) { LOGGER.atWarning().withCause(e).log("tickComponentResync failed for %s", instance.getPlayerId()); }
                 }
 
-                // Check for deferred visual refresh (inventory change correction)
-                try { instance.tickVisualRefresh(); }
-                catch (Exception e) { LOGGER.atWarning().withCause(e).log("tickVisualRefresh failed for %s", instance.getPlayerId()); }
+                // Periodic visual keep-alive: re-assert correct scale/item/light on node entities.
+                // Hytale's engine resets client-side item entity visuals during certain player actions
+                // (hotbar scroll, combat). This periodic resync heals any corruption within 500ms.
+                try { instance.tickVisualKeepAlive(); }
+                catch (Exception e) { LOGGER.atWarning().withCause(e).log("tickVisualKeepAlive failed for %s", instance.getPlayerId()); }
             });
         }
     }
@@ -545,6 +515,19 @@ public class SkillSanctumManager {
         }
     }
 
+    @Nullable
+    private io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator resolveSyncCoordinator() {
+        if (!syncCoordinatorResolved) {
+            syncCoordinatorResolved = true;
+            ServiceRegistry.get(io.github.larsonix.trailoforbis.gear.GearService.class).ifPresent(svc -> {
+                if (svc instanceof io.github.larsonix.trailoforbis.gear.GearManager mgr) {
+                    cachedSyncCoordinator = mgr.getSyncCoordinator();
+                }
+            });
+        }
+        return cachedSyncCoordinator;
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // PUBLIC API
     // ═══════════════════════════════════════════════════════════════════
@@ -648,6 +631,17 @@ public class SkillSanctumManager {
                     .thenApply(success -> {
                         if (success) {
                             activeInstances.put(playerId, instance);
+
+                            // Suppress UpdateItems flushes while in the sanctum.
+                            // UpdateItems packets corrupt node entity visuals on the client.
+                            // Dirty marks accumulate; one flush on exit catches up tooltips.
+                            var coordinator = resolveSyncCoordinator();
+                            if (coordinator != null) {
+                                coordinator.suppressForSanctum(playerId);
+                            }
+
+                            ServiceRegistry.get(PartyIntegrationManager.class)
+                                .ifPresent(party -> party.updateHudSanctum(playerId));
                             LOGGER.atInfo().log("Sanctum ready for %s, teleporting player", playerId);
                             return instance.teleportPlayerToSpawn(playerRef);
                         } else {
@@ -696,6 +690,12 @@ public class SkillSanctumManager {
         }
 
         try {
+            // Unsuppress flushes — one catch-up flush fires for tooltip updates
+            var coordinator = resolveSyncCoordinator();
+            if (coordinator != null) {
+                coordinator.unsuppressFromSanctum(playerId);
+            }
+
             // Remove any active skill node detail HUD for this player
             skillNodeHudManager.removeHud(playerId);
 
@@ -707,6 +707,10 @@ public class SkillSanctumManager {
                 if (playerRef != null && playerRef.isValid()) {
                     // Restore player's original flight state before exiting
                     instance.restoreFlightForPlayer(playerRef);
+
+                    // Update party HUD location back to overworld
+                    ServiceRegistry.get(PartyIntegrationManager.class)
+                        .ifPresent(party -> party.updateHudOverworld(playerId));
 
                     // Exit player from the instance (teleports back to return point)
                     instance.exitPlayer(playerRef);

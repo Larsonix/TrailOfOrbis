@@ -29,7 +29,7 @@ import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
-import io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator;
+
 import io.github.larsonix.trailoforbis.mobs.calculator.PlayerLevelCalculator;
 import io.github.larsonix.trailoforbis.mobs.classification.MobClassificationConfig;
 import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
@@ -38,8 +38,7 @@ import io.github.larsonix.trailoforbis.mobs.infobar.MobInfoFormatter;
 import io.github.larsonix.trailoforbis.mobs.model.MobStats;
 import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import io.github.larsonix.trailoforbis.mobs.speed.MobSpeedEffectManager;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatProfile;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
 
 import javax.annotation.Nonnull;
@@ -137,10 +136,9 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
         }
 
         PlayerLevelCalculator levelCalculator = manager.getPlayerLevelCalculator();
-        DistanceBonusCalculator distanceCalculator = manager.getDistanceCalculator();
-        MobStatGenerator statGenerator = manager.getStatGenerator();
+        MobStatFactory statFactory = manager.getStatFactory();
 
-        if (levelCalculator == null || distanceCalculator == null || statGenerator == null) {
+        if (levelCalculator == null || statFactory == null) {
             return;
         }
 
@@ -154,8 +152,8 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
             if (MAX_REFRESHES_PER_TICK > 0 && refreshesThisTick >= MAX_REFRESHES_PER_TICK) {
                 return;
             }
-            processChunk(chunk, store, manager, levelCalculator, distanceCalculator,
-                        statGenerator, refreshConfig, stats);
+            processChunk(chunk, store, manager, levelCalculator,
+                        statFactory, refreshConfig, stats);
         });
 
         if (plugin.getConfigManager().getRPGConfig().isDebugMode() && (stats[1] > 0 || stats[2] > 0)) {
@@ -169,8 +167,7 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
         @Nonnull Store<EntityStore> store,
         @Nonnull MobScalingManager manager,
         @Nonnull PlayerLevelCalculator levelCalculator,
-        @Nonnull DistanceBonusCalculator distanceCalculator,
-        @Nonnull MobStatGenerator statGenerator,
+        @Nonnull MobStatFactory statFactory,
         @Nonnull MobScalingConfig.DynamicRefreshConfig refreshConfig,
         @Nonnull int[] stats
     ) {
@@ -251,24 +248,26 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
                 return; // Exit chunk processing early
             }
 
-            // Calculate distance from spawn (not origin) for correct level scaling
-            World world = store.getExternalData().getWorld();
-            double distanceFromSpawn = DistanceBonusCalculator.calculateDistanceFromSpawn(
-                mobPosition.x, mobPosition.z, world);
-            double newBonusPool = distanceCalculator.calculateBonusPool(distanceFromSpawn);
+            // Calculate bonus pool from level (same formula as realm mobs)
+            double newBonusPool = newLevel * manager.getConfig().getDistanceScaling().getPoolPerLevel();
 
             // Apply classification stat multiplier (same as MobScalingSystem at spawn)
             MobClassificationConfig classConfig = manager.getClassificationService().getConfig();
             double statMultiplier = classConfig.getStatMultiplier(classification);
 
             long seed = System.nanoTime() ^ mobRef.hashCode();
-            MobStatProfile profile;
+            String roleName = scaling.getRoleName();
+            // Extract NPC groups from DynamicEntityRegistry for faction/animal detection
+            var registry = manager.getDynamicEntityRegistry();
+            var discovered = (registry != null && roleName != null) ? registry.getDiscoveredRole(roleName) : null;
+            var npcGroups = discovered != null ? discovered.memberGroups() : java.util.Set.<String>of();
+            var elementResolver = manager.getElementResolver();
+            var detectedElement = elementResolver != null ? elementResolver.resolve(roleName, npcGroups) : null;
+
+            MobStats newStats = statFactory.generate(newLevel, newBonusPool, roleName, npcGroups, detectedElement, seed);
             if (statMultiplier != 1.0) {
-                profile = statGenerator.generateSpecial(newLevel, newBonusPool, statMultiplier, seed);
-            } else {
-                profile = statGenerator.generate(newLevel, newBonusPool, seed);
+                newStats = newStats.withMultiplier(statMultiplier);
             }
-            MobStats newStats = convertToLegacyStats(profile);
 
             scaling.setMobLevel(newLevel);
             scaling.setPlayerLevelUsed(newLevel);
@@ -480,54 +479,7 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
         motionController.setKnockbackScale(effectiveKnockbackScale);
     }
 
-    @Nonnull
-    private MobStats convertToLegacyStats(@Nonnull MobStatProfile profile) {
-        // Create ElementalStats with all elemental modifiers from profile
-        ElementalStats elementalStats = new ElementalStats();
-        elementalStats.setFlatDamage(ElementType.FIRE, profile.fireDamage());
-        elementalStats.setFlatDamage(ElementType.WATER, profile.waterDamage());
-        elementalStats.setFlatDamage(ElementType.LIGHTNING, profile.lightningDamage());
-        elementalStats.setFlatDamage(ElementType.VOID, profile.voidDamage());
-        elementalStats.setResistance(ElementType.FIRE, profile.fireResistance());
-        elementalStats.setResistance(ElementType.WATER, profile.waterResistance());
-        elementalStats.setResistance(ElementType.LIGHTNING, profile.lightningResistance());
-        elementalStats.setResistance(ElementType.VOID, profile.voidResistance());
-        elementalStats.setPenetration(ElementType.FIRE, profile.firePenetration());
-        elementalStats.setPenetration(ElementType.WATER, profile.waterPenetration());
-        elementalStats.setPenetration(ElementType.LIGHTNING, profile.lightningPenetration());
-        elementalStats.setPenetration(ElementType.VOID, profile.voidPenetration());
-        // Increased damage (additive %)
-        elementalStats.setPercentDamage(ElementType.FIRE, profile.fireIncreasedDamage());
-        elementalStats.setPercentDamage(ElementType.WATER, profile.waterIncreasedDamage());
-        elementalStats.setPercentDamage(ElementType.LIGHTNING, profile.lightningIncreasedDamage());
-        elementalStats.setPercentDamage(ElementType.VOID, profile.voidIncreasedDamage());
-        // More damage (multiplicative %)
-        elementalStats.setMultiplierDamage(ElementType.FIRE, profile.fireMoreDamage());
-        elementalStats.setMultiplierDamage(ElementType.WATER, profile.waterMoreDamage());
-        elementalStats.setMultiplierDamage(ElementType.LIGHTNING, profile.lightningMoreDamage());
-        elementalStats.setMultiplierDamage(ElementType.VOID, profile.voidMoreDamage());
-
-        return new MobStats(
-            profile.mobLevel(),
-            profile.totalPool(),
-            profile.maxHealth(),
-            profile.physicalDamage(),
-            profile.armor(),
-            profile.moveSpeed(),
-            profile.criticalChance(),
-            profile.criticalMultiplier(),
-            profile.dodgeChance(),
-            profile.lifeSteal(),
-            profile.armorPenetration(),
-            profile.healthRegen(),
-            profile.blockChance(),
-            profile.parryChance(),
-            profile.trueDamage(),
-            profile.accuracy(),
-            profile.knockbackResistance(),
-            elementalStats
-        );
-    }
+    // convertToLegacyStats() removed — MobStatFactory produces MobStats directly
 
     private static double distanceSquared(@Nonnull Vector3d a, @Nonnull Vector3d b) {
         double dx = a.x - b.x;

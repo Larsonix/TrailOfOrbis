@@ -7,12 +7,9 @@ import javax.annotation.Nonnull;
 /**
  * Defines the complete visual appearance of a combat text instance.
  *
- * <p>Each profile corresponds to one registered {@code EntityUIComponent} template
- * at a unique client-side index. Profiles are built from YAML config at startup
- * and are immutable.
- *
- * <p>Examples: {@code "fire_normal"} (orange, standard size), {@code "lightning_crit"}
- * (bright yellow, larger), {@code "dodged"} (gray, smaller, slow fade).
+ * <p>Profiles are built from YAML config at startup and are immutable.
+ * Used to build on-demand {@code EntityUIComponent} packets that override
+ * the vanilla CombatText template at its original index.
  *
  * @param id Unique identifier (e.g., "fire_normal", "lightning_crit", "dodged")
  * @param color RGB color for the text
@@ -20,7 +17,6 @@ import javax.annotation.Nonnull;
  * @param duration How long the text is visible in seconds (vanilla default: 0.4)
  * @param hitAngleModifierStrength How much the hit angle affects position (0.0–10.0)
  * @param animations Animation keyframes (scale, position, opacity)
- * @param templateIndex The client-side EntityUI template index (assigned by registry)
  */
 public record CombatTextProfile(
     @Nonnull String id,
@@ -28,19 +24,14 @@ public record CombatTextProfile(
     float fontSize,
     float duration,
     float hitAngleModifierStrength,
-    @Nonnull CombatTextAnimation[] animations,
-    int templateIndex
+    @Nonnull CombatTextAnimation[] animations
 ) {
 
-    /** Sentinel value indicating the template index has not been assigned yet. */
-    public static final int UNASSIGNED_INDEX = -1;
-
     /**
-     * Creates a profile with an unassigned template index.
-     * The index is set later by {@code CombatTextTemplateRegistry} during registration.
+     * Creates a profile.
      */
     @Nonnull
-    public static CombatTextProfile unregistered(
+    public static CombatTextProfile of(
         @Nonnull String id,
         @Nonnull Color color,
         float fontSize,
@@ -48,18 +39,6 @@ public record CombatTextProfile(
         float hitAngleModifierStrength,
         @Nonnull CombatTextAnimation[] animations
     ) {
-        return new CombatTextProfile(id, color, fontSize, duration, hitAngleModifierStrength, animations, UNASSIGNED_INDEX);
-    }
-
-    /**
-     * Creates a copy with the given template index.
-     */
-    @Nonnull
-    public CombatTextProfile withTemplateIndex(int templateIndex) {
-        return new CombatTextProfile(id, color, fontSize, duration, hitAngleModifierStrength, animations, templateIndex);
-    }
-
-    public boolean isRegistered() {
-        return templateIndex != UNASSIGNED_INDEX;
+        return new CombatTextProfile(id, color, fontSize, duration, hitAngleModifierStrength, animations);
     }
 }

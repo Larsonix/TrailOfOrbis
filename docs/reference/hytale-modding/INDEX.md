@@ -146,11 +146,6 @@ The decompiled Hytale server source and community reference implementations have
 | Define projectile configs | [json-schemas.md §Projectiles](json-schemas.md) |
 | Patch existing assets (mod-compatible) | [json-schemas.md §Patch System](json-schemas.md) |
 
-### Find Working Examples
-| Task | Go To |
-|------|-------|
-| Which mod does what I need? | [mod-examples.md](mod-examples.md) |
-
 ---
 
 ## Reference Files
@@ -166,7 +161,6 @@ The decompiled Hytale server source and community reference implementations have
 | [npcs.md](npcs.md) | NPC spawning, AI actions, mounts, animations | ~400 |
 | [infrastructure.md](infrastructure.md) | Events, commands, packets, sound, camera, codecs, assets | ~600 |
 | [json-schemas.md](json-schemas.md) | All JSON asset format schemas | ~600 |
-| [mod-examples.md](mod-examples.md) | Mod → pattern cross-reference | ~400 |
 
 ## Source Material
 

@@ -166,9 +166,7 @@ public class SkillSanctumNodeSpawner {
 
     /**
      * Item used for subtitle entities — a custom essence with all visuals suppressed.
-     * The client needs an ItemComponent to create a visual entity that
-     * the nameplate text can anchor to. The Light0 variant has Light: null,
-     * ShowItemParticles: false, and ParticleSystemId: null — no beam, no glow.
+     * The Light0 variant has Light: null, ShowItemParticles: false, ParticleSystemId: null.
      */
     private static final String SUBTITLE_ITEM_ID = "Ingredient_Fire_Essence_Light0";
 
@@ -632,9 +630,16 @@ public class SkillSanctumNodeSpawner {
      * Spawns a subtitle entity above a main node entity.
      *
      * <p>Uses a tiny item ({@value #SUBTITLE_ITEM_ID} at {@value #SUBTITLE_ENTITY_SCALE}
-     * scale) as a visual anchor — the client requires an ItemComponent to create a render object
-     * that the Nameplate text attaches to. The Light0 essence variant has ShowItemParticles: false
-     * (no rarity beam), Light: null (no glow), and ParticleSystemId: null.
+     * scale) as a visual anchor — the client requires an ItemComponent to create a tracked
+     * entity that the Nameplate text can attach to.
+     *
+     * <p>The entity is spawned with <b>empty Nameplate text</b>. The actual text is populated
+     * later by {@code tickNameplateVisibility()}, guaranteeing that the Item+Scale
+     * {@link com.hypixel.hytale.protocol.ComponentUpdate} has been sent to the client
+     * before the Nameplate update arrives. This eliminates the race condition between
+     * {@code ItemSystems.TrackerSystem} and {@code NameplateSystems.EntityTrackerUpdate}
+     * (both in {@code QUEUE_UPDATE_GROUP} with non-deterministic execution order) that
+     * caused ~30% of nameplates to be vertically mispositioned.
      *
      * @param store        The entity store
      * @param node         The skill node
@@ -659,7 +664,8 @@ public class SkillSanctumNodeSpawner {
         try {
             Holder<EntityStore> holder = store.getRegistry().newHolder();
 
-            // Tiny item entity — gives the client a visual to anchor the nameplate to
+            // Tiny item entity — gives the client a tracked entity for the Nameplate to attach to.
+            // The Light0 essence variant has ShowItemParticles: false, Light: null, ParticleSystemId: null.
             ItemStack itemStack = new ItemStack(SUBTITLE_ITEM_ID, 1);
             if (!itemStack.isValid()) {
                 LOGGER.atWarning().log("Invalid subtitle item %s for node %s", SUBTITLE_ITEM_ID, node.getId());
@@ -688,8 +694,10 @@ public class SkillSanctumNodeSpawner {
             holder.addComponent(NetworkId.getComponentType(),
                 new NetworkId(store.getExternalData().takeNextNetworkId()));
 
-            // The nameplate text itself
-            holder.addComponent(Nameplate.getComponentType(), new Nameplate(subtitleText));
+            // Empty Nameplate — text populated later by tickNameplateVisibility().
+            // This guarantees the client receives the Item+Scale ComponentUpdate
+            // BEFORE any Nameplate text, eliminating the tracker race condition.
+            holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
 
             // Interactable + empty Interactions prevents item bobbing animation
             holder.ensureComponent(Interactable.getComponentType());
@@ -821,9 +829,10 @@ public class SkillSanctumNodeSpawner {
                 LOGGER.atWarning().log("SoftCollision HitboxCollisionConfig not found - nodes may not be targetable");
             }
 
-            // Add Nameplate with node name - visibility is managed by SkillSanctumInstance
-            String nameplateText = NodeLabelFormatter.getNameplateText(pending.node);
-            holder.addComponent(Nameplate.getComponentType(), new Nameplate(nameplateText));
+            // Empty Nameplate — text populated later by tickNameplateVisibility().
+            // Spawning with empty text ensures the client receives all Item+Scale data
+            // before any nameplate text, eliminating the tracker race condition.
+            holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
 
             // NOTE: We intentionally do NOT add:
             // - PhysicsValues/Velocity - so it stays static (no gravity/movement)
@@ -1001,8 +1010,8 @@ public class SkillSanctumNodeSpawner {
                 holder.addComponent(HitboxCollision.getComponentType(), new HitboxCollision(hitboxConfig));
             }
 
-            String nameplateText = NodeLabelFormatter.getNameplateText(node);
-            holder.addComponent(Nameplate.getComponentType(), new Nameplate(nameplateText));
+            // Empty Nameplate — text populated by tickNameplateVisibility()
+            holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
 
             attachSkillNodeComponent(holder, componentType, instance.getPlayerId(), node, state);
 

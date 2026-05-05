@@ -6,6 +6,12 @@ import io.github.larsonix.trailoforbis.simulation.core.AvoidanceModel;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.leveling.config.LevelingConfig;
+import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
+import io.github.larsonix.trailoforbis.mobs.archetype.ArchetypeResolver;
+import io.github.larsonix.trailoforbis.mobs.archetype.MobArchetypeConfig;
+import io.github.larsonix.trailoforbis.mobs.profile.MobResistanceConfig;
+import io.github.larsonix.trailoforbis.mobs.profile.ResistanceProfileResolver;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.simulation.builds.BuildArchetype;
 import io.github.larsonix.trailoforbis.simulation.builds.BuildFactory;
@@ -128,13 +134,32 @@ public final class SimulationMain {
         System.out.printf("  Archetypes: %d builds (6 single + 15 double-element + %d element+octant)%n",
                 archetypes.size(), archetypes.size() - 21);
 
+        // Create MobStatFactory for A/B comparison (new Template + Noise generator)
+        MobArchetypeConfig archetypeConfig = configManager.getMobArchetypeConfig();
+        MobResistanceConfig resistanceConfig = configManager.getMobResistanceConfig();
+        MobScalingConfig scalingConfig = configManager.getMobScalingConfig();
+
+        ArchetypeResolver archetypeResolver = new ArchetypeResolver(
+                archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults());
+        ResistanceProfileResolver resistanceResolver = new ResistanceProfileResolver(
+                resistanceConfig != null ? resistanceConfig : MobResistanceConfig.createDefaults());
+
+        MobStatFactory mobFactory = new MobStatFactory(
+                mobConfig,
+                archetypeResolver,
+                resistanceResolver,
+                archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults(),
+                scalingConfig != null ? scalingConfig.getElemental() : null);
+
+        System.out.println("  MobStatFactory created for A/B comparison");
+
         // =====================================================================
         // 3. Run Comprehensive Scenario (levels 1-100, all dimensions)
         // =====================================================================
         System.out.println("[3/6] Running Comprehensive scenario (levels 1-100, all builds, all mob types)...");
 
         ComprehensiveScenario comprehensive = new ComprehensiveScenario(
-                pipeline, buildFactory, archetypes, mobConfig, levelingConfig, avoidanceModel);
+                pipeline, buildFactory, archetypes, mobConfig, levelingConfig, avoidanceModel, mobFactory);
         comprehensive.run(outputDir);
 
         // =====================================================================

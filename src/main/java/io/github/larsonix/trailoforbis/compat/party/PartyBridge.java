@@ -49,6 +49,12 @@ public interface PartyBridge {
     /** Sets custom text fields displayed in the party HUD for a player. */
     void setCustomText(@Nonnull UUID playerId, String text1, String text2);
 
+    /** Sets only custom text slot 1 (preserves slot 2). */
+    void setCustomText1(@Nonnull UUID playerId, String text);
+
+    /** Sets only custom text slot 2 (preserves slot 1). */
+    void setCustomText2(@Nonnull UUID playerId, String text);
+
     /** Clears custom text fields for a player. */
     void clearCustomText(@Nonnull UUID playerId);
 

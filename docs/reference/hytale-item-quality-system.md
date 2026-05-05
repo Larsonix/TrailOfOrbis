@@ -200,12 +200,12 @@ Our `GearRarity` enum maps to Hytale qualities via `getHytaleQualityId()`:
 
 ```bash
 # Vanilla quality files (for reference)
-/home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Server/Item/Qualities/
+<hytale-decompiled>/Assets/Server/Item/Qualities/
 
 # Our custom qualities
 /mnt/c/.../mods/TrailOfOrbis_Realms/Server/Item/Qualities/Mythic.json
 /mnt/c/.../mods/TrailOfOrbis_Realms/Server/Item/Qualities/Unique.json
 
 # Quality schema (for field validation)
-/home/larsonix/work/Hytale-Decompiled-Full-Game/Assets/Schema/ItemQuality.json
+<hytale-decompiled>/Assets/Schema/ItemQuality.json
 ```

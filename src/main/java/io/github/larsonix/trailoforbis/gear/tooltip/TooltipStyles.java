@@ -3,6 +3,7 @@ package io.github.larsonix.trailoforbis.gear.tooltip;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 
 import javax.annotation.Nonnull;
+import java.util.Set;
 
 /**
  * Centralized style constants for rich text tooltips.
@@ -126,6 +127,38 @@ public final class TooltipStyles {
         return rarity.getHexColor();
     }
 
+    // =========================================================================
+    // NEGATIVE-IS-GOOD STATS
+    // =========================================================================
+
+    /**
+     * Stats where a LOWER (more negative) value is beneficial.
+     *
+     * <p>For these stats, the tooltip inverts color logic:
+     * negative values show GREEN (beneficial), positive show RED (detrimental).
+     *
+     * <p>Examples: delay reductions, cost reductions, gravity reductions.
+     */
+    private static final Set<String> LOWER_IS_BETTER_STATS = Set.of(
+        "energy_shield_regen_delay",
+        "mana_cost_percent",
+        "projectile_gravity_percent"
+    );
+
+    /**
+     * Whether a lower (more negative) value is beneficial for this stat.
+     *
+     * @param statId The stat identifier (e.g., "stamina_regen_start_delay")
+     * @return true if negative values are good for this stat
+     */
+    public static boolean isLowerBetter(@Nonnull String statId) {
+        return LOWER_IS_BETTER_STATS.contains(statId.toLowerCase());
+    }
+
+    // =========================================================================
+    // MODIFIER VALUE COLORS
+    // =========================================================================
+
     /**
      * Gets the appropriate color for a modifier value.
      *
@@ -135,6 +168,28 @@ public final class TooltipStyles {
     @Nonnull
     public static String getModifierColor(double value) {
         return value >= 0 ? POSITIVE_MODIFIER : NEGATIVE_MODIFIER;
+    }
+
+    /**
+     * Gets the appropriate color for a modifier value, accounting for lock state
+     * and whether the stat is "lower is better."
+     *
+     * <p>Locked modifiers use teal regardless of sign.
+     * For normal stats: green = positive, red = negative.
+     * For lower-is-better stats: green = negative (beneficial), red = positive (detrimental).
+     *
+     * @param value The modifier value (positive or negative)
+     * @param locked Whether the modifier is locked
+     * @param lowerIsBetter Whether negative values are beneficial
+     * @return Color hex string
+     */
+    @Nonnull
+    public static String getModifierValueColor(double value, boolean locked, boolean lowerIsBetter) {
+        if (locked) {
+            return LOCKED_MODIFIER;
+        }
+        double effectiveValue = lowerIsBetter ? -value : value;
+        return effectiveValue >= 0 ? POSITIVE_MODIFIER : NEGATIVE_MODIFIER;
     }
 
     /**
@@ -149,10 +204,7 @@ public final class TooltipStyles {
      */
     @Nonnull
     public static String getModifierValueColor(double value, boolean locked) {
-        if (locked) {
-            return LOCKED_MODIFIER;
-        }
-        return value >= 0 ? POSITIVE_MODIFIER : NEGATIVE_MODIFIER;
+        return getModifierValueColor(value, locked, false);
     }
 
     /**

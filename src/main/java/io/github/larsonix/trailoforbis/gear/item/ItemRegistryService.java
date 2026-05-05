@@ -17,6 +17,9 @@ import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinResourceTypeRegistry;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 
+import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
@@ -134,6 +137,11 @@ public final class ItemRegistryService {
      * Whether persistence is enabled (requires DataManager).
      */
     private volatile boolean persistenceEnabled = false;
+
+    /**
+     * Tracks hex injections during bulk operations (startup, etc.) for summary logging.
+     */
+    private int hexInjectionCount = 0;
 
     /**
      * Sets the reskin ResourceType registry. Called after recipe generation
@@ -340,6 +348,11 @@ public final class ItemRegistryService {
         LOGGER.atInfo().log(
             "Loaded %d item registrations from cache (%d with secondary interactions, %d skipped)",
             registered, withSecondary, skipped);
+
+        if (hexInjectionCount > 0) {
+            LOGGER.atInfo().log("Hexcode compat: injected hex interactions onto %d items", hexInjectionCount);
+            hexInjectionCount = 0;
+        }
     }
 
     /**
@@ -404,6 +417,15 @@ public final class ItemRegistryService {
 
         // Neutralize durability on death for RPG gear — RPG items are permanent
         neutralizeDurabilityOnDeath(customItem);
+
+        // Neutralize ALL vanilla stat vectors — RPG system is the sole stat authority
+        neutralizeVanillaStats(customItem);
+
+        // Copy playerAnimationsId from base item so the client doesn't log
+        // "Missing playerAnimationsId" for every registered custom item during
+        // ItemAnimations updates. For hex magic weapons, this is overridden later
+        // by injectHexcodeIfApplicable() with "HexStaff" or "HexBook".
+        copyPlayerAnimationsId(baseItem, customItem);
 
         // Inject reskin ResourceType so RPG items match workbench reskin recipes
         injectReskinResourceType(customItem, baseItem);
@@ -487,11 +509,13 @@ public final class ItemRegistryService {
             customInteractions != null && customInteractions.containsKey(InteractionType.Primary),
             customInteractions != null && customInteractions.containsKey(InteractionType.Secondary));
 
-        // Verify same reference (shallow copy worked)
+        // Hytale's Item copy constructor deep-copies the interactions map (new instance).
+        // This is correct behavior — prevents cross-contamination between items.
+        // Only log at FINE for diagnostic purposes.
         if (customInteractions != baseInteractions) {
-            LOGGER.atWarning().log("[INTERACTION] Interactions map NOT shared between base and custom item - copy may have failed!");
+            LOGGER.atFine().log("[INTERACTION] Interactions map deep-copied (expected — Hytale copy constructor behavior)");
         } else {
-            LOGGER.atFine().log("[INTERACTION] Interactions map is shared (shallow copy OK)");
+            LOGGER.atFine().log("[INTERACTION] Interactions map is shared (shallow copy)");
         }
 
         // CRITICAL: Check for Primary interaction (keep at SEVERE - this is an actual error)
@@ -556,6 +580,225 @@ public final class ItemRegistryService {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             LOGGER.atWarning().withCause(e).log(
                 "Failed to set durabilityLossOnDeath - RPG items may lose durability on death");
+        }
+    }
+
+    /**
+     * Neutralizes ALL vanilla stat vectors on a custom RPG item.
+     *
+     * <p>The {@code Item} copy constructor shallow-copies {@code armor}, {@code weapon},
+     * and {@code utility} — they share the same object as the base item. We CANNOT mutate
+     * those shared objects (that would corrupt the base item). Instead, we create fresh
+     * instances that preserve structural fields (armorSlot, cosmeticsToHide, renderDualWielded,
+     * usable, compatible) but zero out every stat-bearing field.
+     *
+     * <h2>Stat Vectors Neutralized</h2>
+     * <table>
+     * <tr><th>Component</th><th>Fields Cleared</th></tr>
+     * <tr><td>ItemArmor</td><td>statModifiers, baseDamageResistance, damageResistanceValues,
+     *     damageEnhancementValues, damageClassEnhancement, knockbackResistances,
+     *     knockbackEnhancements, regeneratingValues, interactionModifiers</td></tr>
+     * <tr><td>ItemWeapon</td><td>statModifiers, entityStatsToClear</td></tr>
+     * <tr><td>ItemUtility</td><td>statModifiers, entityStatsToClear</td></tr>
+     * </table>
+     *
+     * @param item The custom item to neutralize (must be a fresh copy, not the base item)
+     */
+    private void neutralizeVanillaStats(@Nonnull Item item) {
+        neutralizeArmorStats(item);
+        neutralizeWeaponStats(item);
+        neutralizeUtilityStats(item);
+    }
+
+    /**
+     * Replaces the item's {@code ItemArmor} with a stat-free copy.
+     *
+     * <p>Uses the 4-arg constructor which only sets armorSlot, baseDamageResistance (0),
+     * statModifiers (null), and cosmeticsToHide. All other fields default to null.
+     */
+    private void neutralizeArmorStats(@Nonnull Item item) {
+        com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor armor = item.getArmor();
+        if (armor == null) {
+            return;
+        }
+
+        try {
+            // Create a clean ItemArmor with zero stats, preserving only structural fields
+            com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor clean =
+                new com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor(
+                    armor.getArmorSlot(),   // preserve slot (Head/Chest/Legs/Hands)
+                    0.0,                    // zero baseDamageResistance
+                    null,                   // null statModifiers
+                    armor.toPacket().cosmeticsToHide  // preserve cosmetics
+                );
+            // All other fields (damageResistanceValues, damageEnhancementValues,
+            // damageClassEnhancement, knockbackResistances, knockbackEnhancements,
+            // regeneratingValues, interactionModifiers) default to null/empty.
+
+            Field armorField = Item.class.getDeclaredField("armor");
+            armorField.setAccessible(true);
+            armorField.set(item, clean);
+
+            LOGGER.atFine().log("Neutralized armor stats for RPG item");
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            LOGGER.atWarning().withCause(e).log(
+                "Failed to neutralize armor stats - vanilla armor stats may leak");
+        }
+    }
+
+    /**
+     * Replaces the item's {@code ItemWeapon} with a clean copy that preserves
+     * weapon-mechanic fields while preventing vanilla combat stat leakage.
+     *
+     * <p>Preserves via reflection:
+     * <ul>
+     *   <li>{@code renderDualWielded} — dual-wield rendering flag</li>
+     *   <li>{@code entityStatsToClear} — resets SignatureEnergy/Ammo on weapon swap</li>
+     *   <li>{@code statModifiers} — ALL weapon stat modifiers (see below)</li>
+     * </ul>
+     *
+     * <h3>Why statModifiers are preserved entirely</h3>
+     * <p>Vanilla weapon.statModifiers contain ONLY weapon-mechanic stats, never combat stats:
+     * <table>
+     * <tr><th>Stat</th><th>Weapons</th><th>Purpose</th></tr>
+     * <tr><td>SignatureEnergy</td><td>Sword(20), Battleaxe(9), Mace(8), Daggers(27), Shortbow(6), Crossbow(5)</td><td>Signature ability charge pool</td></tr>
+     * <tr><td>SignatureCharges</td><td>Shortbow(1), Crossbow(1)</td><td>Signature charge counter</td></tr>
+     * <tr><td>Ammo</td><td>Crossbow(6)</td><td>Bolt capacity — reload loop exit condition</td></tr>
+     * </table>
+     *
+     * <p>Combat stats (Health, Stamina, Mana) are never in weapon.statModifiers — they only
+     * appear in armor.statModifiers. Our {@link VanillaEquipmentStatSuppressor} handles those.
+     * Stripping weapon.statModifiers was breaking: crossbow reload (Ammo=0), signature attacks
+     * (SignatureEnergy=0), and charged shots (SignatureCharges=0) on ALL RPG weapons.
+     */
+    private void neutralizeWeaponStats(@Nonnull Item item) {
+        com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon weapon = item.getWeapon();
+        if (weapon == null) {
+            return;
+        }
+
+        try {
+            Field renderDualWieldedField = com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon.class
+                .getDeclaredField("renderDualWielded");
+            renderDualWieldedField.setAccessible(true);
+            boolean renderDualWielded = renderDualWieldedField.getBoolean(weapon);
+
+            Field entityStatsToClearField = com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon.class
+                .getDeclaredField("entityStatsToClear");
+            entityStatsToClearField.setAccessible(true);
+            int[] entityStatsToClear = (int[]) entityStatsToClearField.get(weapon);
+
+            // Preserve ALL weapon.statModifiers — they only contain weapon-mechanic stats
+            // (SignatureEnergy, SignatureCharges, Ammo), never combat stats like Health/Stamina.
+            Field statModifiersField = com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon.class
+                .getDeclaredField("statModifiers");
+            statModifiersField.setAccessible(true);
+            Int2ObjectMap<StaticModifier[]> statModifiers =
+                (Int2ObjectMap<StaticModifier[]>) statModifiersField.get(weapon);
+
+            // Create a fresh ItemWeapon preserving all structural and mechanic fields
+            com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon clean =
+                new com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon();
+            renderDualWieldedField.set(clean, renderDualWielded);
+            entityStatsToClearField.set(clean, entityStatsToClear);
+            if (statModifiers != null && !statModifiers.isEmpty()) {
+                statModifiersField.set(clean, statModifiers);
+            }
+
+            Field weaponField = Item.class.getDeclaredField("weapon");
+            weaponField.setAccessible(true);
+            weaponField.set(item, clean);
+
+            LOGGER.atFine().log("Neutralized weapon for RPG item (preserved entityStatsToClear + %d stat modifier(s))",
+                statModifiers != null ? statModifiers.size() : 0);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            LOGGER.atWarning().withCause(e).log(
+                "Failed to neutralize weapon stats - vanilla weapon stats may leak");
+        }
+    }
+
+    /**
+     * Replaces the item's {@code ItemUtility} with a clean copy that preserves
+     * structural flags and mechanic stat modifiers.
+     *
+     * <p>Preserves: {@code usable}, {@code compatible}, {@code entityStatsToClear},
+     * and {@code statModifiers}. Same rationale as weapon stat preservation — utility
+     * stat modifiers (if any) are weapon-mechanic stats, not combat stats.
+     */
+    private void neutralizeUtilityStats(@Nonnull Item item) {
+        com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility utility = item.getUtility();
+        if (utility == null) {
+            return;
+        }
+
+        try {
+            boolean usable = utility.isUsable();
+            boolean compatible = utility.isCompatible();
+
+            Field entityStatsToClearField = com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility.class
+                .getDeclaredField("entityStatsToClear");
+            entityStatsToClearField.setAccessible(true);
+            int[] entityStatsToClear = (int[]) entityStatsToClearField.get(utility);
+
+            // Preserve ALL utility.statModifiers (same rationale as weapon — no combat stats here)
+            Field statModifiersField = com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility.class
+                .getDeclaredField("statModifiers");
+            statModifiersField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Int2ObjectMap<StaticModifier[]> statModifiers =
+                (Int2ObjectMap<StaticModifier[]>) statModifiersField.get(utility);
+
+            com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility clean =
+                new com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility();
+
+            Field usableField = com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility.class
+                .getDeclaredField("usable");
+            usableField.setAccessible(true);
+            usableField.set(clean, usable);
+
+            Field compatibleField = com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility.class
+                .getDeclaredField("compatible");
+            compatibleField.setAccessible(true);
+            compatibleField.set(clean, compatible);
+
+            entityStatsToClearField.set(clean, entityStatsToClear);
+            if (statModifiers != null && !statModifiers.isEmpty()) {
+                statModifiersField.set(clean, statModifiers);
+            }
+
+            Field utilityField = Item.class.getDeclaredField("utility");
+            utilityField.setAccessible(true);
+            utilityField.set(item, clean);
+
+            LOGGER.atFine().log("Neutralized utility for RPG item (preserved entityStatsToClear + %d stat modifier(s))",
+                statModifiers != null ? statModifiers.size() : 0);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            LOGGER.atWarning().withCause(e).log(
+                "Failed to neutralize utility stats - vanilla utility stats may leak");
+        }
+    }
+
+    /**
+     * Copies the {@code playerAnimationsId} field from a base item to a custom item.
+     *
+     * <p>The {@code Item(Item)} copy constructor may not preserve this field.
+     * Without it, the client logs "Missing playerAnimationsId" for every custom
+     * item during ItemAnimations updates — thousands of debug warnings per session.
+     *
+     * @param baseItem The source item
+     * @param customItem The target item
+     */
+    private void copyPlayerAnimationsId(@Nonnull Item baseItem, @Nonnull Item customItem) {
+        try {
+            Field animField = Item.class.getDeclaredField("playerAnimationsId");
+            animField.setAccessible(true);
+            Object baseAnimId = animField.get(baseItem);
+            if (baseAnimId != null) {
+                animField.set(customItem, baseAnimId);
+            }
+        } catch (Exception e) {
+            LOGGER.atFine().log("Could not copy playerAnimationsId from %s: %s",
+                baseItem.getId(), e.getMessage());
         }
     }
 
@@ -866,7 +1109,7 @@ public final class ItemRegistryService {
                             }
                         }
                     }
-                    LOGGER.atInfo().log("[Hexcode] Tag Family=%s injected onto %s (base: %s), verified=%s",
+                    LOGGER.atFine().log("[Hexcode] Tag Family=%s injected onto %s (base: %s), verified=%s",
                             familyTag, customItem.getId(), baseItem.getId(), verified);
                 } else {
                     LOGGER.atWarning().log("[Hexcode] getData() returned null for %s — tags NOT injected",
@@ -941,6 +1184,7 @@ public final class ItemRegistryService {
                 // Not critical
             }
 
+            hexInjectionCount++;
             LOGGER.atFine().log("[Hexcode] Injected hex compat onto %s (base: %s, staff=%s, book=%s): "
                 + "interactions=%d, tag=%s",
                 customItem.getId(), baseItem.getId(), isHexStaff, isHexBook,
@@ -1050,7 +1294,7 @@ public final class ItemRegistryService {
             Object rawMods = rawModsField.get(newWeapon);
             int modCount = (rawMods instanceof java.util.Map<?,?> map) ? map.size() : 0;
 
-            LOGGER.atInfo().log("[Hexcode] Injected hex weapon onto %s: %d stat modifier groups, "
+            LOGGER.atFine().log("[Hexcode] Injected hex weapon onto %s: %d stat modifier groups, "
                     + "renderDualWielded=%s (from ref: %s)",
                     item.getId(), modCount, dualWieldField.getBoolean(newWeapon),
                     hexRef.getId());

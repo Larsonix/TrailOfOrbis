@@ -58,7 +58,7 @@ spawn-settings:
   # This prevents mobs from spawning directly at the realm entry/respawn location
   # Different from min-distance which controls distance from players during gameplay
   # Set to 0 to disable
-  spawn-exclusion-radius: 20
+  spawn-exclusion-radius: 25
 
   # Player count scaling - mobs get stronger with more players
   # Formula: multiplier^(playerCount - 1)

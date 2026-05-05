@@ -65,6 +65,21 @@ public final class ImplicitDefenseCalculator {
     }
 
     /**
+     * Returns whether a given equipment type should have an armor implicit.
+     *
+     * <p>Derived from generation logic: only armor pieces and shields receive
+     * armor implicits. Weapons (including spellbooks, which are off-hand)
+     * never get armor implicits.
+     *
+     * @param equipmentType The equipment type to check
+     * @return true if this type receives an armor implicit during generation
+     */
+    public static boolean shouldHaveArmorImplicit(@Nullable EquipmentType equipmentType) {
+        if (equipmentType == null) return false;
+        return equipmentType.isArmor() || equipmentType == EquipmentType.SHIELD;
+    }
+
+    /**
      * Calculates and rolls an implicit defense stat for an armor piece.
      *
      * @param material The armor material (determines defense type)
@@ -157,6 +172,51 @@ public final class ImplicitDefenseCalculator {
         );
 
         return rerolled;
+    }
+
+    /**
+     * Rescales an existing armor implicit to a new level, preserving the roll percentile.
+     *
+     * <p>When a Threshold Stone changes an item's level, the implicit range shifts
+     * but the quality of the original roll is preserved. A 90th-percentile chestplate
+     * stays at the 90th percentile of the new level's range.
+     *
+     * <p>This operation is fully deterministic — no randomness involved.
+     *
+     * @param existing The current implicit to rescale
+     * @param material The armor material (determines defense type and base range)
+     * @param slot The armor slot (determines slot multiplier)
+     * @param newLevel The new item level
+     * @return A new ArmorImplicit at the new level's range with the same percentile, or null if material not configured
+     */
+    @Nullable
+    public ArmorImplicit rescaleForLevel(
+            @Nonnull ArmorImplicit existing,
+            @Nonnull ArmorMaterial material,
+            @Nonnull ArmorSlot slot,
+            int newLevel
+    ) {
+        Objects.requireNonNull(existing, "existing cannot be null");
+        Objects.requireNonNull(material, "material cannot be null");
+        Objects.requireNonNull(slot, "slot cannot be null");
+
+        DefenseBaseRange newRange = config.calculateRange(material, slot, newLevel);
+        if (newRange == null) {
+            LOGGER.atFine().log("No defense config for material %s, cannot rescale", material);
+            return null;
+        }
+
+        ArmorImplicit rescaled = existing.withPreservedPercentile(newRange.min(), newRange.max());
+
+        LOGGER.atFine().log(
+                "Rescaled defense implicit for %s %s from level ? to %d: %.1f (%.0f%%) → %.1f (%.0f%%), range: %.1f-%.1f",
+                material, slot, newLevel,
+                existing.rolledValue(), existing.rollPercentile() * 100,
+                rescaled.rolledValue(), rescaled.rollPercentile() * 100,
+                newRange.min(), newRange.max()
+        );
+
+        return rescaled;
     }
 
     /**

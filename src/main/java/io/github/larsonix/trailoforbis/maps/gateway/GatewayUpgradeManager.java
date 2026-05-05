@@ -54,10 +54,11 @@ public class GatewayUpgradeManager {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Gets the current tier index of a gateway block.
+     * Gets the current tier index of a gateway block, clamped to the config's max.
+     * Handles legacy DB entries that may reference removed tiers.
      */
     public int getGatewayTier(@Nonnull UUID worldUuid, int x, int y, int z) {
-        return repository.getTier(worldUuid, x, y, z);
+        return clampTier(repository.getTier(worldUuid, x, y, z));
     }
 
     /**
@@ -65,16 +66,23 @@ public class GatewayUpgradeManager {
      */
     @Nullable
     public GatewayTier getGatewayTierConfig(@Nonnull UUID worldUuid, int x, int y, int z) {
-        int tierIndex = repository.getTier(worldUuid, x, y, z);
-        return config.getTier(tierIndex);
+        return config.getTier(getGatewayTier(worldUuid, x, y, z));
     }
 
     /**
      * Gets the maximum realm level a gateway can channel.
      */
     public int getMaxRealmLevel(@Nonnull UUID worldUuid, int x, int y, int z) {
-        int tierIndex = repository.getTier(worldUuid, x, y, z);
-        return config.getMaxRealmLevel(tierIndex);
+        return config.getMaxRealmLevel(getGatewayTier(worldUuid, x, y, z));
+    }
+
+    /**
+     * Clamps a tier index to the valid config range.
+     * Legacy DB entries from removed tiers (e.g., old Mithril=5, Adamantite=6)
+     * are clamped to the current max tier.
+     */
+    private int clampTier(int tierIndex) {
+        return Math.min(tierIndex, config.getMaxTierIndex());
     }
 
     /**
@@ -88,8 +96,7 @@ public class GatewayUpgradeManager {
      * Checks if a gateway is at the maximum tier.
      */
     public boolean isMaxTier(@Nonnull UUID worldUuid, int x, int y, int z) {
-        int tierIndex = repository.getTier(worldUuid, x, y, z);
-        return tierIndex >= config.getMaxTierIndex();
+        return getGatewayTier(worldUuid, x, y, z) >= config.getMaxTierIndex();
     }
 
     /**

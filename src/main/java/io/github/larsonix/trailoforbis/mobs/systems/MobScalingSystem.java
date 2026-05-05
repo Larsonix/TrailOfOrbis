@@ -46,8 +46,7 @@ import io.github.larsonix.trailoforbis.mobs.model.MobStats;
 import io.github.larsonix.trailoforbis.mobs.spawn.component.RPGSpawnedMarker;
 import io.github.larsonix.trailoforbis.mobs.spawn.manager.RPGSpawnManager;
 import io.github.larsonix.trailoforbis.mobs.speed.MobSpeedEffectManager;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatProfile;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
@@ -305,8 +304,8 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             }
         }
 
-        // 3. CALCULATE SCALING FACTORS
-        double bonusPool = distanceCalculator.calculateBonusPool(distFromSpawn);
+        // 3. CALCULATE BONUS POOL (level-based, same formula as realm mobs)
+        double bonusPool = mobLevel * config.getDistanceScaling().getPoolPerLevel();
 
         // 4. APPLY CLASS MULTIPLIERS
         MobClassificationConfig classConfig = classificationService.getConfig();
@@ -318,19 +317,23 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
                 roleName, classification, statMultiplier, mobLevel, bonusPool);
         }
 
-        // 5. GENERATE STATS
-        MobStatGenerator statGenerator = manager.getStatGenerator();
-        if (statGenerator == null) return;
+        // 5. GENERATE STATS via Template + Noise factory
+        MobStatFactory statFactory = manager.getStatFactory();
+        if (statFactory == null) return;
 
         long seed = System.nanoTime() ^ position.hashCode();
-        MobStatProfile newProfile;
 
+        // Resolve NPC groups and element for archetype/resistance resolution
+        var npcGroups = getNpcGroups(roleName, manager);
+        var elementResolver = manager.getElementResolver();
+        var detectedElement = elementResolver != null ? elementResolver.resolve(roleName, npcGroups) : null;
+
+        MobStats stats = statFactory.generate(mobLevel, bonusPool, roleName, npcGroups, detectedElement, seed);
+
+        // Apply classification multiplier (ELITE/BOSS scale HP/damage/armor)
         if (statMultiplier != 1.0) {
-             newProfile = statGenerator.generateSpecial(mobLevel, bonusPool, statMultiplier, seed);
-        } else {
-             newProfile = statGenerator.generate(mobLevel, bonusPool, seed);
+            stats = stats.withMultiplier(statMultiplier);
         }
-        MobStats stats = convertToLegacyStats(newProfile);
 
         // DEBUG: Log generated stats for special mobs (FINE level to avoid log spam)
         if (statMultiplier != 1.0) {
@@ -473,9 +476,8 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             classification = RPGMobClass.HOSTILE;
         }
 
-        // 2. CALCULATE STATS using realm level
-        // Use a moderate bonus pool based on realm level (realms have consistent difficulty)
-        double bonusPool = realmLevel * 2.0;
+        // 2. CALCULATE BONUS POOL (level-based, shared formula with overworld)
+        double bonusPool = realmLevel * manager.getConfig().getDistanceScaling().getPoolPerLevel();
 
         // Apply class multipliers
         MobClassificationService classificationService = manager.getClassificationService();
@@ -491,19 +493,23 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         LOGGER.at(Level.FINE).log("[MobScaling] Realm mob %s: Lv%d, class=%s, statMult=%.2fx",
             roleName, realmLevel, classification, statMultiplier);
 
-        // 3. GENERATE STATS
-        MobStatGenerator statGenerator = manager.getStatGenerator();
-        if (statGenerator == null) return;
+        // 3. GENERATE STATS via Template + Noise factory
+        MobStatFactory statFactory = manager.getStatFactory();
+        if (statFactory == null) return;
 
         long seed = System.nanoTime() ^ holder.hashCode();
-        MobStatProfile profile;
 
+        // Resolve NPC groups and element for archetype/resistance resolution
+        var npcGroups = getNpcGroups(roleName, manager);
+        var elementResolver = manager.getElementResolver();
+        var detectedElement = elementResolver != null ? elementResolver.resolve(roleName, npcGroups) : null;
+
+        MobStats stats = statFactory.generate(realmLevel, bonusPool, roleName, npcGroups, detectedElement, seed);
+
+        // Apply classification multiplier (ELITE/BOSS)
         if (combinedStatMultiplier != 1.0) {
-            profile = statGenerator.generateSpecial(realmLevel, bonusPool, combinedStatMultiplier, seed);
-        } else {
-            profile = statGenerator.generate(realmLevel, bonusPool, seed);
+            stats = stats.withMultiplier(combinedStatMultiplier);
         }
-        MobStats stats = convertToLegacyStats(profile);
 
         // 4. ATTACH COMPONENT
         MobScalingComponent scaling = new MobScalingComponent();
@@ -568,25 +574,28 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             @Nonnull Store<EntityStore> store,
             @Nonnull MobScalingManager manager) {
 
-        // Regenerate MobStats from persisted inputs
-        MobStatGenerator statGenerator = manager.getStatGenerator();
-        if (statGenerator == null) return;
+        // Regenerate MobStats from persisted inputs via Template + Noise factory
+        MobStatFactory statFactory = manager.getStatFactory();
+        if (statFactory == null) return;
 
         int mobLevel = scaling.getMobLevel();
         double distanceBonus = scaling.getDistanceBonus();
         RPGMobClass classification = scaling.getClassification();
+        String roleName = scaling.getRoleName();
 
         MobClassificationConfig classConfig = manager.getClassificationService().getConfig();
         double statMultiplier = classConfig.getStatMultiplier(classification);
 
         long seed = System.nanoTime() ^ holder.hashCode();
-        MobStatProfile profile;
+
+        var npcGroups = getNpcGroups(roleName, manager);
+        var elementResolver = manager.getElementResolver();
+        var detectedElement = elementResolver != null ? elementResolver.resolve(roleName, npcGroups) : null;
+
+        MobStats stats = statFactory.generate(mobLevel, distanceBonus, roleName, npcGroups, detectedElement, seed);
         if (statMultiplier != 1.0) {
-            profile = statGenerator.generateSpecial(mobLevel, distanceBonus, statMultiplier, seed);
-        } else {
-            profile = statGenerator.generate(mobLevel, distanceBonus, seed);
+            stats = stats.withMultiplier(statMultiplier);
         }
-        MobStats stats = convertToLegacyStats(profile);
         scaling.setStats(stats);
 
         // Re-apply health modifier with current formula (putModifier is idempotent)
@@ -845,67 +854,20 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         return plugin.getMobScalingComponentType();
     }
 
+    /**
+     * Extracts NPC group memberships for a mob from the DynamicEntityRegistry.
+     *
+     * <p>Returns empty set if the registry isn't available (e.g., entity discovery disabled).
+     * This enables faction-based resistance profiles (Trork→Earth) and group-based
+     * archetype detection (animals→Beast).
+     */
     @Nonnull
-    private MobStats convertToLegacyStats(@Nonnull MobStatProfile profile) {
-        ElementalStats elementalStats = null;
-        // Create ElementalStats if any elemental damage, resistance, penetration, or modifiers exist
-        boolean hasElemental = profile.fireDamage() > 0 || profile.waterDamage() > 0 ||
-            profile.lightningDamage() > 0 || profile.voidDamage() > 0 ||
-            profile.fireResistance() > 0 || profile.waterResistance() > 0 ||
-            profile.lightningResistance() > 0 || profile.voidResistance() > 0 ||
-            profile.firePenetration() > 0 || profile.waterPenetration() > 0 ||
-            profile.lightningPenetration() > 0 || profile.voidPenetration() > 0 ||
-            profile.fireIncreasedDamage() > 0 || profile.waterIncreasedDamage() > 0 ||
-            profile.lightningIncreasedDamage() > 0 || profile.voidIncreasedDamage() > 0 ||
-            profile.fireMoreDamage() > 0 || profile.waterMoreDamage() > 0 ||
-            profile.lightningMoreDamage() > 0 || profile.voidMoreDamage() > 0;
-
-        if (hasElemental) {
-            double elemMult = plugin.getMobScalingManager().getConfig().getBalanceMultipliers().getElementalDamage();
-            elementalStats = new ElementalStats();
-            elementalStats.setFlatDamage(ElementType.FIRE, profile.fireDamage() * elemMult);
-            elementalStats.setFlatDamage(ElementType.WATER, profile.waterDamage() * elemMult);
-            elementalStats.setFlatDamage(ElementType.LIGHTNING, profile.lightningDamage() * elemMult);
-            elementalStats.setFlatDamage(ElementType.VOID, profile.voidDamage() * elemMult);
-            elementalStats.setResistance(ElementType.FIRE, profile.fireResistance());
-            elementalStats.setResistance(ElementType.WATER, profile.waterResistance());
-            elementalStats.setResistance(ElementType.LIGHTNING, profile.lightningResistance());
-            elementalStats.setResistance(ElementType.VOID, profile.voidResistance());
-            elementalStats.setPenetration(ElementType.FIRE, profile.firePenetration());
-            elementalStats.setPenetration(ElementType.WATER, profile.waterPenetration());
-            elementalStats.setPenetration(ElementType.LIGHTNING, profile.lightningPenetration());
-            elementalStats.setPenetration(ElementType.VOID, profile.voidPenetration());
-            // Increased damage (additive %)
-            elementalStats.setPercentDamage(ElementType.FIRE, profile.fireIncreasedDamage());
-            elementalStats.setPercentDamage(ElementType.WATER, profile.waterIncreasedDamage());
-            elementalStats.setPercentDamage(ElementType.LIGHTNING, profile.lightningIncreasedDamage());
-            elementalStats.setPercentDamage(ElementType.VOID, profile.voidIncreasedDamage());
-            // More damage (multiplicative %)
-            elementalStats.setMultiplierDamage(ElementType.FIRE, profile.fireMoreDamage());
-            elementalStats.setMultiplierDamage(ElementType.WATER, profile.waterMoreDamage());
-            elementalStats.setMultiplierDamage(ElementType.LIGHTNING, profile.lightningMoreDamage());
-            elementalStats.setMultiplierDamage(ElementType.VOID, profile.voidMoreDamage());
+    private java.util.Set<String> getNpcGroups(@Nullable String roleName, @Nonnull MobScalingManager manager) {
+        var registry = manager.getDynamicEntityRegistry();
+        if (registry == null || roleName == null) {
+            return java.util.Set.of();
         }
-
-        return new MobStats(
-            profile.mobLevel(),
-            profile.totalPool(),
-            profile.maxHealth(),
-            profile.physicalDamage(),
-            profile.armor(),
-            profile.moveSpeed(),
-            profile.criticalChance(),
-            profile.criticalMultiplier(),
-            profile.dodgeChance(),
-            profile.lifeSteal(),
-            profile.armorPenetration(),
-            profile.healthRegen(),
-            profile.blockChance(),
-            profile.parryChance(),
-            profile.trueDamage(),
-            profile.accuracy(),
-            profile.knockbackResistance(),
-            elementalStats
-        );
+        var discovered = registry.getDiscoveredRole(roleName);
+        return discovered != null ? discovered.memberGroups() : java.util.Set.of();
     }
 }

@@ -18,10 +18,13 @@ import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 import io.github.larsonix.trailoforbis.skilltree.model.StatModifier;
 import io.github.larsonix.trailoforbis.skilltree.model.StatType;
 import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyConfig;
+import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyProgress;
 import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyType;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 /**
@@ -66,6 +69,7 @@ public class SkillNodeDetailPage {
     private final SkillNode node;
     private final NodeState nodeState;
     private final int availablePoints;
+    @Nullable private final SynergyProgress synergyProgress;
 
     // ═══════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -79,18 +83,21 @@ public class SkillNodeDetailPage {
      * @param node            The skill node to display
      * @param nodeState       The current state of the node (LOCKED/AVAILABLE/ALLOCATED)
      * @param availablePoints The player's available skill points
+     * @param synergyProgress Live synergy progress data, or null if not a synergy node
      */
     public SkillNodeDetailPage(
             @Nonnull TrailOfOrbis plugin,
             @Nonnull PlayerRef player,
             @Nonnull SkillNode node,
             @Nonnull NodeState nodeState,
-            int availablePoints) {
+            int availablePoints,
+            @Nullable SynergyProgress synergyProgress) {
         this.plugin = plugin;
         this.player = player;
         this.node = node;
         this.nodeState = nodeState;
         this.availablePoints = availablePoints;
+        this.synergyProgress = synergyProgress;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -229,9 +236,13 @@ public class SkillNodeDetailPage {
             height += 16 + 4 + (node.getDrawbacks().size() * LINE_HEIGHT) + SECTION_SPACING;
         }
 
-        // Synergy section (compact box)
+        // Synergy section (compact box + optional progress line)
         if (node.hasSynergy()) {
-            height += 38 + SECTION_SPACING;
+            height += 38;
+            if (synergyProgress != null) {
+                height += 16; // Progress line at font-size 11
+            }
+            height += SECTION_SPACING;
         }
 
         // Conditional section (compact box)
@@ -308,22 +319,75 @@ public class SkillNodeDetailPage {
     }
 
     /**
-     * Builds the synergy section for synergy nodes.
+     * Builds the synergy section for synergy nodes, including live progress.
      */
     private String buildSynergySection(SynergyConfig synergy) {
         String description = buildSynergyDescription(synergy, node);
         String capText = synergy.hasCap()
-            ? String.format(" (capped at %.0f%%)", synergy.getCap())
+            ? " (capped at " + NumberFormatter.percent((float) synergy.getCap()) + ")"
             : "";
 
+        String progressLine = buildSynergyProgressLine();
+
         return """
-            <div style="anchor-horizontal: 0; background-color: #2a2a4a; layout-mode: Top; padding: 8;">
+            <div style="anchor-horizontal: 0; layout-mode: Top; padding: 8;">
                 <p style="font-size: 11; color: %s;">Synergy :</p>
                 <div style="anchor-height: 4;"></div>
                 <p style="font-size: 13; color: %s; white-space: wrap;">%s%s</p>
+                %s
             </div>
             <div style="anchor-height: 12;"></div>
-            """.formatted(RPGStyles.TEXT_INFO, RPGStyles.TEXT_PRIMARY, escapeHtml(description), capText);
+            """.formatted(RPGStyles.TEXT_INFO, RPGStyles.TEXT_PRIMARY, escapeHtml(description), capText, progressLine);
+    }
+
+    /**
+     * Builds the live progress line for a synergy node.
+     */
+    private String buildSynergyProgressLine() {
+        if (synergyProgress == null) {
+            return "";
+        }
+
+        String text;
+        String color;
+
+        if (!synergyProgress.hasProgress()) {
+            text = "0 " + synergyProgress.countLabel() + " -> allocate to begin scaling";
+            color = RPGStyles.TEXT_GRAY;
+        } else if (nodeState == NodeState.ALLOCATED) {
+            if (synergyProgress.capped()) {
+                text = String.format("%d %s -> %s (MAXED)",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()));
+            } else {
+                text = String.format("%d %s -> %s | Next at %d",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()),
+                    synergyProgress.nextThreshold());
+            }
+            color = synergyProgress.capped() ? RPGStyles.POSITIVE : RPGStyles.TEXT_SECONDARY;
+        } else {
+            if (synergyProgress.hasBonus()) {
+                text = String.format("%d %s -> would grant %s",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()));
+            } else {
+                text = String.format("%d/%d %s -> %d more needed",
+                    synergyProgress.currentCount(),
+                    synergyProgress.perCount(),
+                    synergyProgress.countLabel(),
+                    synergyProgress.perCount() - synergyProgress.currentCount());
+            }
+            color = RPGStyles.TEXT_GRAY;
+        }
+
+        return """
+                <div style="anchor-height: 4;"></div>
+                <p style="font-size: 11; color: %s;">%s</p>
+            """.formatted(color, escapeHtml(text));
     }
 
     /**
@@ -336,30 +400,30 @@ public class SkillNodeDetailPage {
         }
 
         String statName = formatStatName(bonus.getStat());
-        double value = bonus.getValue();
+        String valueStr = NumberFormatter.signedPercent((float) bonus.getValue());
         int perCount = synergy.getPerCount();
         SynergyType type = synergy.getType();
 
         return switch (type) {
             case ELEMENTAL_COUNT -> String.format(
-                "+%.0f%% %s per %d %s nodes allocated",
-                value, statName, perCount, synergy.getElementRegion().getDisplayName()
+                "%s %s per %d %s nodes allocated",
+                valueStr, statName, perCount, synergy.getElementRegion().getDisplayName()
             );
             case STAT_COUNT -> String.format(
-                "+%.0f%% %s per %d nodes with %s",
-                value, statName, perCount, formatStatName(synergy.getStatType())
+                "%s %s per %d nodes with %s",
+                valueStr, statName, perCount, formatStatName(synergy.getStatType())
             );
             case BRANCH_COUNT -> String.format(
-                "+%.0f%% %s per %d %s nodes allocated",
-                value, statName, perCount, node.getSkillTreeRegion().getDisplayName()
+                "%s %s per %d %s nodes allocated",
+                valueStr, statName, perCount, node.getSkillTreeRegion().getDisplayName()
             );
             case TIER_COUNT -> String.format(
-                "+%.0f%% %s per %d %s allocated",
-                value, statName, perCount, synergy.getTier() != null ? synergy.getTier().toLowerCase() + "s" : "notable nodes"
+                "%s %s per %d %s allocated",
+                valueStr, statName, perCount, synergy.getTier() != null ? synergy.getTier().toLowerCase() + "s" : "notable nodes"
             );
             case TOTAL_COUNT -> String.format(
-                "+%.0f%% %s per %d total nodes allocated",
-                value, statName, perCount
+                "%s %s per %d total nodes allocated",
+                valueStr, statName, perCount
             );
         };
     }
@@ -370,13 +434,13 @@ public class SkillNodeDetailPage {
     private String buildConditionalSection(ConditionalConfig conditional) {
         String trigger = formatTrigger(conditional.getTrigger());
         String duration = conditional.isTimedEffect()
-            ? String.format("for %.1fs", conditional.getDuration())
+            ? "for " + NumberFormatter.time((float) conditional.getDuration())
             : "(while active)";
 
         StringBuilder effects = new StringBuilder();
         for (ConditionalConfig.ConditionalEffect effect : conditional.getEffects()) {
             String statName = formatStatName(effect.getStat());
-            effects.append(String.format("+%.0f%% %s, ", effect.getValue(), statName));
+            effects.append(NumberFormatter.signedPercent((float) effect.getValue())).append(" ").append(statName).append(", ");
         }
         // Remove trailing comma
         if (effects.length() > 2) {

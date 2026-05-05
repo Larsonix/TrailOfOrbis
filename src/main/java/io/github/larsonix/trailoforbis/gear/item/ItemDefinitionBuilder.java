@@ -125,19 +125,17 @@ public final class ItemDefinitionBuilder {
                 return null;
             }
 
-            // For magic weapons (staffs, wands, spellbooks), use the REGISTERED custom
-            // Item as the definition source. The registered Item already has the correct
-            // weapon/utility/interactions/animations from injectHexcodeIfApplicable().
-            // This ensures the client definition exactly mirrors the server state —
-            // e.g., weapon=null for spellbooks, utility.usable=true, hex interactions.
+            // Use the REGISTERED custom Item as definition source for ALL gear types.
+            // The registered Item has correct weapon/utility/interactions from
+            // createCustomItem() — this ensures the client definition mirrors server state.
+            // Critical for weapon HUD: neutralizeWeaponStats() guarantees a non-null
+            // ItemWeapon on the registered item, while baseItem.toPacket() may not.
             Item definitionSource = baseItem;
-            if (HexcodeCompat.isLoaded() && isMagicWeapon(gearData.baseItemId())) {
-                String customItemId = gearData.getItemId();
-                if (customItemId != null) {
-                    Item registered = Item.getAssetMap().getAsset(customItemId);
-                    if (registered != null && registered != Item.UNKNOWN) {
-                        definitionSource = registered;
-                    }
+            String customItemId = gearData.getItemId();
+            if (customItemId != null) {
+                Item registered = Item.getAssetMap().getAsset(customItemId);
+                if (registered != null && registered != Item.UNKNOWN) {
+                    definitionSource = registered;
                 }
             }
 
@@ -145,11 +143,9 @@ public final class ItemDefinitionBuilder {
             ItemBase definition = definitionSource.toPacket().clone();
 
             // Override ResourceTypes with the REGISTERED custom item's types.
-            // The definition source is the BASE item whose ResourceTypes are the
-            // Armory's originals. The registered custom item has our RPG_Reskin_*
-            // type injected. The client needs the custom item's ResourceTypes to
-            // validate workbench recipe matching.
-            String customItemId = gearData.getItemId();
+            // The registered item has our RPG_Reskin_* type injected. The client
+            // needs these ResourceTypes to validate workbench recipe matching.
+            // (When definitionSource IS the registered item, this is a no-op.)
             if (customItemId != null) {
                 Item registeredCustom = Item.getAssetMap().getAsset(customItemId);
                 if (registeredCustom != null && registeredCustom != Item.UNKNOWN) {
@@ -175,9 +171,8 @@ public final class ItemDefinitionBuilder {
             // making the item completely unusable in the active hand.
             stripContainerInteraction(definition);
 
-            // Override interactions for hex magic weapons — the server-side Item was already
-            // modified by ItemRegistryService.injectHexcodeIfApplicable(), but the client
-            // definition is built from the BASE item and needs the same override.
+            // Override interactions for hex magic weapons — ensures hex interaction IDs
+            // are present in the client definition regardless of definition source.
             overrideHexInteractionsIfApplicable(definition, gearData);
 
             // Override utility for hex items — reads from registered custom Item (has hex utility)
@@ -196,7 +191,7 @@ public final class ItemDefinitionBuilder {
                 if (hexStaffItem == null) hexStaffItem = Item.getAssetMap().getAsset("Hexstaff_Basic_Copper");
                 ItemBase hexStaffDef = hexStaffItem != null ? hexStaffItem.toPacket() : null;
 
-                LOGGER.atInfo().log("[HexDef] RPG: %s (base: %s, type: %s): "
+                LOGGER.atFine().log("[HexDef] RPG: %s (base: %s, type: %s): "
                         + "weapon=%s, tool=%s, armor=%s, utility=%s, "
                         + "usable=%s, compatible=%s, anim=%s, model=%s, "
                         + "interactions=%s, definitionSource=%s",
@@ -213,7 +208,7 @@ public final class ItemDefinitionBuilder {
                         definitionSource == baseItem ? "baseItem" : "registeredItem");
 
                 if (hexBookDef != null) {
-                    LOGGER.atInfo().log("[HexDef] REF Hex_Book: weapon=%s, tool=%s, armor=%s, utility=%s, "
+                    LOGGER.atFine().log("[HexDef] REF Hex_Book: weapon=%s, tool=%s, armor=%s, utility=%s, "
                             + "usable=%s, compatible=%s, anim=%s, model=%s, interactions=%s",
                             hexBookDef.weapon != null ? "PRESENT" : "null",
                             hexBookDef.tool != null ? "PRESENT" : "null",
@@ -226,7 +221,7 @@ public final class ItemDefinitionBuilder {
                             hexBookDef.interactions != null ? hexBookDef.interactions.size() + " keys" : "null");
                 }
                 if (hexStaffDef != null) {
-                    LOGGER.atInfo().log("[HexDef] REF HexStaff: weapon=%s, tool=%s, armor=%s, utility=%s, "
+                    LOGGER.atFine().log("[HexDef] REF HexStaff: weapon=%s, tool=%s, armor=%s, utility=%s, "
                             + "usable=%s, compatible=%s, anim=%s, model=%s, interactions=%s",
                             hexStaffDef.weapon != null ? "PRESENT" : "null",
                             hexStaffDef.tool != null ? "PRESENT" : "null",
@@ -243,7 +238,10 @@ public final class ItemDefinitionBuilder {
             // Hide from creative inventory — custom gear items should never appear in the library
             // Exception: preserve Hexcode-specific categories so items appear in hex UI sections
             definition.categories = resolveCategories(baseItem);
-            definition.variant = true;
+            // NOTE: Do NOT set variant=true. The definition is a complete clone of the base
+            // item (model, texture, icon, animations — everything). Setting variant=true causes
+            // the client to re-resolve fields from the base at render time, which makes RPG items
+            // inherit modified descriptions when CraftingPreviewService changes the base item.
 
             // Set the custom instance ID (must match ItemStack.itemId for client lookup)
             String itemId = gearData.getItemId();
@@ -422,7 +420,7 @@ public final class ItemDefinitionBuilder {
      */
     // Increment this when the definition format changes to force re-sync of all cached items.
     // This ensures old definitions (missing playerAnimationsId, etc.) get rebuilt.
-    private static final int DEFINITION_FORMAT_VERSION = 2;
+    private static final int DEFINITION_FORMAT_VERSION = 4;
 
     public int computeDefinitionHash(@Nonnull GearData gearData, @Nullable UUID playerId, long statsVersion) {
         Objects.requireNonNull(gearData, "gearData cannot be null");
@@ -453,29 +451,48 @@ public final class ItemDefinitionBuilder {
     }
 
     /**
-     * Clears vanilla stat modifiers from the item definition.
+     * Sanitizes vanilla fields from the CLIENT item definition (packet).
      *
-     * <p>RPG gear uses custom modifiers displayed in the tooltip description,
-     * not the vanilla weapon/armor stat modifiers. This prevents the base item's
-     * modifiers from applying to the gear (e.g., vanilla damage values).
+     * <p>Strips ALL stat modifiers from weapon/utility/armor so the client does not
+     * apply them locally for prediction. Weapon-mechanic stats (SignatureEnergy, Ammo,
+     * SignatureCharges) are managed entirely by the server via the server-side Item's
+     * preserved statModifiers — see {@code ItemRegistryService.neutralizeWeaponStats()}.
      *
-     * @param definition The item definition to clear modifiers from
+     * <p><b>Why client-side statModifiers must be null:</b> Our {@code ItemSyncCoordinator}
+     * periodically sends UpdateItems packets. If the client-side weapon definition includes
+     * statModifiers, the client re-applies them on each update, resetting SignatureEnergy
+     * to max. This breaks the signature attack lifecycle — after consuming SE, the client
+     * restores it to full, causing the client to route all attacks to the (now on-cooldown)
+     * signature attack, locking the player.
+     *
+     * <p>{@code displayEntityStatsHUD} is preserved (inherited from the server-side Item
+     * via toPacket) to tell the client which stat HUD bars to render. The bar values come
+     * from server EntityStatValue updates, not from client-side stat prediction.
+     *
+     * <p>Durability is zeroed because RPG gear is permanent — the native durability bar
+     * should never appear.
+     *
+     * @param definition The item definition to sanitize for client display
      */
     private void clearVanillaModifiers(@Nonnull ItemBase definition) {
-        // Clear weapon modifiers (damage, attack speed, etc.)
         if (definition.weapon != null) {
             definition.weapon.statModifiers = null;
         }
 
-        // Clear armor modifiers (defense, resistances, etc.)
         if (definition.armor != null) {
             definition.armor.statModifiers = null;
+            definition.armor.baseDamageResistance = 0;
             definition.armor.damageResistance = null;
             definition.armor.damageEnhancement = null;
             definition.armor.damageClassEnhancement = null;
         }
 
-        // Note: ItemTool does not have statModifiers field in Hytale's protocol
+        if (definition.utility != null) {
+            definition.utility.statModifiers = null;
+        }
+
+        // Durability: RPG gear is permanent — hide the native durability bar.
+        definition.durability = 0;
     }
 
     /**

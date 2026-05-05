@@ -1,15 +1,9 @@
 package io.github.larsonix.trailoforbis.combat.indicators.color;
 
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.protocol.UIComponentsUpdate;
 import com.hypixel.hytale.protocol.UpdateType;
 import com.hypixel.hytale.protocol.packets.assets.UpdateEntityUIComponents;
-import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
-import com.hypixel.hytale.server.core.modules.entityui.UIComponentList;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.combat.DamageBreakdown;
 import io.github.larsonix.trailoforbis.combat.indicators.CombatIndicatorService.CombatTextParams;
 import io.github.larsonix.trailoforbis.config.ConfigManager;
@@ -19,7 +13,6 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Level;
 
 /**
@@ -73,6 +66,10 @@ public class CombatTextColorManager {
                 return false;
             }
 
+            // Inject built-in profiles that must exist regardless of config file version.
+            // This ensures JAR-only upgrades work for existing players without config changes.
+            injectBuiltInProfiles(profileMap);
+
             // Register templates
             templateRegistry = new CombatTextTemplateRegistry();
             List<CombatTextProfile> profileList = new ArrayList<>(profileMap.values());
@@ -82,19 +79,16 @@ public class CombatTextColorManager {
                 return false;
             }
 
-            // Rebuild profile map with assigned template indices
-            Map<String, CombatTextProfile> registeredProfiles = new java.util.LinkedHashMap<>();
+            // Create resolver directly — no template index assignment needed.
+            // Templates are built on demand and applied at the vanilla index.
+            Map<String, CombatTextProfile> resolvedProfiles = new java.util.LinkedHashMap<>();
             for (CombatTextProfile profile : profileList) {
-                int index = templateRegistry.getTemplateIndex(profile.id());
-                CombatTextProfile registered = profile.withTemplateIndex(index);
-                registeredProfiles.put(registered.id(), registered);
+                resolvedProfiles.put(profile.id(), profile);
             }
-
-            // Create resolver with registered profiles
-            profileResolver = new CombatTextProfileResolver(registeredProfiles);
+            profileResolver = new CombatTextProfileResolver(resolvedProfiles);
 
             enabled = true;
-            LOGGER.atInfo().log("Colored combat text initialized: %d profiles", registeredProfiles.size());
+            LOGGER.atInfo().log("Colored combat text initialized: %d profiles", resolvedProfiles.size());
             return true;
 
         } catch (Exception e) {
@@ -107,40 +101,19 @@ public class CombatTextColorManager {
     /**
      * Syncs all custom templates to a newly connected player.
      *
-     * <p>Call from {@code PlayerReadyEvent} handler after the player is in-world.
-     *
-     * @param player The player to sync templates to
-     */
-    public void onPlayerReady(@Nonnull PlayerRef player) {
-        if (!enabled || templateRegistry == null) return;
-        templateRegistry.syncToPlayer(player);
-    }
-
-    /**
-     * Resolves the appropriate color profile and applies the template swap.
+     * Resolves the appropriate color profile and applies the template overwrite.
      *
      * <p>This is the single integration point called by {@code CombatIndicatorService}
-     * BEFORE queuing {@code CombatTextUpdate}. It:
-     * <ol>
-     *   <li>Resolves which profile matches the damage event</li>
-     *   <li>Reads the defender entity's {@code UIComponentList}</li>
-     *   <li>Clones the component IDs and swaps the CombatText index</li>
-     *   <li>Queues a {@code UIComponentsUpdate} on the attacker's viewer</li>
-     * </ol>
+     * BEFORE queuing {@code CombatTextUpdate}. It overwrites the vanilla CombatText
+     * template definition at its original index on the attacker's client.
      *
-     * @param store The entity store
-     * @param defenderRef The entity the combat text appears on
-     * @param attackerViewer The attacker's entity viewer (who sees the text)
-     * @param attacker The attacker player ref (for fallback template overwrite)
+     * @param attacker The attacker player ref (receives the template overwrite)
      * @param breakdown The damage breakdown for profile resolution
      * @param params Combat text flags (crit, avoidance)
      * @return The resolved profile (for text formatting), or null if no color applied
      */
     @Nullable
     public CombatTextProfile applyAndResolve(
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Ref<EntityStore> defenderRef,
-        @Nonnull EntityTrackerSystems.EntityViewer attackerViewer,
         @Nonnull PlayerRef attacker,
         @Nullable DamageBreakdown breakdown,
         @Nonnull CombatTextParams params
@@ -148,18 +121,10 @@ public class CombatTextColorManager {
         if (!enabled || profileResolver == null || templateRegistry == null) return null;
 
         try {
-            // 1. Resolve profile
             CombatTextProfile profile = profileResolver.resolve(breakdown, params);
-            if (profile == null || !profile.isRegistered()) return null;
+            if (profile == null) return null;
 
-            // 2. Try per-entity template swap (preferred approach)
-            boolean applied = tryPerEntitySwap(store, defenderRef, attackerViewer, profile);
-
-            // 3. Fallback: global template definition overwrite (for entities without UIComponentList)
-            if (!applied) {
-                applyTemplateOverwriteFallback(attacker, profile);
-            }
-
+            applyTemplateOverwrite(attacker, profile);
             return profile;
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to apply colored combat text — falling back to vanilla");
@@ -171,113 +136,75 @@ public class CombatTextColorManager {
         return enabled;
     }
 
+    /**
+     * Applies a specific color profile by key, bypassing the damage/avoidance resolver.
+     *
+     * <p>Used for non-damage combat text like recovery healing ("+15" in green).
+     * Falls back gracefully if the profile doesn't exist or the system is disabled.
+     *
+     * @param store The entity store
+     * @param entityRef The entity to apply the template on
+     * @param viewer The viewer who sees the colored text
+     * @param player The player ref for fallback path
+     * @param profileKey The profile key (e.g., "healing")
+     */
+    public void applyByKey(
+        @Nonnull PlayerRef player,
+        @Nonnull String profileKey
+    ) {
+        if (!enabled || profileResolver == null || templateRegistry == null) return;
+
+        CombatTextProfile profile = profileResolver.getByKey(profileKey);
+        if (profile == null) return;
+
+        applyTemplateOverwrite(player, profile);
+    }
+
     public void shutdown() {
         enabled = false;
     }
 
-    // ── Per-entity template swap (Approach B) ────────────────────────────
+    // ── Built-in profiles ──────────────────────────────────────────────
 
     /**
-     * Swaps the CombatText template index in the defender's UIComponentList
-     * for the attacker's viewer only.
-     *
-     * @return true if the swap was applied, false if UIComponentList unavailable
+     * Injects profiles that must exist for code-driven features, regardless of
+     * the player's config file version. Config values take precedence if present.
      */
-    private boolean tryPerEntitySwap(
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Ref<EntityStore> defenderRef,
-        @Nonnull EntityTrackerSystems.EntityViewer attackerViewer,
-        @Nonnull CombatTextProfile profile
-    ) {
-        UIComponentList uiComponentList = store.getComponent(defenderRef, UIComponentList.getComponentType());
-        if (uiComponentList == null) return false;
-
-        int[] currentIds = uiComponentList.getComponentIds();
-        if (currentIds == null || currentIds.length == 0) return false;
-
-        // Find the CombatText position in the component IDs array
-        int combatTextPos = findCombatTextPosition(currentIds);
-        if (combatTextPos == -1) return false;
-
-        // Clone and swap
-        int[] modifiedIds = currentIds.clone();
-        modifiedIds[combatTextPos] = profile.templateIndex();
-
-        // Send UIComponentsUpdate to the attacker's viewer for the defender entity
-        attackerViewer.queueUpdate(defenderRef, new UIComponentsUpdate(modifiedIds));
-
-        LOGGER.at(Level.FINE).log("Applied combat text template '%s' (index %d) to entity via per-entity swap",
-            profile.id(), profile.templateIndex());
-
-        return true;
-    }
-
-    /**
-     * Finds the position in the componentIds array that holds the CombatText template.
-     *
-     * <p>Looks for either the vanilla CombatText index or any of our custom indices
-     * (in case a previous hit already swapped it).
-     *
-     * @return Position index, or -1 if not found
-     */
-    private int findCombatTextPosition(@Nonnull int[] componentIds) {
-        int vanillaIndex = templateRegistry.getVanillaCombatTextIndex();
-        Set<Integer> customIndices = templateRegistry.getAllRegisteredIndices();
-
-        for (int i = 0; i < componentIds.length; i++) {
-            if (componentIds[i] == vanillaIndex || customIndices.contains(componentIds[i])) {
-                return i;
-            }
+    private void injectBuiltInProfiles(@Nonnull Map<String, CombatTextProfile> profiles) {
+        if (!profiles.containsKey("healing")) {
+            profiles.put("healing", CombatTextProfile.of(
+                "healing",
+                CombatTextColorConfig.parseColor("#55FF55"), // green
+                54.0f,  // smaller than damage, same as avoidance text
+                0.6f,   // slightly longer visibility
+                0f,     // no hit angle influence for self-text
+                CombatTextColorConfig.HARDCODED_DEFAULTS.animations()
+            ));
         }
-        return -1;
     }
 
-    // ── Template overwrite fallback (Approach A) ─────────────────────────
+    // ── Global template overwrite ──────────────────────────────────────────
 
     /**
-     * Falls back to overwriting the global CombatText template definition
-     * on the attacker's client. Less precise (affects all entities), but works
-     * when the entity has no UIComponentList.
+     * Overwrites the vanilla CombatText template at its original index
+     * on the attacker's client. Uses the vanilla maxId to avoid client-side
+     * array resize races with Hytale's asset pipeline.
      */
-    private void applyTemplateOverwriteFallback(
+    private void applyTemplateOverwrite(
         @Nonnull PlayerRef attacker,
         @Nonnull CombatTextProfile profile
     ) {
         int vanillaIndex = templateRegistry.getVanillaCombatTextIndex();
+        com.hypixel.hytale.protocol.EntityUIComponent packet = templateRegistry.buildTemplate(profile);
 
         attacker.getPacketHandler().writeNoCache(
             new UpdateEntityUIComponents(
                 UpdateType.AddOrUpdate,
-                templateRegistry.getMaxId(),
-                Map.of(vanillaIndex, buildTemplatePacket(profile))
+                templateRegistry.getVanillaMaxId(),
+                Map.of(vanillaIndex, packet)
             )
         );
 
-        LOGGER.at(Level.FINE).log("Applied combat text template '%s' via global overwrite fallback", profile.id());
-    }
-
-    /**
-     * Builds a protocol template packet for the overwrite fallback.
-     * Re-creates from profile since the registry's stored packets are at custom indices.
-     */
-    @Nonnull
-    private com.hypixel.hytale.protocol.EntityUIComponent buildTemplatePacket(@Nonnull CombatTextProfile profile) {
-        // Clone the vanilla template and apply this profile's visual properties.
-        // Used for the fallback path where we overwrite the global template definition.
-        var serverAssetMap = com.hypixel.hytale.server.core.modules.entityui.asset.EntityUIComponent.getAssetMap();
-        var vanillaAsset = serverAssetMap.getAsset(templateRegistry.getVanillaCombatTextIndex());
-        if (vanillaAsset == null) return new com.hypixel.hytale.protocol.EntityUIComponent();
-
-        com.hypixel.hytale.protocol.EntityUIComponent packet = vanillaAsset.toPacket();
-        packet.combatTextColor = profile.color();
-        packet.combatTextFontSize = profile.fontSize();
-        packet.combatTextDuration = profile.duration();
-        packet.combatTextHitAngleModifierStrength = profile.hitAngleModifierStrength();
-
-        if (profile.animations().length > 0) {
-            packet.combatTextAnimationEvents = CombatTextTemplateRegistry.convertAnimations(profile.animations());
-        }
-
-        return packet;
+        LOGGER.at(Level.FINE).log("Applied combat text template '%s' via global overwrite", profile.id());
     }
 }

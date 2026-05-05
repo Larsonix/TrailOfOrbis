@@ -27,6 +27,7 @@ public class SkillTreeEventDispatcher {
     private final List<SkillTreeEvents.NodeAllocatedListener> nodeAllocatedListeners = new CopyOnWriteArrayList<>();
     private final List<SkillTreeEvents.NodeDeallocatedListener> nodeDeallocatedListeners = new CopyOnWriteArrayList<>();
     private final List<SkillTreeEvents.RespecListener> respecListeners = new CopyOnWriteArrayList<>();
+    private final List<SkillTreeEvents.RefundPointsChangedListener> refundPointsChangedListeners = new CopyOnWriteArrayList<>();
 
     // ═══════════════════════════════════════════════════════════════════
     // REGISTRATION
@@ -50,6 +51,12 @@ public class SkillTreeEventDispatcher {
         }
     }
 
+    public void registerRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener) {
+        if (listener != null && !refundPointsChangedListeners.contains(listener)) {
+            refundPointsChangedListeners.add(listener);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // UNREGISTRATION
     // ═══════════════════════════════════════════════════════════════════
@@ -69,6 +76,12 @@ public class SkillTreeEventDispatcher {
     public void unregisterRespecListener(@Nonnull SkillTreeEvents.RespecListener listener) {
         if (listener != null) {
             respecListeners.remove(listener);
+        }
+    }
+
+    public void unregisterRefundPointsChangedListener(@Nonnull SkillTreeEvents.RefundPointsChangedListener listener) {
+        if (listener != null) {
+            refundPointsChangedListeners.remove(listener);
         }
     }
 
@@ -143,6 +156,22 @@ public class SkillTreeEventDispatcher {
         }
     }
 
+    /**
+     * Dispatches a refund points changed event to all registered listeners.
+     *
+     * @param playerId The player's UUID
+     * @param newRefundPoints The player's refund point total after modification
+     */
+    public void dispatchRefundPointsChanged(@Nonnull UUID playerId, int newRefundPoints) {
+        for (SkillTreeEvents.RefundPointsChangedListener listener : refundPointsChangedListeners) {
+            try {
+                listener.onRefundPointsChanged(playerId, newRefundPoints);
+            } catch (Exception e) {
+                LOGGER.at(Level.SEVERE).withCause(e).log("Error in RefundPointsChangedListener");
+            }
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // UTILITIES
     // ═══════════════════════════════════════════════════════════════════
@@ -156,6 +185,7 @@ public class SkillTreeEventDispatcher {
         nodeAllocatedListeners.clear();
         nodeDeallocatedListeners.clear();
         respecListeners.clear();
+        refundPointsChangedListeners.clear();
     }
 
     /**
@@ -166,6 +196,7 @@ public class SkillTreeEventDispatcher {
     public boolean hasListeners() {
         return !nodeAllocatedListeners.isEmpty()
             || !nodeDeallocatedListeners.isEmpty()
-            || !respecListeners.isEmpty();
+            || !respecListeners.isEmpty()
+            || !refundPointsChangedListeners.isEmpty();
     }
 }

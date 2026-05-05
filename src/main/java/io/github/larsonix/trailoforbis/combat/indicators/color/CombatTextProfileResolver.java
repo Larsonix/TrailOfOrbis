@@ -35,6 +35,17 @@ public class CombatTextProfileResolver {
     }
 
     /**
+     * Looks up a profile directly by key, bypassing damage/avoidance resolution.
+     *
+     * @param key The profile key (e.g., "healing", "fire_normal")
+     * @return The profile, or null if not registered
+     */
+    @Nullable
+    public CombatTextProfile getByKey(@Nonnull String key) {
+        return profiles.get(key);
+    }
+
+    /**
      * Resolves which profile to use for a damage event.
      *
      * @param breakdown The damage breakdown (nullable for edge cases)

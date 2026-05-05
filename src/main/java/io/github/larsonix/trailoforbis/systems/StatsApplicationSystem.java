@@ -3,7 +3,9 @@ package io.github.larsonix.trailoforbis.systems;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.protocol.MovementSettings;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
@@ -136,6 +138,16 @@ public final class StatsApplicationSystem {
             return -1;
         }
 
+        // NEVER modify Creative players' stats — Hytale gives them the Invulnerable
+        // component and manages their health natively. Our modifier swaps (which briefly
+        // drop max health during percentage preservation) and vanilla stat suppression
+        // can cause health clamping that kills Creative players.
+        Player player = store.getComponent(entityRef, Player.getComponentType());
+        if (player != null && player.getGameMode() == GameMode.Creative) {
+            LOGGER.atFine().log("Skipping stat application for Creative player %s", playerRef.getUuid());
+            return -1;
+        }
+
         float actualMaxHp = applyResourceStats(store, entityRef, stats);
         StatMapBridge.applyToEntity(store, entityRef, stats, playerRef.getUuid());
         applyMovementSpeed(store, entityRef, playerRef, stats);
@@ -171,15 +183,12 @@ public final class StatsApplicationSystem {
         float baseMana = VanillaStatReader.getBaseMana(store, entityRef);
         float baseStamina = VanillaStatReader.getBaseStamina(store, entityRef);
         float baseOxygen = VanillaStatReader.getBaseOxygen(store, entityRef);
-        float baseSignatureEnergy = VanillaStatReader.getBaseSignatureEnergy(store, entityRef);
-
         // Calculate bonuses (total - vanilla base)
         float healthBonus = stats.getMaxHealth() - baseHealth;
         // NOTE: Mana is handled by StatMapBridge (uses "rpg_max_mana" modifier key)
         // to support unified mana pool with Hexcode's ArmorManaPatcher.
         float staminaBonus = stats.getMaxStamina() - baseStamina;
         float oxygenBonus = stats.getMaxOxygen() - baseOxygen;
-        float signatureEnergyBonus = stats.getMaxSignatureEnergy() - baseSignatureEnergy;
 
         // Apply bonuses with percentage preservation
         float actualMaxHp = applyStatModifierWithPreservation(
@@ -187,10 +196,14 @@ public final class StatsApplicationSystem {
         );
         applyStatModifierWithPreservation(statMap, DefaultEntityStatTypes.getStamina(), staminaBonus);
         applyStatModifierWithPreservation(statMap, DefaultEntityStatTypes.getOxygen(), oxygenBonus);
-        // SignatureEnergy is special: current value builds through combat (+1-2 per hit from vanilla's
-        // EntityStatsOnHit) and is consumed by signature abilities. We should ONLY modify the MAX,
-        // not forcibly set the current value, otherwise we overwrite vanilla's combat gains.
-        applyMaxModifierOnly(statMap, DefaultEntityStatTypes.getSignatureEnergy(), signatureEnergyBonus);
+        // SignatureEnergy: DO NOT apply an RPG modifier. Vanilla weapons provide max via
+        // weapon.statModifiers (which we now preserve in neutralizeWeaponStats). Adding an
+        // RPG modifier on top would double the max (e.g., sword: 20 weapon + 20 RPG = 40),
+        // breaking the signature attack lifecycle (ChangeStat -100% subtracts from wrong max,
+        // and our applyMaxModifierOnly remove/put cycle can restore consumed energy mid-chain).
+        // Let vanilla handle SignatureEnergy, SignatureCharges, and Ammo entirely.
+        // Clean up stale RPG modifier from previous versions that applied one.
+        statMap.removeModifier(DefaultEntityStatTypes.getSignatureEnergy(), RPG_MODIFIER_ID);
 
         return actualMaxHp;
     }
@@ -277,6 +290,69 @@ public final class StatsApplicationSystem {
         }
 
         return currentMax;
+    }
+
+    /**
+     * Removes all RPG stat modifiers from a player's ECS components.
+     *
+     * <p>Called when entering Creative mode to cleanly revert to vanilla stats.
+     * Removes the {@code rpg_attribute_bonus} modifier from all resource stats
+     * and resets movement speed to vanilla base values.
+     *
+     * @param store The entity store
+     * @param entityRef The entity reference
+     * @param playerRef The player reference
+     */
+    public static void removeAllRpgModifiers(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> entityRef,
+            @Nonnull PlayerRef playerRef
+    ) {
+        if (entityRef == null || !entityRef.isValid()) {
+            return;
+        }
+
+        EntityStatMap statMap = store.getComponent(entityRef, EntityStatMap.getComponentType());
+        if (statMap != null) {
+            // Remove RPG resource modifiers
+            statMap.removeModifier(DefaultEntityStatTypes.getHealth(), RPG_MODIFIER_ID);
+            statMap.removeModifier(DefaultEntityStatTypes.getStamina(), RPG_MODIFIER_ID);
+            statMap.removeModifier(DefaultEntityStatTypes.getOxygen(), RPG_MODIFIER_ID);
+            statMap.removeModifier(DefaultEntityStatTypes.getSignatureEnergy(), RPG_MODIFIER_ID);
+
+            // Remove mana modifier (managed by StatMapBridge)
+            StatMapBridge.removeManaModifier(statMap);
+
+            // Restore health to max after removing our modifiers
+            EntityStatValue healthStat = statMap.get(DefaultEntityStatTypes.getHealth());
+            if (healthStat != null) {
+                statMap.setStatValue(EntityStatMap.Predictable.SELF,
+                    DefaultEntityStatTypes.getHealth(), healthStat.getMax());
+            }
+        }
+
+        // Reset movement speed to vanilla base values
+        UUID uuid = playerRef.getUuid();
+        MovementManager movementManager = store.getComponent(entityRef, MovementManager.getComponentType());
+        if (movementManager != null && movementManager.getSettings() != null) {
+            MovementSettings settings = movementManager.getSettings();
+            settings.forwardSprintSpeedMultiplier = VanillaStatReader.getBaseForwardSprintSpeed(uuid);
+            settings.forwardRunSpeedMultiplier = VanillaStatReader.getBaseForwardRunSpeed(uuid);
+            settings.backwardRunSpeedMultiplier = VanillaStatReader.getBaseBackwardRunSpeed(uuid);
+            settings.strafeRunSpeedMultiplier = VanillaStatReader.getBaseStrafeRunSpeed(uuid);
+            settings.forwardWalkSpeedMultiplier = VanillaStatReader.getBaseForwardWalkSpeed(uuid);
+            settings.backwardWalkSpeedMultiplier = VanillaStatReader.getBaseBackwardWalkSpeed(uuid);
+            settings.strafeWalkSpeedMultiplier = VanillaStatReader.getBaseStrafeWalkSpeed(uuid);
+            settings.forwardCrouchSpeedMultiplier = VanillaStatReader.getBaseForwardCrouchSpeed(uuid);
+            settings.backwardCrouchSpeedMultiplier = VanillaStatReader.getBaseBackwardCrouchSpeed(uuid);
+            settings.strafeCrouchSpeedMultiplier = VanillaStatReader.getBaseStrafeCrouchSpeed(uuid);
+            settings.jumpForce = VanillaStatReader.getBaseJumpForce(uuid);
+            settings.climbSpeed = VanillaStatReader.getBaseClimbSpeed(uuid);
+            settings.climbSpeedLateral = VanillaStatReader.getBaseClimbSpeedLateral(uuid);
+            movementManager.update(playerRef.getPacketHandler());
+        }
+
+        LOGGER.atInfo().log("Removed all RPG modifiers for Creative player %s", uuid);
     }
 
     /**

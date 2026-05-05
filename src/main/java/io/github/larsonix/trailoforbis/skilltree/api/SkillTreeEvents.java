@@ -88,4 +88,22 @@ public final class SkillTreeEvents {
          */
         void onRespec(@Nonnull UUID playerId, @Nonnull Set<String> nodesCleared, int pointsRefunded, int freeRespecsRemaining);
     }
+
+    /**
+     * Listener for refund point changes outside the normal allocate/deallocate/respec flow.
+     *
+     * <p>Called when refund points are modified by an external source (e.g., Orb of Unlearning
+     * stone, admin commands). Normal deallocation and respec events already carry refund point
+     * data — this event covers all other modification paths.
+     */
+    @FunctionalInterface
+    public interface RefundPointsChangedListener {
+        /**
+         * Called when a player's refund points are modified externally.
+         *
+         * @param playerId The player's UUID
+         * @param newRefundPoints The player's refund point total after modification
+         */
+        void onRefundPointsChanged(@Nonnull UUID playerId, int newRefundPoints);
+    }
 }

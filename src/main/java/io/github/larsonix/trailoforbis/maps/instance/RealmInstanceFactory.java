@@ -199,16 +199,23 @@ public class RealmInstanceFactory {
                         LOGGER.atFine().log("Preloaded %d chunks for realm %s (radius=%d)",
                             chunkFutures.size(), realmId, arenaRadius);
 
-                        // Scan from Base height + 1 (not Y=256 or Y=80) to avoid hitting
-                        // dome ceilings in Caverns. Base+1 is always below any ceiling.
-                        int maxScanY = (int) io.github.larsonix.trailoforbis.maps.templates
-                            .RealmTemplateRegistry.getBaseYForBiome(mapData.biome()) + 1;
+                        // Ceiling biomes (Caverns, Frozen Crypts, Sand Tombs) scan from
+                        // baseY + 1 to stay below the ceiling — ceiling is made of the same
+                        // terrain materials as the floor, so a higher scan would land on the
+                        // ceiling underside instead of the cave floor.
+                        // Surface biomes scan from baseY + 30 to catch terrain pushed above
+                        // base Y by WorldGen noise (consistent with mob spawner, structure
+                        // placer, victory portal, and reward chest systems).
+                        RealmBiomeType biome = mapData.biome();
+                        int baseY = (int) io.github.larsonix.trailoforbis.maps.templates
+                            .RealmTemplateRegistry.getBaseYForBiome(biome);
+                        int maxScanY = baseY + (biome.isCeilingBiome() ? 1 : 30);
+                        java.util.Set<String> terrainMaterials = biome.getTerrainMaterials();
 
                         // Clear WorldGen props (trees, rocks, bushes) around spawn.
                         // Must run BEFORE spawn transform is set so ground detection
                         // sees clean terrain. Skip MOUNTAINS (labyrinth carves its own
                         // spawn clearing) and utility biomes (no combat, fixed template).
-                        RealmBiomeType biome = mapData.biome();
                         if (biome != RealmBiomeType.MOUNTAINS && !biome.isUtilityBiome()) {
                             SpawnZoneClearer.clearSpawnArea(
                                 world, biome, 0, 0,
@@ -216,15 +223,49 @@ public class RealmInstanceFactory {
                         }
 
                         // Override world spawn point to actual terrain height at (0,0).
-                        int groundY = io.github.larsonix.trailoforbis.util.TerrainUtils
-                            .findGroundLevel(world, 0, 0, maxScanY);
+                        // Two strategies depending on biome type:
+                        int groundY;
+                        if (biome.isCeilingBiome()) {
+                            // Ceiling biomes: generic terrain check (Soil_*/Rock_*).
+                            // The scan starts near floor level (baseY+1), so floating
+                            // decorative props aren't a concern. Biome-aware check is
+                            // too restrictive here — cave floors can have blocks not in
+                            // the biome whitelist (mossy variants, crystals, etc.).
+                            // NO heightmap fallback — heightmap returns ceiling, not floor.
+                            groundY = io.github.larsonix.trailoforbis.util.TerrainUtils
+                                .findGroundLevel(world, 0, 0, maxScanY);
+                        } else {
+                            // Surface biomes: biome-aware check to skip decorative props
+                            // (Rock_Stone_Mossy, crystals) that float above real terrain.
+                            groundY = io.github.larsonix.trailoforbis.util.TerrainUtils
+                                .findGroundLevel(world, 0, 0, maxScanY, terrainMaterials);
+
+                            // Heightmap fallback: if biome-aware scan found nothing,
+                            // use Hytale's precomputed heightmap as last resort. May land
+                            // on a tree canopy, but better than spawning inside terrain.
+                            if (groundY == io.github.larsonix.trailoforbis.util.TerrainUtils.FALLBACK_GROUND_Y) {
+                                var chunk = world.getChunkIfInMemory(
+                                    ChunkUtil.indexChunkFromBlock(0, 0));
+                                if (chunk != null) {
+                                    int heightmapY = chunk.getHeight(0, 0);
+                                    if (heightmapY > 0) {
+                                        groundY = heightmapY + 1;
+                                        LOGGER.atWarning().log(
+                                            "Spawn ground detection returned fallback for realm %s "
+                                            + "(biome=%s, maxScanY=%d). Heightmap fallback Y=%d",
+                                            realmId, biome, maxScanY, groundY);
+                                    }
+                                }
+                            }
+                        }
+
                         Transform spawnTransform = new Transform(
                             new Vector3d(0, groundY + 0.5, 0), new Vector3f(0, 0, 0));
                         world.getWorldConfig().setSpawnProvider(
                             new com.hypixel.hytale.server.core.universe.world.spawn
                                 .IndividualSpawnProvider(spawnTransform));
-                        LOGGER.atFine().log("Set realm spawn to terrain height Y=%d for %s",
-                            groundY, realmId);
+                        LOGGER.atInfo().log("Realm %s spawn set to Y=%d (biome=%s, baseY=%d, maxScanY=%d)",
+                            realmId, groundY, biome, baseY, maxScanY);
 
                         // Transition to READY (all arena chunks guaranteed loaded)
                         realm.transitionTo(RealmState.READY);

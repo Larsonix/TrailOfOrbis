@@ -29,12 +29,15 @@ import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -195,6 +198,10 @@ public class StoneDropListener extends DeathSystems.OnDeathSystem {
 
         // Calculate drop chance
         double dropChance = calculateDropChance(config, mobLevel, mobType);
+
+        // Apply realm STONE_DROP_BONUS modifier
+        dropChance = applyRealmStoneDropBonus(dropChance, killerInfo);
+
         double roll = ThreadLocalRandom.current().nextDouble();
 
         if (roll > dropChance) {
@@ -212,6 +219,9 @@ public class StoneDropListener extends DeathSystems.OnDeathSystem {
 
         // Roll rarity using unified system
         GearRarity stoneRarity = rollStoneRarity(rarityRoller, rarityBonus);
+
+        // Apply realm STONE_RARITY_BONUS — upgrade by 1 tier
+        stoneRarity = applyRealmStoneRarityBonus(stoneRarity, killerInfo);
 
         // Select a stone of that rarity
         StoneType stoneType = selectStoneOfRarity(stoneRarity);
@@ -268,6 +278,68 @@ public class StoneDropListener extends DeathSystems.OnDeathSystem {
             case ELITE -> config.getEliteStoneDropMultiplier();
             case NORMAL -> 1.0;
         };
+    }
+
+    /**
+     * Upgrades stone rarity by 1 tier if the realm has STONE_RARITY_BONUS.
+     *
+     * @param baseRarity The rolled rarity
+     * @param killerInfo The killer info for realm lookup
+     * @return Upgraded rarity (capped at LEGENDARY), or unchanged if no modifier
+     */
+    private GearRarity applyRealmStoneRarityBonus(@Nonnull GearRarity baseRarity, @Nonnull KillerInfo killerInfo) {
+        if (plugin == null) {
+            return baseRarity; // Test path
+        }
+        RealmsManager rm = plugin.getRealmsManager();
+        if (rm == null) {
+            return baseRarity;
+        }
+        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(killerInfo.playerId());
+        if (realmOpt.isEmpty()) {
+            return baseRarity;
+        }
+        if (!realmOpt.get().getMapData().hasModifier(RealmModifierType.STONE_RARITY_BONUS)) {
+            return baseRarity;
+        }
+        // Upgrade by 1 tier, capped at LEGENDARY (don't go to MYTHIC/UNIQUE for stones)
+        GearRarity[] rarities = GearRarity.values();
+        int nextOrdinal = baseRarity.ordinal() + 1;
+        int maxOrdinal = GearRarity.LEGENDARY.ordinal();
+        if (nextOrdinal > maxOrdinal) {
+            return baseRarity; // Already at or above cap
+        }
+        GearRarity upgraded = rarities[nextOrdinal];
+        LOGGER.atFine().log("Realm stone rarity bonus: %s -> %s", baseRarity, upgraded);
+        return upgraded;
+    }
+
+    /**
+     * Applies the realm STONE_DROP_BONUS modifier to the drop chance.
+     *
+     * @param baseChance The base drop chance before realm bonus
+     * @param killerInfo The killer info (contains player UUID for realm lookup)
+     * @return The boosted drop chance, clamped to [0, 1]
+     */
+    private double applyRealmStoneDropBonus(double baseChance, @Nonnull KillerInfo killerInfo) {
+        if (plugin == null) {
+            return baseChance; // Test path — no realm access
+        }
+        RealmsManager rm = plugin.getRealmsManager();
+        if (rm == null) {
+            return baseChance;
+        }
+        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(killerInfo.playerId());
+        if (realmOpt.isEmpty()) {
+            return baseChance;
+        }
+        int bonusPercent = realmOpt.get().getMapData().getModifierValue(RealmModifierType.STONE_DROP_BONUS);
+        if (bonusPercent <= 0) {
+            return baseChance;
+        }
+        double boosted = baseChance * (1.0 + bonusPercent / 100.0);
+        LOGGER.atFine().log("Realm stone drop bonus +%d%%: %.4f -> %.4f", bonusPercent, baseChance, boosted);
+        return Math.min(1.0, boosted);
     }
 
     // ═══════════════════════════════════════════════════════════════════

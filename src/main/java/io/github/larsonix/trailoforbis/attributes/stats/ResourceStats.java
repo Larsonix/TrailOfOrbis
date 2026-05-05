@@ -27,16 +27,27 @@ public final class ResourceStats {
     private float staminaRegen;
     private float oxygenRegen;
     private float signatureEnergyRegen;
+    private float energyShieldRegen;
+
+    // ==================== Regeneration Delays (seconds) ====================
+    /** Delay in seconds before energy shield starts regenerating after being hit. Base: 3.0s. */
+    private float energyShieldRegenDelay;
 
     // ==================== Regeneration Modifiers ====================
     /** Health regeneration bonus percentage. Multiplies healthRegen: effective = healthRegen * (1 + pct/100). */
     private float healthRegenPercent;
+    /** Energy shield regen bonus percentage. Multiplies energyShieldRegen: effective = energyShieldRegen * (1 + pct/100). */
+    private float energyShieldRegenPercent;
+    /** Mana regeneration bonus percentage. Multiplies manaRegen: effective = manaRegen * (1 + pct/100). */
+    private float manaRegenPercent;
 
     // ==================== Percent Modifiers ====================
     /** Max health percentage modifier. Final = base * (1 + pct/100). */
     private float maxHealthPercent;
     /** Max mana percentage modifier. Final = base * (1 + pct/100). */
     private float maxManaPercent;
+    /** Max oxygen percentage modifier. Final = base * (1 + pct/100). */
+    private float maxOxygenPercent;
     /** Mana cost percentage modifier (positive = higher cost). */
     private float manaCostPercent;
     /** Max stamina percentage modifier. Final = base * (1 + pct/100). */
@@ -77,10 +88,15 @@ public final class ResourceStats {
         this.staminaRegen = builder.staminaRegen;
         this.oxygenRegen = builder.oxygenRegen;
         this.signatureEnergyRegen = builder.signatureEnergyRegen;
+        this.energyShieldRegen = builder.energyShieldRegen;
+        this.energyShieldRegenDelay = builder.energyShieldRegenDelay;
         this.healthRegenPercent = builder.healthRegenPercent;
+        this.energyShieldRegenPercent = builder.energyShieldRegenPercent;
+        this.manaRegenPercent = builder.manaRegenPercent;
 
         this.maxHealthPercent = builder.maxHealthPercent;
         this.maxManaPercent = builder.maxManaPercent;
+        this.maxOxygenPercent = builder.maxOxygenPercent;
         this.manaCostPercent = builder.manaCostPercent;
         this.maxStaminaPercent = builder.maxStaminaPercent;
         this.staminaRegenPercent = builder.staminaRegenPercent;
@@ -132,10 +148,25 @@ public final class ResourceStats {
         return signatureEnergyRegen;
     }
 
+    public float getEnergyShieldRegen() {
+        return energyShieldRegen;
+    }
+
+    public float getEnergyShieldRegenDelay() {
+        return energyShieldRegenDelay;
+    }
+
     public float getHealthRegenPercent() {
         return healthRegenPercent;
     }
 
+    public float getEnergyShieldRegenPercent() {
+        return energyShieldRegenPercent;
+    }
+
+    public float getManaRegenPercent() {
+        return manaRegenPercent;
+    }
 
     public float getMaxHealthPercent() {
         return maxHealthPercent;
@@ -143,6 +174,10 @@ public final class ResourceStats {
 
     public float getMaxManaPercent() {
         return maxManaPercent;
+    }
+
+    public float getMaxOxygenPercent() {
+        return maxOxygenPercent;
     }
 
     public float getManaCostPercent() {
@@ -215,10 +250,25 @@ public final class ResourceStats {
         this.signatureEnergyRegen = signatureEnergyRegen;
     }
 
+    public void setEnergyShieldRegen(float energyShieldRegen) {
+        this.energyShieldRegen = energyShieldRegen;
+    }
+
+    public void setEnergyShieldRegenDelay(float energyShieldRegenDelay) {
+        this.energyShieldRegenDelay = energyShieldRegenDelay;
+    }
+
     public void setHealthRegenPercent(float healthRegenPercent) {
         this.healthRegenPercent = healthRegenPercent;
     }
 
+    public void setEnergyShieldRegenPercent(float energyShieldRegenPercent) {
+        this.energyShieldRegenPercent = energyShieldRegenPercent;
+    }
+
+    public void setManaRegenPercent(float manaRegenPercent) {
+        this.manaRegenPercent = manaRegenPercent;
+    }
 
     public void setMaxHealthPercent(float maxHealthPercent) {
         this.maxHealthPercent = maxHealthPercent;
@@ -226,6 +276,10 @@ public final class ResourceStats {
 
     public void setMaxManaPercent(float maxManaPercent) {
         this.maxManaPercent = maxManaPercent;
+    }
+
+    public void setMaxOxygenPercent(float maxOxygenPercent) {
+        this.maxOxygenPercent = maxOxygenPercent;
     }
 
     public void setManaCostPercent(float manaCostPercent) {
@@ -278,9 +332,14 @@ public final class ResourceStats {
         staminaRegen = 0;
         oxygenRegen = 0;
         signatureEnergyRegen = 0;
+        energyShieldRegen = 0;
+        energyShieldRegenDelay = 0;
         healthRegenPercent = 0;
+        energyShieldRegenPercent = 0;
+        manaRegenPercent = 0;
         maxHealthPercent = 0;
         maxManaPercent = 0;
+        maxOxygenPercent = 0;
         manaCostPercent = 0;
         maxStaminaPercent = 0;
         staminaRegenPercent = 0;
@@ -308,9 +367,14 @@ public final class ResourceStats {
             .staminaRegen(staminaRegen)
             .oxygenRegen(oxygenRegen)
             .signatureEnergyRegen(signatureEnergyRegen)
+            .energyShieldRegen(energyShieldRegen)
+            .energyShieldRegenDelay(energyShieldRegenDelay)
             .healthRegenPercent(healthRegenPercent)
+            .energyShieldRegenPercent(energyShieldRegenPercent)
+            .manaRegenPercent(manaRegenPercent)
             .maxHealthPercent(maxHealthPercent)
             .maxManaPercent(maxManaPercent)
+            .maxOxygenPercent(maxOxygenPercent)
             .manaCostPercent(manaCostPercent)
             .maxStaminaPercent(maxStaminaPercent)
             .staminaRegenPercent(staminaRegenPercent)
@@ -331,9 +395,14 @@ public final class ResourceStats {
         private float staminaRegen;
         private float oxygenRegen;
         private float signatureEnergyRegen;
+        private float energyShieldRegen;
+        private float energyShieldRegenDelay;
         private float healthRegenPercent;
+        private float energyShieldRegenPercent;
+        private float manaRegenPercent;
         private float maxHealthPercent;
         private float maxManaPercent;
+        private float maxOxygenPercent;
         private float manaCostPercent;
         private float maxStaminaPercent;
         private float staminaRegenPercent;
@@ -394,11 +463,30 @@ public final class ResourceStats {
             return this;
         }
 
+        public Builder energyShieldRegen(float value) {
+            this.energyShieldRegen = value;
+            return this;
+        }
+
+        public Builder energyShieldRegenDelay(float value) {
+            this.energyShieldRegenDelay = value;
+            return this;
+        }
+
         public Builder healthRegenPercent(float value) {
             this.healthRegenPercent = value;
             return this;
         }
 
+        public Builder energyShieldRegenPercent(float value) {
+            this.energyShieldRegenPercent = value;
+            return this;
+        }
+
+        public Builder manaRegenPercent(float value) {
+            this.manaRegenPercent = value;
+            return this;
+        }
 
         public Builder maxHealthPercent(float value) {
             this.maxHealthPercent = value;
@@ -407,6 +495,11 @@ public final class ResourceStats {
 
         public Builder maxManaPercent(float value) {
             this.maxManaPercent = value;
+            return this;
+        }
+
+        public Builder maxOxygenPercent(float value) {
+            this.maxOxygenPercent = value;
             return this;
         }
 
@@ -467,16 +560,21 @@ public final class ResourceStats {
             && Float.compare(staminaRegen, that.staminaRegen) == 0
             && Float.compare(oxygenRegen, that.oxygenRegen) == 0
             && Float.compare(signatureEnergyRegen, that.signatureEnergyRegen) == 0
+            && Float.compare(energyShieldRegen, that.energyShieldRegen) == 0
+            && Float.compare(energyShieldRegenDelay, that.energyShieldRegenDelay) == 0
             && Float.compare(healthRegenPercent, that.healthRegenPercent) == 0
+            && Float.compare(energyShieldRegenPercent, that.energyShieldRegenPercent) == 0
+            && Float.compare(manaRegenPercent, that.manaRegenPercent) == 0
             && Float.compare(maxStaminaPercent, that.maxStaminaPercent) == 0
+            && Float.compare(maxOxygenPercent, that.maxOxygenPercent) == 0
             && Float.compare(staminaRegenPercent, that.staminaRegenPercent) == 0
             && Float.compare(staminaRegenStartDelay, that.staminaRegenStartDelay) == 0;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(maxHealth, maxMana, maxStamina, healthRegen, manaRegen, healthRegenPercent,
-            maxStaminaPercent, staminaRegenPercent, staminaRegenStartDelay);
+        return Objects.hash(maxHealth, maxMana, maxStamina, healthRegen, manaRegen, energyShieldRegen,
+            energyShieldRegenDelay, healthRegenPercent, energyShieldRegenPercent, manaRegenPercent, maxStaminaPercent, staminaRegenPercent, staminaRegenStartDelay);
     }
 
     @Override

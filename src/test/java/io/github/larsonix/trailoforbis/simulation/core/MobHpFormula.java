@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.simulation.core;
 
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.mobs.model.MobStats;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatProfile;
 import io.github.larsonix.trailoforbis.util.LevelScaling;
@@ -168,5 +169,57 @@ public final class MobHpFormula {
     @Nonnull
     public ComputedStats toActualCombatStats(@Nonnull MobStatProfile profile, boolean isBoss) {
         return toActualCombatStats(profile, isBoss, false);
+    }
+
+    // =========================================================================
+    // MobStats overloads (for new MobStatFactory output)
+    // =========================================================================
+
+    /**
+     * Calculates actual in-game HP from a MobStats record.
+     * Same formula as the MobStatProfile version.
+     */
+    public double calculateActualHP(@Nonnull MobStats stats, boolean isBoss) {
+        double rpgTargetHP = stats.maxHealth();
+        int mobLevel = stats.level();
+
+        double progressiveScale = poolConfig.calculateScalingFactor(mobLevel);
+        double expMultiplier = LevelScaling.getMultiplier(mobLevel);
+        double bossMultiplier = isBoss ? BOSS_HP_MULT : 1.0;
+        double weight = Math.sqrt(DEFAULT_VANILLA_HP / 100.0);
+
+        double effectiveRpg = Math.max(rpgTargetHP * progressiveScale * expMultiplier, HP_FLOOR * bossMultiplier);
+        return effectiveRpg * weight;
+    }
+
+    /**
+     * Calculates actual in-game damage from a MobStats record.
+     */
+    public double calculateActualDamage(@Nonnull MobStats stats, boolean isBoss, boolean isElite) {
+        double rpgTargetDmg = stats.physicalDamage();
+        int mobLevel = stats.level();
+
+        double progressiveScale = poolConfig.calculateScalingFactor(mobLevel);
+        double classMult = isBoss ? BOSS_DMG_MULT : isElite ? ELITE_DMG_MULT : HOSTILE_DMG_MULT;
+
+        double weight = Math.sqrt(Math.max(DEFAULT_VANILLA_DMG, MIN_VANILLA_DMG) / VANILLA_DMG_DIVISOR);
+        double effectiveRpg = Math.max(rpgTargetDmg * progressiveScale * classMult, DMG_FLOOR * classMult);
+        return effectiveRpg * weight;
+    }
+
+    /**
+     * Creates ComputedStats with corrected HP/damage from a MobStats record.
+     */
+    @Nonnull
+    public ComputedStats toActualCombatStats(@Nonnull MobStats stats, boolean isBoss, boolean isElite) {
+        double actualHP = calculateActualHP(stats, isBoss);
+        double actualDmg = calculateActualDamage(stats, isBoss, isElite);
+
+        ComputedStats base = stats.toComputedStats();
+        return base.toBuilder()
+                .maxHealth((float) actualHP)
+                .physicalDamage((float) actualDmg)
+                .mobStats(true)
+                .build();
     }
 }

@@ -487,7 +487,8 @@ public class RewardChestManager {
     /**
      * Populates L4E with per-player rewards for a freshly spawned chest.
      *
-     * <p>Registers the chest as a L4E template (so L4E recognizes it as a loot chest),
+     * <p>Configures the realm world's L4E settings (break protection, particles),
+     * registers the chest as a L4E template (so L4E recognizes it as a loot chest),
      * then pre-sets each player's inventory so they see their own rewards when opening.
      *
      * <p>MUST be called on the world thread (inside spawnChestInternal).
@@ -500,6 +501,10 @@ public class RewardChestManager {
                 realmId.toString().substring(0, 8));
             return;
         }
+
+        // Configure L4E world settings: break protection + reward chest particles
+        // This runs AFTER L4E's StartWorldEvent handler, so our settings stick.
+        l4eBridge.configureRealmWorld(world, "#ffdd00ff");
 
         // Register the chest as a L4E template (empty items, "custom" droplist)
         // This tells L4E to treat this position as a managed loot chest

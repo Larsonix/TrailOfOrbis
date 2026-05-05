@@ -7,17 +7,17 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemData;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemInstanceId;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemSyncService;
-import io.github.larsonix.trailoforbis.gear.item.ItemDisplayNameService;
 import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
-import io.github.larsonix.trailoforbis.gear.tooltip.RichTooltipFormatter;
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipStyles;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.gems.GemManager;
@@ -35,78 +35,42 @@ import java.util.Optional;
 import java.util.logging.Level;
 
 /**
- * Unified service for handling all item pickup notifications.
+ * Sole notification channel for all item pickups.
  *
- * <p>Centralizes pickup handling for:
+ * <p>Hytale's native {@code notifyPickupItem()} is disabled globally (via GameplayConfig
+ * reflection in {@code TrailOfOrbis.suppressNativePickupToasts()}). This service replaces
+ * it, sending appropriate toasts for every item type:
  * <ul>
- *   <li>RPG Gear - Shows level, modifiers, and quality</li>
- *   <li>Realm Maps - Shows level and biome</li>
- *   <li>Stones - Uses standard display name</li>
+ *   <li>RPG Gear (all rarities) — enhanced rarity toast (color, level, quality, 3D model)</li>
+ *   <li>Realm Maps (all rarities) — enhanced rarity toast (color, level, quality, 3D model)</li>
+ *   <li>Gems / Stones / Vanilla — simple "Picked up X" toast</li>
  * </ul>
  *
- * <h2>Responsibilities</h2>
+ * <p>Runs at handler position 4 in the InventoryChangeEvent chain, AFTER:
  * <ol>
- *   <li>Sync item definitions to player (via ItemSyncService/CustomItemSyncService)</li>
- *   <li>Send chat notifications for notable items</li>
+ *   <li>LootFilterInventoryHandler (position 0) — ejects filtered items from the slot</li>
+ *   <li>ImmediateItemSyncHandler (position 2) — syncs ItemBase definitions to client</li>
  * </ol>
  *
- * <h2>Architecture</h2>
- * <pre>
- * ┌─────────────────────────────────┐
- * │    PickupNotificationService    │
- * │                                 │
- * │  • Unified pickup handling      │
- * │  • ItemDisplayNameService       │
- * │  • Translation coordination     │
- * │  • Chat + Native UI support     │
- * └─────────────────────────────────┘
- *                │
- * ┌──────────────┼──────────────┐
- * ↓              ↓              ↓
- * ┌─────────┐   ┌─────────┐   ┌─────────┐
- * │  Gear   │   │  Maps   │   │ Stones  │
- * └─────────┘   └─────────┘   └─────────┘
- * </pre>
- *
- * <h2>Thread Safety</h2>
- * <p>This class is thread-safe. All dependencies are immutable after construction.
+ * <p>Because the loot filter runs first, filtered items are already gone from the
+ * container by the time {@link io.github.larsonix.trailoforbis.gear.listener.UnifiedPickupListener}
+ * checks the slot. If the slot is empty, {@code handlePickup()} is never called — no toast.
  *
  * @see ItemSyncService
  * @see CustomItemSyncService
- * @see ItemDisplayNameService
  */
 public final class PickupNotificationService {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    /**
-     * Minimum rarity for chat notifications.
-     * Common items don't trigger chat notifications to reduce spam.
-     */
-    private static final GearRarity MIN_CHAT_NOTIFICATION_RARITY = GearRarity.UNCOMMON;
-
-    private final ItemDisplayNameService displayNameService;
     private final ItemSyncService gearSyncService;
     private final CustomItemSyncService customItemSyncService;
-    private final RichTooltipFormatter tooltipFormatter;
 
-    /**
-     * Creates a PickupNotificationService.
-     *
-     * @param displayNameService Service for generating consistent display names
-     * @param gearSyncService Service for syncing gear definitions (may be null)
-     * @param customItemSyncService Service for syncing custom item definitions (may be null)
-     * @param tooltipFormatter Formatter for modifier formatting in chat notifications
-     */
     public PickupNotificationService(
-            @Nonnull ItemDisplayNameService displayNameService,
             @Nullable ItemSyncService gearSyncService,
-            @Nullable CustomItemSyncService customItemSyncService,
-            @Nonnull RichTooltipFormatter tooltipFormatter) {
-        this.displayNameService = Objects.requireNonNull(displayNameService, "displayNameService cannot be null");
+            @Nullable CustomItemSyncService customItemSyncService) {
         this.gearSyncService = gearSyncService;
         this.customItemSyncService = customItemSyncService;
-        this.tooltipFormatter = Objects.requireNonNull(tooltipFormatter, "tooltipFormatter cannot be null");
     }
 
     // =========================================================================
@@ -115,17 +79,7 @@ public final class PickupNotificationService {
 
     /**
      * Handles a pickup event for any item type.
-     *
-     * <p>Auto-detects item type and routes to appropriate handler:
-     * <ul>
-     *   <li>Gear - Syncs definition and sends chat notification for Uncommon+</li>
-     *   <li>Map - Syncs definition and sends chat notification</li>
-     *   <li>Stone - Native item, no action needed</li>
-     *   <li>Vanilla - No action needed</li>
-     * </ul>
-     *
-     * @param player The player who picked up the item
-     * @param itemStack The item that was picked up
+     * Auto-detects type and routes to the appropriate handler.
      */
     public void handlePickup(@Nonnull PlayerRef player, @Nonnull ItemStack itemStack) {
         Objects.requireNonNull(player, "player cannot be null");
@@ -141,11 +95,18 @@ public final class PickupNotificationService {
         // Try map
         Optional<RealmMapData> mapOpt = RealmMapUtils.readMapData(itemStack);
         if (mapOpt.isPresent()) {
-            handleCustomItemPickup(player, mapOpt.get());
+            RealmMapData mapData = mapOpt.get();
+            handleCustomItemPickup(player, mapData);
+
+            // Enhanced toast: rarity-colored name + level/quality subtitle
+            String mapCompactId = mapData.instanceId() != null
+                    ? mapData.instanceId().toCompactString() : null;
+            sendRPGPickupToast(player, itemStack, mapData.rarity(),
+                    mapData.level(), mapData.quality(), mapCompactId);
+
             // Guide milestone: map with 2+ modifiers
             TrailOfOrbis rpgMap = TrailOfOrbis.getInstanceOrNull();
             if (rpgMap != null && rpgMap.getGuideManager() != null) {
-                RealmMapData mapData = mapOpt.get();
                 int totalMods = mapData.prefixes().size() + mapData.suffixes().size();
                 if (totalMods >= 2) {
                     rpgMap.getGuideManager().tryShow(player.getUuid(), io.github.larsonix.trailoforbis.guide.GuideMilestone.MAP_MODIFIERS);
@@ -168,10 +129,11 @@ public final class PickupNotificationService {
                             new GemItemData(instanceId, defOpt.get(), gemDataOpt.get()));
                 }
             }
+            sendSimplePickupToast(player, itemStack);
             return;
         }
 
-        // Stones are native Hytale items — no custom sync needed, but trigger guide
+        // Stones — trigger guide, then simple toast
         if (io.github.larsonix.trailoforbis.stones.StoneUtils.isStone(itemStack)) {
             TrailOfOrbis rpgStone = TrailOfOrbis.getInstanceOrNull();
             if (rpgStone != null && rpgStone.getGuideManager() != null) {
@@ -179,7 +141,9 @@ public final class PickupNotificationService {
             }
         }
 
-        // Vanilla items need no special handling
+        // Simple toast for all remaining items (stones, vanilla)
+        // Replaces Hytale's disabled native notifyPickupItem() toast
+        sendSimplePickupToast(player, itemStack);
     }
 
     /**
@@ -225,8 +189,15 @@ public final class PickupNotificationService {
      * <p>Performs:
      * <ol>
      *   <li>Syncs item definition to player (includes translation with proper display name)</li>
-     *   <li>Sends chat notification for Uncommon+ items</li>
+     *   <li>Sends enhanced toast notification with rarity-colored name + level/quality for ALL rarities</li>
+     *   <li>Triggers guide milestones</li>
      * </ol>
+     *
+     * <p>The notification is sent AFTER ImmediateItemSyncHandler (handler position 2) has
+     * already synced the ItemBase definition (with qualityIndex) via UpdateItems. This ensures
+     * the client has the definition cached when it renders the notification, so the quality-
+     * colored background appears correctly. Hytale's native notifyPickupItem() fires too
+     * early (before our sync), which is why we send our own.
      *
      * @param player The player who picked up the gear
      * @param item The gear item stack
@@ -240,15 +211,13 @@ public final class PickupNotificationService {
         Objects.requireNonNull(item, "item cannot be null");
         Objects.requireNonNull(gearData, "gearData cannot be null");
 
-        // 1. Sync item definition (includes translation with display name)
+        // 1. Sync item definition (includes translation with display name + qualityIndex)
         if (gearSyncService != null && gearData.hasInstanceId()) {
             gearSyncService.syncItem(player, item, gearData);
         }
 
-        // 2. Send chat notification for Uncommon+ items
-        if (gearData.rarity().isAtLeast(MIN_CHAT_NOTIFICATION_RARITY)) {
-            sendGearChatNotification(player, item, gearData);
-        }
+        // 2. Toast: enhanced for ALL gear (rarity-colored name + level/quality subtitle)
+        sendEnhancedPickupToast(player, item, gearData);
 
         // 3. Guide milestones
         TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
@@ -268,12 +237,6 @@ public final class PickupNotificationService {
     /**
      * Handles custom item (map) pickup.
      *
-     * <p>Performs:
-     * <ol>
-     *   <li>Syncs item definition to player (includes translation with proper display name)</li>
-     *   <li>Sends chat notification</li>
-     * </ol>
-     *
      * @param player The player who picked up the item
      * @param customData The custom item's data
      */
@@ -283,51 +246,101 @@ public final class PickupNotificationService {
         Objects.requireNonNull(player, "player cannot be null");
         Objects.requireNonNull(customData, "customData cannot be null");
 
-        // 1. Sync item definition (includes translation with display name)
         if (customItemSyncService != null && customData.hasInstanceId()) {
             customItemSyncService.syncItem(player, customData);
         }
-
     }
 
     // =========================================================================
-    // CHAT NOTIFICATIONS
+    // TOAST NOTIFICATIONS
     // =========================================================================
 
     /**
-     * Sends a chat notification for gear pickup.
-     *
-     * <p>Format: "[LEGENDARY] Sharp Iron Sword (Lv30, Q75%)"
-     * <p>Includes modifier lines for Epic+ items.
-     *
-     * @param player The player to send the notification to
-     * @param item The gear item stack
-     * @param gearData The gear's RPG data
+     * Enhanced toast for gear: delegates to the shared RPG pickup toast.
      */
-    private void sendGearChatNotification(
-            @Nonnull PlayerRef player,
-            @Nonnull ItemStack item,
-            @Nonnull GearData gearData) {
-        String displayName = displayNameService.getGearDisplayName(gearData, item);
-        GearRarity rarity = gearData.rarity();
+    private void sendEnhancedPickupToast(@Nonnull PlayerRef player, @Nonnull ItemStack item,
+                                         @Nonnull GearData gearData) {
+        String compactId = gearData.hasInstanceId()
+                ? gearData.instanceId().toCompactString() : null;
+        sendRPGPickupToast(player, item, gearData.rarity(),
+                gearData.level(), gearData.quality(), compactId);
+    }
+
+    /**
+     * Shared enhanced pickup toast for any RPG item (gear, maps).
+     *
+     * <p>Shows:
+     * <ul>
+     *   <li>Title: item name in rarity color (resolved via translation key if available)</li>
+     *   <li>Subtitle: "Lv : X - Quality : Y%" in white</li>
+     *   <li>3D item model with quality-colored background</li>
+     * </ul>
+     *
+     * @param player The player to send the toast to
+     * @param item The item stack (for 3D model and fallback name)
+     * @param rarity The item's rarity (determines title color)
+     * @param level The item's level
+     * @param quality The item's quality percentage
+     * @param compactInstanceId Compact instance ID for translation key lookup (nullable)
+     */
+    private void sendRPGPickupToast(@Nonnull PlayerRef player, @Nonnull ItemStack item,
+                                     @Nonnull GearRarity rarity, int level, int quality,
+                                     @Nullable String compactInstanceId) {
         String rarityColor = TooltipStyles.getRarityColor(rarity);
 
-        // Build: [LEGENDARY] Sharp Iron Sword (Lv30, Q75%)
-        Message message = Message.raw("")
-                .insert(Message.raw("[" + rarity.name() + "] ").color(rarityColor).bold(true))
-                .insert(Message.raw(displayName).color(rarityColor))
-                .insert(Message.raw(" (Lv" + gearData.level() + ", Q" + gearData.quality() + "%)").color(TooltipStyles.LABEL_GRAY));
-
-        // Add modifier lines for Epic+ items (full stats view)
-        if (rarity.isAtLeast(GearRarity.EPIC)) {
-            Message modifiers = tooltipFormatter.buildModifiersOnly(gearData);
-            if (!modifiers.equals(Message.empty())) {
-                message = message.insert(modifiers);
-            }
+        // Title: item name resolved client-side from our registered translation
+        Message title;
+        if (compactInstanceId != null) {
+            String nameKey = io.github.larsonix.trailoforbis.gear.item.TranslationSyncService.getNameKey(compactInstanceId);
+            title = Message.translation(nameKey).color(rarityColor);
+        } else {
+            // Fallback: base item translation key
+            title = Message.translation(item.getItem().getTranslationKey()).color(rarityColor);
         }
 
-        player.sendMessage(message);
-        LOGGER.at(Level.FINE).log("Sent gear pickup notification for %s to %s", displayName, player.getUuid());
+        Message subtitle = Message.raw("")
+                .insert(Message.raw("Lv : ").bold(true).color("#FFFFFF"))
+                .insert(Message.raw(String.valueOf(level)).color("#FFFFFF"))
+                .insert(Message.raw(" - ").color("#FFFFFF"))
+                .insert(Message.raw("Quality : " + quality + "%").bold(true).color("#FFFFFF"));
+
+        try {
+            NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    title,
+                    subtitle,
+                    item.toPacket(),
+                    NotificationStyle.Default
+            );
+        } catch (Exception e) {
+            LOGGER.at(Level.WARNING).withCause(e).log("Failed to send RPG pickup toast");
+        }
+    }
+
+    /**
+     * Simple "Picked up [item]" toast — exact replica of Hytale's native
+     * {@code Player.notifyPickupItem()} notification.
+     *
+     * <p>Used for gems, stones, and vanilla items. Produces the same visual
+     * the player would see from the native system: item name from translation
+     * key, no subtitle, 3D item model, Default style.
+     */
+    private void sendSimplePickupToast(@Nonnull PlayerRef player, @Nonnull ItemStack itemStack) {
+        try {
+            com.hypixel.hytale.server.core.asset.type.item.config.Item item = itemStack.getItem();
+            if (item == null) return;
+
+            Message itemName = Message.translation(item.getTranslationKey());
+            NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    Message.translation("server.general.pickedUpItem").param("item", itemName),
+                    null,
+                    itemStack.toPacket()
+            );
+        } catch (Exception e) {
+            // Non-critical — the item is still in inventory regardless
+            LOGGER.at(Level.FINE).withCause(e).log("Failed to send simple pickup toast");
+        }
     }
 
 }

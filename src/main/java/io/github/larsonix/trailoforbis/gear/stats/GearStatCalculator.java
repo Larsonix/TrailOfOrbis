@@ -1,9 +1,11 @@
 package io.github.larsonix.trailoforbis.gear.stats;
 
+import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator;
 import io.github.larsonix.trailoforbis.gear.item.ItemRegistryService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.ArmorImplicit;
 import io.github.larsonix.trailoforbis.gear.model.WeaponImplicit;
@@ -68,6 +70,7 @@ public final class GearStatCalculator {
         double weaponBaseDamage = 0.0;
         String weaponItemId = null;
         boolean isHoldingRpgGear = false;
+        ElementType weaponSpellElement = null;
 
         // Process armor
         processContainer(playerId, inventory.getArmor(), flatBonuses, percentBonuses);
@@ -78,26 +81,23 @@ public final class GearStatCalculator {
         weaponBaseDamage = weaponResult.baseDamage;
         weaponItemId = weaponResult.vanillaItemId;
         isHoldingRpgGear = weaponResult.isRpgGear;
+        weaponSpellElement = weaponResult.spellElement;
 
-        // Process ALL utility items (offhand — shields, etc.)
-        // Must iterate the container directly, NOT use getUtilityItem().
-        // getUtilityItem() only returns the "active" utility — when the player
-        // isn't actively using the offhand, it returns null and stats vanish.
-        // Shields should always provide stats while equipped, like armor.
-        var utilContainer = inventory.getUtility();
-        if (utilContainer != null) {
-            short utilCap = utilContainer.getCapacity();
-            for (short i = 0; i < utilCap; i++) {
-                ItemStack utilItem = utilContainer.getItemStack(i);
-                if (utilItem != null && !utilItem.isEmpty()) {
-                    String uid = utilItem.getItemId();
-                    boolean isRpg = GearUtils.isRpgGear(utilItem);
-                    LOGGER.atInfo().log("[UTIL-DIAG] Slot %d: id=%s, isRpg=%s", i, uid, isRpg);
-                }
-            }
-            processContainer(playerId, utilContainer, flatBonuses, percentBonuses);
+        // Process the ACTIVE utility item only (offhand — shields, spellbooks, etc.)
+        // Utility slots work like hotbar: 4 slots, 1 active at a time.
+        // Only the actively selected item provides stats, matching Hytale's native behavior.
+        //
+        // Skip offhand stats when holding a 2-handed weapon (longswords, battleaxes,
+        // spears, bows, crossbows, staves). Uses our WeaponType classification which
+        // correctly identifies all 200+ vanilla weapons via keyword matching.
+        // Unknown weapons default to 1H (offhand applies) — safe fallback.
+        boolean isTwoHanded = WeaponType.fromItemIdOrUnknown(weaponItemId).isTwoHanded();
+        if (!isTwoHanded) {
+            ItemStack activeUtility = inventory.getUtilityItem();
+            processItem(playerId, activeUtility, flatBonuses, percentBonuses);
         } else {
-            LOGGER.atInfo().log("[UTIL-DIAG] Utility container is null");
+            LOGGER.atFine().log("Skipping offhand stats for player %s — weapon %s is two-handed",
+                    playerId, weaponItemId);
         }
 
         return new GearBonuses(
@@ -105,7 +105,8 @@ public final class GearStatCalculator {
                 Collections.unmodifiableMap(percentBonuses),
                 weaponBaseDamage,
                 weaponItemId,
-                isHoldingRpgGear
+                isHoldingRpgGear,
+                weaponSpellElement
         );
     }
 
@@ -115,9 +116,10 @@ public final class GearStatCalculator {
      * @param baseDamage The weapon's implicit damage (0 if requirements not met)
      * @param vanillaItemId The vanilla item ID for attack effectiveness lookup
      * @param isRpgGear True if the weapon is RPG-generated gear (regardless of requirements)
+     * @param spellElement The fixed element from the weapon implicit (null for physical/legacy)
      */
-    private record WeaponResult(double baseDamage, @Nullable String vanillaItemId, boolean isRpgGear) {
-        static final WeaponResult EMPTY = new WeaponResult(0.0, null, false);
+    private record WeaponResult(double baseDamage, @Nullable String vanillaItemId, boolean isRpgGear, @Nullable ElementType spellElement) {
+        static final WeaponResult EMPTY = new WeaponResult(0.0, null, false, null);
     }
 
     /**
@@ -234,7 +236,7 @@ public final class GearStatCalculator {
         if (gearDataOpt.isEmpty()) {
             // Non-RPG item (vanilla weapon) - still return the item ID for vanilla effectiveness
             LOGGER.atFine().log("[WEAPON DEBUG] No gear data found for %s, returning vanilla result", itemId);
-            return new WeaponResult(0.0, vanillaItemId, false);
+            return new WeaponResult(0.0, vanillaItemId, false, null);
         }
 
         GearData gearData = gearDataOpt.get();
@@ -246,13 +248,13 @@ public final class GearStatCalculator {
         // This ensures the damage system uses RPG path with 0 damage instead of vanilla damage.
         if (!validator.canEquip(playerId, gearData)) {
             LOGGER.atFine().log("[WEAPON DEBUG] Player cannot equip - requirements not met, isRpgGear=true, damage=0");
-            return new WeaponResult(0.0, vanillaItemId, true);
+            return new WeaponResult(0.0, vanillaItemId, true, null);
         }
 
         // Check if item is broken - still mark as RPG gear but provide no damage
         if (isItemBroken(item)) {
             LOGGER.atFine().log("Skipping weapon bonuses - item is broken, isRpgGear=true, damage=0");
-            return new WeaponResult(0.0, vanillaItemId, true);
+            return new WeaponResult(0.0, vanillaItemId, true, null);
         }
 
         // Calculate quality multiplier
@@ -270,16 +272,17 @@ public final class GearStatCalculator {
             // Implicit damage is NOT affected by quality (per gear-balance.yml documentation)
             // Quality only affects modifiers (prefixes/suffixes), not the weapon's base damage
             double baseDamage = implicit.rolledValue();
-            LOGGER.atFine().log("[STAT CALC DEBUG] Weapon implicit damage: %.1f (rolled value, quality does NOT apply)",
-                    baseDamage);
-            return new WeaponResult(baseDamage, vanillaItemId, true);
+            ElementType spellElement = implicit.getSpellElement();
+            LOGGER.atFine().log("[STAT CALC DEBUG] Weapon implicit damage: %.1f (rolled value, quality does NOT apply), spellElement=%s",
+                    baseDamage, spellElement);
+            return new WeaponResult(baseDamage, vanillaItemId, true, spellElement);
         }
 
         // Weapon without implicit (shouldn't happen for properly generated gear)
         // Still mark as RPG gear to use RPG damage path
         LOGGER.atFine().log("[STAT CALC DEBUG] Weapon has NO implicit! baseItemId=%s, level=%d, rarity=%s",
                 gearData.getBaseItemId(), gearData.level(), gearData.rarity());
-        return new WeaponResult(0.0, vanillaItemId, true);
+        return new WeaponResult(0.0, vanillaItemId, true, null);
     }
 
     /**
@@ -389,12 +392,13 @@ public final class GearStatCalculator {
             Map<String, Double> percentBonuses,
             double weaponBaseDamage,
             @Nullable String weaponItemId,
-            boolean isHoldingRpgGear
+            boolean isHoldingRpgGear,
+            @Nullable ElementType weaponSpellElement
     ) {
         /**
          * Empty bonuses instance.
          */
-        public static final GearBonuses EMPTY = new GearBonuses(Map.of(), Map.of(), 0.0, null, false);
+        public static final GearBonuses EMPTY = new GearBonuses(Map.of(), Map.of(), 0.0, null, false, null);
 
         /**
          * Checks if there are any bonuses (excluding weapon base damage).

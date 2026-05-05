@@ -30,21 +30,22 @@ public class HexcodeItemConfig {
 
     private void initializeDefaults() {
         if (staff_level_map.isEmpty()) {
-            // Basic staffs — tier progression matching material curve
-            staff_level_map.put("Hexstaff_Basic_Crude", new LevelRange(1, 10));
-            staff_level_map.put("Hexstaff_Basic_Copper", new LevelRange(5, 15));
-            staff_level_map.put("Hexstaff_Basic_Bronze", new LevelRange(10, 20));
-            staff_level_map.put("Hexstaff_Basic_Iron", new LevelRange(15, 30));
-            staff_level_map.put("Hexstaff_Basic_Thorium", new LevelRange(25, 40));
-            staff_level_map.put("Hexstaff_Basic_Cobalt", new LevelRange(35, 50));
-            staff_level_map.put("Hexstaff_Basic_Adamantite", new LevelRange(45, 60));
-            staff_level_map.put("Hexstaff_Basic_Mithril", new LevelRange(55, 70));
-            staff_level_map.put("Hexstaff_Basic_Onyxium", new LevelRange(65, 80));
+            // Basic staffs — matching vanilla material_distances level ranges
+            staff_level_map.put("Hexstaff_Basic_Crude", new LevelRange(1, 5));
+            staff_level_map.put("Hexstaff_Basic_Copper", new LevelRange(3, 10));
+            staff_level_map.put("Hexstaff_Basic_Bronze", new LevelRange(7, 17));
+            staff_level_map.put("Hexstaff_Basic_Iron", new LevelRange(10, 21));
+            staff_level_map.put("Hexstaff_Basic_Thorium", new LevelRange(21, 34));
+            staff_level_map.put("Hexstaff_Basic_Cobalt", new LevelRange(27, 41));
+            staff_level_map.put("Hexstaff_Basic_Mithril", new LevelRange(34, 54));
+            staff_level_map.put("Hexstaff_Basic_Adamantite", new LevelRange(47, 67));
+            staff_level_map.put("Hexstaff_Basic_Onyxium", new LevelRange(54, 75));
             // Special staffs — endgame
             staff_level_map.put("Hexstaff_Special_Arcane", new LevelRange(70, 100));
             staff_level_map.put("Hexstaff_Special_Astral", new LevelRange(70, 100));
             staff_level_map.put("Hexstaff_Special_Fire", new LevelRange(70, 100));
             staff_level_map.put("Hexstaff_Special_Ice", new LevelRange(70, 100));
+            staff_level_map.put("Hexstaff_Special_Life", new LevelRange(70, 100));
         }
 
         if (book_level_map.isEmpty()) {

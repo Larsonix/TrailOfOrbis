@@ -45,7 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadLocalRandom;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -224,10 +224,10 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
 
         UUID playerUuid = uuidComponent.getUuid();
 
-        // Compute gear level from MATERIAL distance range using shared mob scaling formula.
-        // This ensures crafted gear level matches the zone where the material is found,
-        // and automatically stays in sync if mob scaling parameters change.
-        int gearLevel = computeMaterialBasedLevel(outputItemId);
+        // Compute gear level: material ceiling clamped to player's RPG level.
+        // A level 1 player crafting crude (ceiling 5) gets level 1 gear, not random 1-5.
+        int playerLevel = levelingService.getLevel(playerUuid);
+        int gearLevel = computeCraftedGearLevel(outputItemId, playerLevel);
 
         // Guide milestone: first Portal_Device (Ancient Gateway) crafted
         if ("Portal_Device".equals(outputItemId)) {
@@ -539,32 +539,31 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
     }
 
     /**
-     * Computes gear level from material distance range using the shared mob scaling formula.
-     * Ensures crafted gear level matches the zone where the material is found,
-     * and automatically stays in sync if mob scaling parameters change.
+     * Computes crafted gear level: material ceiling clamped to player level.
+     *
+     * <p>The material determines the maximum level (based on where it spawns
+     * in the overworld), and the player's RPG level sets the upper bound.
+     * This ensures a level 1 player never gets an unequippable level 5 item
+     * from crafting starter materials.
      */
-    private int computeMaterialBasedLevel(@Nonnull String outputItemId) {
+    private int computeCraftedGearLevel(@Nonnull String outputItemId, int playerLevel) {
         if (distanceCalculator == null) {
-            return 1;
+            return Math.max(1, playerLevel);
         }
 
         MaterialTierMapper materialMapper = converter.getMaterialMapper();
         VanillaConversionConfig.DistanceRange distRange = materialMapper.getDistanceRange(outputItemId);
 
-        int minLevel = distanceCalculator.estimateLevelFromDistance(distRange.getMin());
-        int maxLevel = distanceCalculator.estimateLevelFromDistance(distRange.getMax());
+        int materialCeiling = Math.max(1, distanceCalculator.estimateLevelFromDistance(distRange.getMax()));
 
-        minLevel = Math.max(1, minLevel);
-        maxLevel = Math.max(minLevel, maxLevel);
-
-        int gearLevel = (minLevel == maxLevel)
-                ? minLevel
-                : ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
+        // Deterministic: exactly min(playerLevel, materialCeiling).
+        // Crafting is a deliberate action — the level must match the tooltip promise.
+        int gearLevel = Math.max(1, Math.min(playerLevel, materialCeiling));
 
         gearLevel = Math.max(1, (int)(gearLevel * craftingLevelMultiplier));
 
-        LOGGER.atFine().log("Material level for %s: distance=%d-%d, level=%d (range %d-%d)",
-                outputItemId, distRange.getMin(), distRange.getMax(), gearLevel, minLevel, maxLevel);
+        LOGGER.atFine().log("Crafted level for %s: playerLv=%d, materialCeiling=%d, result=%d",
+                outputItemId, playerLevel, materialCeiling, gearLevel);
 
         return gearLevel;
     }

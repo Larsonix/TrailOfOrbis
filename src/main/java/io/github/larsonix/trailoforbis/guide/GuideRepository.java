@@ -118,6 +118,27 @@ public class GuideRepository {
     }
 
     /**
+     * Removes ALL milestone completion records for a player.
+     * Used when a player re-enables guides after skipping them.
+     */
+    public void deleteAllMilestones(@Nonnull UUID playerId) {
+        try (Connection conn = dataManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                 "DELETE FROM rpg_guide_milestones WHERE player_uuid = ?")) {
+
+            stmt.setString(1, playerId.toString());
+            int deleted = stmt.executeUpdate();
+
+            LOGGER.atInfo().log("Deleted %d milestones for %s",
+                deleted, playerId.toString().substring(0, 8));
+
+        } catch (SQLException e) {
+            LOGGER.atWarning().withCause(e).log("Failed to delete all milestones for %s",
+                playerId.toString().substring(0, 8));
+        }
+    }
+
+    /**
      * Removes a milestone completion record. Used by admin commands for testing.
      */
     public void deleteMilestone(@Nonnull UUID playerId, @Nonnull String milestoneId) {

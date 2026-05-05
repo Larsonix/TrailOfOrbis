@@ -482,7 +482,8 @@ public class RPGConfig {
         public static class WaterGrants {
             private float spellDamagePercent = 0.5f;     // +0.5% spell damage
             private float maxMana = 1.5f;                // +1.5 mana
-            private float energyShield = 2.0f;           // +2.0 barrier (energy shield)
+            private float energyShieldPercent = 0.5f;    // +0.5% max energy shield
+            private float energyShieldRegen = 0.2f;      // +0.2 ES/s regen
             private float manaRegen = 0.15f;             // +0.15 mana/s regen
             private float freezeChance = 0.1f;           // +0.1% freeze chance
             private float magicPower = 0.02f;            // +2% spell power per point
@@ -504,12 +505,20 @@ public class RPGConfig {
                 this.maxMana = maxMana;
             }
 
-            public float getEnergyShield() {
-                return energyShield;
+            public float getEnergyShieldPercent() {
+                return energyShieldPercent;
             }
 
-            public void setEnergyShield(float energyShield) {
-                this.energyShield = energyShield;
+            public void setEnergyShieldPercent(float energyShieldPercent) {
+                this.energyShieldPercent = energyShieldPercent;
+            }
+
+            public float getEnergyShieldRegen() {
+                return energyShieldRegen;
+            }
+
+            public void setEnergyShieldRegen(float energyShieldRegen) {
+                this.energyShieldRegen = energyShieldRegen;
             }
 
             public float getManaRegen() {
@@ -1434,16 +1443,18 @@ public class RPGConfig {
         private float maxReduction = 0.90f;
 
         /**
-         * Divisor used in the armor formula: armor / (armor + divisor * damage).
-         *
-         * <p>This controls how armor scales against damage:
-         * <ul>
-         *   <li>Lower values make armor more effective against all damage</li>
-         *   <li>Higher values make armor less effective, especially vs high damage</li>
-         *   <li>Default: 10.0 (matches Path of Exile formula)</li>
-         * </ul>
+         * Level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant).
+         * Controls how much each attacker level increases the armor demand.
+         * Default: 9.0
          */
-        private float formulaDivisor = 10.0f;
+        private float levelScale = 9.0f;
+
+        /**
+         * Base constant in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant).
+         * Floor constant ensuring meaningful scaling even at level 1.
+         * Default: 50.0
+         */
+        private float baseConstant = 50.0f;
 
         /**
          * Minimum armor effectiveness after penetration (0.0 to 1.0).
@@ -1490,12 +1501,20 @@ public class RPGConfig {
             this.maxReduction = maxReduction;
         }
 
-        public float getFormulaDivisor() {
-            return formulaDivisor;
+        public float getLevelScale() {
+            return levelScale;
         }
 
-        public void setFormulaDivisor(float formulaDivisor) {
-            this.formulaDivisor = formulaDivisor;
+        public void setLevelScale(float levelScale) {
+            this.levelScale = levelScale;
+        }
+
+        public float getBaseConstant() {
+            return baseConstant;
+        }
+
+        public void setBaseConstant(float baseConstant) {
+            this.baseConstant = baseConstant;
         }
 
         public float getArmorPenetrationFloor() {
@@ -1520,9 +1539,13 @@ public class RPGConfig {
                 throw new ConfigValidationException(
                     "armor.maxReduction must be between 0.0 and 1.0, got: " + maxReduction);
             }
-            if (formulaDivisor <= 0f) {
+            if (levelScale <= 0f) {
                 throw new ConfigValidationException(
-                    "armor.formulaDivisor must be positive, got: " + formulaDivisor);
+                    "armor.levelScale must be positive, got: " + levelScale);
+            }
+            if (baseConstant < 0f) {
+                throw new ConfigValidationException(
+                    "armor.baseConstant must be non-negative, got: " + baseConstant);
             }
             if (armorPenetrationFloor < 0f || armorPenetrationFloor > 1f) {
                 throw new ConfigValidationException(

@@ -10,14 +10,17 @@ import io.github.larsonix.trailoforbis.gear.config.GearConfigLoader.Configuratio
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaConversionConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootDiscoveryConfig;
-import io.github.larsonix.trailoforbis.gear.loot.LootItemsConfig;
+
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipConfig;
 import io.github.larsonix.trailoforbis.loot.container.ContainerLootConfig;
 import io.github.larsonix.trailoforbis.leveling.config.LevelingConfig;
+import io.github.larsonix.trailoforbis.mobs.MobRarityConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
+import io.github.larsonix.trailoforbis.mobs.archetype.MobArchetypeConfig;
 import io.github.larsonix.trailoforbis.mobs.classification.EntityDiscoveryConfig;
 import io.github.larsonix.trailoforbis.mobs.classification.MobClassificationConfig;
 import io.github.larsonix.trailoforbis.mobs.elemental.MobElementConfig;
+import io.github.larsonix.trailoforbis.mobs.profile.MobResistanceConfig;
 import io.github.larsonix.trailoforbis.mobs.spawn.config.MobSpawnConfig;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.combat.indicators.color.CombatTextColorConfig;
@@ -26,6 +29,8 @@ import io.github.larsonix.trailoforbis.ui.inventory.InventoryDetectionConfig;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
+
+import io.github.larsonix.trailoforbis.config.migration.ConfigMigrationService;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -54,6 +59,9 @@ public class ConfigManager implements ConfigService {
     private MobScalingConfig mobScalingConfig;
     private MobSpawnConfig mobSpawnConfig;
     private MobElementConfig mobElementConfig;
+    private MobResistanceConfig mobResistanceConfig;
+    private MobArchetypeConfig mobArchetypeConfig;
+    private MobRarityConfig mobRarityConfig;
     private LevelingConfig levelingConfig;
     private DeathRecapConfig deathRecapConfig;
     private InventoryDetectionConfig inventoryDetectionConfig;
@@ -67,7 +75,6 @@ public class ConfigManager implements ConfigService {
     // Gear configuration
     private GearBalanceConfig gearBalanceConfig;
     private ModifierConfig modifierConfig;
-    private LootItemsConfig lootItemsConfig;
     private LootDiscoveryConfig lootDiscoveryConfig;
     private TooltipConfig tooltipConfig;
     private VanillaConversionConfig vanillaConversionConfig;
@@ -90,6 +97,9 @@ public class ConfigManager implements ConfigService {
         this.mobStatPoolConfig = MobStatPoolConfig.createDefaults(); // Default for testing
         this.mobScalingConfig = new MobScalingConfig(); // Default for testing
         this.mobElementConfig = MobElementConfig.createDefaults(); // Default for testing
+        this.mobResistanceConfig = MobResistanceConfig.createDefaults(); // Default for testing
+        this.mobArchetypeConfig = MobArchetypeConfig.createDefaults(); // Default for testing
+        this.mobRarityConfig = MobRarityConfig.createDefaults(); // Default for testing
         this.levelingConfig = new LevelingConfig(); // Default for testing
         this.deathRecapConfig = new DeathRecapConfig(); // Default for testing
         this.gearConfigLoader = new GearConfigLoader(dataFolder);
@@ -106,6 +116,9 @@ public class ConfigManager implements ConfigService {
         try {
             // Create config directory if it doesn't exist
             Files.createDirectories(configDir);
+
+            // Migrate all configs before loading (adds new keys, preserves user values)
+            new ConfigMigrationService(configDir).migrateAll();
 
             // Load main config
             rpgConfig = loadConfig("config.yml", RPGConfig.class, new RPGConfig());
@@ -197,6 +210,18 @@ public class ConfigManager implements ConfigService {
             LOGGER.at(Level.INFO).log("Mob Elements loaded: %d group mappings, %d keyword categories",
                 mobElementConfig.getGroup_elements().size(),
                 mobElementConfig.getKeywords().size());
+
+            // Load mob resistance config
+            mobResistanceConfig = loadConfig("mob-resistances.yml", MobResistanceConfig.class, MobResistanceConfig.createDefaults());
+            LOGGER.at(Level.INFO).log("Mob Resistances loaded");
+
+            // Load mob archetype config
+            mobArchetypeConfig = loadConfig("mob-archetypes.yml", MobArchetypeConfig.class, MobArchetypeConfig.createDefaults());
+            LOGGER.at(Level.INFO).log("Mob Archetypes loaded");
+
+            // Load mob rarity config
+            mobRarityConfig = loadConfig("mob-rarity.yml", MobRarityConfig.class, MobRarityConfig.createDefaults());
+            LOGGER.at(Level.INFO).log("Mob Rarity loaded");
 
             // Load leveling config
             levelingConfig = loadConfig("leveling.yml", LevelingConfig.class, new LevelingConfig());
@@ -416,6 +441,18 @@ public class ConfigManager implements ConfigService {
         return mobElementConfig;
     }
 
+    public MobResistanceConfig getMobResistanceConfig() {
+        return mobResistanceConfig;
+    }
+
+    public MobArchetypeConfig getMobArchetypeConfig() {
+        return mobArchetypeConfig;
+    }
+
+    public MobRarityConfig getMobRarityConfig() {
+        return mobRarityConfig;
+    }
+
     public DeathRecapConfig getDeathRecapConfig() {
         return deathRecapConfig;
     }
@@ -527,7 +564,6 @@ public class ConfigManager implements ConfigService {
         // Load configs using the gear config loader
         Path balancePath = configDir.resolve("gear-balance.yml");
         Path modifiersPath = configDir.resolve("gear-modifiers.yml");
-        Path lootItemsPath = configDir.resolve("loot-items.yml");
         Path lootDiscoveryPath = configDir.resolve("loot-discovery.yml");
         Path tooltipPath = configDir.resolve("tooltip.yml");
         Path vanillaConversionPath = configDir.resolve("vanilla-conversion.yml");
@@ -544,10 +580,7 @@ public class ConfigManager implements ConfigService {
             this.modifierConfig = gearConfigLoader.loadDefaultModifierConfig();
         }
 
-        // Load loot items config (legacy, kept for backward compatibility)
-        this.lootItemsConfig = loadLootItemsConfig(lootItemsPath);
-
-        // Load loot discovery config (new dynamic system)
+        // Load loot discovery config
         this.lootDiscoveryConfig = loadLootDiscoveryConfig(lootDiscoveryPath);
 
         // Load tooltip config
@@ -588,30 +621,6 @@ public class ConfigManager implements ConfigService {
         }
 
         return new VanillaConversionConfig();
-    }
-
-    private LootItemsConfig loadLootItemsConfig(Path path) {
-        try {
-            if (Files.exists(path)) {
-                LoaderOptions loaderOptions = new LoaderOptions();
-                Yaml yaml = new Yaml(new Constructor(LootItemsConfig.class, loaderOptions));
-                try (InputStream input = Files.newInputStream(path)) {
-                    LootItemsConfig loaded = yaml.loadAs(input, LootItemsConfig.class);
-                    if (loaded != null) {
-                        loaded.validate();
-                        LOGGER.at(Level.INFO).log("Loot items config loaded: %d slots configured",
-                                loaded.getSlots().size());
-                        return loaded;
-                    }
-                }
-            }
-        } catch (LootItemsConfig.ConfigValidationException e) {
-            LOGGER.at(Level.SEVERE).log("Loot items config validation failed: %s", e.getMessage());
-        } catch (Exception e) {
-            LOGGER.at(Level.WARNING).withCause(e).log("Failed to load loot-items.yml, using defaults");
-        }
-
-        return LootItemsConfig.createDefaults();
     }
 
     private LootDiscoveryConfig loadLootDiscoveryConfig(Path path) {
@@ -663,17 +672,7 @@ public class ConfigManager implements ConfigService {
         return modifierConfig;
     }
 
-    /**
-     * @throws IllegalStateException if gear configs not loaded
-     * @deprecated Use getLootDiscoveryConfig() for the new dynamic system
-     */
-    @Deprecated
-    public LootItemsConfig getLootItemsConfig() {
-        if (lootItemsConfig == null) {
-            throw new IllegalStateException("Loot items config not loaded");
-        }
-        return lootItemsConfig;
-    }
+
 
     /**
      * Dynamic item discovery from Hytale's asset registry, replacing static loot-items.yml.

@@ -28,7 +28,11 @@ import io.github.larsonix.trailoforbis.mobs.model.MobStats;
 import io.github.larsonix.trailoforbis.mobs.spawn.config.MobSpawnConfig;
 import io.github.larsonix.trailoforbis.mobs.spawn.manager.RPGSpawnManager;
 import io.github.larsonix.trailoforbis.mobs.speed.MobSpeedEffectManager;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
+import io.github.larsonix.trailoforbis.mobs.archetype.ArchetypeResolver;
+import io.github.larsonix.trailoforbis.mobs.archetype.MobArchetypeConfig;
+import io.github.larsonix.trailoforbis.mobs.profile.MobResistanceConfig;
+import io.github.larsonix.trailoforbis.mobs.profile.ResistanceProfileResolver;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.mobs.systems.MobScalingSystem;
 
@@ -42,7 +46,7 @@ import javax.annotation.Nullable;
  * <ul>
  *   <li>{@link DistanceBonusCalculator} - Distance-based bonus pool</li>
  *   <li>{@link PlayerLevelCalculator} - Player-based mob level</li>
- *   <li>{@link MobStatGenerator} - Dirichlet-based stat distribution</li>
+ *   <li>{@link MobStatFactory} - Template + Noise stat distribution with archetypes and resistance profiles</li>
  *   <li>{@link MobScalingSystem} - ECS spawn interceptor</li>
  * </ul>
  *
@@ -61,7 +65,7 @@ public class MobScalingManager implements MobScalingService {
     private MobScalingConfig config;
     private DistanceBonusCalculator distanceCalculator;
     private PlayerLevelCalculator playerLevelCalculator;
-    private MobStatGenerator statGenerator;
+    private MobStatFactory statFactory;
     private MobElementResolver elementResolver;
     private MobClassificationService classificationService;
     private DynamicEntityRegistry dynamicEntityRegistry;
@@ -120,8 +124,16 @@ public class MobScalingManager implements MobScalingService {
             // Create calculators
             distanceCalculator = new DistanceBonusCalculator(config);
             playerLevelCalculator = new PlayerLevelCalculator(levelingService, config, distanceCalculator);
-            // Use standalone MobStatPoolConfig from ConfigManager (loaded from mob-stat-pool.yml)
-            statGenerator = new MobStatGenerator(configManager.getMobStatPoolConfig());
+            // Create Template + Noise factory for stat production
+            MobStatPoolConfig poolConfig = configManager.getMobStatPoolConfig();
+            MobArchetypeConfig archetypeConfig = configManager.getMobArchetypeConfig();
+            MobResistanceConfig resistanceConfig = configManager.getMobResistanceConfig();
+            statFactory = new MobStatFactory(
+                    poolConfig,
+                    new ArchetypeResolver(archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults()),
+                    new ResistanceProfileResolver(resistanceConfig != null ? resistanceConfig : MobResistanceConfig.createDefaults()),
+                    archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults(),
+                    config.getElemental());
 
             // Create tag lookup provider (shared between classification service and registry)
             HytaleTagLookupProvider tagLookupProvider = new HytaleTagLookupProvider();
@@ -229,8 +241,16 @@ public class MobScalingManager implements MobScalingService {
 
         distanceCalculator = new DistanceBonusCalculator(config);
         playerLevelCalculator = new PlayerLevelCalculator(levelingService, config, distanceCalculator);
-        // Use standalone MobStatPoolConfig from ConfigManager (loaded from mob-stat-pool.yml)
-        statGenerator = new MobStatGenerator(configManager.getMobStatPoolConfig());
+        // Recreate Template + Noise factory with fresh config
+        MobStatPoolConfig poolConfig = configManager.getMobStatPoolConfig();
+        MobArchetypeConfig archetypeConfig = configManager.getMobArchetypeConfig();
+        MobResistanceConfig resistanceConfig = configManager.getMobResistanceConfig();
+        statFactory = new MobStatFactory(
+                poolConfig,
+                new ArchetypeResolver(archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults()),
+                new ResistanceProfileResolver(resistanceConfig != null ? resistanceConfig : MobResistanceConfig.createDefaults()),
+                archetypeConfig != null ? archetypeConfig : MobArchetypeConfig.createDefaults(),
+                config.getElemental());
 
         // Create tag lookup provider (shared between classification service and registry)
         HytaleTagLookupProvider tagLookupProvider = new HytaleTagLookupProvider();
@@ -326,8 +346,8 @@ public class MobScalingManager implements MobScalingService {
     }
 
     @Nullable
-    public MobStatGenerator getStatGenerator() {
-        return statGenerator;
+    public MobStatFactory getStatFactory() {
+        return statFactory;
     }
 
     /**

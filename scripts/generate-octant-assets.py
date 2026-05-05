@@ -25,7 +25,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSET_ROOT = PROJECT_ROOT / "src" / "main" / "resources" / "hytale-assets"
-VANILLA_ROOT = Path("/home/larsonix/work/Hytale-Decompiled-Full-Game/Assets")
+VANILLA_ROOT = Path(os.environ.get("HYTALE_VANILLA_ASSETS", "../HytaleAssets"))
 
 # Source texture directories
 ESSENCE_SRC_DIR = ASSET_ROOT / "Common" / "Resources" / "Ingredients" / "Essence_Textures_Dim"

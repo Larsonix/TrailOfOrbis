@@ -107,6 +107,7 @@ public class RealmRewardCalculator {
         double iirBonus = 0.0;
         double stoneBonus = 0.0;
         double xpBonus = 0.0;
+        double mapBonus = 0.0;
 
         // Add modifier bonuses
         for (RealmModifier modifier : mapData.modifiers()) {
@@ -116,6 +117,7 @@ public class RealmRewardCalculator {
                 case ITEM_RARITY -> iirBonus += value;
                 case EXPERIENCE_BONUS -> xpBonus += value;
                 case STONE_DROP_BONUS -> stoneBonus += value;
+                case MAP_DISCOVERY -> mapBonus += value;
                 default -> { } // Other modifiers don't affect rewards directly
             }
         }
@@ -129,7 +131,7 @@ public class RealmRewardCalculator {
         double finalIiqMultiplier = (lootMultiplier + iiqBonus + difficultyBonus);
         double finalIirMultiplier = (lootMultiplier + iirBonus + difficultyBonus);
         double finalStoneMultiplier = (1.0 + stoneBonus + difficultyBonus);
-        double finalMapMultiplier = (1.0 + difficultyBonus);
+        double finalMapMultiplier = (1.0 + mapBonus + difficultyBonus);
 
         // Apply completion penalty if timed out
         if (reason == CompletionReason.TIMEOUT) {

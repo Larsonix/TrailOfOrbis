@@ -20,6 +20,9 @@ public final class DefensiveStats {
     private float evasion;
     private float energyShield;
 
+    /** Energy shield percentage modifier. Final = base * (1 + pct/100). */
+    private float energyShieldPercent;
+
     // ==================== Passive Defense ====================
     /**
      * Passive block chance - % chance to partially block damage without actively blocking.
@@ -144,6 +147,7 @@ public final class DefensiveStats {
         this.armorPercent = builder.armorPercent;
         this.evasion = builder.evasion;
         this.energyShield = builder.energyShield;
+        this.energyShieldPercent = builder.energyShieldPercent;
         this.passiveBlockChance = builder.passiveBlockChance;
         this.parryChance = builder.parryChance;
         this.knockbackResistance = builder.knockbackResistance;
@@ -188,6 +192,10 @@ public final class DefensiveStats {
 
     public float getEnergyShield() {
         return energyShield;
+    }
+
+    public float getEnergyShieldPercent() {
+        return energyShieldPercent;
     }
 
     public float getPassiveBlockChance() {
@@ -312,6 +320,10 @@ public final class DefensiveStats {
         this.energyShield = energyShield;
     }
 
+    public void setEnergyShieldPercent(float energyShieldPercent) {
+        this.energyShieldPercent = energyShieldPercent;
+    }
+
     public void setPassiveBlockChance(float passiveBlockChance) {
         this.passiveBlockChance = passiveBlockChance;
     }
@@ -432,6 +444,7 @@ public final class DefensiveStats {
         armorPercent = 0;
         evasion = 0;
         energyShield = 0;
+        energyShieldPercent = 0;
         passiveBlockChance = 0;
         parryChance = 0;
         knockbackResistance = 0;
@@ -472,6 +485,7 @@ public final class DefensiveStats {
             .armorPercent(armorPercent)
             .evasion(evasion)
             .energyShield(energyShield)
+            .energyShieldPercent(energyShieldPercent)
             .passiveBlockChance(passiveBlockChance)
             .parryChance(parryChance)
             .knockbackResistance(knockbackResistance)
@@ -505,6 +519,7 @@ public final class DefensiveStats {
         private float armorPercent;
         private float evasion;
         private float energyShield;
+        private float energyShieldPercent;
         private float passiveBlockChance;
         private float parryChance;
         private float knockbackResistance;
@@ -551,6 +566,11 @@ public final class DefensiveStats {
 
         public Builder energyShield(float value) {
             this.energyShield = value;
+            return this;
+        }
+
+        public Builder energyShieldPercent(float value) {
+            this.energyShieldPercent = value;
             return this;
         }
 
@@ -700,6 +720,7 @@ public final class DefensiveStats {
             && Float.compare(armorPercent, that.armorPercent) == 0
             && Float.compare(evasion, that.evasion) == 0
             && Float.compare(energyShield, that.energyShield) == 0
+            && Float.compare(energyShieldPercent, that.energyShieldPercent) == 0
             && Float.compare(passiveBlockChance, that.passiveBlockChance) == 0
             && Float.compare(parryChance, that.parryChance) == 0
             && Float.compare(knockbackResistance, that.knockbackResistance) == 0

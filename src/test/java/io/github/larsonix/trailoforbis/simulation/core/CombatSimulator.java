@@ -4,6 +4,9 @@ import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.combat.AttackType;
 import io.github.larsonix.trailoforbis.combat.DamageBreakdown;
 import io.github.larsonix.trailoforbis.combat.RPGDamageCalculator;
+import io.github.larsonix.trailoforbis.elemental.ElementType;
+import io.github.larsonix.trailoforbis.elemental.ElementalStats;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.simulation.core.AvoidanceModel.AvoidanceResult;
 
 import javax.annotation.Nonnull;
@@ -25,6 +28,16 @@ public final class CombatSimulator {
 
     /** Base attack speed: 1 hit per second. */
     private static final float BASE_ATTACK_INTERVAL = 1.0f;
+
+    /**
+     * Maximum life steal healing as a fraction of max HP per second.
+     *
+     * <p>PoE caps leech at 20% max life/s. We use 15% to prevent DPS+VOID
+     * hybrids from becoming immortal. Without this cap, high-DPS builds
+     * with any life steal investment create a feedback loop where healing
+     * exceeds incoming damage, producing infinite TTD.
+     */
+    private static final double MAX_LIFE_STEAL_PERCENT_PER_SEC = 0.15;
 
     private final RPGDamageCalculator calculator;
     private final AvoidanceModel avoidance;
@@ -74,6 +87,26 @@ public final class CombatSimulator {
         float playerWeaponDmg = playerStats.getWeaponBaseDamage();
         float mobBaseDmg = mobStats.getPhysicalDamage();
 
+        // Detect player weapon type for correct attack path
+        WeaponType weaponType = WeaponType.fromItemIdOrUnknown(playerStats.getWeaponItemId());
+        boolean isSpell = weaponType.isMagic();
+        boolean isProjectile = weaponType.isRanged();
+        AttackType playerAttackType = isSpell ? AttackType.SPELL
+                : isProjectile ? AttackType.PROJECTILE
+                : AttackType.MELEE;
+
+        // For spell attacks, determine dominant element from elemental stats
+        ElementType spellElement = null;
+        if (isSpell) {
+            ElementalStats elemental = playerStats.toElementalStats();
+            double bestVal = 0;
+            for (ElementType type : ElementType.values()) {
+                double flat = elemental.getFlatDamage(type);
+                if (flat > bestVal) { bestVal = flat; spellElement = type; }
+            }
+            if (spellElement == null) spellElement = ElementType.WATER;
+        }
+
         // =====================================================================
         // Player attacking mob — avoidance + damage per hit
         // =====================================================================
@@ -98,12 +131,15 @@ public final class CombatSimulator {
             }
 
             // Phase 4: Damage calculation (only on hit)
+            // Uses the full 10-param calculate() to pass attackType + spellElement
             playerHits++;
             DamageBreakdown hit = calculator.calculate(
                     playerWeaponDmg,
                     playerStats, playerStats.toElementalStats(),
                     mobStats, mobStats.toElementalStats(),
-                    AttackType.MELEE, false);
+                    playerAttackType, false,
+                    1.0f, false, spellElement, 1,
+                    spellElement != null);
             playerTotalDamage += hit.totalDamage();
             if (hit.wasCritical()) playerCrits++;
         }
@@ -177,7 +213,11 @@ public final class CombatSimulator {
         double totalStealPct = (lifeSteal + lifeLeech) / 100.0;
         double stealRecoveryMult = 1.0 + healthRecoveryPct / 100.0;
         // Healing per second = playerDPS × steal% × recovery multiplier
-        double lifeStealHPS = playerDPS * totalStealPct * stealRecoveryMult;
+        // Capped at MAX_LIFE_STEAL_PERCENT_PER_SEC of max HP (PoE-style leech cap)
+        // This prevents DPS+VOID hybrids from producing infinite TTD
+        double rawLifeStealHPS = playerDPS * totalStealPct * stealRecoveryMult;
+        double lifeStealCap = playerHP * MAX_LIFE_STEAL_PERCENT_PER_SEC;
+        double lifeStealHPS = Math.min(rawLifeStealHPS, lifeStealCap);
 
         // === ENERGY SHIELD (Water identity) ===
         // Formula from DamageModifierProcessor:163-182:

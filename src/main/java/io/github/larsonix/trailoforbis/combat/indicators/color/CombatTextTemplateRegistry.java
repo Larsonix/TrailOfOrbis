@@ -4,28 +4,27 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.CombatTextEntityUIAnimationEventType;
 import com.hypixel.hytale.protocol.CombatTextEntityUIComponentAnimationEvent;
 import com.hypixel.hytale.protocol.EntityUIComponent;
-import com.hypixel.hytale.protocol.UpdateType;
 import com.hypixel.hytale.protocol.Vector2f;
-import com.hypixel.hytale.protocol.packets.assets.UpdateEntityUIComponents;
 import com.hypixel.hytale.server.core.modules.entityui.asset.CombatTextUIComponent;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Manages the registration and distribution of custom combat text templates.
+ * Manages combat text color profiles and builds template packets on demand.
  *
- * <p>At startup, scans the vanilla EntityUI asset map for the CombatText template,
- * then creates colored variants at new client-side indices. These are sent to each
- * player via {@link UpdateEntityUIComponents} on connect.
+ * <p>At startup, scans the vanilla EntityUI asset map for the CombatText template
+ * to use as a base for colored variants. Templates are built per-hit by cloning
+ * the vanilla template and applying profile colors/animations, then sent as a
+ * global overwrite at the vanilla index.
  *
- * <p>The templates only exist on the client — the server-side asset map is not modified.
+ * <p>Previous approach (pre-registering custom templates at indices beyond the
+ * vanilla range) caused intermittent client crashes: the inflated {@code maxId}
+ * raced with Hytale's asset pipeline during world transitions, causing the
+ * client's internal template array to be resized inconsistently.
  */
 public class CombatTextTemplateRegistry {
 
@@ -38,17 +37,12 @@ public class CombatTextTemplateRegistry {
     @Nullable
     private EntityUIComponent vanillaTemplate;
 
-    /** Profile ID → registered template index. */
-    private final Map<String, Integer> profileIndexMap = new HashMap<>();
+    /** Profile ID → resolved profile. Used for template building on demand. */
+    private final Map<String, CombatTextProfile> profileMap = new HashMap<>();
 
-    /** Template index → protocol packet. All custom templates keyed by their client-side index. */
-    private final Map<Integer, EntityUIComponent> customTemplates = new HashMap<>();
-
-    /** Set of all our custom template indices (for detecting already-swapped entities). */
-    private final Set<Integer> registeredIndices = new HashSet<>();
-
-    /** The maxId to use when sending UpdateEntityUIComponents. */
-    private int maxId;
+    /** The vanilla maxId — always use this in UpdateEntityUIComponents to avoid
+     *  maxId race with Hytale's asset pipeline during world transitions. */
+    private int vanillaMaxId;
 
     private boolean initialized;
 
@@ -78,76 +72,52 @@ public class CombatTextTemplateRegistry {
 
         LOGGER.atInfo().log("Found vanilla CombatText template at index %d", vanillaCombatTextIndex);
 
-        // Assign client-side template indices starting after the asset map
-        int nextIndex = serverAssetMap.getNextIndex();
+        // Store vanilla maxId — we MUST use this in all UpdateEntityUIComponents
+        // packets. Using a higher maxId (from custom indices) causes a race with
+        // Hytale's asset pipeline during world transitions: the client's internal
+        // template array can be shrunk by a vanilla update, invalidating custom
+        // indices → NullReferenceException crash.
+        vanillaMaxId = serverAssetMap.getNextIndex();
 
+        // Store profiles for on-demand template building (no pre-registration
+        // at custom indices — all templates are applied at the vanilla index)
         for (CombatTextProfile profile : profiles) {
-            int templateIndex = nextIndex++;
-            EntityUIComponent packet = buildTemplate(profile);
-            customTemplates.put(templateIndex, packet);
-            profileIndexMap.put(profile.id(), templateIndex);
-            registeredIndices.add(templateIndex);
+            profileMap.put(profile.id(), profile);
         }
 
-        maxId = nextIndex;
         initialized = true;
 
-        LOGGER.atInfo().log("Registered %d colored combat text templates (indices %d–%d)",
-            customTemplates.size(),
-            serverAssetMap.getNextIndex(),
-            maxId - 1);
+        LOGGER.atInfo().log("Initialized %d combat text profiles (vanilla index=%d, vanillaMaxId=%d)",
+            profiles.size(), vanillaCombatTextIndex, vanillaMaxId);
 
         return true;
     }
 
     /**
-     * Sends all custom templates to a player's client.
-     *
-     * <p>Must be called after the player has connected and is ready to receive packets.
-     * Uses {@code writeNoCache} for immediate delivery.
-     *
-     * @param player The player to sync templates to
+     * Gets the vanilla CombatText template index.
      */
-    public void syncToPlayer(@Nonnull PlayerRef player) {
-        if (!initialized || customTemplates.isEmpty()) return;
-
-        player.getPacketHandler().writeNoCache(
-            new UpdateEntityUIComponents(UpdateType.AddOrUpdate, maxId, customTemplates)
-        );
-
-        LOGGER.atFine().log("Synced %d combat text templates to player %s",
-            customTemplates.size(), player.getUsername());
-    }
-
-    /**
-     * Gets the template index for a profile.
-     *
-     * @param profileId The profile ID (e.g., "fire_normal")
-     * @return Template index, or -1 if not registered
-     */
-    public int getTemplateIndex(@Nonnull String profileId) {
-        return profileIndexMap.getOrDefault(profileId, -1);
-    }
-
     public int getVanillaCombatTextIndex() {
         return vanillaCombatTextIndex;
     }
 
     /**
-     * Returns all registered custom template indices.
-     * Used to detect entities that already had their template swapped.
+     * Gets the vanilla maxId — always use this in UpdateEntityUIComponents
+     * packets to avoid client-side array resize races.
      */
-    @Nonnull
-    public Set<Integer> getAllRegisteredIndices() {
-        return registeredIndices;
+    public int getVanillaMaxId() {
+        return vanillaMaxId;
     }
 
     public boolean isInitialized() {
         return initialized;
     }
 
-    public int getMaxId() {
-        return maxId;
+    /**
+     * Gets a profile by its ID for on-demand template building.
+     */
+    @Nullable
+    public CombatTextProfile getProfile(@Nonnull String profileId) {
+        return profileMap.get(profileId);
     }
 
     // ── Template building ────────────────────────────────────────────────
@@ -155,9 +125,10 @@ public class CombatTextTemplateRegistry {
     /**
      * Builds an EntityUIComponent protocol packet for a profile by cloning
      * the vanilla CombatText template and overriding visual properties.
+     * Package-private so CombatTextColorManager can build templates on demand.
      */
     @Nonnull
-    private EntityUIComponent buildTemplate(@Nonnull CombatTextProfile profile) {
+    EntityUIComponent buildTemplate(@Nonnull CombatTextProfile profile) {
         EntityUIComponent packet = vanillaTemplate.clone();
 
         // Override visual properties from profile

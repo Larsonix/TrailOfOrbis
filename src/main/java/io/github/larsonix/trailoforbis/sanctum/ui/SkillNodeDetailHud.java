@@ -17,10 +17,13 @@ import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 import io.github.larsonix.trailoforbis.skilltree.model.StatModifier;
 import io.github.larsonix.trailoforbis.skilltree.model.StatType;
 import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyConfig;
+import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyProgress;
 import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyType;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.UUID;
 
@@ -74,6 +77,7 @@ public class SkillNodeDetailHud {
     private final int availablePoints;
     private final boolean canDeallocate;
     private final SkillNodeHudManager hudManager;
+    @Nullable private final SynergyProgress synergyProgress;
 
     // ═══════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -89,6 +93,7 @@ public class SkillNodeDetailHud {
      * @param availablePoints The player's available skill points
      * @param canDeallocate   Whether this node can be deallocated (true for leaf nodes)
      * @param hudManager      The HUD manager for tracking this instance
+     * @param synergyProgress Live synergy progress data, or null if not a synergy node
      */
     public SkillNodeDetailHud(
             @Nonnull TrailOfOrbis plugin,
@@ -97,7 +102,8 @@ public class SkillNodeDetailHud {
             @Nonnull NodeState nodeState,
             int availablePoints,
             boolean canDeallocate,
-            @Nonnull SkillNodeHudManager hudManager) {
+            @Nonnull SkillNodeHudManager hudManager,
+            @Nullable SynergyProgress synergyProgress) {
         this.plugin = plugin;
         this.player = player;
         this.node = node;
@@ -105,6 +111,7 @@ public class SkillNodeDetailHud {
         this.availablePoints = availablePoints;
         this.canDeallocate = canDeallocate;
         this.hudManager = hudManager;
+        this.synergyProgress = synergyProgress;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -259,18 +266,23 @@ public class SkillNodeDetailHud {
             height += 10 + 4 + (node.getDrawbacks().size() * 14) + SECTION_SPACING;
         }
 
-        // Synergy section: box with padding(6), label(font-size 10), description(font-size 11, may wrap)
+        // Synergy section: box with padding(6), label(font-size 10), description(font-size 11, may wrap), progress line
         if (node.hasSynergy()) {
             String synergyText = buildSynergyDescription(node.getSynergy(), node);
             if (node.getSynergy().hasCap()) {
-                synergyText += String.format(" (cap: %.0f%%)", node.getSynergy().getCap());
+                synergyText += " (cap: " + NumberFormatter.percent((float) node.getSynergy().getCap()) + ")";
             }
             // Synergy box is narrower: panel(320) - panel padding(32) - synergy padding(12) = ~276px
             // At font-size 11, roughly 50 chars per line
             int synergyCharsPerLine = 50;
             int synergyLines = Math.max(1, (synergyText.length() + synergyCharsPerLine - 1) / synergyCharsPerLine);
             // Base: 12px padding + 10px label + 12px first line = 34px, +12px per additional line
-            height += 34 + ((synergyLines - 1) * 12) + SECTION_SPACING;
+            height += 34 + ((synergyLines - 1) * 12);
+            // Progress line (font-size 10, always present if synergy progress is available)
+            if (synergyProgress != null) {
+                height += 14; // One additional line at font-size 10
+            }
+            height += SECTION_SPACING;
         }
 
         // Conditional section (padding 6*2 + label ~10 + text ~13)
@@ -352,21 +364,79 @@ public class SkillNodeDetailHud {
     }
 
     /**
-     * Builds the synergy section for synergy nodes.
+     * Builds the synergy section for synergy nodes, including live progress.
      */
     private String buildSynergySection(SynergyConfig synergy) {
         String description = buildSynergyDescription(synergy, node);
         String capText = synergy.hasCap()
-            ? String.format(" (cap: %.0f%%)", synergy.getCap())
+            ? " (cap: " + NumberFormatter.percent((float) synergy.getCap()) + ")"
             : "";
 
+        String progressLine = buildSynergyProgressLine();
+
         return """
-            <div style="anchor-horizontal: 0; background-color: #2a2a4a(0.8); layout-mode: Top; padding: 6;">
+            <div style="anchor-horizontal: 0; layout-mode: Top; padding: 6;">
                 <p style="font-size: 10; color: %s;">Synergy :</p>
                 <p style="font-size: 11; color: %s; white-space: wrap;">%s%s</p>
+                %s
             </div>
             <div style="anchor-height: %d;"></div>
-            """.formatted(RPGStyles.TEXT_INFO, RPGStyles.TEXT_PRIMARY, escapeHtml(description), capText, SECTION_SPACING);
+            """.formatted(RPGStyles.TEXT_INFO, RPGStyles.TEXT_PRIMARY, escapeHtml(description), capText, progressLine, SECTION_SPACING);
+    }
+
+    /**
+     * Builds the live progress line for a synergy node.
+     *
+     * <p>Shows current count, earned bonus, and next threshold. Adapts based on
+     * whether the node is allocated (active bonus) or not (preview).
+     */
+    private String buildSynergyProgressLine() {
+        if (synergyProgress == null) {
+            return "";
+        }
+
+        String text;
+        String color;
+
+        if (!synergyProgress.hasProgress()) {
+            // No relevant nodes allocated yet
+            text = "0 " + synergyProgress.countLabel() + " -> allocate to begin scaling";
+            color = RPGStyles.TEXT_GRAY;
+        } else if (nodeState == NodeState.ALLOCATED) {
+            // Node is active ->show live bonus
+            if (synergyProgress.capped()) {
+                text = String.format("%d %s -> %s (MAXED)",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()));
+            } else {
+                text = String.format("%d %s -> %s | Next at %d",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()),
+                    synergyProgress.nextThreshold());
+            }
+            color = synergyProgress.capped() ? RPGStyles.POSITIVE : RPGStyles.TEXT_SECONDARY;
+        } else {
+            // Node not allocated ->show preview
+            if (synergyProgress.hasBonus()) {
+                text = String.format("%d %s -> would grant %s",
+                    synergyProgress.currentCount(),
+                    synergyProgress.countLabel(),
+                    NumberFormatter.signedPercent((float) synergyProgress.currentBonus()));
+            } else {
+                text = String.format("%d/%d %s -> %d more needed",
+                    synergyProgress.currentCount(),
+                    synergyProgress.perCount(),
+                    synergyProgress.countLabel(),
+                    synergyProgress.perCount() - synergyProgress.currentCount());
+            }
+            color = RPGStyles.TEXT_GRAY;
+        }
+
+        return """
+                <p style="font-size: 10; color: %s;">%s</p>
+            """.formatted(color, escapeHtml(text));
     }
 
     /**
@@ -379,30 +449,30 @@ public class SkillNodeDetailHud {
         }
 
         String statName = formatStatName(bonus.getStat());
-        double value = bonus.getValue();
+        String valueStr = NumberFormatter.signedPercent((float) bonus.getValue());
         int perCount = synergy.getPerCount();
         SynergyType type = synergy.getType();
 
         return switch (type) {
             case ELEMENTAL_COUNT -> String.format(
-                "+%.0f%% %s per %d %s nodes",
-                value, statName, perCount, synergy.getElementRegion().getDisplayName()
+                "%s %s per %d %s nodes",
+                valueStr, statName, perCount, synergy.getElementRegion().getDisplayName()
             );
             case STAT_COUNT -> String.format(
-                "+%.0f%% %s per %d nodes with %s",
-                value, statName, perCount, formatStatName(synergy.getStatType())
+                "%s %s per %d nodes with %s",
+                valueStr, statName, perCount, formatStatName(synergy.getStatType())
             );
             case BRANCH_COUNT -> String.format(
-                "+%.0f%% %s per %d %s nodes",
-                value, statName, perCount, node.getSkillTreeRegion().getDisplayName()
+                "%s %s per %d %s nodes",
+                valueStr, statName, perCount, node.getSkillTreeRegion().getDisplayName()
             );
             case TIER_COUNT -> String.format(
-                "+%.0f%% %s per %d %s",
-                value, statName, perCount, synergy.getTier() != null ? synergy.getTier().toLowerCase() + "s" : "notables"
+                "%s %s per %d %s",
+                valueStr, statName, perCount, synergy.getTier() != null ? synergy.getTier().toLowerCase() + "s" : "notables"
             );
             case TOTAL_COUNT -> String.format(
-                "+%.0f%% %s per %d total nodes",
-                value, statName, perCount
+                "%s %s per %d total nodes",
+                valueStr, statName, perCount
             );
         };
     }
@@ -413,13 +483,13 @@ public class SkillNodeDetailHud {
     private String buildConditionalSection(ConditionalConfig conditional) {
         String trigger = formatTrigger(conditional.getTrigger());
         String duration = conditional.isTimedEffect()
-            ? String.format("for %.1fs", conditional.getDuration())
+            ? "for " + NumberFormatter.time((float) conditional.getDuration())
             : "";
 
         StringBuilder effects = new StringBuilder();
         for (ConditionalConfig.ConditionalEffect effect : conditional.getEffects()) {
             String statName = formatStatName(effect.getStat());
-            effects.append(String.format("+%.0f%% %s, ", effect.getValue(), statName));
+            effects.append(NumberFormatter.signedPercent((float) effect.getValue())).append(" ").append(statName).append(", ");
         }
         if (effects.length() > 2) {
             effects.setLength(effects.length() - 2);

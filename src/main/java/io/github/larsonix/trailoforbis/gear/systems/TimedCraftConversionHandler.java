@@ -21,6 +21,7 @@ import io.github.larsonix.trailoforbis.gear.conversion.VanillaItemConverter;
 import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
+import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator;
 
 import javax.annotation.Nonnull;
@@ -29,7 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
+
 
 /**
  * Converts timed craft output from workbenches to RPG gear via InventoryChangeEvent.
@@ -83,6 +84,7 @@ public final class TimedCraftConversionHandler {
     private final VanillaItemConverter converter;
     private final DistanceBonusCalculator distanceCalculator;
     private final VanillaConversionConfig config;
+    private final LevelingService levelingService;
     @javax.annotation.Nullable private final ItemSyncService itemSyncService;
 
     /** Recursion guard — prevents feedback loop from our own slot replacements. */
@@ -91,18 +93,21 @@ public final class TimedCraftConversionHandler {
     public TimedCraftConversionHandler(
             @Nonnull VanillaItemConverter converter,
             @Nonnull DistanceBonusCalculator distanceCalculator,
-            @Nonnull VanillaConversionConfig config) {
-        this(converter, distanceCalculator, config, null);
+            @Nonnull VanillaConversionConfig config,
+            @Nonnull LevelingService levelingService) {
+        this(converter, distanceCalculator, config, levelingService, null);
     }
 
     public TimedCraftConversionHandler(
             @Nonnull VanillaItemConverter converter,
             @Nonnull DistanceBonusCalculator distanceCalculator,
             @Nonnull VanillaConversionConfig config,
+            @Nonnull LevelingService levelingService,
             @javax.annotation.Nullable ItemSyncService itemSyncService) {
         this.converter = converter;
         this.distanceCalculator = distanceCalculator;
         this.config = config;
+        this.levelingService = levelingService;
         this.itemSyncService = itemSyncService;
     }
 
@@ -140,8 +145,9 @@ public final class TimedCraftConversionHandler {
         if (item.getWeapon() == null && item.getArmor() == null) return;
         if (item.getMaxStack() > 1) return;
 
-        // Compute level from material distance
-        int gearLevel = computeMaterialBasedLevel(itemId);
+        // Compute level: material ceiling clamped to player level
+        int playerLevel = levelingService.getLevel(playerId);
+        int gearLevel = computeCraftedGearLevel(itemId, playerLevel);
 
         Optional<ItemStack> converted = converter.convertCrafted(slotAfter, gearLevel);
         if (converted.isEmpty()) return;
@@ -170,7 +176,7 @@ public final class TimedCraftConversionHandler {
                         }
                     }
                     changedContainer.setItemStackForSlot(txSlot, rpgItem);
-                    LOGGER.atInfo().log("Timed craft: %s → RPG Lv%d for %s (slot %d)",
+                    LOGGER.atFine().log("Timed craft: %s → RPG Lv%d for %s (slot %d)",
                             itemId, gearLevel,
                             playerId.toString().substring(0, 8), txSlot);
                 } catch (Exception e) {
@@ -186,18 +192,17 @@ public final class TimedCraftConversionHandler {
     }
 
     /**
-     * Computes gear level from material distance range using the shared mob scaling formula.
+     * Computes crafted gear level: material ceiling clamped to player level.
      */
-    private int computeMaterialBasedLevel(@Nonnull String itemId) {
+    private int computeCraftedGearLevel(@Nonnull String itemId, int playerLevel) {
         MaterialTierMapper mapper = converter.getMaterialMapper();
         VanillaConversionConfig.DistanceRange distRange = mapper.getDistanceRange(itemId);
 
-        int minLevel = Math.max(1, distanceCalculator.estimateLevelFromDistance(distRange.getMin()));
-        int maxLevel = Math.max(minLevel, distanceCalculator.estimateLevelFromDistance(distRange.getMax()));
+        int materialCeiling = Math.max(1, distanceCalculator.estimateLevelFromDistance(distRange.getMax()));
 
-        int gearLevel = (minLevel == maxLevel)
-                ? minLevel
-                : ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
+        // Deterministic: exactly min(playerLevel, materialCeiling).
+        // Crafting is a deliberate action — the level must match the tooltip promise.
+        int gearLevel = Math.max(1, Math.min(playerLevel, materialCeiling));
 
         return Math.max(1, (int)(gearLevel * config.getCraftingLevelMultiplier()));
     }

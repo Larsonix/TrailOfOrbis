@@ -591,7 +591,9 @@ public record RealmMapData(
     public int getTimeoutSeconds() {
         int base = size.getBaseTimeoutSeconds();
         int reduction = getModifierValue(RealmModifierType.REDUCED_TIME);
-        return Math.max(60, base - (base * reduction / 100));
+        int bonusTime = getModifierValue(RealmModifierType.BONUS_TIME);
+        int adjusted = base - (base * reduction / 100) + (base * bonusTime / 100);
+        return Math.max(60, adjusted);
     }
 
     // =========================================================================

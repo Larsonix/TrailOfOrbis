@@ -15,7 +15,6 @@ import java.util.*;
  * distance_bonus_per_block: 0.3
  * boss_pool_multiplier: 1.5
  * elite_pool_multiplier: 1.25
- * dirichlet_precision: 1.0    # NOT YET WIRED — see field Javadoc
  *
  * stats:
  *   max_health:
@@ -39,19 +38,6 @@ public class MobStatPoolConfig {
     private double distanceBonusPerBlock = 0.3;
     private double bossPoolMultiplier = 1.5;
     private double elitePoolMultiplier = 1.25;
-    /**
-     * Global concentration parameter for the Dirichlet distribution.
-     *
-     * <p><b>NOT YET WIRED.</b> This field loads from YAML and validates, but
-     * {@link DirichletDistributor} does not read it. The actual distribution
-     * variance is controlled solely by per-stat {@code alphaWeight} values.
-     *
-     * <p>When wired, this would multiply all alpha weights:
-     * {@code effective_alpha = dirichletPrecision × base_alpha}.
-     * Lower values → more extreme stat specialization per mob.
-     * Higher values → more uniform stat distribution.
-     */
-    private double dirichletPrecision = 1.0;
 
     // ==================== Progressive Scaling ====================
     // Makes low-level mobs weaker, ramping up to full power at soft cap level
@@ -152,239 +138,206 @@ public class MobStatPoolConfig {
         statConfigs.get(MobStatType.ACCURACY).setBaseValue(100.0);
 
         // Initialize default archetypes (52 weights per archetype)
-        // Order: MAX_HEALTH, PHYSICAL_DAMAGE, ARMOR, MOVE_SPEED, ATTACK_SPEED, ATTACK_RANGE,
-        //        ATTACK_COOLDOWN, CRITICAL_CHANCE, CRITICAL_MULTIPLIER, DODGE_CHANCE,
-        //        BLOCK_CHANCE, PARRY_CHANCE, LIFE_STEAL, HEALTH_REGEN,
-        //        FIRE_DAMAGE, WATER_DAMAGE, LIGHTNING_DAMAGE, EARTH_DAMAGE, WIND_DAMAGE, VOID_DAMAGE,
-        //        FIRE_RESISTANCE, WATER_RESISTANCE, LIGHTNING_RESISTANCE, EARTH_RESISTANCE, WIND_RESISTANCE, VOID_RESISTANCE,
-        //        FIRE_PENETRATION, WATER_PENETRATION, LIGHTNING_PENETRATION, EARTH_PENETRATION, WIND_PENETRATION, VOID_PENETRATION,
-        //        FIRE_INCREASED_DAMAGE, WATER_INCREASED_DAMAGE, LIGHTNING_INCREASED_DAMAGE, EARTH_INCREASED_DAMAGE, WIND_INCREASED_DAMAGE, VOID_INCREASED_DAMAGE,
-        //        FIRE_MORE_DAMAGE, WATER_MORE_DAMAGE, LIGHTNING_MORE_DAMAGE, EARTH_MORE_DAMAGE, WIND_MORE_DAMAGE, VOID_MORE_DAMAGE,
-        //        AGGRO_RANGE, REACTION_DELAY, CHARGE_TIME, CHARGE_DISTANCE,
-        //        ARMOR_PENETRATION, TRUE_DAMAGE, ACCURACY, KNOCKBACK_RESISTANCE
+        // Order: MAX_HEALTH(0), PHYSICAL_DAMAGE(1), ARMOR(2), MOVE_SPEED(3),
+        //        ATTACK_SPEED(4-DEAD), ATTACK_RANGE(5-DEAD), ATTACK_COOLDOWN(6-DEAD),
+        //        CRITICAL_CHANCE(7), CRITICAL_MULTIPLIER(8), DODGE_CHANCE(9),
+        //        BLOCK_CHANCE(10-DEAD), PARRY_CHANCE(11-DEAD), LIFE_STEAL(12), HEALTH_REGEN(13),
+        //        FIRE_DAMAGE(14)..VOID_DAMAGE(19), FIRE_RESISTANCE(20)..VOID_RESISTANCE(25),
+        //        FIRE_PENETRATION(26)..VOID_PENETRATION(31),
+        //        FIRE_INCREASED_DAMAGE(32-DEAD)..VOID_INCREASED_DAMAGE(37-DEAD),
+        //        FIRE_MORE_DAMAGE(38-DEAD)..VOID_MORE_DAMAGE(43-DEAD),
+        //        AGGRO_RANGE(44-DEAD)..CHARGE_DISTANCE(47-DEAD),
+        //        ARMOR_PENETRATION(48), TRUE_DAMAGE(49), ACCURACY(50), KNOCKBACK_RESISTANCE(51)
+        // DEAD positions are zeroed — these stats consume no pool
         archetypeWeights = new HashMap<>();
         archetypeWeights.put("warrior", new double[]{
-            2.5, 2.5, 2.0, 0.8, 0.8, 0.8, 1.5, 1.5, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // damage: fire/water/lightning/earth/wind/void
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // resistance: fire/water/lightning/earth/wind/void
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // penetration: fire/water/lightning/earth/wind/void
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // increased damage (low - physical focus)
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // more damage (low - physical focus)
-            0.5, 0.8, 1.0, 1.0,
+            2.5, 2.5, 2.0, 0.8, 0.0, 0.0, 0.0, 1.5, 1.0, 1.0,
+            0.0, 0.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // DEAD: increased damage
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // DEAD: more damage
+            0.0, 0.0, 0.0, 0.0,             // DEAD: AI stats
             1.0, 1.0, 1.5, 2.0
         });
         archetypeWeights.put("ranger", new double[]{
-            1.0, 1.5, 0.8, 2.5, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 1.0, 0.5, // damage: wind affinity
-            0.5, 0.5, 0.5, 0.5, 0.8, 0.5, // resistance: wind affinity
-            0.3, 0.3, 0.3, 0.3, 0.5, 0.3, // penetration: wind affinity
-            0.3, 0.3, 0.3, 0.3, 0.5, 0.3, // increased damage: wind affinity
-            0.3, 0.3, 0.3, 0.3, 0.5, 0.3, // more damage: wind affinity
-            1.5, 1.5, 0.8, 1.0,
+            1.0, 1.5, 0.8, 2.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+            0.0, 0.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 1.0, 0.5,
+            0.5, 0.5, 0.5, 0.5, 0.8, 0.5,
+            0.3, 0.3, 0.3, 0.3, 0.5, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.0, 1.0, 2.0, 0.5
         });
         archetypeWeights.put("mage", new double[]{
-            1.0, 1.0, 0.5, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            0.5, 0.5, 0.5, 1.0, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, // damage: all elements
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, // resistance: all elements
-            2.0, 2.0, 2.0, 2.0, 2.0, 2.0, // penetration: all elements
-            2.5, 2.5, 2.5, 2.5, 2.5, 2.5, // increased damage (high - elemental focus)
-            1.5, 1.5, 1.5, 1.5, 1.5, 1.5, // more damage (medium-high - elemental focus)
-            0.5, 0.8, 1.0, 0.5,
+            1.0, 1.0, 0.5, 0.8, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+            0.0, 0.0, 0.5, 1.0, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5,
+            1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            2.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.0, 1.0, 1.0, 0.3
         });
         archetypeWeights.put("tank", new double[]{
-            3.0, 1.5, 3.0, 0.5, 0.5, 1.0, 2.0, 2.0, 1.0, 1.0,
-            2.0, 2.0, 2.0, 1.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // damage: all low
-            2.0, 2.0, 2.0, 2.0, 2.0, 2.0, // resistance: all high
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // penetration: all low
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // increased damage (low - defensive focus)
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // more damage (low - defensive focus)
-            0.5, 0.5, 1.5, 0.5,
+            3.0, 1.5, 3.0, 0.5, 0.0, 0.0, 0.0, 2.0, 1.0, 1.0,
+            0.0, 0.0, 2.0, 1.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            2.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.0, 1.0, 1.0, 3.0
         });
         archetypeWeights.put("assassin", new double[]{
-            0.8, 2.5, 0.5, 2.0, 1.5, 1.0, 1.0, 1.0, 2.5, 2.0,
-            2.0, 1.0, 1.0, 1.5, 0.5, 0.5, 0.5, 0.5, 0.8, 0.5, // damage: slight wind affinity
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // resistance: all low
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // penetration: all medium
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // increased damage (medium - balanced)
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // more damage (medium - balanced)
-            1.0, 1.0, 0.5, 2.0,
+            0.8, 2.5, 0.5, 2.0, 0.0, 0.0, 0.0, 1.0, 2.5, 2.0,
+            0.0, 0.0, 1.0, 1.5, 0.5, 0.5, 0.5, 0.5, 0.8, 0.5,
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.0, 1.0, 2.5, 0.3
         });
-
-        // === ELEMENTAL SPECIALISTS ===
-
-        // Pyromancer - Fire specialist
         archetypeWeights.put("pyromancer", new double[]{
-            0.8, 0.3, 0.3, 1.0, 1.2, 1.5, 1.0, 1.5, 2.0, 0.8,
-            0.3, 0.3, 0.5, 0.8, 3.5, 0.0, 0.5, 0.3, 0.3, 0.5, // fire focus, low earth/wind
-            3.0, 0.0, 0.5, 0.3, 0.3, 0.5, // fire resistance high
-            3.0, 0.0, 0.3, 0.3, 0.3, 0.3, // fire penetration high
-            3.0, 0.0, 0.3, 0.3, 0.3, 0.3, // fire increased only
-            2.5, 0.0, 0.3, 0.3, 0.3, 0.3, // fire more only
-            1.0, 1.0, 1.5, 0.5,
+            0.8, 0.3, 0.3, 1.0, 0.0, 0.0, 0.0, 1.5, 2.0, 0.8,
+            0.0, 0.0, 0.5, 0.8, 3.5, 0.0, 0.5, 0.3, 0.3, 0.5,
+            3.0, 0.0, 0.5, 0.3, 0.3, 0.5,
+            3.0, 0.0, 0.3, 0.3, 0.3, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.5, 0.5, 1.5, 0.3
         });
-
-        // Frost Warden - Water/Cold tank
         archetypeWeights.put("frost_warden", new double[]{
-            2.5, 1.0, 2.5, 0.6, 0.7, 1.0, 1.5, 0.8, 1.0, 0.5,
-            2.0, 1.5, 0.5, 1.5, 0.0, 3.0, 0.3, 0.3, 0.3, 0.3, // water focus
-            0.0, 3.0, 1.0, 0.5, 0.5, 1.0, // water resistance high
-            0.0, 2.5, 0.3, 0.3, 0.3, 0.3, // water penetration high
-            0.0, 2.5, 0.3, 0.3, 0.3, 0.3, // water increased only
-            0.0, 2.0, 0.3, 0.3, 0.3, 0.3, // water more only
-            0.8, 0.5, 2.0, 0.5,
+            2.5, 1.0, 2.5, 0.6, 0.0, 0.0, 0.0, 0.8, 1.0, 0.5,
+            0.0, 0.0, 0.5, 1.5, 0.0, 3.0, 0.3, 0.3, 0.3, 0.3,
+            0.0, 3.0, 1.0, 0.5, 0.5, 1.0,
+            0.0, 2.5, 0.3, 0.3, 0.3, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.8, 0.5, 1.0, 2.5
         });
-
-        // Storm Caller - Lightning speed specialist (with wind affinity)
         archetypeWeights.put("storm_caller", new double[]{
-            1.0, 0.5, 0.5, 2.0, 3.0, 2.0, 0.5, 2.0, 1.5, 1.5,
-            0.5, 0.5, 0.5, 0.8, 0.3, 0.3, 3.5, 0.3, 2.0, 0.3, // lightning + wind damage
-            0.5, 0.5, 3.0, 0.3, 1.5, 0.5, // lightning + wind resistance
-            0.3, 0.3, 3.0, 0.3, 1.5, 0.3, // lightning + wind penetration
-            0.3, 0.3, 3.0, 0.3, 1.5, 0.3, // lightning + wind increased
-            0.3, 0.3, 2.5, 0.3, 1.2, 0.3, // lightning + wind more
-            2.0, 2.5, 0.3, 1.5,
+            1.0, 0.5, 0.5, 2.0, 0.0, 0.0, 0.0, 2.0, 1.5, 1.5,
+            0.0, 0.0, 0.5, 0.8, 0.3, 0.3, 3.5, 0.3, 2.0, 0.3,
+            0.5, 0.5, 3.0, 0.3, 1.5, 0.5,
+            0.3, 0.3, 3.0, 0.3, 1.5, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.5, 0.5, 2.0, 0.5
         });
-
-        // Void Weaver - Void specialist
         archetypeWeights.put("void_weaver", new double[]{
-            1.2, 0.3, 0.5, 1.0, 1.0, 2.0, 1.0, 1.5, 2.0, 1.5,
-            0.3, 0.3, 1.5, 0.5, 0.3, 0.3, 0.3, 0.3, 0.3, 3.5, // void damage focus
-            0.5, 0.5, 0.5, 0.3, 0.3, 3.0, // void resistance focus
-            0.3, 0.3, 0.3, 0.3, 0.3, 3.0, // void penetration focus
-            0.3, 0.3, 0.3, 0.3, 0.3, 3.0, // void increased only
-            0.3, 0.3, 0.3, 0.3, 0.3, 2.5, // void more only
-            1.5, 1.0, 1.0, 1.0,
+            1.2, 0.3, 0.5, 1.0, 0.0, 0.0, 0.0, 1.5, 2.0, 1.5,
+            0.0, 0.0, 1.5, 0.5, 0.3, 0.3, 0.3, 0.3, 0.3, 3.5,
+            0.5, 0.5, 0.5, 0.3, 0.3, 3.0,
+            0.3, 0.3, 0.3, 0.3, 0.3, 3.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.5, 2.5, 1.2, 1.0
         });
-
-        // === COMBAT SPECIALISTS ===
-
-        // Berserker - Rage damage, life steal sustain
         archetypeWeights.put("berserker", new double[]{
-            1.5, 3.5, 0.3, 2.0, 2.5, 0.8, 0.5, 2.0, 2.0, 0.3,
-            0.3, 0.3, 3.0, 0.5, 0.8, 0.3, 0.3, 0.3, 0.3, 0.8, // fire and void affinity
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // low elemental resistance
-            0.5, 0.3, 0.3, 0.3, 0.3, 0.5, // some fire/void penetration
-            0.5, 0.3, 0.3, 0.3, 0.3, 0.5, // some fire/void increased
-            0.5, 0.3, 0.3, 0.3, 0.3, 0.5, // some fire/void more
-            2.0, 0.3, 0.3, 2.5,
+            1.5, 3.5, 0.3, 2.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.3,
+            0.0, 0.0, 3.0, 0.5, 0.8, 0.3, 0.3, 0.3, 0.3, 0.8,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.5, 0.3, 0.3, 0.3, 0.3, 0.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             2.0, 1.0, 1.5, 0.5
         });
-
-        // Juggernaut - Unstoppable charger (earth affinity for tankiness)
         archetypeWeights.put("juggernaut", new double[]{
-            3.0, 2.0, 2.5, 1.5, 0.5, 1.0, 2.0, 0.5, 1.0, 0.3,
-            1.5, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.8, 0.3, 0.5, // slight earth damage
-            1.5, 1.5, 1.5, 2.0, 0.8, 1.5, // earth resistance high
-            0.5, 0.5, 0.5, 0.5, 0.3, 0.5, // penetration low
-            0.5, 0.5, 0.5, 0.5, 0.3, 0.5, // increased damage low
-            0.5, 0.5, 0.5, 0.5, 0.3, 0.5, // more damage low
-            1.5, 0.5, 0.3, 3.5,
+            3.0, 2.0, 2.5, 1.5, 0.0, 0.0, 0.0, 0.5, 1.0, 0.3,
+            0.0, 0.0, 0.5, 1.0, 0.5, 0.5, 0.5, 0.8, 0.3, 0.5,
+            1.5, 1.5, 1.5, 2.0, 0.8, 1.5,
+            0.5, 0.5, 0.5, 0.5, 0.3, 0.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             2.5, 1.5, 0.8, 3.5
         });
-
-        // Duelist - Technical fighter with parry/dodge (wind affinity for speed)
         archetypeWeights.put("duelist", new double[]{
-            1.0, 1.5, 1.0, 1.5, 1.8, 1.2, 0.8, 2.5, 2.0, 2.5,
-            1.5, 3.0, 0.5, 0.8, 0.3, 0.3, 0.3, 0.3, 0.8, 0.3, // slight wind damage
-            0.8, 0.8, 0.8, 0.5, 1.0, 0.8, // wind resistance medium
-            0.5, 0.5, 0.5, 0.3, 0.8, 0.5, // wind penetration medium
-            0.5, 0.5, 0.5, 0.3, 0.8, 0.5, // wind increased medium
-            0.5, 0.5, 0.5, 0.3, 0.8, 0.5, // wind more medium
-            1.2, 2.0, 0.5, 1.5,
+            1.0, 1.5, 1.0, 1.5, 0.0, 0.0, 0.0, 2.5, 2.0, 2.5,
+            0.0, 0.0, 0.5, 0.8, 0.3, 0.3, 0.3, 0.3, 0.8, 0.3,
+            0.8, 0.8, 0.8, 0.5, 1.0, 0.8,
+            0.5, 0.5, 0.5, 0.3, 0.8, 0.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.5, 0.5, 3.0, 1.0
         });
-
-        // Ravager - Armor penetration specialist
         archetypeWeights.put("ravager", new double[]{
-            1.5, 2.0, 0.8, 1.8, 2.0, 1.0, 0.8, 1.5, 1.5, 1.0,
-            0.5, 0.5, 1.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, // void affinity
-            0.5, 0.5, 0.5, 0.5, 0.5, 1.0, // void resistance
-            1.0, 1.0, 1.0, 0.8, 0.8, 1.5, // all penetration, void high
-            0.8, 0.8, 0.8, 0.5, 0.5, 1.0, // void increased
-            0.8, 0.8, 0.8, 0.5, 0.5, 1.0, // void more
-            1.5, 1.5, 0.5, 1.5,
+            1.5, 2.0, 0.8, 1.8, 0.0, 0.0, 0.0, 1.5, 1.5, 1.0,
+            0.0, 0.0, 1.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0,
+            0.5, 0.5, 0.5, 0.5, 0.5, 1.0,
+            1.0, 1.0, 1.0, 0.8, 0.8, 1.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             3.5, 3.0, 1.8, 0.8
         });
-
-        // === HYBRID/SPECIAL ARCHETYPES ===
-
-        // Spellblade - Physical + elemental hybrid (all elements balanced)
         archetypeWeights.put("spellblade", new double[]{
-            1.5, 2.0, 1.5, 1.2, 1.5, 1.0, 1.0, 1.5, 1.5, 1.0,
-            1.0, 1.0, 0.8, 0.8, 1.5, 1.5, 1.5, 1.2, 1.2, 1.0, // all elements balanced
-            1.0, 1.0, 1.0, 1.0, 1.0, 0.8, // all resistance balanced
-            1.2, 1.2, 1.2, 1.0, 1.0, 0.8, // all penetration balanced
-            1.5, 1.5, 1.5, 1.2, 1.2, 0.8, // all increased balanced
-            1.2, 1.2, 1.2, 1.0, 1.0, 0.8, // all more balanced
-            1.0, 1.2, 0.8, 1.2,
+            1.5, 2.0, 1.5, 1.2, 0.0, 0.0, 0.0, 1.5, 1.5, 1.0,
+            0.0, 0.0, 0.8, 0.8, 1.5, 1.5, 1.5, 1.2, 1.2, 1.0,
+            1.0, 1.0, 1.0, 1.0, 1.0, 0.8,
+            1.2, 1.2, 1.2, 1.0, 1.0, 0.8,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.5, 0.8, 1.5, 1.2
         });
-
-        // Necromancer - Water/Void life drain
         archetypeWeights.put("necromancer", new double[]{
-            1.0, 0.5, 0.5, 0.8, 0.8, 2.0, 1.5, 1.0, 1.5, 1.0,
-            0.3, 0.3, 3.5, 2.5, 0.3, 2.0, 0.3, 0.3, 0.3, 2.5, // water and void damage
-            0.5, 2.0, 0.5, 0.3, 0.3, 2.5, // water and void resistance
-            0.3, 1.5, 0.3, 0.3, 0.3, 2.0, // water and void penetration
-            0.3, 1.5, 0.3, 0.3, 0.3, 2.0, // water and void increased
-            0.3, 1.2, 0.3, 0.3, 0.3, 1.5, // water and void more
-            1.5, 0.8, 1.5, 0.5,
+            1.0, 0.5, 0.5, 0.8, 0.0, 0.0, 0.0, 1.0, 1.5, 1.0,
+            0.0, 0.0, 3.5, 2.5, 0.3, 2.0, 0.3, 0.3, 0.3, 2.5,
+            0.5, 2.0, 0.5, 0.3, 0.3, 2.5,
+            0.3, 1.5, 0.3, 0.3, 0.3, 2.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.5, 1.5, 1.2, 0.5
         });
-
-        // Elemental - Pure elemental being, all elements equally
         archetypeWeights.put("elemental", new double[]{
-            1.5, 0.0, 0.5, 1.5, 1.5, 1.5, 1.0, 1.0, 1.5, 1.5,
-            0.3, 0.3, 0.5, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, // all elemental damage
-            2.0, 2.0, 2.0, 2.0, 2.0, 2.0, // all elemental resistance
-            1.5, 1.5, 1.5, 1.5, 1.5, 1.5, // all elemental penetration
-            2.0, 2.0, 2.0, 2.0, 2.0, 2.0, // all elemental increased
-            1.5, 1.5, 1.5, 1.5, 1.5, 1.5, // all elemental more
-            1.5, 1.2, 1.0, 1.0,
+            1.5, 0.0, 0.5, 1.5, 0.0, 0.0, 0.0, 1.0, 1.5, 1.5,
+            0.0, 0.0, 0.5, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+            2.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+            1.5, 1.5, 1.5, 1.5, 1.5, 1.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.3, 1.0, 1.5, 1.0
         });
-
-        // Shade - Shadow assassin with void
         archetypeWeights.put("shade", new double[]{
-            0.6, 1.5, 0.3, 2.5, 2.0, 1.0, 0.5, 2.5, 2.5, 3.0,
-            0.3, 0.3, 1.0, 0.3, 0.3, 0.5, 0.3, 0.3, 0.3, 2.5, // void damage
-            0.3, 1.0, 0.3, 0.3, 0.3, 2.5, // void resistance
-            0.3, 0.5, 0.3, 0.3, 0.3, 2.5, // void penetration
-            0.3, 0.5, 0.3, 0.3, 0.3, 2.5, // void increased
-            0.3, 0.5, 0.3, 0.3, 0.3, 2.0, // void more
-            2.5, 2.5, 0.3, 2.0,
+            0.6, 1.5, 0.3, 2.5, 0.0, 0.0, 0.0, 2.5, 2.5, 3.0,
+            0.0, 0.0, 1.0, 0.3, 0.3, 0.5, 0.3, 0.3, 0.3, 2.5,
+            0.3, 1.0, 0.3, 0.3, 0.3, 2.5,
+            0.3, 0.5, 0.3, 0.3, 0.3, 2.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             1.0, 1.5, 2.5, 0.3
         });
-
-        // Guardian - Ultimate blocker/defender (earth affinity)
         archetypeWeights.put("guardian", new double[]{
-            3.5, 1.0, 3.5, 0.5, 0.5, 1.5, 2.0, 0.5, 1.0, 0.5,
-            3.5, 2.5, 0.3, 2.0, 0.3, 0.3, 0.3, 0.5, 0.3, 0.3, // slight earth damage
-            2.5, 2.5, 2.5, 3.0, 2.0, 2.5, // all resistance high, earth highest
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // low penetration
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // low increased
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.3, // low more
-            1.0, 0.5, 2.5, 0.3,
+            3.5, 1.0, 3.5, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0, 0.5,
+            0.0, 0.0, 0.3, 2.0, 0.3, 0.3, 0.3, 0.5, 0.3, 0.3,
+            2.5, 2.5, 2.5, 3.0, 2.0, 2.5,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             0.5, 0.3, 0.8, 3.5
         });
-
-        // Executioner - Slow but devastating one-shot
         archetypeWeights.put("executioner", new double[]{
-            2.0, 3.5, 1.5, 0.5, 0.3, 1.5, 3.0, 1.0, 3.0, 0.3,
-            0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // balanced elemental damage
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, // all resistance medium
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // all penetration medium
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // all increased medium
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, // all more medium
-            1.0, 0.3, 3.0, 0.5,
+            2.0, 3.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0, 3.0, 0.3,
+            0.0, 0.0, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
             3.0, 2.5, 1.0, 2.5
         });
     }
@@ -428,13 +381,6 @@ public class MobStatPoolConfig {
      */
     public void setElite_pool_multiplier(double value) {
         this.elitePoolMultiplier = value;
-    }
-
-    /**
-     * YAML setter for 'dirichlet_precision'.
-     */
-    public void setDirichlet_precision(double value) {
-        this.dirichletPrecision = value;
     }
 
     /**
@@ -626,14 +572,6 @@ public class MobStatPoolConfig {
         this.elitePoolMultiplier = elitePoolMultiplier;
     }
 
-    public double getDirichletPrecision() {
-        return dirichletPrecision;
-    }
-
-    public void setDirichletPrecision(double dirichletPrecision) {
-        this.dirichletPrecision = dirichletPrecision;
-    }
-
     // ==================== Progressive Scaling Getters/Setters ====================
 
     public boolean isProgressiveScalingEnabled() {
@@ -809,9 +747,6 @@ public class MobStatPoolConfig {
         if (elitePoolMultiplier < 1.0) {
             throw new ConfigValidationException("elite_pool_multiplier must be >= 1.0");
         }
-        if (dirichletPrecision <= 0) {
-            throw new ConfigValidationException("dirichlet_precision must be > 0");
-        }
 
         // Validate stat configs
         for (Map.Entry<MobStatType, StatConfig> entry : statConfigs.entrySet()) {
@@ -872,7 +807,6 @@ public class MobStatPoolConfig {
         sb.append("  distance_bonus_per_block: ").append(distanceBonusPerBlock).append("\n");
         sb.append("  boss_pool_multiplier: ").append(bossPoolMultiplier).append("\n");
         sb.append("  elite_pool_multiplier: ").append(elitePoolMultiplier).append("\n");
-        sb.append("  dirichlet_precision: ").append(dirichletPrecision).append("\n");
 
         sb.append("\n[Stat Configs] (").append(statConfigs.size()).append(" stats)\n");
         for (MobStatType type : MobStatType.values()) {

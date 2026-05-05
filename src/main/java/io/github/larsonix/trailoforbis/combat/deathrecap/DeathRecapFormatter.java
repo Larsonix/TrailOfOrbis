@@ -8,9 +8,10 @@ import io.github.larsonix.trailoforbis.combat.avoidance.AvoidanceProcessor;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import io.github.larsonix.trailoforbis.util.MessageColors;
+import io.github.larsonix.trailoforbis.util.NumberFormatter;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -160,22 +161,22 @@ public final class DeathRecapFormatter {
     @Nonnull
     private static Message appendDamageBreakdown(@Nonnull Message message, @Nonnull CombatSnapshot snapshot) {
         // Base damage
-        message = message.insert(Message.raw(String.format("Base Damage :    %.1f\n", snapshot.baseDamage())).color(MessageColors.WHITE));
+        message = message.insert(Message.raw("Base Damage :    " + NumberFormatter.smallFlat(snapshot.baseDamage()) + "\n").color(MessageColors.WHITE));
 
         // Flat bonus
         if (snapshot.flatBonus() > 0) {
-            message = message.insert(Message.raw(String.format("+ Flat Bonus :   +%.1f\n", snapshot.flatBonus())).color(MessageColors.SUCCESS));
+            message = message.insert(Message.raw("+ Flat Bonus :   " + NumberFormatter.signed(snapshot.flatBonus()) + "\n").color(MessageColors.SUCCESS));
         }
 
         // Percent bonus
         if (snapshot.percentBonus() > 0) {
             float percentAdd = snapshot.baseDamage() * (snapshot.percentBonus() / 100f);
-            message = message.insert(Message.raw(String.format("+ %% Bonus :      +%.0f%% (+%.1f)\n", snapshot.percentBonus(), percentAdd)).color(MessageColors.SUCCESS));
+            message = message.insert(Message.raw("+ % Bonus :      " + NumberFormatter.signedPercent(snapshot.percentBonus()) + " (" + NumberFormatter.signed(percentAdd) + ")\n").color(MessageColors.SUCCESS));
         }
 
         // Critical hit
         if (snapshot.wasCritical()) {
-            message = message.insert(Message.raw(String.format("* CRITICAL :     x%.1f (%.1f)\n", snapshot.critMultiplier(), snapshot.damageAfterAttackerBonuses())).color(MessageColors.GOLD));
+            message = message.insert(Message.raw("* CRITICAL :     " + NumberFormatter.multiplier(snapshot.critMultiplier()) + " (" + NumberFormatter.smallFlat(snapshot.damageAfterAttackerBonuses()) + ")\n").color(MessageColors.GOLD));
         }
 
         // Armor reduction (back-calculate physical-only blocked amount from exact post-armor value)
@@ -183,23 +184,20 @@ public final class DeathRecapFormatter {
             float redFraction = snapshot.reductionPercent() / 100f;
             float armorReduced = snapshot.damageAfterArmor() * redFraction / (1f - redFraction);
             if (snapshot.armorPenetration() > 0) {
-                message = message.insert(Message.raw(String.format("- Armor (%.0f) :  -%.0f%% (-%.1f) [%.0f%% pen]\n",
-                    snapshot.defenderArmor(), snapshot.reductionPercent(), armorReduced, snapshot.armorPenetration())).color(MessageColors.ERROR));
+                message = message.insert(Message.raw("- Armor (" + NumberFormatter.flat(snapshot.defenderArmor()) + ") :  -" + NumberFormatter.percent(snapshot.reductionPercent()) + " (-" + NumberFormatter.smallFlat(armorReduced) + ") [" + NumberFormatter.percent(snapshot.armorPenetration()) + " pen]\n").color(MessageColors.ERROR));
             } else {
-                message = message.insert(Message.raw(String.format("- Armor (%.0f) :  -%.0f%% (-%.1f)\n",
-                    snapshot.defenderArmor(), snapshot.reductionPercent(), armorReduced)).color(MessageColors.ERROR));
+                message = message.insert(Message.raw("- Armor (" + NumberFormatter.flat(snapshot.defenderArmor()) + ") :  -" + NumberFormatter.percent(snapshot.reductionPercent()) + " (-" + NumberFormatter.smallFlat(armorReduced) + ")\n").color(MessageColors.ERROR));
             }
         }
 
         // Total elemental (summary line)
         if (snapshot.totalElementalDamage() > 0) {
-            message = message.insert(Message.raw(String.format("+ Elemental :    +%.1f\n", snapshot.totalElementalDamage())).color(MessageColors.PURPLE));
+            message = message.insert(Message.raw("+ Elemental :    " + NumberFormatter.signed(snapshot.totalElementalDamage()) + "\n").color(MessageColors.PURPLE));
         }
 
         // Separator and final
         message = message.insert(Message.raw("--------------------\n").color(MessageColors.GRAY));
-        message = message.insert(Message.raw(String.format("Final :          %.1f / %.1f HP\n",
-            snapshot.finalDamage(), snapshot.defenderHealthBefore())).color(MessageColors.ERROR));
+        message = message.insert(Message.raw("Final :          " + NumberFormatter.smallFlat(snapshot.finalDamage()) + " / " + NumberFormatter.flat(snapshot.defenderHealthBefore()) + " HP\n").color(MessageColors.ERROR));
 
         return message;
     }
@@ -235,12 +233,11 @@ public final class DeathRecapFormatter {
                 timeLabel = "KILLING BLOW";
             } else {
                 float secondsAgo = (now - snap.timestamp()) / 1000f;
-                timeLabel = String.format("%.1fs ago", secondsAgo);
+                timeLabel = NumberFormatter.time(secondsAgo) + " ago";
             }
 
             String color = snap.wasCritical() ? MessageColors.GOLD : MessageColors.GRAY;
-            String line = String.format("  %d. %s: %.0f dmg from %s%s  [%s]\n",
-                displayNum, typeName, snap.finalDamage(), attacker, critMark, timeLabel);
+            String line = "  " + displayNum + ". " + typeName + ": " + NumberFormatter.flat(snap.finalDamage()) + " dmg from " + attacker + critMark + "  [" + timeLabel + "]\n";
             message = message.insert(Message.raw(line).color(color));
         }
 
@@ -309,20 +306,20 @@ public final class DeathRecapFormatter {
             float damageMultiplier = 1f - effectiveResist / 100f;
             float originalDamage = (damageMultiplier > 0) ? finalDamage / damageMultiplier : finalDamage;
             float blockedDamage = originalDamage - finalDamage;
-            resistText = String.format("(%.0f%% resisted, blocked %.1f)", effectiveResist, blockedDamage);
+            resistText = "(" + NumberFormatter.percent(effectiveResist) + " resisted, blocked " + NumberFormatter.smallFlat(blockedDamage) + ")";
         } else if (effectiveResist < 0) {
             // Negative resistance (vulnerability): player took extra damage
             // Formula: finalDamage = originalDamage * (1 + |resist|/100)
             float damageMultiplier = 1f + Math.abs(effectiveResist) / 100f;
             float originalDamage = finalDamage / damageMultiplier;
             float extraDamage = finalDamage - originalDamage;
-            resistText = String.format("(%.0f%% vulnerable, +%.1f extra)", Math.abs(effectiveResist), extraDamage);
+            resistText = "(" + NumberFormatter.percent(Math.abs(effectiveResist)) + " vulnerable, " + NumberFormatter.signed(extraDamage) + " extra)";
         } else {
             // Zero resistance
             resistText = "(0% resisted)";
         }
 
-        return String.format("%s : +%.1f %s\n", element.getDisplayName(), finalDamage, resistText);
+        return element.getDisplayName() + " : " + NumberFormatter.signed(finalDamage) + " " + resistText + "\n";
     }
 
     /** Appends defensive stats section. */
@@ -330,8 +327,7 @@ public final class DeathRecapFormatter {
     private static Message appendDefensiveStats(@Nonnull Message message, @Nonnull CombatSnapshot snapshot) {
         // Armor
         if (snapshot.defenderArmor() > 0) {
-            message = message.insert(Message.raw(String.format("Armor : %.0f (blocked %.0f%%)\n",
-                snapshot.defenderArmor(), snapshot.reductionPercent())).color(MessageColors.INFO));
+            message = message.insert(Message.raw("Armor : " + NumberFormatter.flat(snapshot.defenderArmor()) + " (blocked " + NumberFormatter.percent(snapshot.reductionPercent()) + ")\n").color(MessageColors.INFO));
         } else {
             message = message.insert(Message.raw("Armor : 0 (no protection)\n").color(MessageColors.GRAY));
         }
@@ -341,13 +337,13 @@ public final class DeathRecapFormatter {
             String chanceDetail = computeEvasionChance(snapshot.defenderEvasion(), snapshot.attackerLevel());
             if (snapshot.wasDodged()) {
                 String dodgeText = (chanceDetail != null)
-                    ? String.format("Evasion : %.0f (%s - dodged!)\n", snapshot.defenderEvasion(), chanceDetail)
-                    : String.format("Evasion : %.0f (dodged !)\n", snapshot.defenderEvasion());
+                    ? "Evasion : " + NumberFormatter.flat(snapshot.defenderEvasion()) + " (" + chanceDetail + " - dodged!)\n"
+                    : "Evasion : " + NumberFormatter.flat(snapshot.defenderEvasion()) + " (dodged !)\n";
                 message = message.insert(Message.raw(dodgeText).color(MessageColors.SUCCESS));
             } else {
                 String missText = (chanceDetail != null)
-                    ? String.format("Evasion : %.0f (%s - didn't proc)\n", snapshot.defenderEvasion(), chanceDetail)
-                    : String.format("Evasion : %.0f (didn't proc)\n", snapshot.defenderEvasion());
+                    ? "Evasion : " + NumberFormatter.flat(snapshot.defenderEvasion()) + " (" + chanceDetail + " - didn't proc)\n"
+                    : "Evasion : " + NumberFormatter.flat(snapshot.defenderEvasion()) + " (didn't proc)\n";
                 message = message.insert(Message.raw(missText).color(MessageColors.GRAY));
             }
         }
@@ -404,18 +400,17 @@ public final class DeathRecapFormatter {
 
         if (rawResist < 0) {
             // Negative resistance = vulnerability
-            return String.format("%s : %.0f%% (vulnerable)\n", elementName, rawResist);
+            return elementName + " : " + NumberFormatter.percent(rawResist) + " (vulnerable)\n";
         } else if (penetration > 0 && rawResist > 0) {
             // Has penetration that matters (and positive resistance to penetrate)
             float effectiveResist = Math.max(0, rawResist - penetration);
-            return String.format("%s : %.0f%% (%.0f%% penetrated > %.0f%% effective)\n",
-                elementName, rawResist, penetration, effectiveResist);
+            return elementName + " : " + NumberFormatter.percent(rawResist) + " (" + NumberFormatter.percent(penetration) + " penetrated > " + NumberFormatter.percent(effectiveResist) + " effective)\n";
         } else if (rawResist == 0) {
             // Zero resistance
-            return String.format("%s : 0%%\n", elementName);
+            return elementName + " : 0%\n";
         } else {
             // Positive resistance, no penetration
-            return String.format("%s : %.0f%%\n", elementName, rawResist);
+            return elementName + " : " + NumberFormatter.percent(rawResist) + "\n";
         }
     }
 
@@ -443,12 +438,11 @@ public final class DeathRecapFormatter {
             MobStatPoolConfig poolConfig = configService.getMobStatPoolConfig();
             if (poolConfig == null) return null;
 
-            float refAccuracy = (float) new MobStatGenerator(poolConfig)
-                    .getBaseStats(attackerLevel).accuracy();
+            float refAccuracy = (float) MobStatFactory.getReferenceAccuracy(poolConfig, attackerLevel);
             float hitChance = AvoidanceProcessor.calculateHitChance(
                     evasionConfig, refAccuracy, evasion);
             float evadeChance = (1f - hitChance) * 100f;
-            return String.format("%.1f%% vs Lv.%d", evadeChance, attackerLevel);
+            return NumberFormatter.percent(evadeChance) + " vs Lv." + attackerLevel;
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to compute evasion chance for death recap");
             return null;

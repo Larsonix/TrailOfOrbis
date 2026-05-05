@@ -1,10 +1,12 @@
 package io.github.larsonix.trailoforbis.ui.stats;
 
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.combat.CombatCalculator;
+import io.github.larsonix.trailoforbis.combat.RPGDamageCalculator;
+import io.github.larsonix.trailoforbis.combat.RPGDamageCalculator.DamageEstimate;
 import io.github.larsonix.trailoforbis.combat.avoidance.AvoidanceProcessor;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
-import io.github.larsonix.trailoforbis.elemental.ElementType;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatGenerator;
+import io.github.larsonix.trailoforbis.mobs.stats.MobStatFactory;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 
 import javax.annotation.Nonnull;
@@ -44,7 +46,7 @@ public final class BuildSummaryCalculator {
             @Nullable RPGConfig.CombatConfig.EvasionConfig evasionCfg,
             @Nullable MobStatPoolConfig poolConfig
     ) {
-        DamageBreakdownDetail damageDetail = computeAvgDamage(stats);
+        DamageEstimate damageDetail = computeAvgDamage(stats);
         EHPBreakdownDetail ehpDetail = computeEffectiveHP(stats, level, evasionCfg, poolConfig);
 
         return new BuildSummary(
@@ -62,90 +64,16 @@ public final class BuildSummaryCalculator {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Computes average damage per hit following RPGDamageCalculator steps 1-8
-     * with expected crit instead of RNG.
-     *
-     * <p>Pipeline (assumes melee, the most common attack type):
-     * <ol>
-     *   <li>Weapon base damage (already quality-adjusted in ComputedStats)</li>
-     *   <li>+ flat physical + flat melee</li>
-     *   <li>+ flat elemental (sum of all 6 elements)</li>
-     *   <li>× (1 + %increased / 100) where %increased = physDmg% + melee% + dmg%</li>
-     *   <li>× (1 + allDmgPct/100) × (1 + dmgMult/100) — "more" multipliers</li>
-     *   <li>× (1 + critChance/100 × (critMult/100 - 1)) — expected crit</li>
-     * </ol>
+     * Delegates to {@link RPGDamageCalculator#estimateAverageDamage} — the single source
+     * of truth for the damage pipeline. No formula reimplementation here.
      */
     @Nonnull
-    private static DamageBreakdownDetail computeAvgDamage(@Nonnull ComputedStats stats) {
-        float weaponBase = stats.getWeaponBaseDamage();
-
-        // If no weapon and not holding RPG gear, return zero
-        if (weaponBase <= 0 && !stats.isHoldingRpgGear()) {
-            return DamageBreakdownDetail.ZERO;
+    private static DamageEstimate computeAvgDamage(@Nonnull ComputedStats stats) {
+        if (stats.getWeaponBaseDamage() <= 0 && !stats.isHoldingRpgGear()) {
+            return DamageEstimate.ZERO;
         }
-
-        // Step 1-2: Flat physical + melee (assume melee attack type)
-        float flatPhys = stats.getPhysicalDamage();
-        float flatMelee = stats.getMeleeDamage();
-        float baseTotal = weaponBase + flatPhys + flatMelee;
-
-        // Step 2b: Flat elemental
-        float flatElemental = 0f;
-        for (ElementType type : ElementType.values()) {
-            flatElemental += getFlatElementalDamage(stats, type);
-        }
-        baseTotal += flatElemental;
-
-        // Step 4: % Increased (summed additively, applied once)
-        float physPct = stats.getPhysicalDamagePercent();
-        float meleePct = stats.getMeleeDamagePercent();
-        float dmgPct = stats.getDamagePercent();
-        float totalIncreasedPct = physPct + meleePct + dmgPct;
-        float increasedMult = 1f + totalIncreasedPct / 100f;
-        float afterIncreased = baseTotal * increasedMult;
-
-        // Step 6: % More multipliers (multiplicative chain)
-        float allDmgPct = stats.getAllDamagePercent();
-        float dmgMult = stats.getDamageMultiplier();
-        float moreMult = (1f + allDmgPct / 100f) * (1f + dmgMult / 100f);
-        float afterMore = afterIncreased * moreMult;
-
-        // Step 8: Expected crit (probability × multiplier bonus)
-        float critChance = stats.getCriticalChance();
-        float critMultRaw = stats.getCriticalMultiplier();
-        float expectedCritMult = 1f + Math.max(0f, critChance) / 100f * (Math.max(100f, critMultRaw) / 100f - 1f);
-        float avgDamage = afterMore * expectedCritMult;
-
-        return new DamageBreakdownDetail(
-                avgDamage,
-                weaponBase,
-                flatPhys,
-                flatMelee,
-                flatElemental,
-                baseTotal,
-                totalIncreasedPct,
-                increasedMult,
-                allDmgPct,
-                dmgMult,
-                moreMult,
-                critChance,
-                critMultRaw,
-                expectedCritMult
-        );
-    }
-
-    /**
-     * Gets flat elemental damage for a specific element from ComputedStats.
-     */
-    private static float getFlatElementalDamage(@Nonnull ComputedStats stats, @Nonnull ElementType type) {
-        return switch (type) {
-            case FIRE -> stats.getFireDamage();
-            case WATER -> stats.getWaterDamage();
-            case LIGHTNING -> stats.getLightningDamage();
-            case EARTH -> stats.getEarthDamage();
-            case WIND -> stats.getWindDamage();
-            case VOID -> stats.getVoidDamage();
-        };
+        RPGDamageCalculator calculator = new RPGDamageCalculator();
+        return calculator.estimateAverageDamage(stats);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -158,7 +86,7 @@ public final class BuildSummaryCalculator {
      * <p>Formula:
      * <ol>
      *   <li>rawHP = maxHealth + energyShield</li>
-     *   <li>armorMit = armor / (armor + 1000), clamped [0, 0.9]</li>
+     *   <li>armorMit = armor / (armor + 9*level + 50), capped at 90% ({@link CombatCalculator#estimateArmorReduction})</li>
      *   <li>ehpFromArmor = rawHP / (1 - armorMit)</li>
      *   <li>avoidance = 1 - (1-dodge)(1-evasion)(1-block)(1-parry), clamped [0, 0.95]</li>
      *   <li>effectiveHP = ehpFromArmor / (1 - avoidance)</li>
@@ -175,10 +103,9 @@ public final class BuildSummaryCalculator {
         float energyShield = stats.getEnergyShield();
         float rawHP = maxHealth + energyShield;
 
-        // Armor mitigation
+        // Armor mitigation — uses canonical level-scaled formula from CombatCalculator
         float armor = stats.getArmor();
-        float armorMit = armor > 0 ? armor / (armor + 1000f) : 0f;
-        armorMit = Math.min(armorMit, 0.9f);
+        float armorMit = CombatCalculator.estimateArmorReduction(armor, level) / 100f;
         float ehpFromArmor = rawHP / (1f - armorMit);
 
         // Avoidance layers
@@ -187,8 +114,7 @@ public final class BuildSummaryCalculator {
 
         float evasionAvoid = 0f;
         if (evasionCfg != null && poolConfig != null && stats.getEvasion() > 0 && level >= 1) {
-            float refAccuracy = (float) new MobStatGenerator(poolConfig)
-                    .getBaseStats(level).accuracy();
+            float refAccuracy = (float) MobStatFactory.getReferenceAccuracy(poolConfig, level);
             float hitChance = AvoidanceProcessor.calculateHitChance(
                     evasionCfg, refAccuracy, stats.getEvasion());
             evasionAvoid = 1f - hitChance;
@@ -230,38 +156,20 @@ public final class BuildSummaryCalculator {
     /**
      * Immutable summary of computed build stats for the Overview tab.
      */
+    /**
+     * Immutable summary of computed build stats for the Overview tab.
+     *
+     * <p>Damage detail is a {@link DamageEstimate} from the real
+     * {@link RPGDamageCalculator} — no reimplemented formulas.
+     */
     public record BuildSummary(
             float avgDamagePerHit,
             float effectiveHP,
-            @Nonnull DamageBreakdownDetail damageDetail,
+            @Nonnull DamageEstimate damageDetail,
             @Nonnull EHPBreakdownDetail ehpDetail,
             boolean hasWeapon,
             @Nullable String weaponItemId
     ) {}
-
-    /**
-     * Breakdown of the average damage per hit calculation for tooltip display.
-     */
-    public record DamageBreakdownDetail(
-            float avgDamagePerHit,
-            float weaponBase,
-            float flatPhysical,
-            float flatMelee,
-            float flatElemental,
-            float baseTotal,
-            float totalIncreasedPct,
-            float increasedMult,
-            float allDamagePct,
-            float damageMultiplier,
-            float moreMult,
-            float critChance,
-            float critMultRaw,
-            float expectedCritMult
-    ) {
-        static final DamageBreakdownDetail ZERO = new DamageBreakdownDetail(
-                0f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, 100f, 1f
-        );
-    }
 
     /**
      * Breakdown of the Effective HP calculation for tooltip display.

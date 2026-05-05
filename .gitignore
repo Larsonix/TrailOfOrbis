@@ -1,148 +1,165 @@
-# ===== Build outputs =====
+# =============================================
+# WHITELIST .gitignore
+# Only explicitly included content is tracked.
+# Everything else is private by default.
+# =============================================
+
+# Step 1: Ignore all files
+*
+
+# Step 2: Allow directory traversal (required for nested includes)
+!*/
+
+# Step 3: Block expensive/sensitive directories from traversal
+.gradle/
+.kotlin/
+.idea/
+.vscode/
+.settings/
+.claude/
+.obsidian/
+.jdk/
 build/
 bin/
 out/
 target/
-*.class
-
-# ===== Gradle =====
-.gradle/
-.kotlin/
-
-# ===== IDE =====
-.idea/
-.vscode/
-.settings/
-.classpath
-.project
-*.iml
-*.ipr
-*.iws
-
-# ===== OS =====
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# ===== Local configuration =====
-.env
-.env.local
-local.properties
-key.properties
-
-# ===== Logs =====
-*.log
-build.log
-
-# ===== Database files =====
-*.mv.db
-*.trace.db
-*.h2.db
-
-# ===== Internal tooling (AI assistant, Obsidian vault) =====
-CLAUDE.md
-.claude/
-.claudeignore
-.clinerules
-.mcp.json
-.obsidian/
-
-# ===== Documentation — selective inclusion =====
-# Public docs (WorldgenV2, HyUI, design, reference, research, realms, changelogs) are tracked.
-# Internal-only content is excluded below.
-
-# AI prompt files within docs
-docs/WorldgenV2/CLAUDE_TERRAIN_PROMPT.md
-docs/research/NEXT_RESEARCH_PROMPT.md
-
-# Internal planning & roadmaps
-docs/plan/
-docs/prompts/
-
-# Analysis of other mods (not ours to share)
-docs/vendor/
-docs/fubsyrpg/
-docs/dungeonmod/
-docs/multiclass-leveling/
-
-# Files primarily built from vendor mod analysis
-docs/reference/hytale-modding/mod-examples.md
-docs/reference/INFORMATION_SOURCES.md
-docs/design/custom-skills-comparison.md
-docs/design/loot4everyone.md
-docs/research/item-comparison-tooltips.md
-docs/reference/hexcode-analysis.md
-docs/reference/hexcode-glyph-deepdive.md
-docs/reference/hexcode-spellcrafting-guide.md
-docs/reference/voile-analysis.md
-
-# HyUI cloned repo metadata
-docs/HyUI/.git/
-
-# Internal audit & review files
-docs/reference/full-audit-2026-03-27.md
-docs/reference/remaining-improvements-2026-03-27.md
-docs/reference/quality-audit-map.md
-docs/reference/refactoring-plan.md
-docs/reference/stale-comments.md
-docs/reference/stat-review-checklist.md
-docs/reference/stat-review-findings.md
-docs/reference/stat-system-audit.md
-
-# ===== Obsidian vault & project management (not public) =====
-10-Projects/
-20-Areas/
-30-Resources/
-40-Archive/
-Memory/
+vendor/
 .index/
 db/
-reports/
 AllLogs/
-
-# ===== Obsidian vault structure =====
-# Root-level only (/) to avoid catching Java packages like maps/templates/
+reports/
+node_modules/
+__pycache__/
 /00-Inbox/
+/10-Projects/
+/20-Areas/
+/30-Resources/
+/40-Archive/
+/Memory/
 /Common/
 /Daily/
 /Guides/
 /Templates/
-
-# ===== Vendor mods (development reference, not redistributable) =====
-vendor/
-
-# ===== Recovery / backup artifacts =====
 _recovery*/
 _backup*/
 _corrupted_backup/
-_deployed_jar_backup_pre_corruption.jar
-
-# ===== Binary / media (tracked selectively via LFS or explicit includes) =====
-*.jar
-!libs/*.jar
-!gradle/wrapper/gradle-wrapper.jar
-
-# ===== Legacy root manifest (real one is in src/main/resources/) =====
-/manifest.json
-
-# ===== Local JDK cache =====
-.jdk/
-
-# ===== Python bytecache =====
-__pycache__/
-*.pyc
-
-# ===== Internal command reference =====
-QUICKSTART.md
-
-# ===== Commission / private work =====
 LadyPaladraStonesDesignCommission/
-
-# ===== Wiki platform config & analysis (not part of mod source) =====
-# Wiki content IS tracked — it ships in the JAR via Voile
-# But the HytaleModding.dev platform files are not part of the mod
 Wiki/hytale-docs-main/
-Wiki/custom-css-theme.css
-Wiki/content/Larsonix_TrailOfOrbis.json
 Wiki/voile-extracted/
-Wiki/VOILE_ANALYSIS.md
+docs/HyUI/.git/
+docs/dungeonmod/
+docs/fubsyrpg/
+docs/multiclass-leveling/
+docs/vendor/
+
+# ==========================================
+# WHITELISTED CONTENT
+# ==========================================
+
+# ─── Root project files ───
+!.gitignore
+!README.md
+!CONTRIBUTING.md
+!LICENSE
+!LICENSE-ASSETS
+!build.gradle.kts
+!settings.gradle.kts
+!gradle.properties
+!gradlew
+!gradlew.bat
+
+# ─── CI/CD workflows ───
+!.github/**
+
+# ─── Gradle wrapper ───
+!gradle/**
+
+# ─── Dependency JARs ───
+!libs/**
+
+# ─── Source code (all Java, resources, tests) ───
+!src/**
+
+# ─── Wiki content (in-game wiki, ships via Voile) ───
+!Wiki/content/**
+
+# ─── External dependency metadata ───
+!external/.gitignore
+!external/README.md
+!external/REGISTRY.md
+!external/libraries/**/*.md
+!external/plugins/**/*.md
+!external/platforms/**/*.md
+!external/scripts/**
+
+# ─── Public changelogs (released versions only, e.g. 1.0.0.md) ───
+!changelogs/[0-9]*.md
+
+# ─── Screenshots & logos ───
+!docs/images/**
+
+# ─── Platform release descriptions (public-facing) ───
+!docs/release/PLATFORM_DESCRIPTION.md
+!docs/release/CURSEFORGE_DESCRIPTION.html
+!docs/release/BUILTBYBIT_DESCRIPTION.bbcode
+
+# ─── Hytale API reference (community gold — undocumented API) ───
+!docs/hytale-api/**
+docs/hytale-api/SOURCE_MAP.md
+
+# ─── HyUI library documentation ───
+!docs/HyUI/**
+
+# ─── WorldGen V2 documentation ───
+!docs/WorldgenV2/**
+docs/WorldgenV2/CLAUDE_TERRAIN_PROMPT.md
+
+# ─── Hytale modding reference (ECS, combat, items, UI, NPCs, worlds) ───
+!docs/reference/hytale-modding/**
+
+# ─── Reference docs (community-useful Hytale knowledge) ───
+!docs/reference/CUSTOM_TOOLTIPS_GUIDE.md
+!docs/reference/ENTITY_CLASSIFICATION.md
+!docs/reference/ENTITY_INTERACTION_GUIDE.md
+!docs/reference/HYTALE_UI_REFERENCE.md
+!docs/reference/ailment-dot-system.md
+!docs/reference/colored-combat-text-findings.md
+!docs/reference/confirmed-dead-approaches.md
+!docs/reference/entity-classification.md
+!docs/reference/gear-scaling-calculations.md
+!docs/reference/hytale-font-charset.md
+!docs/reference/hytale-item-quality-system.md
+!docs/reference/hytale-ui-syntax.md
+!docs/reference/hyui-library.md
+!docs/reference/mob-scaling-calculations.md
+!docs/reference/native-ui-command-builder.md
+!docs/reference/player-combat-calculations.md
+!docs/reference/portal-device-ui-system.md
+!docs/reference/reskin-transmog-system.md
+!docs/reference/skill-tree-v2-design.md
+!docs/reference/stat-pipeline.md
+!docs/reference/vanilla-asset-catalog.md
+!docs/reference/worldgenv2-props-reference.md
+
+# ─── Design docs (educational — shows our design thinking) ───
+!docs/design/*.md
+!docs/design/mob-stat-refactor/phase-*.md
+# Re-exclude vendor-derived analysis docs
+docs/design/loot4everyone.md
+docs/design/custom-skills-comparison.md
+
+# ─── Research docs (educational — how systems were researched) ───
+!docs/research/**
+docs/research/ResearchTodo.md
+docs/research/item-comparison-tooltips.md
+docs/research/NEXT_RESEARCH_PROMPT.md
+
+# ─── Realms documentation (public chapters 01-07) ───
+!docs/realms/README.md
+!docs/realms/0[1-7]-*.md
+
+# ─── Community-useful scripts ───
+!scripts/generate-realm-biomes.py
+!scripts/generate-octant-assets.py
+!scripts/generate-octant-positions.py
+!scripts/create-elemental-assets.java

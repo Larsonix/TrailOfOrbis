@@ -36,24 +36,25 @@ class GearStatApplierTest {
     }
 
     @Test
-    @DisplayName("apply - flat bonuses applied first, then percent")
-    void apply_FlatBonusesFirst() {
+    @DisplayName("apply - flat bonuses added to base, percent bonuses added to accumulator")
+    void apply_FlatToBase_PercentToAccumulator() {
         ComputedStats stats = new ComputedStats();
         stats.setMaxHealth(100);
 
         GearBonuses bonuses = new GearBonuses(
             Map.of("max_health", 50.0),  // Flat +50
-            Map.of("max_health", 50.0),  // Percent +50%
+            Map.of("max_health", 50.0),  // Percent +50% (to accumulator)
             0.0,  // No weapon base damage
             null, // No weapon item ID
-            false // Not RPG gear
+            false, null // Not RPG gear
         );
 
         applier.apply(stats, bonuses);
 
-        // Flat first: 100 + 50 = 150
-        // Then percent: 150 * 1.5 = 225
-        assertEquals(225, stats.getMaxHealth(), 0.01);
+        // Flat: 100 + 50 = 150
+        // Percent: accumulated to maxHealthPercent, NOT multiplied into base
+        assertEquals(150, stats.getMaxHealth(), 0.01);
+        assertEquals(50, stats.getMaxHealthPercent(), 0.01);
     }
 
     @Test
@@ -68,7 +69,7 @@ class GearStatApplierTest {
             Map.of(),
             0.0,  // No weapon base damage
             null, // No weapon item ID
-            false // Not RPG gear
+            false, null // Not RPG gear
         );
 
         applier.apply(stats, bonuses);
@@ -106,7 +107,7 @@ class GearStatApplierTest {
             Map.of("crit_chance", 5.0),
             0.0,
             null,
-            false
+            false, null
         );
 
         String summary = applier.createSummary(bonuses);
@@ -126,7 +127,7 @@ class GearStatApplierTest {
             Map.of(),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -145,7 +146,7 @@ class GearStatApplierTest {
             Map.of("crit_chance", 10.0),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -165,7 +166,7 @@ class GearStatApplierTest {
             Map.of("fire_resistance", 5.0, "water_resistance", 10.0),
             0.0,
             null,
-            false
+            false, null
         );
 
         applier.apply(stats, bonuses);
@@ -184,7 +185,7 @@ class GearStatApplierTest {
             Map.of(),
             150.0,  // Weapon deals 150 base damage
             null,   // No weapon item ID
-            true    // Is RPG gear
+            true, null    // Is RPG gear
         );
 
         applier.apply(stats, bonuses);
@@ -203,7 +204,7 @@ class GearStatApplierTest {
             Map.of(),
             200.0,  // Weapon deals 200 base damage
             null,   // No weapon item ID
-            true    // Is RPG gear
+            true, null    // Is RPG gear
         );
 
         applier.apply(stats, bonuses);
@@ -238,7 +239,7 @@ class GearStatApplierTest {
             Map.of(),  // Empty percent bonuses (no suffixes)
             150.0,     // Implicit damage from weapon type + level scaling
             "Weapon_Sword_Iron",  // Weapon item ID for profile lookup
-            true       // IS RPG gear (critical flag!)
+            true, null       // IS RPG gear (critical flag!)
         );
 
         applier.apply(stats, bonuses);
@@ -258,12 +259,12 @@ class GearStatApplierTest {
 
         // RPG weapon with no modifiers
         GearBonuses rpgWeapon = new GearBonuses(
-            Map.of(), Map.of(), 100.0, "Weapon_Dagger_Steel", true
+            Map.of(), Map.of(), 100.0, "Weapon_Dagger_Steel", true, null
         );
 
         // Vanilla weapon (not RPG gear)
         GearBonuses vanillaWeapon = new GearBonuses(
-            Map.of(), Map.of(), 0.0, null, false
+            Map.of(), Map.of(), 0.0, null, false, null
         );
 
         applier.apply(stats, rpgWeapon);
@@ -287,7 +288,7 @@ class GearStatApplierTest {
             Map.of(),  // No percent bonuses
             0.0,       // Not a weapon
             null,      // Not a weapon
-            false      // Not RPG gear (armor has different handling)
+            false, null      // Not RPG gear (armor has different handling)
         );
 
         applier.apply(stats, emptyArmor);
@@ -306,7 +307,7 @@ class GearStatApplierTest {
             Map.of(),
             75.0,  // Implicit damage
             "Weapon_Staff_Void",  // Important for vanilla profile lookup
-            true
+            true, null
         );
 
         applier.apply(stats, bonuses);
@@ -327,7 +328,7 @@ class GearStatApplierTest {
             Map.of(),  // Empty - no percent modifiers
             250.0,     // Implicit damage scaled for level 100
             "Weapon_Longsword_Obsidian",
-            true
+            true, null
         );
 
         applier.apply(stats, implicitOnlyWeapon);

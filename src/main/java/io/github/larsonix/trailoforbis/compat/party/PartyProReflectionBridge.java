@@ -44,6 +44,8 @@ public final class PartyProReflectionBridge implements PartyBridge {
     private final Method getOnlinePartyMembersMethod;
     private final Method getPartyLeaderMethod;
     private final Method setPlayerCustomTextMethod;
+    private final Method setPlayerCustomText1Method;
+    private final Method setPlayerCustomText2Method;
     private final Method clearPlayerCustomTextMethod;
     private final Method registerListenerMethod;
     private final Method unregisterListenerMethod;
@@ -90,6 +92,8 @@ public final class PartyProReflectionBridge implements PartyBridge {
         getOnlinePartyMembersMethod = apiClass.getMethod("getOnlinePartyMembers", UUID.class);
         getPartyLeaderMethod = apiClass.getMethod("getPartyLeader", UUID.class);
         setPlayerCustomTextMethod = apiClass.getMethod("setPlayerCustomText", UUID.class, String.class, String.class);
+        setPlayerCustomText1Method = apiClass.getMethod("setPlayerCustomText1", UUID.class, String.class);
+        setPlayerCustomText2Method = apiClass.getMethod("setPlayerCustomText2", UUID.class, String.class);
         clearPlayerCustomTextMethod = apiClass.getMethod("clearPlayerCustomText", UUID.class);
         registerListenerMethod = apiClass.getMethod("registerListener",
             Class.forName("me.tsumori.partypro.api.PartyEventListener"));
@@ -99,7 +103,7 @@ public final class PartyProReflectionBridge implements PartyBridge {
         // Resolve event listener interface for Proxy
         eventListenerInterface = Class.forName("me.tsumori.partypro.api.PartyEventListener");
 
-        LOGGER.at(Level.INFO).log("PartyPro reflection bridge initialized — all %d methods cached", 10);
+        LOGGER.at(Level.INFO).log("PartyPro reflection bridge initialized — all %d methods cached", 12);
     }
 
     /**
@@ -233,6 +237,26 @@ public final class PartyProReflectionBridge implements PartyBridge {
             setPlayerCustomTextMethod.invoke(apiInstance, playerId, text1, text2);
         } catch (Exception e) {
             LOGGER.at(Level.FINE).log("Failed to set custom text for %s: %s",
+                playerId.toString().substring(0, 8), e.getMessage());
+        }
+    }
+
+    @Override
+    public void setCustomText1(@Nonnull UUID playerId, String text) {
+        try {
+            setPlayerCustomText1Method.invoke(apiInstance, playerId, text);
+        } catch (Exception e) {
+            LOGGER.at(Level.FINE).log("Failed to set custom text1 for %s: %s",
+                playerId.toString().substring(0, 8), e.getMessage());
+        }
+    }
+
+    @Override
+    public void setCustomText2(@Nonnull UUID playerId, String text) {
+        try {
+            setPlayerCustomText2Method.invoke(apiInstance, playerId, text);
+        } catch (Exception e) {
+            LOGGER.at(Level.FINE).log("Failed to set custom text2 for %s: %s",
                 playerId.toString().substring(0, 8), e.getMessage());
         }
     }

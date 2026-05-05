@@ -18,15 +18,19 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for StatsCombiner.
  *
- * <p>Tests the PoE-style stat calculation formula:
- * Final = (Base + Flat) × (1 + Sum(Percent)/100) × Product(1 + Multiplier/100)
+ * <p>Tests the ARPG deposit model where StatsCombiner deposits into accumulators,
+ * and the full formula is applied later:
  *
- * <p>Also tests special handling for:
- * <ul>
- *   <li>EVASION_PERCENT - applied as percent modifier to evasion</li>
- *   <li>ELEMENTAL_RESISTANCE - distributed to all 6 element resistances</li>
- *   <li>ALL_ELEMENTAL_DAMAGE_PERCENT - distributed to all 6 element damage %</li>
- * </ul>
+ * <pre>
+ * Final = (Base + ALL_FLAT) × (1 + ALL_PERCENT/100) × Π(1 + MORE/100)
+ * </pre>
+ *
+ * <p>Three stat categories:
+ * <ol>
+ *   <li>Base stats with percent pair: FLAT adds to base, PERCENT routes to accumulator</li>
+ *   <li>Accumulator stats (_PERCENT): all modifier types add to the pool</li>
+ *   <li>Standalone stats: all modifier types add directly</li>
+ * </ol>
  */
 public class StatsCombinerTest {
 
@@ -37,11 +41,11 @@ public class StatsCombinerTest {
         combiner = new StatsCombiner();
     }
 
-    // ==================== Basic Formula Tests ====================
+    // ==================== Deposit Model: Base Stats ====================
 
     @Nested
-    @DisplayName("PoE Formula: (Base + Flat) × (1 + %Sum/100) × Π(1 + Mult/100)")
-    class FormulaTests {
+    @DisplayName("Base Stats with Percent Pair (deposit model)")
+    class BaseStatTests {
 
         @Test
         @DisplayName("No modifiers returns base stats unchanged")
@@ -52,17 +56,14 @@ public class StatsCombinerTest {
                 .build();
 
             AggregatedModifiers emptyMods = AggregatedModifiers.builder().build();
-
             ComputedStats result = combiner.combine(base, emptyMods);
 
-            assertEquals(100f, result.getMaxHealth(), 0.1f,
-                "No modifiers should keep base health");
-            assertEquals(50f, result.getPhysicalDamage(), 0.1f,
-                "No modifiers should keep base damage");
+            assertEquals(100f, result.getMaxHealth(), 0.1f);
+            assertEquals(50f, result.getPhysicalDamage(), 0.1f);
         }
 
         @Test
-        @DisplayName("Flat modifier: 100 base + 20 flat = 120")
+        @DisplayName("FLAT on MAX_HEALTH adds to base: 100 + 20 = 120")
         void combine_flatModifier_addsToBase() {
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(100f)
@@ -74,12 +75,11 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(120f, result.getMaxHealth(), 0.1f,
-                "100 + 20 flat = 120");
+            assertEquals(120f, result.getMaxHealth(), 0.1f, "100 + 20 flat = 120");
         }
 
         @Test
-        @DisplayName("Multiple flat modifiers stack additively: 100 + 10 + 15 = 125")
+        @DisplayName("Multiple FLAT stack additively: 100 + 10 + 15 = 125")
         void combine_multipleFlatModifiers_stackAdditively() {
             ComputedStats base = ComputedStats.builder()
                 .physicalDamage(100f)
@@ -92,15 +92,15 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(125f, result.getPhysicalDamage(), 0.1f,
-                "100 + 10 + 15 = 125");
+            assertEquals(125f, result.getPhysicalDamage(), 0.1f);
         }
 
         @Test
-        @DisplayName("Percent modifier: 100 × (1 + 50/100) = 150")
-        void combine_percentModifier_multipliesTotal() {
+        @DisplayName("PERCENT on MAX_HEALTH routes to maxHealthPercent accumulator")
+        void combine_percentModifier_routesToAccumulator() {
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(100f)
+                .maxHealthPercent(10f)  // 10% from attributes
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -109,15 +109,19 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(150f, result.getMaxHealth(), 0.1f,
-                "100 × 1.5 = 150");
+            // PERCENT routes to maxHealthPercent, doesn't multiply maxHealth
+            assertEquals(100f, result.getMaxHealth(), 0.1f,
+                "maxHealth unchanged — PERCENT deposited to accumulator");
+            assertEquals(60f, result.getMaxHealthPercent(), 0.1f,
+                "10% base + 50% routed from MAX_HEALTH = 60%");
         }
 
         @Test
-        @DisplayName("Multiple percent modifiers stack additively: 100 × (1 + 30 + 20)/100) = 150")
-        void combine_multiplePercentModifiers_stackAdditively() {
+        @DisplayName("PERCENT on PHYSICAL_DAMAGE routes to physicalDamagePercent")
+        void combine_percentOnDamage_routesToAccumulator() {
             ComputedStats base = ComputedStats.builder()
                 .physicalDamage(100f)
+                .physicalDamagePercent(5f)  // 5% from attributes
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -127,117 +131,18 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(150f, result.getPhysicalDamage(), 0.1f,
-                "100 × (1 + 50/100) = 150");
+            assertEquals(100f, result.getPhysicalDamage(), 0.1f,
+                "physicalDamage unchanged");
+            assertEquals(55f, result.getPhysicalDamagePercent(), 0.1f,
+                "5% + 30% + 20% = 55%");
         }
 
         @Test
-        @DisplayName("Multiplier modifier: 100 × (1 + 20/100) = 120")
-        void combine_multiplierModifier_multipliesResult() {
-            ComputedStats base = ComputedStats.builder()
-                .maxHealth(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.MAX_HEALTH, 20f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(120f, result.getMaxHealth(), 0.1f,
-                "100 × 1.2 = 120");
-        }
-
-        @Test
-        @DisplayName("Multiple multipliers chain: 100 × 1.2 × 1.15 = 138")
-        void combine_multipleMultipliers_chainMultiplicatively() {
-            ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.MULTIPLIER))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 15f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(138f, result.getPhysicalDamage(), 0.1f,
-                "100 × 1.2 × 1.15 = 138");
-        }
-
-        @Test
-        @DisplayName("Full formula: (100 + 20) × (1 + 50/100) × (1 + 20/100) = 216")
-        void combine_fullFormula_correctOrder() {
-            ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 50f, ModifierType.PERCENT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            // (100 + 20) × 1.5 × 1.2 = 120 × 1.5 × 1.2 = 216
-            assertEquals(216f, result.getPhysicalDamage(), 0.1f,
-                "(100 + 20) × 1.5 × 1.2 = 216");
-        }
-    }
-
-    // ==================== Skill Tree Example Tests ====================
-
-    @Nested
-    @DisplayName("Skill Tree Examples")
-    class SkillTreeExampleTests {
-
-        @Test
-        @DisplayName("Example: 100 base, +20 flat, +50%+30%, 20% more = 259.2")
-        void combine_docExampleCalculation() {
-            ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 50f, ModifierType.PERCENT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 30f, ModifierType.PERCENT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            // (100 + 20) × (1 + 80/100) × (1 + 20/100)
-            // = 120 × 1.8 × 1.2 = 259.2
-            assertEquals(259.2f, result.getPhysicalDamage(), 0.1f,
-                "(100 + 20) × 1.80 × 1.20 = 259.2");
-        }
-
-        @Test
-        @DisplayName("Critical chance from skill tree nodes")
-        void combine_criticalChance_fromNodes() {
-            ComputedStats base = ComputedStats.builder()
-                .criticalChance(5f)  // 5% base crit
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, 2f, ModifierType.FLAT))  // +2%
-                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, 3f, ModifierType.FLAT))  // +3%
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(10f, result.getCriticalChance(), 0.1f,
-                "5% + 2% + 3% = 10% crit chance");
-        }
-
-        @Test
-        @DisplayName("Defense stats: armor with percent bonus")
-        void combine_armorWithPercentBonus() {
+        @DisplayName("FLAT + PERCENT on ARMOR: flat adds to base, percent to armorPercent")
+        void combine_armorFlatAndPercent() {
             ComputedStats base = ComputedStats.builder()
                 .armor(100f)
+                .armorPercent(0f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -247,9 +152,267 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // (100 + 50) × 1.25 = 187.5
-            assertEquals(187.5f, result.getArmor(), 0.1f,
-                "(100 + 50) × 1.25 = 187.5");
+            assertEquals(150f, result.getArmor(), 0.1f, "100 + 50 flat = 150");
+            assertEquals(25f, result.getArmorPercent(), 0.1f, "25% routed to armorPercent");
+        }
+
+        @Test
+        @DisplayName("Negative flat modifier reduces stat")
+        void combine_negativeFlatModifier_reduces() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealth(100f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH, -20f, ModifierType.FLAT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            assertEquals(80f, result.getMaxHealth(), 0.1f, "100 - 20 = 80");
+        }
+
+        @Test
+        @DisplayName("Negative PERCENT routes to accumulator as negative")
+        void combine_negativePercent_routesToAccumulator() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealth(100f)
+                .maxHealthPercent(50f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH, -25f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            assertEquals(100f, result.getMaxHealth(), 0.1f);
+            assertEquals(25f, result.getMaxHealthPercent(), 0.1f,
+                "50% - 25% routed = 25%");
+        }
+
+        @Test
+        @DisplayName("Large values don't overflow")
+        void combine_largeValues_noOverflow() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealth(1000000f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH, 1000000f, ModifierType.FLAT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            assertEquals(2000000f, result.getMaxHealth(), 1f);
+        }
+    }
+
+    // ==================== Deposit Model: Accumulator Stats ====================
+
+    @Nested
+    @DisplayName("Accumulator Stats (_PERCENT fields)")
+    class AccumulatorTests {
+
+        @Test
+        @DisplayName("FLAT on MAX_HEALTH_PERCENT adds percentage points")
+        void accumulator_flat_addsDirectly() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealthPercent(10f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 25f, ModifierType.FLAT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            assertEquals(35f, result.getMaxHealthPercent(), 0.1f, "10 + 25 = 35%");
+        }
+
+        @Test
+        @DisplayName("PERCENT on MAX_HEALTH_PERCENT adds (not multiplies) — all types additive")
+        void accumulator_percent_addsNotMultiplies() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealthPercent(10f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 5f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 5f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 5f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // All types additive for accumulators: 10 + 5 + 5 + 5 = 25
+            assertEquals(25f, result.getMaxHealthPercent(), 0.1f,
+                "10 + 5 + 5 + 5 = 25 (not 10 × 1.15)");
+        }
+
+        @Test
+        @DisplayName("Zero base + PERCENT on accumulator still works (not percent-of-percent)")
+        void accumulator_zeroBase_percentStillAdds() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealthPercent(0f)  // 0 Earth attribute
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 50f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // With old PoE: (0 + 0) × (1 + 50/100) = 0 — EVERYTHING LOST
+            // With deposit:  0 + 50 = 50 — correct!
+            assertEquals(50f, result.getMaxHealthPercent(), 0.1f,
+                "50% bonus should NOT be lost when base is 0");
+        }
+
+        @Test
+        @DisplayName("Pending percent from base stat routing adds to accumulator")
+        void accumulator_includesPendingFromBaseStats() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealth(100f)
+                .maxHealthPercent(10f)  // from Earth attr
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                // PERCENT on MAX_HEALTH → routes to MAX_HEALTH_PERCENT as pending
+                .addModifier(new StatModifier(StatType.MAX_HEALTH, 30f, ModifierType.PERCENT))
+                // Direct PERCENT on MAX_HEALTH_PERCENT → adds directly
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 20f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // 10 (earth) + 30 (routed from MAX_HEALTH PERCENT) + 20 (direct) = 60
+            assertEquals(60f, result.getMaxHealthPercent(), 0.1f,
+                "10 + 30 routed + 20 direct = 60%");
+            assertEquals(100f, result.getMaxHealth(), 0.1f,
+                "maxHealth unchanged (no FLAT mods)");
+        }
+    }
+
+    // ==================== Deposit Model: Standalone Stats ====================
+
+    @Nested
+    @DisplayName("Standalone Stats (all types additive)")
+    class StandaloneTests {
+
+        @Test
+        @DisplayName("FLAT on CRITICAL_CHANCE adds percentage points")
+        void standalone_flat_adds() {
+            ComputedStats base = ComputedStats.builder()
+                .criticalChance(5f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, 2f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.CRITICAL_CHANCE, 3f, ModifierType.FLAT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            assertEquals(10f, result.getCriticalChance(), 0.1f, "5 + 2 + 3 = 10");
+        }
+
+        @Test
+        @DisplayName("PERCENT on standalone adds (not multiplies)")
+        void standalone_percent_adds() {
+            ComputedStats base = ComputedStats.builder()
+                .knockbackResistance(10f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.KNOCKBACK_RESISTANCE, 15f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.KNOCKBACK_RESISTANCE, 50f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // Standalone: all types additive: 10 + 15 + 50 = 75
+            assertEquals(75f, result.getKnockbackResistance(), 0.1f,
+                "10 + 15 + 50 = 75 (all additive for standalone)");
+        }
+
+        @Test
+        @DisplayName("MULTIPLIER on standalone adds (not multiplies)")
+        void standalone_multiplier_adds() {
+            ComputedStats base = ComputedStats.builder()
+                .blockCounterDamage(10f)
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 5f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 100f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 50f, ModifierType.MULTIPLIER))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // Standalone: all additive: 10 + 5 + 100 + 50 = 165
+            assertEquals(165f, result.getBlockCounterDamage(), 0.1f,
+                "10 + 5 + 100 + 50 = 165");
+        }
+    }
+
+    // ==================== Full Pipeline Examples ====================
+
+    @Nested
+    @DisplayName("Full Pipeline (combiner + consolidation)")
+    class FullPipelineTests {
+
+        @Test
+        @DisplayName("User scenario: 100 base + 50 flat + 100% = 300 HP after consolidation")
+        void fullPipeline_userScenario_correctHP() {
+            ComputedStats base = ComputedStats.builder()
+                .maxHealth(100f)
+                .maxHealthPercent(10f)  // 10% from Earth attribute
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                // +50 flat HP from skill tree
+                .addModifier(new StatModifier(StatType.MAX_HEALTH, 50f, ModifierType.FLAT))
+                // +90% HP from skill tree (routes to maxHealthPercent)
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 50f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.MAX_HEALTH_PERCENT, 40f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // After combiner: maxHealth=150, maxHealthPercent=100 (10+50+40)
+            assertEquals(150f, result.getMaxHealth(), 0.1f);
+            assertEquals(100f, result.getMaxHealthPercent(), 0.1f);
+
+            // After consolidation: 150 × (1 + 100/100) = 300
+            result.consolidateResourcePercents();
+            assertEquals(300f, result.getMaxHealth(), 0.1f,
+                "150 × (1 + 100/100) = 300 HP");
+        }
+
+        @Test
+        @DisplayName("Damage stat: combiner deposits, damage calc applies formula")
+        void fullPipeline_damageDeposits() {
+            ComputedStats base = ComputedStats.builder()
+                .physicalDamage(0f)
+                .physicalDamagePercent(5f)  // from Fire attribute
+                .build();
+
+            AggregatedModifiers mods = AggregatedModifiers.builder()
+                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.FLAT))
+                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 50f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 30f, ModifierType.PERCENT))
+                .build();
+
+            ComputedStats result = combiner.combine(base, mods);
+
+            // physicalDamage = 0 + 20 flat = 20
+            assertEquals(20f, result.getPhysicalDamage(), 0.1f);
+            // physicalDamagePercent = 5 + 50 + 30 = 85
+            assertEquals(85f, result.getPhysicalDamagePercent(), 0.1f,
+                "5% base + 50% + 30% routed = 85%");
+            // Damage calculator would then apply: (weapon + 20) × (1 + 85/100) at combat time
         }
     }
 
@@ -272,9 +435,7 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // 100 × (1 + 50/100) = 150
-            assertEquals(150f, result.getEvasion(), 0.1f,
-                "100 evasion + 50% = 150");
+            assertEquals(150f, result.getEvasion(), 0.1f, "100 × (1 + 50/100) = 150");
         }
 
         @Test
@@ -295,19 +456,12 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // All 6 resistances should gain +15
-            assertEquals(25f, result.getFireResistance(), 0.1f,
-                "10 + 15 = 25 fire res");
-            assertEquals(25f, result.getWaterResistance(), 0.1f,
-                "10 + 15 = 25 water res");
-            assertEquals(25f, result.getLightningResistance(), 0.1f,
-                "10 + 15 = 25 lightning res");
-            assertEquals(25f, result.getEarthResistance(), 0.1f,
-                "10 + 15 = 25 earth res");
-            assertEquals(25f, result.getWindResistance(), 0.1f,
-                "10 + 15 = 25 wind res");
-            assertEquals(15f, result.getVoidResistance(), 0.1f,
-                "0 + 15 = 15 void res");
+            assertEquals(25f, result.getFireResistance(), 0.1f);
+            assertEquals(25f, result.getWaterResistance(), 0.1f);
+            assertEquals(25f, result.getLightningResistance(), 0.1f);
+            assertEquals(25f, result.getEarthResistance(), 0.1f);
+            assertEquals(25f, result.getWindResistance(), 0.1f);
+            assertEquals(15f, result.getVoidResistance(), 0.1f);
         }
 
         @Test
@@ -328,19 +482,12 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // All 6 elemental damage % should gain +25
-            assertEquals(35f, result.getFireDamagePercent(), 0.1f,
-                "10 + 25 = 35 fire dmg %");
-            assertEquals(45f, result.getWaterDamagePercent(), 0.1f,
-                "20 + 25 = 45 water dmg %");
-            assertEquals(25f, result.getLightningDamagePercent(), 0.1f,
-                "0 + 25 = 25 lightning dmg %");
-            assertEquals(40f, result.getEarthDamagePercent(), 0.1f,
-                "15 + 25 = 40 earth dmg %");
-            assertEquals(33f, result.getWindDamagePercent(), 0.1f,
-                "8 + 25 = 33 wind dmg %");
-            assertEquals(30f, result.getVoidDamagePercent(), 0.1f,
-                "5 + 25 = 30 void dmg %");
+            assertEquals(35f, result.getFireDamagePercent(), 0.1f);
+            assertEquals(45f, result.getWaterDamagePercent(), 0.1f);
+            assertEquals(25f, result.getLightningDamagePercent(), 0.1f);
+            assertEquals(40f, result.getEarthDamagePercent(), 0.1f);
+            assertEquals(33f, result.getWindDamagePercent(), 0.1f);
+            assertEquals(30f, result.getVoidDamagePercent(), 0.1f);
         }
     }
 
@@ -360,19 +507,18 @@ public class StatsCombinerTest {
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
+                // PERCENT on MAX_HEALTH → routes to maxHealthPercent
                 .addModifier(new StatModifier(StatType.MAX_HEALTH, 50f, ModifierType.PERCENT))
                 .addModifier(new StatModifier(StatType.MAX_MANA, 20f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 20f, ModifierType.MULTIPLIER))
+                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 5f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(150f, result.getMaxHealth(), 0.1f,
-                "Health: 100 × 1.5 = 150");
-            assertEquals(70f, result.getMaxMana(), 0.1f,
-                "Mana: 50 + 20 = 70");
-            assertEquals(12f, result.getPhysicalDamage(), 0.1f,
-                "Phys: 10 × 1.2 = 12");
+            assertEquals(100f, result.getMaxHealth(), 0.1f, "maxHealth unchanged (PERCENT routed)");
+            assertEquals(50f, result.getMaxHealthPercent(), 0.1f, "50% routed from MAX_HEALTH");
+            assertEquals(70f, result.getMaxMana(), 0.1f, "50 + 20 = 70");
+            assertEquals(15f, result.getPhysicalDamage(), 0.1f, "10 + 5 = 15");
         }
 
         @Test
@@ -390,12 +536,9 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(200f, result.getMaxHealth(), 0.1f,
-                "Health should be modified");
-            assertEquals(50f, result.getMaxMana(), 0.1f,
-                "Mana should be unchanged");
-            assertEquals(75f, result.getArmor(), 0.1f,
-                "Armor should be unchanged");
+            assertEquals(200f, result.getMaxHealth(), 0.1f);
+            assertEquals(50f, result.getMaxMana(), 0.1f);
+            assertEquals(75f, result.getArmor(), 0.1f);
         }
     }
 
@@ -408,9 +551,6 @@ public class StatsCombinerTest {
         @Test
         @DisplayName("HP_SCALING_DAMAGE: bonus physDmg% = (maxHP/100) × stat")
         void hpScalingDamage_addsPhysDmgPercentFromMaxHp() {
-            // base maxHP=500, physDmgPct=10, HP_SCALING_DAMAGE=0.5
-            // bonus physDmg% = (500/100) * 0.5 = 2.5
-            // result physDmgPct = 10 + 2.5 = 12.5
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(500f)
                 .physicalDamagePercent(10f)
@@ -423,15 +563,12 @@ public class StatsCombinerTest {
             ComputedStats result = combiner.combine(base, mods);
 
             assertEquals(12.5f, result.getPhysicalDamagePercent(), 0.1f,
-                "bonus physDmg% = (500/100) × 0.5 = 2.5 → 10 + 2.5 = 12.5");
+                "bonus = (500/100) × 0.5 = 2.5 → 10 + 2.5 = 12.5");
         }
 
         @Test
         @DisplayName("SPEED_TO_SPELL_POWER: bonus spellDmg% = moveSpeed% × (stat/100)")
         void speedToSpellPower_convertsMoveSpeedToSpellDmg() {
-            // base moveSpeedPct=30, spellDmgPct=10, SPEED_TO_SPELL_POWER=50
-            // bonus spellDmg% = 30 * (50/100) = 15
-            // result spellDmgPct = 10 + 15 = 25
             ComputedStats base = ComputedStats.builder()
                 .movementSpeedPercent(30f)
                 .spellDamagePercent(10f)
@@ -444,15 +581,12 @@ public class StatsCombinerTest {
             ComputedStats result = combiner.combine(base, mods);
 
             assertEquals(25f, result.getSpellDamagePercent(), 0.1f,
-                "bonus spellDmg% = 30 × (50/100) = 15 → 10 + 15 = 25");
+                "30 × (50/100) = 15 → 10 + 15 = 25");
         }
 
         @Test
         @DisplayName("ATK_SPEED_TO_SPELL_POWER: bonus spellDmg% = atkSpeed% × (stat/100)")
         void atkSpeedToSpellPower_convertsAtkSpeedToSpellDmg() {
-            // base atkSpeedPct=20, spellDmgPct=5, ATK_SPEED_TO_SPELL_POWER=75
-            // bonus spellDmg% = 20 * (75/100) = 15
-            // result spellDmgPct = 5 + 15 = 20
             ComputedStats base = ComputedStats.builder()
                 .attackSpeedPercent(20f)
                 .spellDamagePercent(5f)
@@ -465,7 +599,7 @@ public class StatsCombinerTest {
             ComputedStats result = combiner.combine(base, mods);
 
             assertEquals(20f, result.getSpellDamagePercent(), 0.1f,
-                "bonus spellDmg% = 20 × (75/100) = 15 → 5 + 15 = 20");
+                "20 × (75/100) = 15 → 5 + 15 = 20");
         }
 
         @Test
@@ -484,41 +618,17 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(25f, result.getDetonateDotOnCrit(), 0.1f, "DETONATE_DOT_ON_CRIT");
-            assertEquals(5f, result.getConsecutiveHitBonus(), 0.1f, "CONSECUTIVE_HIT_BONUS");
-            assertEquals(30f, result.getBlockCounterDamage(), 0.1f, "BLOCK_COUNTER_DAMAGE");
-            assertEquals(10f, result.getShieldRegenOnDot(), 0.1f, "SHIELD_REGEN_ON_DOT");
-            assertEquals(1f, result.getImmunityOnAilment(), 0.1f, "IMMUNITY_ON_AILMENT");
-            assertEquals(15f, result.getSpellEchoChance(), 0.1f, "SPELL_ECHO_CHANCE");
-        }
-
-        @Test
-        @DisplayName("Octant stats apply PoE formula (FLAT+PERCENT+MULT)")
-        void octantStat_appliesFullPoeFormula() {
-            // BLOCK_COUNTER_DAMAGE: base=10, flat=5, percent=100, mult=50
-            // Result = (10+5) × (1+100/100) × (1+50/100) = 15 × 2 × 1.5 = 45
-            ComputedStats base = ComputedStats.builder()
-                .blockCounterDamage(10f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 5f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 100f, ModifierType.PERCENT))
-                .addModifier(new StatModifier(StatType.BLOCK_COUNTER_DAMAGE, 50f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(45f, result.getBlockCounterDamage(), 0.1f,
-                "(10+5) × 2.0 × 1.5 = 45");
+            assertEquals(25f, result.getDetonateDotOnCrit(), 0.1f);
+            assertEquals(5f, result.getConsecutiveHitBonus(), 0.1f);
+            assertEquals(30f, result.getBlockCounterDamage(), 0.1f);
+            assertEquals(10f, result.getShieldRegenOnDot(), 0.1f);
+            assertEquals(1f, result.getImmunityOnAilment(), 0.1f);
+            assertEquals(15f, result.getSpellEchoChance(), 0.1f);
         }
 
         @Test
         @DisplayName("EVASION_TO_ARMOR: bonus armor = evasion × (stat/100)")
         void evasionToArmor_convertsEvasionToArmor() {
-            // base evasion=200, armor=50, EVASION_TO_ARMOR=30
-            // bonus armor = 200 × (30/100) = 60
-            // result armor = 50 + 60 = 110
             ComputedStats base = ComputedStats.builder()
                 .evasion(200f)
                 .armor(50f)
@@ -530,17 +640,13 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(110f, result.getArmor(), 0.1f,
-                "bonus armor = 200 × (30/100) = 60 → 50 + 60 = 110");
-            assertEquals(200f, result.getEvasion(), 0.1f,
-                "evasion should be unchanged (conversion doesn't consume it)");
+            assertEquals(110f, result.getArmor(), 0.1f, "50 + 200×0.3 = 110");
+            assertEquals(200f, result.getEvasion(), 0.1f);
         }
 
         @Test
         @DisplayName("EVASION_TO_ARMOR: uses post-processed evasion value")
         void evasionToArmor_usesPostProcessedEvasion() {
-            // base evasion=100, +100 flat → combined evasion=200
-            // EVASION_TO_ARMOR=50 → bonus armor = 200 × (50/100) = 100
             ComputedStats base = ComputedStats.builder()
                 .evasion(100f)
                 .armor(0f)
@@ -553,17 +659,13 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(200f, result.getEvasion(), 0.1f, "evasion = 100 + 100 = 200");
-            assertEquals(100f, result.getArmor(), 0.1f,
-                "bonus armor = 200 × (50/100) = 100 (uses post-processed evasion)");
+            assertEquals(200f, result.getEvasion(), 0.1f);
+            assertEquals(100f, result.getArmor(), 0.1f, "200 × 0.5 = 100");
         }
 
         @Test
         @DisplayName("Derived stats use post-processed maxHP, not base")
         void derivedStats_usePostProcessedValues() {
-            // Base maxHP=100, FLAT +400 → combined maxHP=500
-            // HP_SCALING_DAMAGE=1.0 → bonus physDmg% = (500/100) × 1.0 = 5.0
-            // Verifies that the derived stat reads the COMBINED maxHP, not base
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(100f)
                 .physicalDamagePercent(0f)
@@ -576,11 +678,9 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // maxHP should be 500 (100 + 400)
-            assertEquals(500f, result.getMaxHealth(), 0.1f, "maxHP = 100 + 400 = 500");
-            // physDmgPct should be 5.0 (from 500 HP, not 100 base)
+            assertEquals(500f, result.getMaxHealth(), 0.1f);
             assertEquals(5.0f, result.getPhysicalDamagePercent(), 0.1f,
-                "bonus physDmg% = (500/100) × 1.0 = 5.0 (uses post-processed maxHP)");
+                "(500/100) × 1.0 = 5.0 (uses post-processed maxHP)");
         }
     }
 
@@ -603,15 +703,15 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(50f, result.getPhysicalDamage(), 0.1f,
-                "0 + 50 = 50");
+            assertEquals(50f, result.getPhysicalDamage(), 0.1f);
         }
 
         @Test
-        @DisplayName("Zero base with percent modifier stays zero")
-        void combine_zeroBaseWithPercent_staysZero() {
+        @DisplayName("Zero base with PERCENT routes to accumulator (not lost)")
+        void combine_zeroBaseWithPercent_routesToAccumulator() {
             ComputedStats base = ComputedStats.builder()
                 .physicalDamage(0f)
+                .physicalDamagePercent(0f)
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
@@ -620,85 +720,13 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // 0 × 2.0 = 0
-            assertEquals(0f, result.getPhysicalDamage(), 0.1f,
-                "0 × any = 0");
-        }
-
-        @Test
-        @DisplayName("Negative flat modifier reduces stat")
-        void combine_negativeFlatModifier_reduces() {
-            ComputedStats base = ComputedStats.builder()
-                .maxHealth(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.MAX_HEALTH, -20f, ModifierType.FLAT))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(80f, result.getMaxHealth(), 0.1f,
-                "100 - 20 = 80");
-        }
-
-        @Test
-        @DisplayName("Negative percent modifier reduces stat")
-        void combine_negativePercentModifier_reduces() {
-            ComputedStats base = ComputedStats.builder()
-                .maxHealth(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.MAX_HEALTH, -25f, ModifierType.PERCENT))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(75f, result.getMaxHealth(), 0.1f,
-                "100 × 0.75 = 75");
-        }
-
-        @Test
-        @DisplayName("Large values don't overflow")
-        void combine_largeValues_noOverflow() {
-            ComputedStats base = ComputedStats.builder()
-                .maxHealth(1000000f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.MAX_HEALTH, 1000000f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.MAX_HEALTH, 100f, ModifierType.PERCENT))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            // (1M + 1M) × 2.0 = 4M
-            assertEquals(4000000f, result.getMaxHealth(), 1f,
-                "Large values should not overflow");
-        }
-
-        @Test
-        @DisplayName("Multiple multipliers with one being zero")
-        void combine_multiplierWithZero_becomesZero() {
-            ComputedStats base = ComputedStats.builder()
-                .physicalDamage(100f)
-                .build();
-
-            AggregatedModifiers mods = AggregatedModifiers.builder()
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, 50f, ModifierType.MULTIPLIER))
-                .addModifier(new StatModifier(StatType.PHYSICAL_DAMAGE, -100f, ModifierType.MULTIPLIER))
-                .build();
-
-            ComputedStats result = combiner.combine(base, mods);
-
-            // 100 × 1.5 × 0.0 = 0
-            assertEquals(0f, result.getPhysicalDamage(), 0.1f,
-                "Multiplier of -100% should reduce to zero");
+            assertEquals(0f, result.getPhysicalDamage(), 0.1f);
+            assertEquals(100f, result.getPhysicalDamagePercent(), 0.1f,
+                "100% routed to accumulator, not lost");
         }
     }
 
-    // ==================== Stat Categories Tests ====================
+    // ==================== Stat Category Tests ====================
 
     @Nested
     @DisplayName("Stat Categories")
@@ -736,6 +764,7 @@ public class StatsCombinerTest {
                 .build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
+                // PERCENT on ARMOR → routes to armorPercent
                 .addModifier(new StatModifier(StatType.ARMOR, 50f, ModifierType.PERCENT))
                 .addModifier(new StatModifier(StatType.EVASION, 100f, ModifierType.FLAT))
                 .addModifier(new StatModifier(StatType.BLOCK_CHANCE, 5f, ModifierType.FLAT))
@@ -743,9 +772,10 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(150f, result.getArmor(), 0.1f);
-            assertEquals(150f, result.getEvasion(), 0.1f);
-            assertEquals(15f, result.getBlockChance(), 0.1f);
+            assertEquals(100f, result.getArmor(), 0.1f, "base unchanged, PERCENT routed");
+            assertEquals(50f, result.getArmorPercent(), 0.1f, "50% in accumulator");
+            assertEquals(150f, result.getEvasion(), 0.1f, "50 + 100 = 150");
+            assertEquals(15f, result.getBlockChance(), 0.1f, "10 + 5 = 15");
         }
 
         @Test
@@ -760,17 +790,19 @@ public class StatsCombinerTest {
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
                 .addModifier(new StatModifier(StatType.MAX_HEALTH, 50f, ModifierType.FLAT))
+                // PERCENT on MAX_MANA → routes to maxManaPercent
                 .addModifier(new StatModifier(StatType.MAX_MANA, 100f, ModifierType.PERCENT))
                 .addModifier(new StatModifier(StatType.HEALTH_REGEN, 1f, ModifierType.FLAT))
-                .addModifier(new StatModifier(StatType.MANA_REGEN, 50f, ModifierType.PERCENT))
+                .addModifier(new StatModifier(StatType.MANA_REGEN, 0.5f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(150f, result.getMaxHealth(), 0.1f);
-            assertEquals(100f, result.getMaxMana(), 0.1f);
-            assertEquals(2f, result.getHealthRegen(), 0.1f);
-            assertEquals(0.75f, result.getManaRegen(), 0.01f);
+            assertEquals(150f, result.getMaxHealth(), 0.1f, "100 + 50 flat");
+            assertEquals(50f, result.getMaxMana(), 0.1f, "mana unchanged, PERCENT routed");
+            assertEquals(100f, result.getMaxManaPercent(), 0.1f, "100% in accumulator");
+            assertEquals(2f, result.getHealthRegen(), 0.1f, "1 + 1 = 2");
+            assertEquals(1f, result.getManaRegen(), 0.01f, "0.5 + 0.5 = 1.0");
         }
     }
 
@@ -780,24 +812,19 @@ public class StatsCombinerTest {
     @DisplayName("Pipeline Coverage — every StatType wired correctly")
     class PipelineCoverageTests {
 
-        /**
-         * Verifies that every standard StatType, when given a flat modifier,
-         * produces a non-zero output. This catches stats that are silently
-         * dropped due to missing applyModifier() calls or setStatInBuilder() cases.
-         */
         @ParameterizedTest(name = "{0}")
         @EnumSource(value = StatType.class, mode = EnumSource.Mode.EXCLUDE, names = {
-            // Derived (post-processed from already-combined values in combine())
+            // Derived (post-processed from already-combined values)
             "HP_SCALING_DAMAGE", "SPEED_TO_SPELL_POWER", "ATK_SPEED_TO_SPELL_POWER", "EVASION_TO_ARMOR",
-            // Fan-out (distributed to multiple fields, not a single field)
+            // Fan-out (distributed to multiple fields)
             "ELEMENTAL_RESISTANCE", "ALL_ELEMENTAL_DAMAGE_PERCENT", "EVASION_PERCENT",
-            // Combat pass-through (empty case — read from AggregatedModifiers directly)
+            // Combat pass-through (no ComputedStats field)
             "SPELL_TO_PHYSICAL_CONVERSION", "PHYSICAL_TO_SPELL_CONVERSION", "PHYSICAL_TO_FIRE_CONVERSION",
             "DAMAGE_TO_MANA_CONVERSION", "DAMAGE_TO_VOID_CONVERSION",
             "ENEMY_ELEMENTAL_VULNERABILITY", "ENEMY_RESISTANCE_REDUCTION",
-            // Not wired in combine() — has setStatInBuilder case but no applyModifier call
+            // Not wired in combine()
             "EXPERIENCE_GAIN",
-            // Dead stat — passive_block_chance redirected to BLOCK_CHANCE
+            // Dead stat
             "PASSIVE_BLOCK_CHANCE"
         })
         @DisplayName("StatType flows through pipeline")
@@ -810,14 +837,13 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            // Use reflection to read the corresponding field value
             String fieldName = stat.getFieldName();
             String getterName = "get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
             Method getter = ComputedStats.class.getMethod(getterName);
             float value = ((Number) getter.invoke(result)).floatValue();
 
             assertNotEquals(0f, value,
-                String.format("%s: flat +10 should produce non-zero result via %s() (got %.2f)",
+                String.format("%s: flat +10 should produce non-zero via %s() (got %.2f)",
                     stat, getterName, value));
         }
     }
@@ -842,35 +868,27 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(8f, result.getLifeLeech(), 0.1f,
-                "LIFE_LEECH should modify lifeLeech: 5 + 3 = 8");
-            assertEquals(10f, result.getLifeSteal(), 0.1f,
-                "LIFE_LEECH should NOT modify lifeSteal");
+            assertEquals(8f, result.getLifeLeech(), 0.1f);
+            assertEquals(10f, result.getLifeSteal(), 0.1f);
         }
 
         @Test
         @DisplayName("STAMINA_REGEN flows through pipeline")
         void staminaRegen_flowsThrough() {
-            ComputedStats base = ComputedStats.builder()
-                .staminaRegen(2f)
-                .build();
+            ComputedStats base = ComputedStats.builder().staminaRegen(2f).build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
                 .addModifier(new StatModifier(StatType.STAMINA_REGEN, 3f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(5f, result.getStaminaRegen(), 0.1f,
-                "2 + 3 = 5 stamina regen");
+            assertEquals(5f, result.getStaminaRegen(), 0.1f);
         }
 
         @Test
-        @DisplayName("KNOCKBACK_RESISTANCE applies PoE formula")
-        void knockbackResistance_appliesFormula() {
-            ComputedStats base = ComputedStats.builder()
-                .knockbackResistance(10f)
-                .build();
+        @DisplayName("KNOCKBACK_RESISTANCE all types additive (standalone)")
+        void knockbackResistance_additive() {
+            ComputedStats base = ComputedStats.builder().knockbackResistance(10f).build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
                 .addModifier(new StatModifier(StatType.KNOCKBACK_RESISTANCE, 15f, ModifierType.FLAT))
@@ -878,10 +896,7 @@ public class StatsCombinerTest {
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
-            // (10 + 15) × 1.5 = 37.5
-            assertEquals(37.5f, result.getKnockbackResistance(), 0.1f,
-                "(10 + 15) × 1.5 = 37.5");
+            assertEquals(75f, result.getKnockbackResistance(), 0.1f, "10+15+50=75");
         }
 
         @Test
@@ -894,7 +909,6 @@ public class StatsCombinerTest {
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
             assertEquals(25f, result.getChargedAttackDamagePercent(), 0.1f);
         }
 
@@ -908,7 +922,6 @@ public class StatsCombinerTest {
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
             assertEquals(10f, result.getAccuracyPercent(), 0.1f);
         }
 
@@ -922,25 +935,20 @@ public class StatsCombinerTest {
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
             assertEquals(8f, result.getPercentHitAsTrueDamage(), 0.1f);
         }
 
         @Test
         @DisplayName("THORNS_DAMAGE_PERCENT flows through pipeline")
         void thornsDamagePercent_flowsThrough() {
-            ComputedStats base = ComputedStats.builder()
-                .thornsDamagePercent(5f)
-                .build();
+            ComputedStats base = ComputedStats.builder().thornsDamagePercent(5f).build();
 
             AggregatedModifiers mods = AggregatedModifiers.builder()
                 .addModifier(new StatModifier(StatType.THORNS_DAMAGE_PERCENT, 10f, ModifierType.FLAT))
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
-            assertEquals(15f, result.getThornsDamagePercent(), 0.1f,
-                "5 + 10 = 15");
+            assertEquals(15f, result.getThornsDamagePercent(), 0.1f);
         }
 
         @Test
@@ -989,7 +997,6 @@ public class StatsCombinerTest {
                 .build();
 
             ComputedStats result = combiner.combine(base, mods);
-
             assertEquals(15f, result.getJumpForcePercent(), 0.1f);
         }
 

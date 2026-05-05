@@ -3,7 +3,7 @@
 Research findings from investigating the Hytale decompiled codebase for item data storage systems.
 
 **Research Date**: 2026-01-23
-**Source**: `/home/larsonix/work/Hytale-Decompiled-Full-Game`
+**Source**: `<hytale-decompiled>`
 
 ---
 

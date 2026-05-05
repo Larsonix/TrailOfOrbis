@@ -156,12 +156,27 @@ public final class LootFilterInventoryHandler {
 
     /**
      * Processes a single slot transaction, checking if the added item should be filtered.
+     *
+     * <p>Distinguishes genuine pickups from in-place item modifications (durability changes,
+     * metadata updates). When Hytale's {@code setItemStackForSlot()} replaces an ItemStack
+     * (e.g., after durability decrease), the transaction fires as ADD with a new object —
+     * but the slot already had the same item. We detect this by comparing item IDs
+     * before and after the transaction.
      */
     private void processSlot(Player player, ItemContainer container,
                              SlotTransaction slot, UUID playerId) {
         ItemStack itemStack = slot.getSlotAfter();
         if (itemStack == null || itemStack.isEmpty()) return;
         if (!GearUtils.isRpgGear(itemStack)) return;
+
+        // Skip in-place modifications (durability, metadata, etc.)
+        // If the slot had the same item ID before, this is NOT a new pickup
+        ItemStack before = slot.getSlotBefore();
+        if (before != null && !before.isEmpty()
+                && before.getItemId() != null
+                && before.getItemId().equals(itemStack.getItemId())) {
+            return;
+        }
 
         evaluateAndEject(player, container, slot, itemStack, playerId);
     }

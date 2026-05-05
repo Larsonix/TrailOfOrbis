@@ -61,7 +61,7 @@ Important: use native UI only. Do not use HyUI.
 | `InGame/Pages/Inventory/` | Full inventory page |
 | `Common/Buttons/` | Shared button styles |
 
-Search with: `grep "Hotbar" /home/larsonix/work/Hytale-Decompiled-Full-Game/.index/CLIENT_UI_INDEX.txt`
+Search with: `grep "Hotbar" <hytale-decompiled>/.index/CLIENT_UI_INDEX.txt`
 
 See `docs/hytale-api/client-data.md` for the full client data reference.
 

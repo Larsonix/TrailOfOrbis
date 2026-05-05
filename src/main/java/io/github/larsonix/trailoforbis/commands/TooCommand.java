@@ -37,5 +37,6 @@ public final class TooCommand extends OpenCommandCollection {
         this.addSubCommand(new TooSanctumCommand(plugin));
         this.addSubCommand(new TooRealmCommand(plugin));
         this.addSubCommand(new TooCombatCommand(plugin));
+        this.addSubCommand(new TooSorryCommand(plugin));
     }
 }

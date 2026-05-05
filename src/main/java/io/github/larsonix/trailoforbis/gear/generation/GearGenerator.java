@@ -1,7 +1,9 @@
 package io.github.larsonix.trailoforbis.gear.generation;
 
+import io.github.larsonix.trailoforbis.attributes.AttributeType;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.compat.HexcodeMetadataInjector;
+import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig.RarityConfig;
@@ -25,6 +27,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
@@ -241,15 +244,6 @@ public final class GearGenerator {
         int prefixCount = distribution[0];
         int suffixCount = distribution[1];
 
-        // Roll modifiers with equipment type filtering
-        List<GearModifier> prefixes = modifierPool.rollPrefixes(
-                prefixCount, itemLevel, slot, rarity, effectiveEquipmentType);
-        List<GearModifier> suffixes = modifierPool.rollSuffixes(
-                suffixCount, itemLevel, slot, rarity, effectiveEquipmentType);
-
-        // Generate unique instance ID
-        GearInstanceId instanceId = GearInstanceIdGenerator.generate();
-
         // Determine the original base item ID for weapon type detection
         // If the item already has a baseItemId stored (regeneration), use that
         // Otherwise, use the item's current ID
@@ -258,8 +252,37 @@ public final class GearGenerator {
             baseItemIdForWeaponType = baseItem.getItemId();
         }
 
-        // Generate weapon and armor implicits
-        ImplicitResult implicits = generateImplicits(slot, baseItemIdForWeaponType, effectiveEquipmentType, itemLevel, random);
+        // For magic weapons: pre-roll the element so modifiers can be biased toward it.
+        // Element is always rolled and stored (Hexcode compat: display adapts at runtime).
+        WeaponType weaponTypeForAffinity = "weapon".equalsIgnoreCase(slot)
+                ? WeaponType.fromItemIdOrUnknown(baseItemIdForWeaponType)
+                : WeaponType.UNKNOWN;
+        ElementType preRolledElement = null;
+        if (weaponTypeForAffinity.isMagic()) {
+            preRolledElement = ElementType.values()[random.nextInt(ElementType.values().length)];
+            AttributeType affinity = AttributeType.fromString(preRolledElement.name());
+            modifierPool.setElementAffinity(affinity);
+        }
+
+        // Roll modifiers with equipment type filtering (+ element affinity if magic weapon)
+        // try/finally ensures affinity is cleared even if rolling throws
+        List<GearModifier> prefixes;
+        List<GearModifier> suffixes;
+        try {
+            prefixes = modifierPool.rollPrefixes(
+                    prefixCount, itemLevel, slot, rarity, effectiveEquipmentType);
+            suffixes = modifierPool.rollSuffixes(
+                    suffixCount, itemLevel, slot, rarity, effectiveEquipmentType);
+        } finally {
+            modifierPool.clearElementAffinity();
+        }
+
+        // Generate unique instance ID
+        GearInstanceId instanceId = GearInstanceIdGenerator.generate();
+
+        // Generate weapon and armor implicits (uses pre-rolled element for magic weapons)
+        ImplicitResult implicits = generateImplicitsWithElement(
+                slot, baseItemIdForWeaponType, effectiveEquipmentType, itemLevel, random, preRolledElement);
         WeaponImplicit implicit = implicits.weapon();
         ArmorImplicit armorImplicit = implicits.armor();
 
@@ -436,6 +459,16 @@ public final class GearGenerator {
             @Nullable EquipmentType equipmentType,
             int itemLevel,
             Random random) {
+        return generateImplicitsWithElement(slot, itemId, equipmentType, itemLevel, random, null);
+    }
+
+    private ImplicitResult generateImplicitsWithElement(
+            @Nullable String slot,
+            @Nullable String itemId,
+            @Nullable EquipmentType equipmentType,
+            int itemLevel,
+            Random random,
+            @Nullable ElementType preRolledElement) {
 
         // Weapon implicit
         WeaponImplicit weapon = null;
@@ -444,7 +477,12 @@ public final class GearGenerator {
             LOGGER.atFine().log("[IMPLICIT DEBUG] slot=%s, itemId=%s, weaponType=%s, shouldHaveImplicit=%s",
                     slot, itemId, weaponType, implicitCalculator.shouldHaveImplicit(weaponType));
             if (implicitCalculator.shouldHaveImplicit(weaponType)) {
-                weapon = implicitCalculator.calculate(weaponType, itemLevel, random);
+                if (preRolledElement != null && weaponType.isMagic()) {
+                    // Use pre-rolled element (already consumed random for element selection)
+                    weapon = implicitCalculator.calculateWithElement(weaponType, itemLevel, preRolledElement, random);
+                } else {
+                    weapon = implicitCalculator.calculate(weaponType, itemLevel, random);
+                }
                 LOGGER.atFine().log("[IMPLICIT DEBUG] Generated implicit: %s", weapon);
             }
         } else {
@@ -470,6 +508,111 @@ public final class GearGenerator {
         }
 
         return new ImplicitResult(weapon, armor);
+    }
+
+    // =========================================================================
+    // IMPLICIT EXPECTATION (for migration — source of truth)
+    // =========================================================================
+
+    /**
+     * Describes what implicits an item SHOULD have based on current generation rules.
+     * Used by the migration system to compare existing items against the source of truth.
+     */
+    public final class ImplicitExpectation {
+        private final boolean shouldHaveWeapon;
+        private final boolean shouldHaveArmor;
+        private final @Nullable WeaponType weaponType;
+        private final @Nullable EquipmentType equipmentType;
+        private final int itemLevel;
+
+        private ImplicitExpectation(boolean shouldHaveWeapon, boolean shouldHaveArmor,
+                                    @Nullable WeaponType weaponType,
+                                    @Nullable EquipmentType equipmentType, int itemLevel) {
+            this.shouldHaveWeapon = shouldHaveWeapon;
+            this.shouldHaveArmor = shouldHaveArmor;
+            this.weaponType = weaponType;
+            this.equipmentType = equipmentType;
+            this.itemLevel = itemLevel;
+        }
+
+        public boolean shouldHaveWeapon() { return shouldHaveWeapon; }
+        public boolean shouldHaveArmor() { return shouldHaveArmor; }
+
+        /** Checks if the given damage type is valid for this weapon type. */
+        public boolean isWeaponTypeValid(@Nullable String damageType) {
+            if (!shouldHaveWeapon || weaponType == null || damageType == null) return false;
+            return ImplicitDamageCalculator.getValidDamageTypes(weaponType).contains(damageType);
+        }
+
+        /** Checks if the given defense type is valid for this armor type. */
+        public boolean isArmorTypeValid(@Nullable String defenseType) {
+            if (!shouldHaveArmor || equipmentType == null || defenseType == null) return false;
+            // The correct defense type is determined by armor material
+            ArmorMaterial material = equipmentType.getArmorMaterial();
+            if (material == null && equipmentType.isOffhand()) return "block_chance".equals(defenseType);
+            if (material == null) return false;
+            String expectedStat = balanceConfig.implicitDefense().getStatForMaterial(material);
+            return expectedStat != null && expectedStat.equals(defenseType);
+        }
+
+        /** Generates the correct weapon implicit for this item. */
+        @Nullable
+        public WeaponImplicit generateWeapon(@Nonnull Random rng) {
+            if (!shouldHaveWeapon || weaponType == null) return null;
+            return implicitCalculator.calculate(weaponType, itemLevel, rng);
+        }
+
+        /** Generates the correct armor implicit for this item. */
+        @Nullable
+        public ArmorImplicit generateArmor(@Nonnull Random rng) {
+            if (!shouldHaveArmor || equipmentType == null) return null;
+            if (equipmentType.isOffhand()) {
+                return implicitDefenseCalculator.calculateShield(itemLevel, rng);
+            }
+            ArmorMaterial material = equipmentType.getArmorMaterial();
+            EquipmentType.ArmorSlot armorSlot = equipmentType.getArmorSlot();
+            if (material == null || armorSlot == null) return null;
+            return implicitDefenseCalculator.calculate(material, armorSlot, itemLevel, rng);
+        }
+    }
+
+    /**
+     * Returns what implicits an item SHOULD have based on current generation rules.
+     *
+     * <p>This is the source of truth for the migration system. Instead of duplicating
+     * generation logic in validation rules, migration calls this and compares.
+     *
+     * @param slot The gear slot ("weapon", "head", "chest", "legs", "hands")
+     * @param baseItemId The original item ID for weapon type detection
+     * @param equipmentType The resolved equipment type (nullable)
+     * @param itemLevel The item's level
+     * @return An ImplicitExpectation describing what the item should have
+     */
+    @Nonnull
+    public ImplicitExpectation getExpectedImplicits(
+            @Nullable String slot,
+            @Nullable String baseItemId,
+            @Nullable EquipmentType equipmentType,
+            int itemLevel) {
+
+        // Weapon implicit: only for weapon slot with a known weapon type
+        boolean shouldHaveWeapon = false;
+        WeaponType weaponType = null;
+        if ("weapon".equalsIgnoreCase(slot) && implicitCalculator.isEnabled() && baseItemId != null) {
+            weaponType = WeaponType.fromItemIdOrUnknown(baseItemId);
+            if (weaponType != WeaponType.UNKNOWN && implicitCalculator.shouldHaveImplicit(weaponType)) {
+                shouldHaveWeapon = true;
+            }
+        }
+
+        // Armor implicit: only for armor/shield with known equipment type
+        boolean shouldHaveArmor = false;
+        if (implicitDefenseCalculator.isEnabled() && equipmentType != null
+                && implicitDefenseCalculator.shouldHaveImplicit(equipmentType)) {
+            shouldHaveArmor = true;
+        }
+
+        return new ImplicitExpectation(shouldHaveWeapon, shouldHaveArmor, weaponType, equipmentType, itemLevel);
     }
 
     // =========================================================================

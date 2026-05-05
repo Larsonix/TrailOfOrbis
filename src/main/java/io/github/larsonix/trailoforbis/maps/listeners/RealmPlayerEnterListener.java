@@ -113,6 +113,10 @@ public class RealmPlayerEnterListener {
         // the client. Calling hide() would send Set commands to those cleared
         // elements, crashing the client.
         realmsManager.getHudManager().discardAllHudsForPlayer(playerId);
+
+        // Clean up spawn protection if active — the player's entity is leaving the
+        // world, so the invulnerability flag is destroyed with it. We just need to untrack.
+        realmsManager.getSpawnProtection().cleanup(playerId);
     }
 
     /**
@@ -265,12 +269,27 @@ public class RealmPlayerEnterListener {
             // reference Append-created elements. If both packets arrive during
             // JoinWorld processing, the Set crashes. One tick of deferral ensures
             // the client's UI state is stable.
+            //
+            // DEDUP: Skip if combat HUD already exists. Hytale fires TWO ClientReady
+            // packets per world transition. On remote connections the second arrives
+            // 30+ seconds later. Recreating the HUD (discard+create) on that second
+            // event sends packets during the client's second OnWorldJoined → crash.
             RealmInstance realm = realmOpt.get();
+
+            // Grant spawn protection — invincible until first movement.
+            // Protection reads the player's actual position from TransformComponent,
+            // adds the Invulnerable component, and starts a polling timer.
             if (playerId != null && !realm.getBiome().isUtilityBiome()) {
+                realmsManager.getSpawnProtection().grant(playerId, world);
+            }
+            if (playerId != null && !realm.getBiome().isUtilityBiome()
+                    && !realmsManager.getHudManager().hasCombatHud(playerId)) {
                 final UUID deferredPlayerId = playerId;
                 final PlayerRef deferredRef = playerRef;
                 world.execute(() -> {
                     if (!deferredRef.isValid()) return;
+                    // Double-check after deferral (another tick might have created it)
+                    if (realmsManager.getHudManager().hasCombatHud(deferredPlayerId)) return;
                     realmsManager.getHudManager().showCombatHud(deferredPlayerId, deferredRef, realm);
                 });
             }

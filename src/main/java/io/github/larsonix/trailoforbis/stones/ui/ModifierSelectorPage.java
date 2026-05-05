@@ -8,10 +8,12 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.gear.GearManager;
@@ -429,7 +431,7 @@ public class ModifierSelectorPage {
         // Get fresh player ref and entity
         Ref<EntityStore> ref = player.getReference();
         if (ref == null || !ref.isValid()) {
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
@@ -437,14 +439,14 @@ public class ModifierSelectorPage {
         Player playerEntity = freshStore.getComponent(ref, Player.getComponentType());
         if (playerEntity == null) {
             LOGGER.atWarning().log("Cannot apply stone - Player entity not found");
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
         Inventory inventory = playerEntity.getInventory();
         if (inventory == null) {
             LOGGER.atWarning().log("Cannot apply stone - Inventory is null");
-            sendErrorMessage("Failed to apply stone !");
+            sendWarningNotification("Failed to apply stone !");
             return;
         }
 
@@ -461,12 +463,36 @@ public class ModifierSelectorPage {
             targetContainer
         );
 
-        // Send feedback message
+        // Send feedback notification
         if (result.success()) {
-            sendSuccessMessage(result.message());
-            resyncModifiedItem(result.updatedTargetItem());
+            var notif = StoneResultMessageBuilder.buildNotification(
+                stoneType, targetData, result.modifiedData(), result.message());
+            ItemStack updatedItem = result.updatedTargetItem();
+
+            if (updatedItem != null) {
+                NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    notif.primary(),
+                    notif.secondary(),
+                    updatedItem.toPacket(),
+                    NotificationStyle.Success);
+            } else {
+                NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    notif.primary(),
+                    notif.secondary(),
+                    NotificationStyle.Success);
+            }
+
+            resyncModifiedItem(updatedItem);
         } else {
-            sendErrorMessage(result.message());
+            var notif = StoneResultMessageBuilder.buildFailureNotification(
+                stoneType, result.message());
+            NotificationUtil.sendNotification(
+                player.getPacketHandler(),
+                notif.primary(),
+                notif.secondary(),
+                NotificationStyle.Warning);
         }
 
         plugin.getUIManager().closePage(player.getUuid());
@@ -577,24 +603,15 @@ public class ModifierSelectorPage {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // MESSAGES
+    // NOTIFICATIONS
     // ═══════════════════════════════════════════════════════════════════
 
-    private void sendSuccessMessage(String message) {
-        Message msg = Message.raw("[")
-            .color(RPGStyles.TITLE_GOLD)
-            .insert(Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()))
-            .insert(Message.raw("] ").color(RPGStyles.TITLE_GOLD))
-            .insert(Message.raw(message).color(RPGStyles.POSITIVE));
-
-        player.sendMessage(msg);
-    }
-
-    private void sendErrorMessage(String message) {
-        Message msg = Message.raw("[Stones] ").color(RPGStyles.TITLE_GOLD)
-            .insert(Message.raw(message).color(RPGStyles.NEGATIVE));
-
-        player.sendMessage(msg);
+    private void sendWarningNotification(String message) {
+        NotificationUtil.sendNotification(
+            player.getPacketHandler(),
+            Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+            Message.raw(message).color("#FF5555"),
+            NotificationStyle.Warning);
     }
 
     // ═══════════════════════════════════════════════════════════════════
