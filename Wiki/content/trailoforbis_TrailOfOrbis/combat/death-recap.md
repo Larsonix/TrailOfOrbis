@@ -93,8 +93,8 @@ This shows per-hit calculation details as they happen :
 
 | What the Recap Shows | What to Do |
 |---------------------|-----------|
-| High physical damage, low armor reduction | Stack more armor ([Earth](attributes#earth) attribute, plate gear) |
-| High elemental damage, 0% resistance | Add resistance gear for that element |
+| High [physical](damage-types#physical) damage, low armor reduction | Stack more armor ([Earth](attributes#earth) attribute, plate gear) |
+| High elemental damage, **0%** resistance | Add resistance gear for that element |
 | Crit killed you (CRIT flag) | You can't prevent crits directly, but more max HP lets you survive them |
 | Multiple small hits wore you down | Evasion ([Wind](attributes#wind)) or life sustain ([Void](attributes#void) leech) |
 | Single massive hit one-shot | More max health, energy shield, or avoidance |

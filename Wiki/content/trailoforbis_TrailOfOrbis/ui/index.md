@@ -13,6 +13,13 @@ published: true
 
 Trail of Orbis adds custom UI pages for managing your character. Every page has navigation buttons linking to every other page - open any one and click your way through the rest.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/92721ff2-0c75-46bf-a8fe-37d304f6d8f2.png" alt="Stats page showing offensive stats with color-coded values">
+</figure>
+
+<div class="too-figure-end"></div>
+
 ---
 
 ## Character Stats Page
@@ -133,10 +140,10 @@ The Realm HUD is visible during **active realm sessions** only. It appears when 
 
 | Size | Starting Time |
 |------|---------------|
-| Small | 5:00 (300 seconds) |
-| Medium | 10:00 (600 seconds) |
-| Large | 15:00 (900 seconds) |
-| Massive | 20:00 (1200 seconds) |
+| [Small](realm-sizes#small) | 5:00 (300 seconds) |
+| [Medium](realm-sizes#medium) | 10:00 (600 seconds) |
+| [Large](realm-sizes#large) | 15:00 (900 seconds) |
+| [Massive](realm-sizes#huge) | 20:00 (1200 seconds) |
 
 The **Reduced Time** prefix modifier can decrease the starting time by 10-40%.
 

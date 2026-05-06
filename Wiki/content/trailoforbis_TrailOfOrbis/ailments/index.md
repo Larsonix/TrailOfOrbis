@@ -24,10 +24,10 @@ sub-topics:
 
 | Ailment | Element | Type | Duration | Max Stacks | Base Chance |
 |:--------|:-------:|:-----|:--------:|:----------:|------------:|
-| [**Burn**](burn-fire-dot) | [Fire](attributes#fire) | Damage over Time | 4 seconds | 1 (refreshes) | 10% |
-| [**Freeze**](freeze-water-slow) | [Water](attributes#water) | Movement Slow | 3 seconds | 1 (refreshes) | 10% |
-| [**Shock**](shock-lightning-damage-amp) | [Lightning](attributes#lightning) | Damage Amplification | 2 seconds | 1 (refreshes) | 10% |
-| [**Poison**](poison-void-stacking-dot) | [Void](attributes#void) | Stacking *DoT* | 5 seconds | 10 stacks | 10% |
+| [**Burn**](burn-fire-dot) | [Fire](attributes#fire) | Damage over Time | 4 seconds | 1 (refreshes) | **10%** |
+| [**Freeze**](freeze-water-slow) | [Water](attributes#water) | Movement Slow | 3 seconds | 1 (refreshes) | **10%** |
+| [**Shock**](shock-lightning-damage-amp) | [Lightning](attributes#lightning) | Damage Amplification | 2 seconds | 1 (refreshes) | **10%** |
+| [**Poison**](poison-void-stacking-dot) | [Void](attributes#void) | Stacking *DoT* | 5 seconds | 10 stacks | **10%** |
 
 > [!NOTE]
 > **[Earth](attributes#earth) and [Wind](attributes#wind) have no Ailments.** They contribute purely through defensive stats (Earth) and evasion/accuracy (Wind). Not every Element needs a status effect.
@@ -73,10 +73,10 @@ At 100 Void points (+30% duration) :
 
 | Ailment | Base Duration | With 100 Void |
 |---------|--------------|---------------|
-| Burn | 4.0s | 5.2s |
-| Freeze | 3.0s | 3.9s |
-| Shock | 2.0s | 2.6s |
-| Poison | 5.0s | 6.5s per stack |
+| [Burn](burn) | 4.0s | 5.2s |
+| [Freeze](freeze) | 3.0s | 3.9s |
+| [Shock](shock) | 2.0s | 2.6s |
+| [Poison](poison) | 5.0s | 6.5s per stack |
 
 ---
 
@@ -104,7 +104,7 @@ At 100 Void points (+30% duration) :
 | [Water](attributes#water) damage | [Freeze](freeze-water-slow) |
 | [Lightning](attributes#lightning) damage | [Shock](shock-lightning-damage-amp) |
 | [Void](attributes#void) damage | [Poison](poison-void-stacking-dot) |
-| Physical damage | No ailment |
+| [Physical](damage-types#physical) damage | No ailment |
 | [Earth](attributes#earth) damage | No ailment |
 | [Wind](attributes#wind) damage | No ailment |
 
@@ -114,10 +114,10 @@ At 100 Void points (+30% duration) :
 
 | Attribute | Ailment Connection |
 |-----------|-------------------|
-| [Fire](attributes#fire) | Grants Burn Damage % and Ignite Chance |
-| [Water](attributes#water) | Grants Freeze Chance |
-| [Lightning](attributes#lightning) | Grants Shock Chance |
-| [Void](attributes#void) | Grants *DoT* Damage % (amplifies Burn AND Poison) and Status Effect Duration (extends ALL ailments) |
+| [Fire](attributes#fire) | Grants [Burn](burn) Damage % and Ignite Chance |
+| [Water](attributes#water) | Grants [Freeze](freeze) Chance |
+| [Lightning](attributes#lightning) | Grants [Shock](shock) Chance |
+| [Void](attributes#void) | Grants *DoT* Damage % (amplifies [Burn](burn) AND [Poison](poison)) and Status Effect Duration (extends ALL ailments) |
 
 > [!TIP]
 > **[Void](attributes#void) is the universal Ailment amplifier.** Its *DoT* Damage % boosts both [Burn](burn-fire-dot) and [Poison](poison-void-stacking-dot) damage, and its Status Effect Duration extends all 4 Ailments. A [Fire](attributes#fire) + Void build has stronger, longer-lasting burns than pure Fire.

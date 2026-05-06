@@ -16,12 +16,38 @@ Chests, barrels, and dungeon containers have their own loot system separate from
 
 ## Container Tiers
 
-| Tier | Loot Multiplier | Rarity Bonus | Example Containers |
-|:-----|----------------:|-------------:|:-------------------|
-| **Basic** | 1.0x | +0.0 | Regular chests, barrels, crates |
-| **Dungeon** | 1.5x | +0.15 | Dungeon chests, cave containers |
-| **Boss** | 2.0x | +0.30 | Boss loot, raid rewards, altars |
-| **Special** | 1.75x | +0.25 | Quest rewards, artifact containers |
+<div class="too-loot-table">
+  <div class="too-loot-header">
+    <span>Tier</span>
+    <span>Loot Multiplier</span>
+    <span>Rarity Bonus</span>
+    <span>Example Containers</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-common">Basic</span>
+    <span>1.0x</span>
+    <span>+0.0</span>
+    <span>Regular chests, barrels, crates</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-uncommon">Dungeon</span>
+    <span>1.5x</span>
+    <span>+0.15</span>
+    <span>Dungeon chests, cave containers</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-rare">Boss</span>
+    <span>2.0x</span>
+    <span>+0.30</span>
+    <span>Boss loot, raid rewards, altars</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-epic">Special</span>
+    <span>1.75x</span>
+    <span>+0.25</span>
+    <span>Quest rewards, artifact containers</span>
+  </div>
+</div>
 
 ---
 
@@ -57,9 +83,9 @@ Quest rewards, artifact containers, and other special sources. 75% more loot tha
 
 ## Tier Comparison
 
-| Property | Basic | Dungeon | Boss | Special |
+| Property | [Basic](container-loot#basic) | [Dungeon](container-loot#dungeon) | [Boss](container-loot#boss) | [Special](container-loot#special) |
 |:---------|------:|--------:|-----:|--------:|
-| Loot Multiplier | 1.0x | 1.5x | 2.0x | 1.75x |
+| Loot Multiplier | **1.0x** | **1.5x** | **2.0x** | **1.75x** |
 | Rarity Bonus | +0.0 | +0.15 | +0.30 | +0.25 |
 
 > [!TIP]

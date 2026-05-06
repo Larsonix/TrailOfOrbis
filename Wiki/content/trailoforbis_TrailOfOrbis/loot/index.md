@@ -20,11 +20,11 @@ Every mob you kill and every container you open has a chance to drop RPG gear, c
 
 | | |
 |:--|:--|
-| **Gear Drop Chance** | 8% per kill |
-| **Stone Drop Chance** | 5% per kill |
-| **Map Drop Chance** | 12% per kill |
-| **Rarity Progression** | 4x geometric (each tier 4x rarer) |
-| **Container Tiers** | 4 (Basic, Dungeon, Boss, Special) |
+| **Gear Drop Chance** | **8%** per kill |
+| **Stone Drop Chance** | **5%** per kill |
+| **Map Drop Chance** | **12%** per kill |
+| **Rarity Progression** | **4x** geometric (each tier 4x rarer) |
+| **Container Tiers** | 4 ([Basic](container-loot#basic), [Dungeon](container-loot#dungeon), [Boss](container-loot#boss), [Special](container-loot#special)) |
 | **Level Blending** | 30% pull toward player level, ±5 cap |
 | **Unique Drop Rate** | ~1 in 5,300 gear drops |
 
@@ -37,9 +37,9 @@ Every mob you kill and every container you open has a chance to drop RPG gear, c
 
 | Drop Type | Base Chance per Kill | What Drops |
 |-----------|---------------------|-----------|
-| **Gear** | 8% | Weapon, armor, or off-hand with random rarity, quality, and modifiers |
-| **Stones** | 5% | Consumable stones |
-| **Realm Maps** | 12% | Consumable maps that open portals to procedural Realm dungeons |
+| **Gear** | **8%** | Weapon, armor, or off-hand with random rarity, quality, and modifiers |
+| **Stones** | **5%** | Consumable stones |
+| **Realm Maps** | **12%** | Consumable maps that open portals to procedural Realm dungeons |
 
 These are independent rolls. A single kill can drop gear, a stone, and a map simultaneously, any combination, or nothing.
 
@@ -51,13 +51,13 @@ When gear drops, its rarity is rolled from this weighted table :
 
 | Rarity | Weight | Approximate Chance |
 |--------|--------|-------------------|
-| Common | 64 | ~75.0% |
-| Uncommon | 16 | ~18.75% |
-| Rare | 4 | ~4.69% |
-| Epic | 1 | ~1.17% |
-| [Legendary](gear-rarities#legendary) | 0.25 | ~0.29% |
-| Mythic | 0.0625 | ~0.073% |
-| Unique | 0.016 | ~0.018% |
+| [Common](gear-rarities#common) | 64 | **~75.0%** |
+| [Uncommon](gear-rarities#uncommon) | 16 | **~18.75%** |
+| [Rare](gear-rarities#rare) | 4 | **~4.69%** |
+| [Epic](gear-rarities#epic) | 1 | **~1.17%** |
+| [Legendary](gear-rarities#legendary) | 0.25 | **~0.29%** |
+| [Mythic](gear-rarities#mythic) | 0.0625 | **~0.073%** |
+| [Unique](gear-rarities#unique) | 0.016 | **~0.018%** |
 
 The total weight is 85.3285, making [Common](gear-rarities#common) gear the vast majority of drops. Rarity bonuses from various sources shift the distribution toward higher tiers.
 
@@ -84,10 +84,10 @@ Containers (chests, barrels, dungeon containers) have their own loot system with
 
 | Tier | Loot Multiplier | Rarity Bonus |
 |------|----------------|-------------|
-| Basic | 1.0x | +0.0 |
-| Dungeon | 1.5x | +0.15 |
-| Boss | 2.0x | +0.30 |
-| Special | 1.75x | +0.25 |
+| [Basic](container-loot#basic) | **1.0x** | +0.0 |
+| [Dungeon](container-loot#dungeon) | **1.5x** | +0.15 |
+| [Boss](container-loot#boss) | **2.0x** | +0.30 |
+| [Special](container-loot#special) | **1.75x** | +0.25 |
 
 Containers produce gear, stones, and maps.
 

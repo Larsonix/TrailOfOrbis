@@ -24,11 +24,11 @@ slowPercent = clamp(hitDamage / targetMaxHealth x 100, 5%, 30%)
 
 | Parameter | Value |
 |-----------|-------|
-| Minimum slow | 5% |
-| Maximum slow | 30% |
+| Minimum slow | **5%** |
+| Maximum slow | **30%** |
 | Base duration | 3 seconds |
 | Max stacks | 1 (refreshes, stronger magnitude wins) |
-| Base application chance | 10% |
+| Base application chance | **10%** |
 | Damage threshold | Yes (minimum hit damage required) |
 
 ---
@@ -52,12 +52,12 @@ The slow percentage depends on the ratio of your hit to the target's health :
 
 | Your Hit | Target Max HP | Slow % |
 |---------|---------------|--------|
-| 50 | 100 | 30% (capped) |
-| 50 | 500 | 10% |
+| 50 | 100 | **30%** (capped) |
+| 50 | 500 | **10%** |
 | 50 | 1000 | **5% (floor)** |
-| 100 | 500 | 20% |
-| 200 | 1000 | 20% |
-| 500 | 1000 | 30% (capped) |
+| 100 | 500 | **20%** |
+| 200 | 1000 | **20%** |
+| 500 | 1000 | **30%** (capped) |
 
 > [!IMPORTANT]
 > This HP-proportional scaling is deliberate. Freeze naturally self-balances : very effective against weak mobs (your damage is a large chunk of their HP) but limited against bosses (your damage is a tiny fraction of their massive HP pool). No special boss immunity needed - the math handles it.
@@ -72,11 +72,11 @@ Freeze duration is extended by [Void](attributes#void)'s Status Effect Duration 
 finalDuration = 3.0 x (1 + statusEffectDuration / 100)
 ```
 
-| Void Points | Duration Bonus | Freeze Duration |
+| [Void](attributes#void) Points | Duration Bonus | [Freeze](freeze) Duration |
 |------------:|---------------:|----------------:|
-| 0 | +0% | 3.0s |
-| 50 | +15% | 3.45s |
-| 100 | +30% | 3.9s |
+| 0 | **+0%** | 3.0s |
+| 50 | **+15%** | 3.45s |
+| 100 | **+30%** | 3.9s |
 
 Longer Freeze = more time for you to attack, reposition, or heal while the enemy is slowed.
 
@@ -88,11 +88,11 @@ Longer Freeze = more time for you to attack, reposition, or heal while the enemy
 finalChance = 10% (base) + freezeChance (from Water attribute + gear)
 ```
 
-| Water Points | Freeze Chance Bonus | Total Freeze Chance |
+| [Water](attributes#water) Points | [Freeze](freeze) Chance Bonus | Total [Freeze](freeze) Chance |
 |-------------:|--------------------:|--------------------:|
-| 0 | +0% | 10% |
-| 50 | +5% | 15% |
-| 100 | +10% | 20% |
+| 0 | **+0%** | **10%** |
+| 50 | **+5%** | **15%** |
+| 100 | **+10%** | **20%** |
 
 ---
 
@@ -122,10 +122,10 @@ Freeze doesn't deal damage, but it enables damage and improves your survivabilit
 
 ## Freeze vs Other Ailments
 
-| Property | Freeze | [Shock](shock-lightning-damage-amp) |
+| Property | [Freeze](freeze) | [Shock](shock-lightning-damage-amp) |
 |----------|--------|-------|
 | Effect type | Reduces target speed | Increases target damage taken |
-| Magnitude range | 5-30% | 5-50% |
+| Magnitude range | **5%**-**30%** | **5%**-**50%** |
 | Scaling | Hit / target max HP | Hit / target max HP |
 | Duration | 3.0s | 2.0s |
 | Best for | Survivability, kiting | DPS amplification |

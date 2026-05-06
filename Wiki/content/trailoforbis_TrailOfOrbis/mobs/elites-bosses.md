@@ -16,11 +16,11 @@ Two special mob tiers sit above standard Hostile mobs. They're the most challeng
 
 ## Overview Comparison
 
-| Property | Hostile | Elite | Boss |
+| Property | [Hostile](elites-bosses#normal) | [Elite](elites-bosses#elite) | [Boss](elites-bosses#boss) |
 |:---------|:-------:|:-----:|:----:|
-| **XP Multiplier** | 1.0x | 1.5x | 5.0x |
-| **Stat Multiplier** | 1.0x | 1.5x | 3.0x |
-| **Tier Mult (XP formula)** | 1.0x | 1.5x | 5.0x |
+| **XP Multiplier** | **1.0x** | **1.5x** | **5.0x** |
+| **Stat Multiplier** | **1.0x** | **1.5x** | **3.0x** |
+| **Tier Mult (XP formula)** | **1.0x** | **1.5x** | **5.0x** |
 | **Combat Relevance** | Yes | Yes | Yes |
 | **Is Hostile** | Yes | Yes | Yes |
 
@@ -35,10 +35,10 @@ Elites aren't specific enemy types. They're **any hostile mob** elevated to Elit
 
 ### What Makes Them Different
 
-| Stat | Elite vs Hostile |
+| Stat | [Elite](elites-bosses#elite) vs [Hostile](elites-bosses#normal) |
 |------|-----------------|
-| XP Multiplier | 1.5x (50% more XP) |
-| Stat Multiplier | 1.5x (50% stronger across all stats) |
+| XP Multiplier | **1.5x** (50% more XP) |
+| Stat Multiplier | **1.5x** (50% stronger across all stats) |
 
 Elites get 50% more total stats than a standard Hostile of the same level. Combined with the Dirichlet distribution (see [Scaling](mob-stat-scaling)), an Elite that rolled high in damage stats can be genuinely dangerous.
 
@@ -74,10 +74,10 @@ Bosses are the apex predators of Trail of Orbis. Major encounters with dramatic 
 
 ### What Makes Them Different
 
-| Stat | Boss vs Hostile |
+| Stat | [Boss](elites-bosses#boss) vs [Hostile](elites-bosses#normal) |
 |------|-----------------|
-| XP Multiplier | 5.0x (5x more XP) |
-| Stat Multiplier | 3.0x (triple stats across the board) |
+| XP Multiplier | **5.0x** (5x more XP) |
+| Stat Multiplier | **3.0x** (triple stats across the board) |
 
 With a 3.0x stat multiplier, a Boss has 3x the health, 3x the damage, and 3x every other stat compared to a standard Hostile of the same level. These fights demand preparation.
 

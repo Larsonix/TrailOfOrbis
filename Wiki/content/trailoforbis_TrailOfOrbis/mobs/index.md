@@ -21,9 +21,9 @@ Every mob you fight falls into one of **5 tiers** and gets stats from **52 stat 
 | **Classification Tiers** | 5 (Passive → Boss) |
 | **Stat Types** | 52 (Dirichlet distribution) |
 | **Stat Categories** | 10 (Combat, Movement, Crit, Defense, Sustain, 6x Elemental) |
-| **Boss XP Multiplier** | 5.0x |
-| **Boss Stat Multiplier** | 3.0x |
-| **Elite Stat Multiplier** | 1.5x (2.0x in Realms) |
+| **[Boss](elites-bosses#boss) XP Multiplier** | **5.0x** |
+| **[Boss](elites-bosses#boss) Stat Multiplier** | **3.0x** |
+| **[Elite](elites-bosses#elite) Stat Multiplier** | **1.5x** (2.0x in Realms) |
 
 ---
 
@@ -31,11 +31,11 @@ Every mob you fight falls into one of **5 tiers** and gets stats from **52 stat 
 
 | Tier | XP Mult | Stat Mult | Description |
 |:-----|--------:|----------:|:------------|
-| **Passive** | 0.1x | 0.1x | Non-combat creatures (critters, ambient wildlife) |
-| **Minor** | 0.5x | 1.0x | Weak enemies (larvae, foxes) |
-| **Hostile** | 1.0x | 1.0x | Standard combat enemies (zombies, trorks) |
-| **Elite** | 1.5x | 1.5x | Mini-bosses (captains, ogres) |
-| **Boss** | 5.0x | 3.0x | Major bosses (dragons, yeti) |
+| **Passive** | **0.1x** | **0.1x** | Non-combat creatures (critters, ambient wildlife) |
+| **Minor** | **0.5x** | **1.0x** | Weak enemies (larvae, foxes) |
+| [Hostile](elites-bosses#normal) | **1.0x** | **1.0x** | Standard combat enemies (zombies, trorks) |
+| [Elite](elites-bosses#elite) | **1.5x** | **1.5x** | Mini-bosses (captains, ogres) |
+| [Boss](elites-bosses#boss) | **5.0x** | **3.0x** | Major bosses (dragons, yeti) |
 
 > [!NOTE]
 > **Passive mobs give 10% XP and have 0.1x stat multiplier.** Farming chickens won't level you up. Fight real enemies.

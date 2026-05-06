@@ -42,10 +42,10 @@ Each elemental arm extends from the Origin along one of the 6 cardinal 3D direct
 
 | Component | Count | Role |
 |-----------|-------|------|
-| Entry | 1 | Gateway from Origin |
-| Clusters | 4 x (5 basic + 1 notable) = 24 | Main progression path |
-| Synergy nodes | 5 | Scale with your investments |
-| Keystones | 2 | Build-defining, endgame |
+| [Entry](node-types#entry) | 1 | Gateway from Origin |
+| Clusters | 4 x (5 [basic](node-types#basic) + 1 [notable](node-types#notable)) = 24 | Main progression path |
+| [Synergy](node-types#synergy) nodes | 5 | Scale with your investments |
+| [Keystones](node-types#keystone) | 2 | Build-defining, endgame |
 
 ---
 
@@ -53,12 +53,12 @@ Each elemental arm extends from the Origin along one of the 6 cardinal 3D direct
 
 | Arm | Keystones Reward | Best For |
 |-----|-----------------|----------|
-| **Fire** | Extreme offense with tradeoffs | Melee DPS, physical builds |
-| **Water** | Sustained casting power | Spell casters, mana-dependent builds |
-| **Lightning** | Volume and mobility | Fast-hitting, crit-stacking builds |
-| **Earth** | Extreme defense with tradeoffs | Tanks, block builds, survivability |
-| **Void** | Damage-based sustain | Life steal, *DoT* builds, vampiric play |
-| **Wind** | Ranged avoidance | Ranged DPS, evasion tanks |
+| [Fire](attributes#fire) | Extreme offense with tradeoffs | Melee DPS, physical builds |
+| [Water](attributes#water) | Sustained casting power | Spell casters, mana-dependent builds |
+| [Lightning](attributes#lightning) | Volume and mobility | Fast-hitting, crit-stacking builds |
+| [Earth](attributes#earth) | Extreme defense with tradeoffs | Tanks, block builds, survivability |
+| [Void](attributes#void) | Damage-based sustain | Life steal, *DoT* builds, vampiric play |
+| [Wind](attributes#wind) | Ranged avoidance | Ranged DPS, evasion tanks |
 
 ---
 

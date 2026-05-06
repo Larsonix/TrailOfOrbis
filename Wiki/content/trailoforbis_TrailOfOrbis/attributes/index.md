@@ -12,6 +12,10 @@ sub-topics: []
 
 # Attributes
 
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/f8ab6f94-c708-4df0-badd-be1585d4353f" alt="Elements & Attributes UI showing the six elemental attribute categories">
+</figure>
+
 Trail of Orbis has no classes. Attributes are one of the systems that shape your build. Each point you put into an Element gives you 5 unique stats. No two Elements share a single stat. 30 attribute-derived stats total, zero overlap.
 
 You start with **1 attribute point** and gain **1 more per level**. Allocation is free and respec costs nothing.
@@ -20,14 +24,41 @@ You start with **1 attribute point** and gain **1 more per level**. Allocation i
 
 ## All Elements
 
-| Element | Color | Stats Per Point | Ailment |
-|:--------|:-----:|:----------------|:-------:|
-| [**Fire**](#fire) | #FF7755 | +0.4% Physical Damage, +0.3% Charged Attack Damage, +0.6% Crit Multiplier, +0.4% Burn Damage, +0.1% Ignite Chance | [Burn](burn-fire-dot) |
-| [**Water**](#water) | #55CCEE | +0.5% Spell Damage, +1.5 Max Mana, +2.0 Energy Shield, +0.15/s Mana Regen, +0.1% Freeze Chance | [Freeze](freeze-water-slow) |
-| [**Lightning**](#lightning) | #FFEE55 | +0.3% Attack Speed, +0.15% Move Speed, +0.1% Crit Chance, +0.1/s Stamina Regen, +0.1% Shock Chance | [Shock](shock-lightning-damage-amp) |
-| [**Earth**](#earth) | #DDAA55 | +0.5% Max Health, +5.0 Armor, +0.2/s Health Regen, +0.2% Passive Block Chance, +0.3% Knockback Resistance | - |
-| [**Wind**](#wind) | #77DD77 | +5.0 Evasion, +3.0 Accuracy, +0.5% Projectile Damage, +0.15% Jump Force, +0.3% Projectile Speed | - |
-| [**Void**](#void) | #BB77DD | +0.1% Life Steal, +0.05% True Damage, +0.3% *DoT* Damage, +0.5 Mana on Kill, +0.3% Effect Duration | [Poison](poison-void-stacking-dot) |
+<div class="too-stat-table">
+  <div class="too-stat-header">
+    <span>Element</span><span>Stats Per Point</span><span>Ailment</span>
+  </div>
+  <div class="too-stat-row too-elem-fire">
+    <span class="too-elem-name"><a href="attributes#fire">Fire</a></span>
+    <span>+0.4% Physical Damage, +0.3% Charged Attack Damage, +0.6% Crit Multiplier, +0.4% Burn Damage, +0.1% Ignite Chance</span>
+    <span class="too-ailment-name"><a href="burn">Burn</a></span>
+  </div>
+  <div class="too-stat-row too-elem-water">
+    <span class="too-elem-name"><a href="attributes#water">Water</a></span>
+    <span>+0.5% Spell Damage, +1.5 Max Mana, +2.0 Energy Shield, +0.15/s Mana Regen, +0.1% Freeze Chance</span>
+    <span class="too-ailment-name"><a href="freeze">Freeze</a></span>
+  </div>
+  <div class="too-stat-row too-elem-lightning">
+    <span class="too-elem-name"><a href="attributes#lightning">Lightning</a></span>
+    <span>+0.3% Attack Speed, +0.15% Move Speed, +0.1% Crit Chance, +0.1/s Stamina Regen, +0.1% Shock Chance</span>
+    <span class="too-ailment-name"><a href="shock">Shock</a></span>
+  </div>
+  <div class="too-stat-row too-elem-earth">
+    <span class="too-elem-name"><a href="attributes#earth">Earth</a></span>
+    <span>+0.5% Max Health, +5.0 Armor, +0.2/s Health Regen, +0.2% Passive Block Chance, +0.3% Knockback Resistance</span>
+    <span>-</span>
+  </div>
+  <div class="too-stat-row too-elem-wind">
+    <span class="too-elem-name"><a href="attributes#wind">Wind</a></span>
+    <span>+5.0 Evasion, +3.0 Accuracy, +0.5% Projectile Damage, +0.15% Jump Force, +0.3% Projectile Speed</span>
+    <span>-</span>
+  </div>
+  <div class="too-stat-row too-elem-void">
+    <span class="too-elem-name"><a href="attributes#void">Void</a></span>
+    <span>+0.1% Life Steal, +0.05% True Damage, +0.3% <em>DoT</em> Damage, +0.5 Mana on Kill, +0.3% Effect Duration</span>
+    <span class="too-ailment-name"><a href="poison">Poison</a></span>
+  </div>
+</div>
 
 ---
 
@@ -78,12 +109,12 @@ Every character starts with these vanilla resource pools :
 
 | Element | Ailment | Effect |
 |---------|---------|--------|
-| Fire | [Burn](burn-fire-dot) | Damage over time |
-| Water | [Freeze](freeze-water-slow) | Movement/action speed slow |
-| Lightning | [Shock](shock-lightning-damage-amp) | Target takes increased damage |
-| Void | [Poison](poison-void-stacking-dot) | Stacking damage over time |
-| Earth | - | No ailment |
-| Wind | - | No ailment |
+| [Fire](attributes#fire) | [Burn](burn) | Damage over time |
+| [Water](attributes#water) | [Freeze](freeze) | Movement/action speed slow |
+| [Lightning](attributes#lightning) | [Shock](shock) | Target takes increased damage |
+| [Void](attributes#void) | [Poison](poison) | Stacking damage over time |
+| [Earth](attributes#earth) | - | No ailment |
+| [Wind](attributes#wind) | - | No ailment |
 
 ---
 
@@ -302,10 +333,10 @@ Void is sustain and amplification. You heal through damage dealt, bypass defense
 
 | Ailment | Base Duration | With 100 Void (+30%) |
 |---------|--------------|---------------------|
-| Burn | 4.0s | 5.2s |
-| Freeze | 3.0s | 3.9s |
-| Shock | 2.0s | 2.6s |
-| Poison | 5.0s | 6.5s per stack |
+| [Burn](burn) | 4.0s | 5.2s |
+| [Freeze](freeze) | 3.0s | 3.9s |
+| [Shock](shock) | 2.0s | 2.6s |
+| [Poison](poison) | 5.0s | 6.5s per stack |
 
 ---
 

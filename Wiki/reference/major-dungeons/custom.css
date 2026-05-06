@@ -1,0 +1,729 @@
+/* ✨ Custom styles for Major Dungeons */
+
+/* Example: change heading colors */
+/* .prose h1, .prose h2 {
+  color: oklch(0.7 0.2 250);
+} */
+
+/* Example: custom card background */
+/* .card {
+  background: linear-gradient(135deg, #1e1b4b, #312e81) !important;
+  border-color: #4338ca !important;
+} */
+
+/* Example: custom accent color */
+/* :root {
+  --primary: oklch(0.65 0.25 260);
+  --primary-foreground: oklch(0.98 0 0);
+} */
+
+.mj-figure {
+    margin: 0 1.5em 1em 0;
+}
+
+.mj-figure.left {
+    float: left;
+}
+
+.mj-figure-end {
+    clear: both;
+}
+
+.mj-figure > img {
+    display: block;
+    image-rendering: pixelated;
+}
+
+.mj-size-small {
+    width: 100%;
+    height: 100px;
+}
+
+.mj-size-medium {
+    width: 100%;
+    height: 200px;
+}
+
+.mj-size-large {
+    width: 100%;
+    height: 400px;
+}
+
+/* ============================================================
+   BENCH TABLE  -  Recipes & Acquisition
+   (Mjolnir Furnace, Nameless God, item-page source tables)
+   ============================================================ */
+
+.mj-bench-table {
+	width: 100%;
+	max-width: 620px;
+	border-radius: 8px;
+	overflow: hidden;
+	font-size: 0.9em;
+	border: 1px solid #333;
+}
+
+.mj-bench-header {
+	display: grid;
+	grid-template-columns: 1fr 64px 1fr;
+	padding: 6px 12px;
+	color: #666;
+	font-size: 0.75em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid #333;
+	background: #0000005e;
+}
+
+/* Remove double border when a section row immediately follows the table header */
+.mj-bench-header + .mj-bench-section {
+	border-top: none;
+}
+
+/* In-table category divider with optional hash-link */
+.mj-bench-section {
+	padding: 5px 12px;
+	color: #666;
+	font-size: 0.72em;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	border-top: 1px solid #2a2a2a;
+	border-bottom: 1px solid #1a1a1a;
+	background: #ffffff05;
+}
+
+.mj-bench-section-link {
+	text-decoration: none;
+	color: inherit;
+}
+
+.mj-bench-section-link:hover {
+	color: #aaa;
+}
+
+.mj-bench-row {
+	display: grid;
+	grid-template-columns: 1fr 64px 1fr;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid #222;
+	transition: background 0.15s;
+}
+
+.mj-bench-row:hover {
+	background: #ffffff08;
+}
+
+.mj-bench-row:last-child {
+	border-bottom: none;
+}
+
+/* Left cell - output item or source station/trader */
+.mj-bench-output {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	text-decoration: none;
+	color: inherit;
+}
+
+.mj-bench-out-icon {
+	width: 70px;
+	height: 70px;
+	object-fit: contain;
+	image-rendering: pixelated;
+	flex-shrink: 0;
+}
+
+.mj-bench-out-name {
+	color: #ddd;
+	font-size: 0.9em;
+	line-height: 1.2;
+}
+
+/* Centre column - arrow, time, tier, yield */
+.mj-bench-mid {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 3px;
+}
+
+.mj-bench-arrow {
+	font-size: 1.3em;
+	color: #555;
+}
+
+.mj-bench-time {
+	font-size: 0.62em;
+	color: #888;
+	line-height: 1;
+}
+
+.mj-bench-tier {
+	margin-top: 5px; 
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0px 5px;
+	border-radius: 999px;
+	border: 1px solid #888;
+	color: #888;
+	font-size: 0.62em;
+	font-weight: bold;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+/* Yield badge - shown when a trade gives more than x1 output */
+.mj-bench-yield {
+	font-size: 0.65em;
+	color: #888;
+	font-weight: bold;
+	line-height: 1;
+}
+
+/* Right cell - ingredients/cost as a vertical list, one row per item */
+.mj-bench-inputs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+}
+
+.mj-bench-ingredient {
+    display: grid;
+    grid-template-columns: 50px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 0;
+    text-decoration: none;
+    color: inherit;
+    width: 100%;
+}
+
+/* When an ingredient has no qty, span the name across both rows and centre it */
+.mj-bench-ingredient:not(:has(.mj-bench-in-qty)) .mj-bench-in-name {
+    grid-row: 1 / 3;
+    align-self: center;
+}
+
+.mj-bench-in-icon {
+    width: 50px;
+    height: 50px;
+    grid-column: 1;
+    grid-row: 1 / 3;   /* spans name row + qty row */
+    object-fit: contain;
+    image-rendering: pixelated;
+    align-self: center;
+}
+
+.mj-bench-in-name {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 0.82em;
+    color: #bbb;
+    line-height: 1.2;
+    align-self: end;
+}
+
+.mj-bench-in-qty {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 0.82em;
+    font-weight: bold;
+    color: #666;
+    align-self: start;
+    text-align: left;
+}
+
+/* ============================================================
+   TIER TABLE  -  Bench upgrade requirements
+   ============================================================ */
+
+.mj-tier-table {
+	width: 100%;
+	max-width: 580px;
+	border-radius: 8px;
+	overflow: hidden;
+	font-size: 0.9em;
+	border: 1px solid #333;
+}
+
+.mj-tier-header {
+	display: grid;
+	grid-template-columns: 90px 64px 1fr;
+	padding: 6px 12px;
+	color: #666;
+	font-size: 0.75em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid #333;
+	background: #0000005e;
+}
+
+.mj-tier-row {
+	display: grid;
+	grid-template-columns: 90px 64px 1fr;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid #222;
+}
+
+.mj-tier-row:last-child {
+	border-bottom: none;
+}
+
+/* Tier badge - the TIER N pill on the left */
+.mj-tier-badge-wrap {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+}
+
+.mj-tier-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 3px 10px;
+	border-radius: 999px;
+	border: 1px solid #555;
+	color: #999;
+	font-size: 0.75em;
+	font-weight: bold;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+/* Time column */
+.mj-tier-time {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.8em;
+	color: #888;
+}
+
+
+/* ============================================================
+   TRADE TABLE  -  Devil Merchant
+   (Receive | arrow | Cost)
+   ============================================================ */
+
+.mj-trade-table {
+	width: 100%;
+	max-width: 580px;
+	border-radius: 8px;
+	overflow: hidden;
+	font-size: 0.9em;
+	border: 1px solid #333;
+}
+
+.mj-trade-header {
+	display: grid;
+	grid-template-columns: 1fr 30px 1fr;
+	padding: 6px 12px;
+	color: #666;
+	font-size: 0.75em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid #333;
+	background: #0000005e;
+}
+
+.mj-trade-header + .mj-trade-section {
+	border-top: none;
+}
+
+.mj-trade-section {
+	padding: 5px 12px;
+	color: #666;
+	font-size: 0.72em;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	border-top: 1px solid #2a2a2a;
+	border-bottom: 1px solid #1a1a1a;
+	background: #ffffff05;
+}
+
+.mj-trade-section-link {
+	text-decoration: none;
+	color: inherit;
+}
+
+.mj-trade-section-link:hover {
+	color: #aaa;
+}
+
+.mj-trade-row {
+	display: grid;
+	grid-template-columns: 1fr 30px 1fr;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid #222;
+	transition: background 0.15s;
+}
+
+.mj-trade-row:hover {
+	background: #ffffff08;
+}
+
+.mj-trade-row:last-child {
+	border-bottom: none;
+}
+
+/* Each side of the trade (receive or cost) */
+.mj-trade-cell {
+	display: flex;
+	align-items: center;
+}
+
+/* Clickable item inside a cell - icon beside text */
+.mj-trade-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	text-decoration: none;
+	color: inherit;
+}
+
+.mj-trade-icon {
+	width: 50px;
+	height: 50px;
+	object-fit: contain;
+	image-rendering: pixelated;
+	flex-shrink: 0;
+}
+
+/* Text block: name stacked above qty */
+.mj-trade-item-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mj-trade-name {
+	color: #ddd;
+	font-size: 0.9em;
+	line-height: 1.2;
+}
+
+.mj-trade-qty {
+	color: #888;
+	font-size: 0.85em;
+	font-weight: bold;
+}
+
+/* Centre column - arrow only (no time/tier for merchant trades) */
+.mj-trade-arrow-col {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #555;
+	font-size: 1.3em;
+}
+
+/* Cost cell modifier - dims the cost item text */
+.mj-trade-cost .mj-trade-name { color: #aaa; }
+.mj-trade-cost .mj-trade-qty  { color: #666; }
+
+
+/* ============================================================
+   LOOT TABLE  -  Treasure Bags & item drop-source tables
+   ============================================================ */
+
+.mj-loot-table {
+	width: 100%;
+	max-width: 580px;
+	border-radius: 8px;
+	overflow: hidden;
+	font-size: 0.9em;
+	border: 1px solid #333;
+}
+
+.mj-loot-header {
+	display: grid;
+	grid-template-columns: 1fr 60px 60px;
+	padding: 6px 12px;
+	color: #666;
+	font-size: 0.75em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid #333;
+	background: #0000005e;
+}
+
+/* In-table pool/category divider */
+.mj-loot-section {
+	padding: 5px 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-top: 1px solid #2a2a2a;
+	border-bottom: 1px solid #1a1a1a;
+	background: #ffffff05;
+}
+
+.mj-loot-section-name {
+	color: #666;
+	font-size: 0.72em;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.mj-loot-row {
+	display: grid;
+	grid-template-columns: 1fr 60px 60px;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid #222;
+	text-decoration: none;
+	color: inherit;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.mj-loot-row:hover {
+	background: #ffffff08;
+}
+
+.mj-loot-row:last-child {
+	border-bottom: none;
+}
+
+.mj-loot-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.mj-loot-icon {
+	width: 50px;
+	height: 50px;
+	object-fit: contain;
+	image-rendering: pixelated;
+	flex-shrink: 0;
+}
+
+.mj-loot-name {
+	color: #ddd;
+	font-size: 0.9em;
+	line-height: 1.2;
+}
+
+.mj-loot-qty {
+	color: #888;
+	font-size: 0.85em;
+	text-align: center;
+}
+
+.mj-loot-chance-wrap {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+/* Base chance pill - always paired with a colour modifier */
+.mj-loot-chance {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px 6px;
+	border-radius: 999px;
+	font-size: 0.78em;
+	font-weight: bold;
+	text-align: center;
+}
+
+.mj-chance-guaranteed { color: #00ccff; border: 1px solid #00ccff; } /* 100%      */
+.mj-chance-high       { color: #23d329; border: 1px solid #23d329; } /* ~50-99%   */
+.mj-chance-med        { color: #c8c840; border: 1px solid #c8c840; } /* ~15-49%   */
+.mj-chance-low        { color: #fbff00; border: 1px solid #fbff00; } /* ~5-14%    */
+.mj-chance-rare       { color: #e91e1e; border: 1px solid #e91e1e; } /* < 5%      */
+
+/* Pool group header row - uses same 3-col grid as mj-loot-row */
+.mj-loot-group-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    align-items: center;
+    padding: 6px 12px;
+    border-top: 1px solid #2a2a2a;
+    border-bottom: 1px solid #1a1a1a;
+    background: #ffffff05;
+}
+
+/* Pool name + "Item Pool" badge */
+.mj-loot-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #888;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mj-loot-pool-badge {
+    font-size: 0.72em;
+    font-weight: normal;
+    color: #555;
+    border: 1px solid #3a3a3a;
+    padding: 1px 6px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Pool item container - sits below the group row */
+.mj-loot-card-pool {
+    padding: 10px 12px;
+    border-bottom: 1px solid #222;
+    background: #00000018;
+}
+
+.mj-loot-card-pool:last-child {
+    border-bottom: none;
+}
+
+/* "one of the following drops" divider */
+.mj-loot-pool-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.mj-pool-divider-line {
+    flex: 1;
+    height: 1px;
+    background: #2e2e2e;
+    display: block;
+}
+
+.mj-pool-divider-text {
+    color: #4a4a4a;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+/* Grid of items inside a pool */
+.mj-loot-card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Individual pool item - vertical card */
+.mj-pool-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    gap: 3px;
+    width: 72px;
+    margin: 0;
+    padding: 0;
+}
+
+.mj-pool-item-icon {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.mj-pool-item-name {
+    font-size: 0.65em;
+    color: #bbb;
+    line-height: 1.2;
+}
+
+.mj-pool-item-qty {
+    font-size: 0.65em;
+    color: #666;
+    font-weight: bold;
+}
+
+/* Weighted chance % shown on pool items (e.g. ~94%) */
+.mj-pool-item-pct {
+    font-size: 0.62em;
+    color: #555;
+    font-style: italic;
+}
+
+/* ── Devil Card entries ───────────────────────────────────── */
+
+.mj-loot-card-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.mj-loot-card-title {
+    font-size: 0.72em;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mj-loot-card-rarity-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Portrait card image */
+.mj-loot-card-img {
+    width: 100%;
+    height: 60px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.mj-loot-card-rarity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Base rarity pill */
+.mj-rarity-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.mj-rarity-common    { color: #aaa;    border: 1px solid #aaa; }
+.mj-rarity-legendary { color: #d4a017; border: 1px solid #d4a017; }
+.mj-rarity-ultra     { color: #bb2c40; border: 1px solid #bb2c40; }
+
+.mj-rarity-pct {
+    font-size: 0.75em;
+    color: #555;
+}
+
+/* "or" separator between card entries in a pool */
+.mj-pool-or {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    padding: 0 6px;
+    color: #444;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}

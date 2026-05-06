@@ -17,12 +17,19 @@ sub-topics:
 
 Your Skill Tree has **485 nodes** spread across **15 regions** in 3D space, all radiating from the Origin at the center. You explore it physically inside a per-player instance called the **Skill Sanctum** - walk up to nodes, press F to allocate. No menus, no flat UI.
 
+
+<figure class="too-figure-lg">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/272105d8-e2d3-450d-b95c-34782e3de1f6.png" alt="3D Skill Sanctum showing glowing skill tree nodes radiating from the Origin">
+</figure>
+
+<div class="too-figure-end"></div>
+
 | | |
 |:--|:--|
 | **Total Nodes** | 485 |
 | **Regions** | 15 (1 Core + 6 Elemental + 8 Octant) |
 | **Bridge Paths** | 12 (connecting adjacent elements) |
-| **Node Types** | 6 (Basic, Notable, Keystone, Origin, Entry, Synergy) |
+| **Node Types** | 6 ([Basic](node-types#basic), [Notable](node-types#notable), [Keystone](node-types#keystone), [Origin](node-types#origin), [Entry](node-types#entry), [Synergy](node-types#synergy)) |
 | **Respec Cost** | Free, no cooldown |
 | **Allocation** | Walk to orbs in 3D, press F |
 
@@ -55,10 +62,10 @@ When you enter, a personal instance is created and all 485 nodes spawn as physic
 
 | Node Type | Orb Size (blocks) | Light Radius (blocks) |
 |:----------|------------------:|----------------------:|
-| **Basic** | 0.5 | 3.0 |
-| **Notable** | 0.7 | 5.0 |
-| **Keystone** | 1.0 | 8.0 |
-| **Origin** | 1.2 | 10.0 |
+| [Basic](node-types#basic) | 0.5 | 3.0 |
+| [Notable](node-types#notable) | 0.7 | 5.0 |
+| [Keystone](node-types#keystone) | 1.0 | 8.0 |
+| [Origin](node-types#origin) | 1.2 | 10.0 |
 
 | State | Light Intensity | Appearance |
 |:------|----------------:|:-----------|
@@ -90,11 +97,11 @@ Available nodes pulse on a **2.0-second cycle**. When you allocate, an explosion
 
 | Type | Cost | Role |
 |:-----|-----:|:-----|
-| **Basic** | 1 point | Small passives, stat bonuses |
-| **Notable** | 2 points | Multi-stat combos, cluster payoffs |
-| **Keystone** | 3 points | Build-defining with tradeoffs/drawbacks |
-| **Origin** | 0 (auto) | Center hub, always allocated |
-| **Entry** | 1 point | Gateway nodes connecting Origin to each arm |
-| **Synergy** | varies | Bonuses that scale based on your other allocations |
+| [Basic](node-types#basic) | 1 point | Small passives, stat bonuses |
+| [Notable](node-types#notable) | 2 points | Multi-stat combos, cluster payoffs |
+| [Keystone](node-types#keystone) | 3 points | Build-defining with tradeoffs/drawbacks |
+| [Origin](node-types#origin) | 0 (auto) | Center hub, always allocated |
+| [Entry](node-types#entry) | 1 point | Gateway nodes connecting Origin to each arm |
+| [Synergy](node-types#synergy) | varies | Bonuses that scale based on your other allocations |
 
 See [Node Types](node-types) for full details. For arm details and archetypes, see [Arms & Regions](arms-regions). For allocation mechanics, see [Allocation](allocating-skill-points).

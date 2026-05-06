@@ -20,11 +20,18 @@ sub-topics:
 
 Gear is the backbone of your combat power. Your first gear comes from **vanilla crafting** at a workbench - crafted items are automatically converted into RPG Gear with Modifiers and Quality. From there, mob drops and Stone crafting improve your equipment over time. Trail of Orbis has **42 equipment types** spanning melee weapons, ranged weapons, magic implements, thrown weapons, 5 armor materials, and shields.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/51f7b15a-75d8-456b-960b-ae3d7b0bdad0.png" alt="Epic sword tooltip showing rarity, quality, implicit damage, and stat modifiers">
+</figure>
+
+<div class="too-figure-end"></div>
+
 | | |
 |:--|:--|
 | **Equipment Types** | 42 (18 weapons, 20 armor, shield, 2 fallbacks) |
-| **Rarity Tiers** | 7 (Common → Unique, 4x geometric) |
-| **Quality Range** | 1-101 (multiplier : 0.51x to 1.51x) |
+| **Rarity Tiers** | 7 ([Common](gear-rarities#common) → [Unique](gear-rarities#unique), 4x geometric) |
+| **Quality Range** | 1-101 (multiplier : **0.51x** to **1.51x**) |
 | **Modifier Definitions** | 101 (Prefixes = offense, Suffixes = defense) |
 | **Max Modifiers** | 6 (on Mythic / Unique) |
 | **Armor Materials** | 5 (Plate, Leather, Cloth, Wood, Special) |
@@ -37,12 +44,12 @@ Hytale gives you **4 armor slots** plus weapons and shields. There's no feet/boo
 
 | Slot | What It Does | Power Share |
 |------|-------------|------------|
-| **Weapon** | Primary damage source, carries weapon implicit | 30% |
-| **Chest** | Largest armor piece, highest defensive stats | 20% |
-| **Legs** | Includes movement stats (no feet slot exists) | 23% |
-| **Head** | Helmet slot | 12% |
-| **Hands** | Gloves, hybrid offense/defense | 8% |
-| **Shield** (offhand) | Block chance, optional slot | 7% |
+| **Weapon** | Primary damage source, carries weapon implicit | **30%** |
+| **Chest** | Largest armor piece, highest defensive stats | **20%** |
+| **Legs** | Includes movement stats (no feet slot exists) | **23%** |
+| **Head** | Helmet slot | **12%** |
+| **Hands** | Gloves, hybrid offense/defense | **8%** |
+| **Shield** (offhand) | Block chance, optional slot | **7%** |
 
 > [!IMPORTANT]
 > Hytale has **no feet/boots slot**. Movement-related stats go on the Legs slot instead. That's why Legs has a higher power share (23%) than you might expect.
@@ -88,8 +95,8 @@ Each material has 4 slots : Head, Chest, Legs, and Hands. That makes 20 armor ty
 
 Every piece of gear has 3 independent power axes :
 
-1. **Rarity** determines how many modifiers you can have (1 to 6) and your stat multiplier (0.3x to 2.8x)
-2. **Quality** multiplies all modifier values, ranging from near-halved at Q1 to 1.51x at Q101
+1. **Rarity** determines how many modifiers you can have (1 to 6) and your stat multiplier (**0.3x** to **2.8x**)
+2. **Quality** multiplies all modifier values, ranging from near-halved at Q1 to **1.51x** at Q101
 3. **Modifiers** are the specific stats on the item, drawn from 101 distinct definitions
 
 These roll independently. A [Rare](gear-rarities#rare) item with perfect quality can outperform a [Legendary](gear-rarities#legendary) with poor quality on specific stats. See [Rarities](rarities), [Quality](quality), and [Modifiers](modifiers) for the full details.

@@ -34,13 +34,13 @@ Prefixes make the Realm harder. Only prefix modifiers contribute to the map's di
 
 | Modifier | Range | Weight |
 |:---------|:------|-------:|
-| **Monster Damage** | +10-100% | 1 |
-| **Monster Life** | +10-150% | 1 |
-| **Monster Speed** | +5-40% | 1 |
-| **Monster Attack Speed** | +10-50% | 1 |
-| **Reduced Time** | -10-40% timeout | 2 |
-| **Reduced Healing** | -20-60% healing | 1 |
-| **No Regeneration** | Binary (on/off) | 3 |
+| **Monster Damage** | **+10-100%** | 1 |
+| **Monster Life** | **+10-150%** | 1 |
+| **Monster Speed** | **+5-40%** | 1 |
+| **Monster Attack Speed** | **+10-50%** | 1 |
+| **Reduced Time** | **-10-40%** timeout | 2 |
+| **Reduced Healing** | **-20-60%** healing | 1 |
+| **No Regeneration** | **Binary (on/off)** | 3 |
 
 > [!WARNING]
 > **No Regeneration** is the most dangerous prefix. It completely disables your passive HP and mana regeneration. You must rely on life steal, potions, or kill-based recovery to sustain. Its weight of 3 makes it the most commonly rolled prefix.
@@ -55,12 +55,12 @@ Suffixes increase your rewards. All suffix modifiers have a weight of 0.
 
 | Modifier | Range | Weight |
 |:---------|:------|-------:|
-| **Item Quantity** | +5-50% IIQ | 0 |
-| **Item Rarity** | +5-40% IIR | 0 |
-| **Experience** | +10-50% XP | 0 |
-| **Stone Drops** | +5-30% stones | 0 |
-| **Monster Count** | +10-50% count | 0 |
-| **Elite Chance** | +5-30% elite spawn | 0 |
+| **Item Quantity** | **+5-50%** IIQ | 0 |
+| **Item Rarity** | **+5-40%** IIR | 0 |
+| **Experience** | **+10-50%** XP | 0 |
+| **Stone Drops** | **+5-30%** stones | 0 |
+| **Monster Count** | **+10-50%** count | 0 |
+| **Elite Chance** | **+5-30%** elite spawn | 0 |
 
 > [!TIP]
 > **Item Quantity** and **Item Rarity** are the most impactful reward modifiers. IIQ means more drops total. IIR means those drops roll higher rarity. Both stack with Fortune's Compass bonus and other loot bonuses.
@@ -77,10 +77,10 @@ qualityMultiplier = 0.5 + quality / 100.0
 
 | Quality | Multiplier | Effect on Modifiers |
 |--------:|-----------:|:--------------------|
-| 1 | 0.51x | Modifier values at roughly half strength |
-| 50 | 1.00x | Baseline modifier values |
-| 75 | 1.25x | 25% stronger modifiers |
-| 101 | 1.51x | Modifier values at roughly 150% strength |
+| 1 | **0.51x** | Modifier values at roughly half strength |
+| 50 | **1.00x** | Baseline modifier values |
+| 75 | **1.25x** | 25% stronger modifiers |
+| 101 | **1.51x** | Modifier values at roughly 150% strength |
 
 Quality affects **both** prefix and suffix modifiers equally. A high-quality map has stronger difficulty modifiers but also stronger reward modifiers.
 
@@ -107,7 +107,7 @@ Level 75 | Epic Quality 82
 ===============================
 ```
 
-This example shows an [Epic](gear-rarities#epic) map (4 max modifiers) with 2 prefixes and 2 suffixes. The quality of 82 means a 1.32x multiplier on all modifier values.
+This example shows an [Epic](gear-rarities#epic) map (4 max modifiers) with 2 prefixes and 2 suffixes. The quality of 82 means a **1.32x** multiplier on all modifier values.
 
 ---
 

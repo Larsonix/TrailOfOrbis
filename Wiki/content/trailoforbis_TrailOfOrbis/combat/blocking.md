@@ -27,10 +27,10 @@ if holdingShield AND random(0-100) < blockChance:
 
 | Component | Range | Source |
 |-----------|-------|--------|
-| Block Chance | 0-100% | Shield stats + [Earth](attributes#earth) attribute |
-| Damage Reduction | 0-100% | Shield's block damage reduction stat |
+| Block Chance | **0%**-**100%** | Shield stats + [Earth](attributes#earth) attribute |
+| Damage Reduction | **0%**-**100%** | Shield's block damage reduction stat |
 | Stamina Cost | Base cost from shield | Reduced by stamina drain reduction |
-| Stamina Drain Reduction | 0-75% (capped) | Gear modifiers |
+| Stamina Drain Reduction | **0%**-**75%** (capped) | Gear modifiers |
 
 > [!WARNING]
 > Blocking costs stamina. If you run out, you can't sustain blocking. [Earth](attributes#earth) attribute's stamina drain reduction (capped at 75%) helps you keep blocking through long fights.
@@ -60,10 +60,10 @@ effectiveCost = baseCost × (1 - min(staminaDrainReduction, 75) / 100)
 
 | Stamina Reduction | Effective Cost |
 |-------------------|---------------|
-| 0% | 100% (full cost) |
-| 25% | 75% of base cost |
-| 50% | 50% of base cost |
-| 75% (cap) | 25% of base cost |
+| **0%** | **100%** (full cost) |
+| **25%** | **75%** of base cost |
+| **50%** | **50%** of base cost |
+| **75%** (cap) | **25%** of base cost |
 
 > [!IMPORTANT]
 > Stamina drain reduction is **capped at 75%**. You always pay at least 25% of the base stamina cost per block. This prevents infinite blocking.

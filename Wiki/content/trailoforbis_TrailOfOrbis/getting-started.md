@@ -44,19 +44,19 @@ You start with no gear, but you're not helpless. Use Hytale's vanilla crafting t
 Mobs near spawn are low level. The overworld scales with **distance from spawn** : the farther you go, the harder mobs get. Stay close at first.
 
 Every mob you kill has three independent chances to drop loot :
-- **8% chance** to drop a piece of Gear (weapon, armor, or shield)
-- **5% chance** to drop a Stone (consumable crafting currency)
-- **12% chance** to drop a Realm Map (your ticket to the core game loop)
+- **8%** chance to drop a piece of Gear (weapon, armor, or shield)
+- **5%** chance to drop a Stone (consumable crafting currency)
+- **12%** chance to drop a Realm Map (your ticket to the core game loop)
 
 XP comes exclusively from mob kills. The amount depends on the mob's level, stat pool, and classification :
 
 | Mob Class | XP Multiplier |
 |-----------|---------------|
-| Passive | 0.1x |
-| Minor | 0.5x |
-| Hostile | 1.0x |
-| Elite | 1.5x |
-| Boss | 5.0x |
+| Passive | **0.1x** |
+| Minor | **0.5x** |
+| [Hostile](elites-bosses#normal) | **1.0x** |
+| [Elite](elites-bosses#elite) | **1.5x** |
+| [Boss](elites-bosses#boss) | **5.0x** |
 
 ---
 
@@ -73,12 +73,12 @@ You'll see the 6 Elements. Each one grants 5 unique stats per point - 30 total s
 
 | Element | What It Does | Good First Pick If... |
 |---------|-------------|----------------------|
-| **Fire** | Physical Damage, Crit Multiplier, Burn | You want to hit harder |
-| **Water** | Spell Damage, Mana, Energy Shield | You plan to use magic weapons |
-| **Lightning** | Attack Speed, Move Speed, Crit Chance | You want to attack and move faster |
-| **Earth** | Max Health, Armor, Block Chance | You want to survive longer |
-| **Wind** | Evasion, Accuracy, Projectile Damage | You use ranged weapons |
-| **Void** | Life Steal, True Damage, *DoT* | You want to sustain through damage |
+| [Fire](attributes#fire) | Physical Damage, Crit Multiplier, Burn | You want to hit harder |
+| [Water](attributes#water) | Spell Damage, Mana, Energy Shield | You plan to use magic weapons |
+| [Lightning](attributes#lightning) | Attack Speed, Move Speed, Crit Chance | You want to attack and move faster |
+| [Earth](attributes#earth) | Max Health, Armor, Block Chance | You want to survive longer |
+| [Wind](attributes#wind) | Evasion, Accuracy, Projectile Damage | You use ranged weapons |
+| [Void](attributes#void) | Life Steal, True Damage, *DoT* | You want to sustain through damage |
 
 > [!NOTE]
 > There are no classes. Your build is defined entirely by how you distribute Attribute Points across the 6 elements. You can respec for free at any time with `/too attr reset`.
@@ -130,13 +130,13 @@ Once Gear drops, inspect it. Every piece has :
 
 | Rarity | Stat Multiplier | Drop Weight |
 |--------|-----------------|-------------|
-| Common | 0.3x | 64 |
-| Uncommon | 0.5x | 16 |
-| Rare | 0.8x | 4 |
-| Epic | 1.2x | 1 |
-| Legendary | 1.7x | 0.25 |
-| Mythic | 2.3x | 0.0625 |
-| Unique | 2.8x | 0.016 |
+| [Common](gear-rarities#common) | **0.3x** | 64 |
+| [Uncommon](gear-rarities#uncommon) | **0.5x** | 16 |
+| [Rare](gear-rarities#rare) | **0.8x** | 4 |
+| [Epic](gear-rarities#epic) | **1.2x** | 1 |
+| [Legendary](gear-rarities#legendary) | **1.7x** | 0.25 |
+| [Mythic](gear-rarities#mythic) | **2.3x** | 0.0625 |
+| [Unique](gear-rarities#unique) | **2.8x** | 0.016 |
 
 The drop weights follow a 4x geometric progression - each rarity tier is 4 times rarer than the one below it.
 
@@ -151,10 +151,10 @@ Realm Maps drop at **12% per kill** from the very first mob you fight. You don't
 
 | Realm Size | Mob Count | Time Limit |
 |------------|-----------|------------|
-| Small | 15 mobs | 5 min |
-| Medium | 25 mobs | 10 min |
-| Large | 40 mobs | 15 min |
-| Massive | 70 mobs | 20 min |
+| [Small](realm-sizes#small) | 15 mobs | 5 min |
+| [Medium](realm-sizes#medium) | 25 mobs | 10 min |
+| [Large](realm-sizes#large) | 40 mobs | 15 min |
+| [Massive](realm-sizes#huge) | 70 mobs | 20 min |
 
 To open a Realm, you need a Portal Device. A ring of **8 portals** is placed at world spawn - you don't need to craft one. Every Portal Device is an [Ancient Gateway](ancient-gateways) with a tier that limits which map levels it can channel. All portals start at **Copper** (Tier 0, max level 10) - enough for your first maps.
 

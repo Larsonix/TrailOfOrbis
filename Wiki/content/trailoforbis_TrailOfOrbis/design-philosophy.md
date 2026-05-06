@@ -34,7 +34,7 @@ Every system has a meaningful tradeoff :
 | **[Void](attributes#void) Attribute** | Must deal damage to survive | Life steal + True Damage |
 | **Harder Realms** | Stronger mobs, difficulty Modifiers | More XP, better loot |
 | **Map Modifiers** | 7 prefix modifiers increase difficulty | 6 suffix modifiers increase rewards |
-| **Death** | 50% progress XP lost (Level 21+) | Teaches you what to improve |
+| **Death** | **50%** progress XP lost (Level 21+) | Teaches you what to improve |
 
 No decision is free. Better loot requires harder fights. Stronger offense requires weaker defense. Perfect Gear requires gambling with Stones. Every decision stays meaningful from Level 1 to Level 1,000,000.
 

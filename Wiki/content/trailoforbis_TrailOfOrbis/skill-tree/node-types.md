@@ -12,9 +12,16 @@ published: true
 
 6 node types serve different roles in your Skill Tree, from basic stat bonuses to build-defining keystones. Each has a distinct Skill Point cost and visual appearance in the Skill Sanctum.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/588026db-55a3-4e52-baa0-f8e4419cacc0.png" alt="Skill tree node allocation HUD showing node details and stat preview">
+</figure>
+
+<div class="too-figure-end"></div>
+
 ---
 
-## Basic Nodes
+## [Basic](node-types#basic) Nodes
 
 | Property | Value |
 |----------|-------|
@@ -29,7 +36,7 @@ Each cluster contains **5 basic nodes** leading to 1 notable.
 
 ---
 
-## Notable Nodes
+## [Notable](node-types#notable) Nodes
 
 | Property | Value |
 |----------|-------|
@@ -42,7 +49,7 @@ Notables are the reward at the end of a cluster. They give substantially stronge
 
 ---
 
-## Keystone Nodes
+## [Keystone](node-types#keystone) Nodes
 
 | Property | Value |
 |----------|-------|
@@ -58,7 +65,7 @@ Keystones are the endgame nodes at the far reaches of each arm. They provide dra
 
 ---
 
-## Origin Node (Start Node)
+## [Origin](node-types#origin) Node (Start Node)
 
 | Property | Value |
 |----------|-------|
@@ -70,7 +77,7 @@ The Origin is the center of the tree. Always allocated, cannot be deallocated, a
 
 ---
 
-## Entry Nodes
+## [Entry](node-types#entry) Nodes
 
 | Property | Value |
 |----------|-------|
@@ -81,7 +88,7 @@ Entry nodes are the first step into any arm. They sit at tier 1 and bridge the g
 
 ---
 
-## Synergy Nodes
+## [Synergy](node-types#synergy) Nodes
 
 | Property | Value |
 |----------|-------|

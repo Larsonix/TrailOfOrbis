@@ -12,6 +12,13 @@ published: true
 
 Every Portal Device in the world is an Ancient Gateway. Gateways have a tier that caps the maximum level of Realm Maps they can channel. Bring metal bars and essences from progressively harder overworld zones to upgrade them. The deeper you push into the world, the harder the Realms you unlock.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/4c997637-a960-44ec-a91b-127e9ee4236d.png" alt="Gateway upgrade UI showing tier progression and material requirements">
+</figure>
+
+<div class="too-figure-end"></div>
+
 | | |
 |:--|:--|
 | **Tiers** | 7 (Copper through Adamantite) |

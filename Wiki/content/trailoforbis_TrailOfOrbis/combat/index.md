@@ -27,10 +27,10 @@ Every attack in Trail of Orbis passes through an **11-step Damage Pipeline** bef
 |:--|:--|
 | **Pipeline Stages** | 11 (Base → True Damage) |
 | **Damage Categories** | 3 (Physical, Elemental, True) |
-| **Base Crit Chance** | 5% (increased by [Lightning](attributes#lightning)) |
-| **Base Crit Multiplier** | 150% (increased by [Fire](attributes#fire)) |
-| **Armor Cap** | 90% physical reduction |
-| **Resistance Cap** | 75% per element |
+| **Base Crit Chance** | **5%** (increased by [Lightning](attributes#lightning)) |
+| **Base Crit Multiplier** | **1.5x** (increased by [Fire](attributes#fire)) |
+| **Armor Cap** | **90%** physical reduction |
+| **Resistance Cap** | **75%** per element |
 
 ---
 
@@ -75,8 +75,8 @@ Trail of Orbis has 3 categories of damage :
 
 | Category | Types | Reduced By |
 |----------|-------|-----------|
-| Physical | Physical | Armor + Physical Resistance |
-| Elemental | Fire, Water, Lightning, Earth, Wind, Void | Per-element Resistance |
+| [Physical](damage-types#physical) | Physical | Armor + Physical Resistance |
+| Elemental | [Fire](attributes#fire), [Water](attributes#water), [Lightning](attributes#lightning), [Earth](attributes#earth), [Wind](attributes#wind), [Void](attributes#void) | Per-element Resistance |
 | True | True Damage | Nothing - bypasses all defenses |
 
 See [Damage Types](damage-types) for the full breakdown with colors.
@@ -89,8 +89,8 @@ Your damage gets reduced by multiple independent defense layers :
 
 | Defense | Protects Against | Stat Source | Cap |
 |:--------|:-----------------|:-----------|:----|
-| Armor | Physical damage | Gear + Earth attribute | 90% reduction |
-| Resistances | Elemental damage (per element) | Gear modifiers | 75% per element |
+| Armor | [Physical](damage-types#physical) damage | Gear + Earth attribute | **90%** reduction |
+| Resistances | Elemental damage (per element) | Gear modifiers | **75%** per element |
 | Evasion | All attacks (full avoidance) | Wind attribute + gear | Diminishing returns |
 | Block | All attacks (partial reduction) | Earth attribute + shield | No cap on chance |
 

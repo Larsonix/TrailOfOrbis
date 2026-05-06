@@ -23,7 +23,7 @@ finalLevel = blendedLevel + random(+/-2)
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
-| Pull factor | 0.3 | Closes 30% of the gap between mob level and your level |
+| Pull factor | **0.3** | Closes 30% of the gap between mob level and your level |
 | Max offset | +/-5 | Blending can shift the level by at most 5 |
 | Variance | +/-2 | Random spread after blending |
 

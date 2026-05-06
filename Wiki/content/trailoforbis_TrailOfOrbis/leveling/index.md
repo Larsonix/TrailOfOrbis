@@ -61,17 +61,17 @@ xp = ceil((mobLevel x 5.0 + statPool x 0.1) x tierMult x 1.2 x (1 + distanceLeve
 
 | Tier | XP Multiplier |
 |:-----|:-------------:|
-| Boss | 5.0x |
-| Elite | 1.5x |
-| Normal | 1.0x |
+| [Boss](elites-bosses#boss) | **5.0x** |
+| [Elite](elites-bosses#elite) | **1.5x** |
+| [Normal](elites-bosses#normal) | **1.0x** |
 
 ### Quick Examples
 
 | Mob | Base Calc | Tier | Result |
 |:----|:----------|:----:|-------:|
-| Level 10 Hostile (150 pool) | (10x5 + 150x0.1) x 1.0 x 1.2 = 78 | Normal | ~78 XP |
-| Level 50 Elite (800 pool) | (50x5 + 800x0.1) x 1.5 x 1.2 = 594 | Elite | ~594 XP |
-| Level 100 Boss (2000 pool) | (100x5 + 2000x0.1) x 5.0 x 1.2 = 4,200 | Boss | ~4,200 XP |
+| Level 10 Hostile (150 pool) | (10x5 + 150x0.1) x 1.0 x 1.2 = 78 | [Normal](elites-bosses#normal) | ~78 XP |
+| Level 50 Elite (800 pool) | (50x5 + 800x0.1) x 1.5 x 1.2 = 594 | [Elite](elites-bosses#elite) | ~594 XP |
+| Level 100 Boss (2000 pool) | (100x5 + 2000x0.1) x 5.0 x 1.2 = 4,200 | [Boss](elites-bosses#boss) | ~4,200 XP |
 
 For the full formula breakdown with worked examples, see [XP Formula](xp-formula-deep-dive).
 

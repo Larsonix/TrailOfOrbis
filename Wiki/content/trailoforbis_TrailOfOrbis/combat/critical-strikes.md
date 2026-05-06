@@ -23,8 +23,8 @@ if random(0-100) < critChance:
 
 | Property | Value |
 |----------|-------|
-| Base crit chance | 5.0% |
-| Base crit multiplier | 150% (1.5x damage) |
+| Base crit chance | **5.0%** |
+| Base crit multiplier | **1.5x** damage |
 | Roll timing | After all scaling, before defenses (step 9 of 11) |
 | Applies to | ALL damage types equally - physical + every element |
 | Roll count | **One roll per attack** - your entire attack crits or doesn't |
@@ -38,22 +38,22 @@ if random(0-100) < critChance:
 
 Two stats control your critical strikes :
 
-### Critical Chance (Lightning)
+### Critical Chance ([Lightning](attributes#lightning))
 
 | Source | Value |
 |--------|-------|
-| Base | 5.0% |
-| [Lightning](attributes#lightning) attribute | +0.1% per point |
+| Base | **5.0%** |
+| [Lightning](attributes#lightning) attribute | **+0.1%** per point |
 | Gear modifiers | Variable |
 
 At 100 Lightning, you have 5% + 10% = **15% crit chance** from base + attributes alone. Combined with gear, 25-35% crit chance is achievable.
 
-### Critical Multiplier (Fire)
+### Critical Multiplier ([Fire](attributes#fire))
 
 | Source | Value |
 |--------|-------|
-| Base | 150% (1.5x damage) |
-| [Fire](attributes#fire) attribute | +0.6% per point |
+| Base | **1.5x** damage |
+| [Fire](attributes#fire) attribute | **+0.6%** per point |
 | Gear modifiers | Variable |
 
 At 100 Fire, your crit multiplier is 150% + 60% = **210% (2.1x damage)**. Combined with gear, 250%+ is achievable.
@@ -62,13 +62,13 @@ At 100 Fire, your crit multiplier is 150% + 60% = **210% (2.1x damage)**. Combin
 
 ## Scaling Examples
 
-| Fire | Lightning | Crit Multiplier | Crit Chance | Expected DPS Increase |
+| [Fire](attributes#fire) | [Lightning](attributes#lightning) | Crit Multiplier | Crit Chance | Expected DPS Increase |
 |-----:|----------:|:----------------|------------:|:----------------------|
-| 0 | 0 | 150% (1.5x) | 5.0% | +2.5% average |
-| 50 | 50 | 180% (1.8x) | 10.0% | +8.0% average |
-| 100 | 50 | 210% (2.1x) | 10.0% | +11.0% average |
-| 50 | 100 | 180% (1.8x) | 15.0% | +12.0% average |
-| 100 | 100 | 210% (2.1x) | 15.0% | +16.5% average |
+| 0 | 0 | **1.5x** | **5.0%** | **+2.5%** average |
+| 50 | 50 | **1.8x** | **10.0%** | **+8.0%** average |
+| 100 | 50 | **2.1x** | **10.0%** | **+11.0%** average |
+| 50 | 100 | **1.8x** | **15.0%** | **+12.0%** average |
+| 100 | 100 | **2.1x** | **15.0%** | **+16.5%** average |
 
 > [!NOTE]
 > Expected DPS increase from crits = `critChance × (critMultiplier / 100 - 1)`. At 15% chance and 210% multiplier : `0.15 × 1.1 = 16.5%` average damage increase.

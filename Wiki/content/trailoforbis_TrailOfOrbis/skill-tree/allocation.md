@@ -43,7 +43,7 @@ Walk to the node you want, press **F** to interact. The Skill Sanctum gives you 
 |------|---------|
 | **Adjacency required** | You can only allocate a node if it's adjacent to an already-allocated node |
 | **BFS from Origin** | The system uses breadth-first search from the Origin to determine reachability |
-| **Skill Point costs** | Basic : 1 point, Notable : 2 points, Keystone : 3 points |
+| **Skill Point costs** | [Basic](node-types#basic) : 1 point, [Notable](node-types#notable) : 2 points, [Keystone](node-types#keystone) : 3 points |
 | **Origin is permanent** | The Origin cannot be deallocated |
 | **Stat recalculation** | Every allocation or deallocation triggers a full stat recalculation |
 

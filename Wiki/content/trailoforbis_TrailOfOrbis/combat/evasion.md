@@ -53,23 +53,23 @@ The attacker's accuracy competes against your evasion :
 
 | Formula Constant | Value | Meaning |
 |:-----------------|------:|:--------|
-| Hit chance constant | 1.25 | Slightly favors the attacker |
-| Evasion scaling factor | 0.2 | Reduces raw evasion before calculation |
-| Evasion exponent | 0.9 | Diminishing returns at high evasion |
-| Minimum hit chance | 5% | Attacks always have at least 5% chance to hit you |
-| Maximum hit chance | 100% | No guaranteed dodge from evasion alone |
+| Hit chance constant | **1.25** | Slightly favors the attacker |
+| Evasion scaling factor | **0.2** | Reduces raw evasion before calculation |
+| Evasion exponent | **0.9** | Diminishing returns at high evasion |
+| Minimum hit chance | **5%** | Attacks always have at least 5% chance to hit you |
+| Maximum hit chance | **100%** | No guaranteed dodge from evasion alone |
 
 ### Hit Chance Examples
 
 | Your Evasion | Attacker Accuracy | Hit Chance | Effective Dodge Rate |
 |-------------:|------------------:|-----------:|--------------------:|
-| 0 | Any | 100% | 0% |
-| 250 | 100 | 93% | 7% |
-| 500 | 100 | 77% | 23% |
-| 1000 | 100 | 57% | 43% |
-| 2000 | 100 | 39% | 61% |
-| 1000 | 200 | 79% | 21% |
-| 2000 | 200 | 60% | 40% |
+| 0 | Any | **100%** | **0%** |
+| 250 | 100 | **93%** | **7%** |
+| 500 | 100 | **77%** | **23%** |
+| 1000 | 100 | **57%** | **43%** |
+| 2000 | 100 | **39%** | **61%** |
+| 1000 | 200 | **79%** | **21%** |
+| 2000 | 200 | **60%** | **40%** |
 
 > [!IMPORTANT]
 > Evasion has **diminishing returns** (exponent 0.9). Doubling your evasion doesn't double your dodge rate. But it always helps - there's no point where more evasion stops mattering.

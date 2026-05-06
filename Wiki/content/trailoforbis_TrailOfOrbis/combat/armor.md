@@ -28,11 +28,11 @@ Your reduction depends on BOTH your armor AND the size of the incoming hit. A fi
 
 | Your Armor | vs 50 Damage | vs 200 Damage | vs 500 Damage |
 |-----------:|-------------:|--------------:|--------------:|
-| 100 | 17% reduced | 5% reduced | 2% reduced |
-| 500 | 50% reduced | 20% reduced | 9% reduced |
-| 1000 | 67% reduced | 33% reduced | 17% reduced |
-| 2000 | 80% reduced | 50% reduced | 29% reduced |
-| 5000 | **90% (capped)** | 71% reduced | 50% reduced |
+| 100 | **17%** reduced | **5%** reduced | **2%** reduced |
+| 500 | **50%** reduced | **20%** reduced | **9%** reduced |
+| 1000 | **67%** reduced | **33%** reduced | **17%** reduced |
+| 2000 | **80%** reduced | **50%** reduced | **29%** reduced |
+| 5000 | **90% (capped)** | **71%** reduced | **50%** reduced |
 
 > [!IMPORTANT]
 > Armor reduction is **capped at 90%**. No matter how much you stack, at least 10% of physical damage always gets through.

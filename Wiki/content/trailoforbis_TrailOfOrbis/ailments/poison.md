@@ -24,10 +24,10 @@ DPS per stack = (hitDamage x 0.3 + flatPoisonDamage) / duration
 
 | Parameter | Value |
 |-----------|-------|
-| Damage ratio | 30% of the triggering void hit (per stack) |
+| Damage ratio | **30%** of the triggering [void](attributes#void) hit (per stack) |
 | Base duration | 5 seconds per stack |
 | Max stacks | **10** (each independent) |
-| Base application chance | 10% |
+| Base application chance | **10%** |
 | Damage threshold | **None** (always applies if chance succeeds) |
 
 > [!IMPORTANT]
@@ -68,9 +68,9 @@ During the overlap period (t=3.0s to t=5.0s), all 3 stacks deal damage simultane
 
 | Stat | Source | Effect |
 |------|--------|--------|
-| **DoT Damage %** | [Void](attributes#void) attribute (+0.3% per point) | Multiplies ALL Poison DPS |
-| **Status Effect Duration %** | [Void](attributes#void) attribute (+0.3% per point) | Extends each stack's duration |
-| **Attack Speed** | [Lightning](attributes#lightning) attribute (+0.3% per point) | More attacks = more chances to apply stacks |
+| **DoT Damage %** | [Void](attributes#void) attribute (**+0.3%** per point) | Multiplies ALL [Poison](poison) DPS |
+| **Status Effect Duration %** | [Void](attributes#void) attribute (**+0.3%** per point) | Extends each stack's duration |
+| **Attack Speed** | [Lightning](attributes#lightning) attribute (**+0.3%** per point) | More attacks = more chances to apply stacks |
 
 Void is Poison's natural home - both *DoT* Damage and Status Effect Duration come from Void, making high-Void builds the best Poison users.
 
@@ -108,11 +108,11 @@ Each Poison stack's duration is extended independently :
 finalDuration = 5.0 x (1 + statusEffectDuration / 100)
 ```
 
-| Void Points | Duration Bonus | Stack Duration |
+| [Void](attributes#void) Points | Duration Bonus | Stack Duration |
 |------------:|---------------:|---------------:|
-| 0 | +0% | 5.0s |
-| 50 | +15% | 5.75s |
-| 100 | +30% | 6.5s |
+| 0 | **+0%** | 5.0s |
+| 50 | **+15%** | 5.75s |
+| 100 | **+30%** | 6.5s |
 
 Longer duration means more overlap between stacks and higher sustained DPS.
 
@@ -124,9 +124,9 @@ With 10% base chance, you need roughly 100 attacks to expect 10 Poison applicati
 
 | Scenario | Chance | Avg Hits to 10 Stacks |
 |----------|--------|----------------------|
-| Base (10%) | 10% | ~100 hits |
-| 100 Void (10% + gear) | ~15% | ~67 hits |
-| 100 Void + 100 Lightning | ~15% at 1.3x speed | ~52 hits equivalent time |
+| Base | **10%** | ~100 hits |
+| 100 [Void](attributes#void) (10% + gear) | **~15%** | ~67 hits |
+| 100 [Void](attributes#void) + 100 [Lightning](attributes#lightning) | **~15%** at **1.3x** speed | ~52 hits equivalent time |
 
 > [!TIP]
 > Poison's power comes from **stack count**. A single Poison stack is modest (30% of one hit over 5s). Ten stacks running simultaneously is devastating. Fast-hitting [Void](attributes#void) builds (Void + [Lightning](attributes#lightning)) maximize stack count through rapid attack speed and high application frequency.
@@ -135,9 +135,9 @@ With 10% base chance, you need roughly 100 attacks to expect 10 Poison applicati
 
 ## Poison vs Burn
 
-| Property | [Burn](burn-fire-dot) (Fire) | Poison (Void) |
+| Property | [Burn](burn-fire-dot) ([Fire](attributes#fire)) | [Poison](poison) ([Void](attributes#void)) |
 |----------|-------------|---------------|
-| Damage ratio | 50% per hit | 30% per hit per stack |
+| Damage ratio | **50%** per hit | **30%** per hit per stack |
 | Stacking | Refreshes (1 instance) | Independent stacks (up to 10) |
 | Duration | 4 seconds | 5 seconds per stack |
 | Max simultaneous DPS | 1 instance | 10 instances |

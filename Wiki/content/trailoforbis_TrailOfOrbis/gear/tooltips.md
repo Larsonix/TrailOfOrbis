@@ -12,6 +12,13 @@ published: true
 
 Every RPG gear piece shows a custom tooltip with all its stats. Learning to read tooltips quickly is essential for evaluating drops and making gear decisions.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/64e3b30f-5046-4ef6-b61d-7b134c927f89.png" alt="Legendary Hexcode staff tooltip showing rarity badge, item level, quality, implicit spell damage, and stat modifiers">
+</figure>
+
+<div class="too-figure-end"></div>
+
 ---
 
 ## Tooltip Sections
@@ -47,7 +54,7 @@ Shows your item's quality value and its tier. Quality is displayed with tier-spe
 | 50 | Baseline (neutral) |
 | 51-75 | Above average |
 | 76-100 | Excellent |
-| 101 | Perfect (0.5% natural drop chance, or guaranteed via Gaia's Perfection) |
+| 101 | Perfect (**0.5%** natural drop chance, or guaranteed via Gaia's Perfection) |
 
 ### 4. Implicit Line
 

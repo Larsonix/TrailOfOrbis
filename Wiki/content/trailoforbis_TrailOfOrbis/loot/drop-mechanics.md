@@ -49,9 +49,9 @@ Maps have the highest base drop chance of any loot type. The chance increases sl
 
 | Mob Type | Map Drop Chance (Level 1) |
 |----------|--------------------------|
-| Normal | ~12% |
-| Elite | ~24% |
-| Boss | ~60% |
+| [Normal](elites-bosses#normal) | **~12%** |
+| [Elite](elites-bosses#elite) | **~24%** |
+| [Boss](elites-bosses#boss) | **~60%** |
 
 ---
 
@@ -59,15 +59,48 @@ Maps have the highest base drop chance of any loot type. The chance increases sl
 
 When gear drops, its rarity is rolled from this weighted distribution :
 
-| Rarity | Weight | Approximate Chance |
-|:------:|-------:|-------------------:|
-| [Common](gear-rarities#common) | 64 | ~75.0% |
-| Uncommon | 16 | ~18.75% |
-| Rare | 4 | ~4.69% |
-| Epic | 1 | ~1.17% |
-| [Legendary](gear-rarities#legendary) | 0.25 | ~0.29% |
-| Mythic | 0.0625 | ~0.073% |
-| Unique | 0.016 | ~0.018% |
+<div class="too-loot-table">
+  <div class="too-loot-header">
+    <span>Rarity</span>
+    <span>Weight</span>
+    <span>Chance</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-common">Common</span>
+    <span>64</span>
+    <span class="too-chance too-chance-high">~75.0%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>16</span>
+    <span class="too-chance too-chance-low">~18.75%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>4</span>
+    <span class="too-chance too-chance-rare">~4.69%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-epic">Epic</span>
+    <span>1</span>
+    <span class="too-chance too-chance-rare">~1.17%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-legendary">Legendary</span>
+    <span>0.25</span>
+    <span class="too-chance too-chance-rare">~0.29%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-mythic">Mythic</span>
+    <span>0.0625</span>
+    <span class="too-chance too-chance-rare">~0.073%</span>
+  </div>
+  <div class="too-loot-row">
+    <span class="too-rarity-badge too-r-unique">Unique</span>
+    <span>0.016</span>
+    <span class="too-chance too-chance-rare">~0.018%</span>
+  </div>
+</div>
 
 ### What This Means in Practice
 
@@ -101,11 +134,11 @@ The gear pool is populated through `DynamicLootRegistry`, which automatically di
 
 | Event | Probability |
 |:------|------------:|
-| Gear drops from a kill | 8% |
-| Stone drops from a kill | 5% |
-| Map drops from a kill | 12% |
-| Nothing drops | ~77.3% |
-| At least one item drops | ~22.7% |
+| Gear drops from a kill | **8%** |
+| Stone drops from a kill | **5%** |
+| Map drops from a kill | **12%** |
+| Nothing drops | **~77.3%** |
+| At least one item drops | **~22.7%** |
 
 > [!NOTE]
 > All three rolls are completely independent. A single kill can produce gear, a stone, AND a map simultaneously.

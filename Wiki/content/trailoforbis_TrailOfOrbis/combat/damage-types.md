@@ -97,13 +97,13 @@ Each damage type has a unique color in combat, so you can instantly see what's h
 
 | Type | Color | What It Means |
 |------|-------|--------------|
-| Physical | White | Melee/projectile damage, reduced by armor |
-| Fire | Orange | Fire damage, check your Fire Resistance |
-| Water | Light Blue | Water/ice damage, check your Water Resistance |
-| Lightning | Yellow | Lightning damage, check your Lightning Resistance |
-| Earth | Brown | Earth damage, check your Earth Resistance |
-| Wind | Green | Wind damage, check your Wind Resistance |
-| Void | Purple | Void damage, check your Void Resistance |
+| [Physical](damage-types#physical) | White | Melee/projectile damage, reduced by armor |
+| [Fire](damage-types#fire) | Orange | Fire damage, check your Fire Resistance |
+| [Water](damage-types#water) | Light Blue | Water/ice damage, check your Water Resistance |
+| [Lightning](damage-types#lightning) | Yellow | Lightning damage, check your Lightning Resistance |
+| [Earth](damage-types#earth) | Brown | Earth damage, check your Earth Resistance |
+| [Wind](damage-types#wind) | Green | Wind damage, check your Wind Resistance |
+| [Void](damage-types#void) | Purple | Void damage, check your Void Resistance |
 
 Critical strikes show in a brighter color variant than normal hits. Physical crits appear red instead of white, so you can gauge your crit rate at a glance.
 

@@ -22,20 +22,20 @@ scaledCooldown = baseCooldown / (1 + attackSpeedPercent / 100)
 
 | Parameter | Value |
 |-----------|-------|
-| Maximum bonus | +500% (6x attack speed) |
-| Minimum bonus | -75% (4x slower) |
+| Maximum bonus | **+500%** (**6x** attack speed) |
+| Minimum bonus | **-75%** (**4x** slower) |
 | Minimum cooldown floor | 0.05 seconds (50ms) |
 
 ### Speed Examples
 
 | Attack Speed % | Cooldown Multiplier | Effect |
 |---------------:|:-------------------:|:-------|
-| -75% (min) | 4.0x | 4x slower than base |
-| 0% (base) | 1.0x | Normal speed |
-| +50% | 0.67x | 50% faster |
-| +100% | 0.50x | Double speed |
-| +200% | 0.33x | Triple speed |
-| +500% (cap) | 0.17x | 6x speed |
+| **-75%** (min) | **4.0x** | 4x slower than base |
+| 0% (base) | **1.0x** | Normal speed |
+| **+50%** | **0.67x** | 50% faster |
+| **+100%** | **0.50x** | Double speed |
+| **+200%** | **0.33x** | Triple speed |
+| **+500%** (cap) | **0.17x** | 6x speed |
 
 > [!NOTE]
 > The formula uses **division**, not subtraction. +100% attack speed doesn't halve your cooldown by removing 100% - it divides by 2.0 (1 + 100/100). This means diminishing returns : going from 0% to +100% doubles your speed, but going from +100% to +200% only bumps it by 50%.
@@ -49,10 +49,10 @@ A weapon with a 1.0 second base cooldown :
 | Attack Speed | Cooldown | Attacks per Second |
 |-------------:|---------:|-------------------:|
 | 0% | 1.00s | 1.0 |
-| +30% | 0.77s | 1.3 |
-| +100% | 0.50s | 2.0 |
-| +200% | 0.33s | 3.0 |
-| +500% | 0.17s | 6.0 |
+| **+30%** | 0.77s | 1.3 |
+| **+100%** | 0.50s | 2.0 |
+| **+200%** | 0.33s | 3.0 |
+| **+500%** | 0.17s | 6.0 |
 
 A weapon with a 0.5 second base cooldown would reach the 50ms floor at lower attack speed values.
 

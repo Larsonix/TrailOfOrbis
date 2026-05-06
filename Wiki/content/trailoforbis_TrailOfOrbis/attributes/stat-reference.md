@@ -20,7 +20,7 @@ This page is the full reference. For a quick overview, see [The 6 Elements](attr
 
 Every Element grants exactly 5 unique stats. No two Elements share a stat - 30 stats total, zero overlap.
 
-| Stat | Fire | Water | Lightning | Earth | Wind | Void |
+| Stat | [Fire](attributes#fire) | [Water](attributes#water) | [Lightning](attributes#lightning) | [Earth](attributes#earth) | [Wind](attributes#wind) | [Void](attributes#void) |
 |:-----|:----:|:-----:|:---------:|:-----:|:----:|:----:|
 | Physical Damage % | **+0.4** | - | - | - | - | - |
 | Charged Attack Damage % | **+0.3** | - | - | - | - | - |
@@ -64,23 +64,23 @@ Every Element grants exactly 5 unique stats. No two Elements share a stat - 30 s
 
 | Element | Key Stat Totals |
 |---------|----------------|
-| Fire 50 | +20% Phys Dmg, +15% Charged Atk, +30% Crit Multi, +20% Burn Dmg, +5% Ignite |
-| Water 50 | +25% Spell Dmg, +75 Mana, +100 Energy Shield, +7.5/s Mana Regen, +5% Freeze |
-| Lightning 50 | +15% Atk Speed, +7.5% Move Speed, +5% Crit Chance, +5.0/s Stamina Regen, +5% Shock |
-| Earth 50 | +25% Max HP, +250 Armor, +10.0/s HP Regen, +10% Block, +15% KB Resist |
-| Wind 50 | +250 Evasion, +150 Accuracy, +25% Proj Dmg, +7.5% Jump Force, +15% Proj Speed |
-| Void 50 | +5% Life Steal, +2.5% True Dmg, +15% *DoT* Dmg, +25 Mana/Kill, +15% Duration |
+| [Fire](attributes#fire) 50 | +20% Phys Dmg, +15% Charged Atk, +30% Crit Multi, +20% Burn Dmg, +5% Ignite |
+| [Water](attributes#water) 50 | +25% Spell Dmg, +75 Mana, +100 Energy Shield, +7.5/s Mana Regen, +5% Freeze |
+| [Lightning](attributes#lightning) 50 | +15% Atk Speed, +7.5% Move Speed, +5% Crit Chance, +5.0/s Stamina Regen, +5% Shock |
+| [Earth](attributes#earth) 50 | +25% Max HP, +250 Armor, +10.0/s HP Regen, +10% Block, +15% KB Resist |
+| [Wind](attributes#wind) 50 | +250 Evasion, +150 Accuracy, +25% Proj Dmg, +7.5% Jump Force, +15% Proj Speed |
+| [Void](attributes#void) 50 | +5% Life Steal, +2.5% True Dmg, +15% *DoT* Dmg, +25 Mana/Kill, +15% Duration |
 
 ### 100 Points in One Element
 
 | Element | Key Stat Totals |
 |---------|----------------|
-| Fire 100 | +40% Phys Dmg, +30% Charged Atk, +60% Crit Multi, +40% Burn Dmg, +10% Ignite |
-| Water 100 | +50% Spell Dmg, +150 Mana, +200 Energy Shield, +15.0/s Mana Regen, +10% Freeze |
-| Lightning 100 | +30% Atk Speed, +15% Move Speed, +10% Crit Chance, +10.0/s Stamina Regen, +10% Shock |
-| Earth 100 | +50% Max HP, +500 Armor, +20.0/s HP Regen, +20% Block, +30% KB Resist |
-| Wind 100 | +500 Evasion, +300 Accuracy, +50% Proj Dmg, +15% Jump Force, +30% Proj Speed |
-| Void 100 | +10% Life Steal, +5% True Dmg, +30% *DoT* Dmg, +50 Mana/Kill, +30% Duration |
+| [Fire](attributes#fire) 100 | +40% Phys Dmg, +30% Charged Atk, +60% Crit Multi, +40% Burn Dmg, +10% Ignite |
+| [Water](attributes#water) 100 | +50% Spell Dmg, +150 Mana, +200 Energy Shield, +15.0/s Mana Regen, +10% Freeze |
+| [Lightning](attributes#lightning) 100 | +30% Atk Speed, +15% Move Speed, +10% Crit Chance, +10.0/s Stamina Regen, +10% Shock |
+| [Earth](attributes#earth) 100 | +50% Max HP, +500 Armor, +20.0/s HP Regen, +20% Block, +30% KB Resist |
+| [Wind](attributes#wind) 100 | +500 Evasion, +300 Accuracy, +50% Proj Dmg, +15% Jump Force, +30% Proj Speed |
+| [Void](attributes#void) 100 | +10% Life Steal, +5% True Dmg, +30% *DoT* Dmg, +50 Mana/Kill, +30% Duration |
 
 ### Hybrid Example : 50 Fire + 50 Earth
 
@@ -239,9 +239,9 @@ finalStat = baseStat + attributeGrants + gearModifiers + skillTreeBonuses
 
 | Element | Ailment | Base Chance | Effect |
 |---------|---------|-------------|--------|
-| [Fire](attributes#fire) | [Burn](burn-fire-dot) | 10% + Ignite Chance | *DoT* : 50% of hit damage over 4s |
-| [Water](attributes#water) | [Freeze](freeze-water-slow) | 10% + Freeze Chance | Slow : 5-30% based on hit/maxHP |
-| [Lightning](attributes#lightning) | [Shock](shock-lightning-damage-amp) | 10% + Shock Chance | Amp : 5-50% increased damage taken |
+| [Fire](attributes#fire) | [Burn](burn) | **10%** + Ignite Chance | *DoT* : 50% of hit damage over 4s |
+| [Water](attributes#water) | [Freeze](freeze) | **10%** + Freeze Chance | Slow : 5-30% based on hit/maxHP |
+| [Lightning](attributes#lightning) | [Shock](shock) | **10%** + Shock Chance | Amp : 5-50% increased damage taken |
 | [Earth](attributes#earth) | - | - | No ailment |
 | [Wind](attributes#wind) | - | - | No ailment |
-| [Void](attributes#void) | [Poison](poison-void-stacking-dot) | 10% + base chance | Stacking *DoT* : 30% over 5s, max 10 stacks |
+| [Void](attributes#void) | [Poison](poison) | **10%** + base chance | Stacking *DoT* : 30% over 5s, max 10 stacks |

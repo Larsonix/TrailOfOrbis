@@ -14,46 +14,179 @@ sub-topics: []
 
 Stones are consumable items that modify your Gear and Realm Maps. There are **25 Stone types**, each consumed on use. Stones are the crafting layer. The difference between "good enough" and "perfect."
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/5f74398e-5439-4309-a466-26a2ff5a21b6.png" alt="Stones Inventory">
+</figure>
+
+<div class="too-figure-end"></div>
+
 | | |
 |:--|:--|
 | **Stone Types** | 25 |
-| **Rarest Stones** | 2 Mythic (Warden's Key, Gaia's Perfection) |
-| **Upgrade Cap** | Legendary (Mythic+ must drop naturally) |
-| **Base Drop Chance** | 5% per mob kill |
-| **Boss Drop Chance** | 50% (5% x 10.0 multiplier) |
+| **Rarest Stones** | 2 [Mythic](gear-rarities#mythic) (Warden's Key, Gaia's Perfection) |
+| **Upgrade Cap** | [Legendary](gear-rarities#legendary) (Mythic+ must drop naturally) |
+| **Base Drop Chance** | **5%** per mob kill |
+| **Boss Drop Chance** | **50%** (5% x **10.0** multiplier) |
 | **Works on Corrupted** | Only Varyn's Touch and Lorekeeper's Scroll |
 
 ---
 
 ## All Stones
 
-| Stone | Rarity | Target | Effect |
-|:------|:------:|:------:|:-------|
-| [Lorekeeper's Scroll](#lorekeepers-scroll) | Common | Both | Identifies an unidentified item |
-| [Orb of Unlearning](#orb-of-unlearning) | Common | Both | Grants 1 skill tree refund point |
-| [Orb of Realignment](#orb-of-realignment) | Common | Both | Grants 1 attribute refund point |
-| [Spark of Potential](#spark-of-potential) | Uncommon | Both | Upgrades Common → Uncommon + 1 Modifier |
-| [Ember of Tuning](#ember-of-tuning) | Uncommon | Both | Rerolls ONE random Modifier value |
-| [Orbisian Blessing](#orbisian-blessing) | Uncommon | Both | Rerolls Quality (1-100) |
-| [Gaia's Gift](#gaias-gift) | Uncommon | Both | Adds one random Modifier |
-| [Cartographer's Polish](#cartographers-polish) | Uncommon | Map Only | Improves map Quality by +5% |
-| [Fortune's Compass](#fortunes-compass) | Uncommon | Map Only | +5% Item Quantity (stacks to +20%) |
-| [Threshold Stone](#threshold-stone) | Uncommon | Both | Rerolls level within +/-3 |
-| [Gaia's Calibration](#gaias-calibration) | Rare | Both | Rerolls ALL Modifier values |
-| [Alterverse Shard](#alterverse-shard) | Rare | Both | Rerolls all unlocked Modifier types |
-| [Ethereal Calibration](#ethereal-calibration) | Rare | Gear Only | Rerolls weapon implicit damage |
-| [Purging Ember](#purging-ember) | Rare | Both | Removes ALL unlocked Modifiers |
-| [Erosion Shard](#erosion-shard) | Rare | Both | Removes ONE random unlocked Modifier |
-| [Transmutation Crystal](#transmutation-crystal) | Rare | Both | Removes one Modifier, adds a new one |
-| [Core of Ascension](#core-of-ascension) | Rare | Both | Upgrades Uncommon → Rare + 1 Modifier |
-| [Heart of Legends](#heart-of-legends) | Epic | Both | Upgrades Rare → Epic + 1 Modifier |
-| [Alterverse Key](#alterverse-key) | Epic | Map Only | Rerolls the map's biome |
-| [Varyn's Touch](#varyns-touch) | Epic | Both | Corrupts the item (permanent, unpredictable) |
-| [Genesis Stone](#genesis-stone) | Epic | Both | Fills ALL remaining Modifier slots |
-| [Crown of Transcendence](#crown-of-transcendence) | Legendary | Both | Upgrades Epic → Legendary + 1 Modifier |
-| [Warden's Seal](#wardens-seal) | Legendary | Both | Locks one random unlocked Modifier |
-| [Warden's Key](#wardens-key) | Mythic | Both | Unlocks one random locked Modifier |
-| [Gaia's Perfection](#gaias-perfection) | Mythic | Both | Sets Quality to 101 (perfect) |
+<div class="too-item-table">
+  <div class="too-item-header"><span>Stone</span><span>Rarity</span><span>Target</span><span>Effect</span></div>
+  <a class="too-item-row" href="#lorekeepers-scroll">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/a2083fb2-fd64-4cca-b37f-0f83d6bd5de8.png"><span class="too-item-name">Lorekeeper's Scroll</span></div>
+    <span class="too-rarity-badge too-r-common">Common</span>
+    <span>Both</span>
+    <span class="too-item-effect">Identifies an unidentified item</span>
+  </a>
+  <a class="too-item-row" href="#orb-of-unlearning">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/9a8b19e7-4f16-47d0-97fb-8d0f6c3a01ff.png"><span class="too-item-name">Orb of Unlearning</span></div>
+    <span class="too-rarity-badge too-r-common">Common</span>
+    <span>Both</span>
+    <span class="too-item-effect">Grants 1 skill tree refund point</span>
+  </a>
+  <a class="too-item-row" href="#orb-of-realignment">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/07c8f8cc-7ad5-4d1c-89e8-405453bacb6d.png"><span class="too-item-name">Orb of Realignment</span></div>
+    <span class="too-rarity-badge too-r-common">Common</span>
+    <span>Both</span>
+    <span class="too-item-effect">Grants 1 attribute refund point</span>
+  </a>
+  <a class="too-item-row" href="#spark-of-potential">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/2639824c-6ff1-42de-af3e-7b5df96a691e.png"><span class="too-item-name">Spark of Potential</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Both</span>
+    <span class="too-item-effect">Upgrades Common to Uncommon + 1 Modifier</span>
+  </a>
+  <a class="too-item-row" href="#ember-of-tuning">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/af04e914-fa67-4aae-896f-ab8635844cd2.png"><span class="too-item-name">Ember of Tuning</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Both</span>
+    <span class="too-item-effect">Rerolls ONE random Modifier value</span>
+  </a>
+  <a class="too-item-row" href="#orbisian-blessing">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/72bfa398-f8f3-4de2-9ad6-b36f650d03c8.png"><span class="too-item-name">Orbisian Blessing</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Both</span>
+    <span class="too-item-effect">Rerolls Quality (1-100)</span>
+  </a>
+  <a class="too-item-row" href="#gaias-gift">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/2969429e-c7cd-4e9f-9bdf-1664a730e2b3.png"><span class="too-item-name">Gaia's Gift</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Both</span>
+    <span class="too-item-effect">Adds one random Modifier</span>
+  </a>
+  <a class="too-item-row" href="#cartographers-polish">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/392ed369-ff9b-40d2-955a-cb79f6e7ea8e.png"><span class="too-item-name">Cartographer's Polish</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Map Only</span>
+    <span class="too-item-effect">Improves map Quality by +5%</span>
+  </a>
+  <a class="too-item-row" href="#fortunes-compass">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/5682cf0a-4fe7-4080-86b8-1a9f7a02e006.png"><span class="too-item-name">Fortune's Compass</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Map Only</span>
+    <span class="too-item-effect">+5% Item Quantity (stacks to +20%)</span>
+  </a>
+  <a class="too-item-row" href="#threshold-stone">
+    <div class="too-item-cell"><span class="too-item-name">Threshold Stone</span></div>
+    <span class="too-rarity-badge too-r-uncommon">Uncommon</span>
+    <span>Both</span>
+    <span class="too-item-effect">Rerolls level within +/-3</span>
+  </a>
+  <a class="too-item-row" href="#gaias-calibration">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/fb9dba54-f298-4c35-9c51-ad30465f7d65.png"><span class="too-item-name">Gaia's Calibration</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Rerolls ALL Modifier values</span>
+  </a>
+  <a class="too-item-row" href="#alterverse-shard">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/1229a053-c36d-4729-be75-ac186d6f4529.png"><span class="too-item-name">Alterverse Shard</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Rerolls all unlocked Modifier types</span>
+  </a>
+  <a class="too-item-row" href="#ethereal-calibration">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/53ff500f-cfbb-4137-8723-662ded5a45cb.png"><span class="too-item-name">Ethereal Calibration</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Gear Only</span>
+    <span class="too-item-effect">Rerolls weapon implicit damage</span>
+  </a>
+  <a class="too-item-row" href="#purging-ember">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/96c42145-d672-4114-9a54-ae796a49d04c.png"><span class="too-item-name">Purging Ember</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Removes ALL unlocked Modifiers</span>
+  </a>
+  <a class="too-item-row" href="#erosion-shard">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/8d61c671-5572-4a24-9bf5-51aa1cf72f7d.png"><span class="too-item-name">Erosion Shard</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Removes ONE random unlocked Modifier</span>
+  </a>
+  <a class="too-item-row" href="#transmutation-crystal">
+    <div class="too-item-cell"><span class="too-item-name">Transmutation Crystal</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Removes one Modifier, adds a new one</span>
+  </a>
+  <a class="too-item-row" href="#core-of-ascension">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/81ad950e-f961-405b-8801-6e7d8d794a4d.png"><span class="too-item-name">Core of Ascension</span></div>
+    <span class="too-rarity-badge too-r-rare">Rare</span>
+    <span>Both</span>
+    <span class="too-item-effect">Upgrades Uncommon to Rare + 1 Modifier</span>
+  </a>
+  <a class="too-item-row" href="#heart-of-legends">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/148b06b4-5f24-4e87-8153-41bd814db0b3.png"><span class="too-item-name">Heart of Legends</span></div>
+    <span class="too-rarity-badge too-r-epic">Epic</span>
+    <span>Both</span>
+    <span class="too-item-effect">Upgrades Rare to Epic + 1 Modifier</span>
+  </a>
+  <a class="too-item-row" href="#alterverse-key">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/e443cfd2-f047-43d7-9136-e5c267216707.png"><span class="too-item-name">Alterverse Key</span></div>
+    <span class="too-rarity-badge too-r-epic">Epic</span>
+    <span>Map Only</span>
+    <span class="too-item-effect">Rerolls the map's biome</span>
+  </a>
+  <a class="too-item-row" href="#varyns-touch">
+    <div class="too-item-cell"><span class="too-item-name">Varyn's Touch</span></div>
+    <span class="too-rarity-badge too-r-epic">Epic</span>
+    <span>Both</span>
+    <span class="too-item-effect">Corrupts the item (permanent, unpredictable)</span>
+  </a>
+  <a class="too-item-row" href="#genesis-stone">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/39765128-8401-48bb-9fff-3a4f2b4093c0.png"><span class="too-item-name">Genesis Stone</span></div>
+    <span class="too-rarity-badge too-r-epic">Epic</span>
+    <span>Both</span>
+    <span class="too-item-effect">Fills ALL remaining Modifier slots</span>
+  </a>
+  <a class="too-item-row" href="#crown-of-transcendence">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/24152a57-c4e1-41ea-97b7-0c53f0f29b8d.png"><span class="too-item-name">Crown of Transcendence</span></div>
+    <span class="too-rarity-badge too-r-legendary">Legendary</span>
+    <span>Both</span>
+    <span class="too-item-effect">Upgrades Epic to Legendary + 1 Modifier</span>
+  </a>
+  <a class="too-item-row" href="#wardens-seal">
+    <div class="too-item-cell"><span class="too-item-name">Warden's Seal</span></div>
+    <span class="too-rarity-badge too-r-legendary">Legendary</span>
+    <span>Both</span>
+    <span class="too-item-effect">Locks one random unlocked Modifier</span>
+  </a>
+  <a class="too-item-row" href="#wardens-key">
+    <div class="too-item-cell"><span class="too-item-name">Warden's Key</span></div>
+    <span class="too-rarity-badge too-r-mythic">Mythic</span>
+    <span>Both</span>
+    <span class="too-item-effect">Unlocks one random locked Modifier</span>
+  </a>
+  <a class="too-item-row" href="#gaias-perfection">
+    <div class="too-item-cell"><img class="too-item-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/544f7ad1-b98e-43d5-9e97-2f4e9d881313.png"><span class="too-item-name">Gaia's Perfection</span></div>
+    <span class="too-rarity-badge too-r-mythic">Mythic</span>
+    <span>Both</span>
+    <span class="too-item-effect">Sets Quality to 101 (perfect)</span>
+  </a>
+</div>
 
 ---
 
@@ -82,10 +215,10 @@ Modifier multiplier = 0.5 + (quality / 100)
 
 | Quality | Multiplier | Effect |
 |--------:|-----------:|:-------|
-| 1 | 0.51x | Modifier values near their minimum |
-| 50 | 1.00x | Modifier values at baseline |
-| 100 | 1.50x | Modifier values at 1.5x |
-| 101 (perfect) | 1.51x | Maximum possible multiplier |
+| 1 | **0.51x** | Modifier values near their minimum |
+| 50 | **1.00x** | Modifier values at baseline |
+| 100 | **1.50x** | Modifier values at 1.5x |
+| 101 (perfect) | **1.51x** | Maximum possible multiplier |
 
 Quality dramatically affects the outcome of any Stone that rolls Modifier values. Fix Quality with Orbisian Blessing **before** investing expensive Stones.
 
@@ -132,9 +265,9 @@ Your locked Modifier survives the entire process.
 
 | Mob Type | Base Stone Chance | Effective With Multiplier |
 |:---------|------------------:|--------------------------:|
-| Normal | 5% | 5% |
-| Elite | 5% x 3.0 | 15% |
-| Boss | 5% x 10.0 | 50% |
+| [Normal](elites-bosses#normal) | **5%** | **5%** |
+| [Elite](elites-bosses#elite) | 5% x **3.0** | **15%** |
+| [Boss](elites-bosses#boss) | 5% x **10.0** | **50%** |
 
 ### From Containers
 
@@ -155,7 +288,7 @@ Your locked Modifier survives the entire process.
 
 | Property | Value |
 |----------|-------|
-| Rarity | Common |
+| Rarity | [Common](gear-rarities#common) |
 | Target | Both |
 | Corrupted | **Yes - works on corrupted items** |
 | Effect | Identifies an unidentified item, revealing its Modifiers |
@@ -168,7 +301,7 @@ Some items drop unidentified. You can see the Rarity but not the specific Modifi
 
 | Property | Value |
 |----------|-------|
-| Rarity | Common |
+| Rarity | [Common](gear-rarities#common) |
 | Target | Both |
 | Corrupted | Yes |
 | Effect | Grants 1 skill tree refund point |
@@ -181,7 +314,7 @@ Right-click to consume. Does not open the stone picker. Refund points are used t
 
 | Property | Value |
 |----------|-------|
-| Rarity | Common |
+| Rarity | [Common](gear-rarities#common) |
 | Target | Both |
 | Corrupted | Yes |
 | Effect | Grants 1 attribute refund point |
@@ -194,7 +327,7 @@ Right-click to consume. Does not open the stone picker. Refund points are used t
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Upgrades Common → Uncommon + adds 1 Modifier |
@@ -207,7 +340,7 @@ Only works on Common items. Upgrades to Uncommon and adds 1 Modifier in one step
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Rerolls ONE random Modifier's value |
@@ -220,7 +353,7 @@ More targeted than Gaia's Calibration. Only one Modifier is rerolled. Cheaper (U
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Rerolls item Quality between 1 and 100 |
@@ -236,7 +369,7 @@ More targeted than Gaia's Calibration. Only one Modifier is rerolled. Cheaper (U
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Adds one new random Modifier |
@@ -252,7 +385,7 @@ The item must have an open Modifier slot. If all slots are filled (based on Rari
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | **Map Only** |
 | Corrupted | No |
 | Effect | Improves map Quality by +5% |
@@ -265,7 +398,7 @@ Only works on Realm Maps. Incrementally improves Quality by 5% per use. Cannot p
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | **Map Only** |
 | Corrupted | No |
 | Effect | +5% Item Quantity |
@@ -282,7 +415,7 @@ Stackable up to 4 uses on the same map for +20% IQ total. More item quantity mea
 
 | Property | Value |
 |----------|-------|
-| Rarity | Uncommon |
+| Rarity | [Uncommon](gear-rarities#uncommon) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Rerolls level within +/-3 of current level |
@@ -295,7 +428,7 @@ Changes the level by up to +/-3. On maps, this adjusts mob levels and potential 
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Rerolls ALL Modifier values within their ranges |
@@ -310,7 +443,7 @@ Use this when your Modifiers are right but the rolls are bad.
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Removes all unlocked Modifiers, rolls new ones |
@@ -326,7 +459,7 @@ Strips every unlocked Modifier and replaces them with completely new random ones
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | **Gear Only** |
 | Corrupted | No |
 | Effect | Rerolls the weapon's implicit damage value |
@@ -339,7 +472,7 @@ Rerolls the Implicit (base) damage within its range. If your weapon rolled 3 on 
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Removes ALL unlocked Modifiers |
@@ -355,7 +488,7 @@ Nuclear option. Strips every unlocked Modifier, leaving only locked ones (from W
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Removes ONE random unlocked Modifier |
@@ -368,7 +501,7 @@ More surgical than Purging Ember. Removes exactly one Modifier. The target is ra
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Removes one random unlocked Modifier and immediately adds a new one |
@@ -381,7 +514,7 @@ Atomic swap. Removes one and adds one in a single operation. Your total Modifier
 
 | Property | Value |
 |----------|-------|
-| Rarity | Rare |
+| Rarity | [Rare](gear-rarities#rare) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Upgrades Uncommon → Rare + adds 1 Modifier |
@@ -394,7 +527,7 @@ Only works on Uncommon items. Upgrades to Rare and adds 1 Modifier in one step.
 
 | Property | Value |
 |----------|-------|
-| Rarity | Epic |
+| Rarity | [Epic](gear-rarities#epic) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Upgrades Rare → Epic + adds 1 Modifier |
@@ -407,7 +540,7 @@ Only works on Rare items. Upgrades to Epic and adds 1 Modifier.
 
 | Property | Value |
 |----------|-------|
-| Rarity | Epic |
+| Rarity | [Epic](gear-rarities#epic) |
 | Target | **Map Only** |
 | Corrupted | No |
 | Effect | Rerolls the map's biome |
@@ -420,7 +553,7 @@ Rerolls the biome to a random different one. If you have a level-appropriate map
 
 | Property | Value |
 |----------|-------|
-| Rarity | Epic |
+| Rarity | [Epic](gear-rarities#epic) |
 | Target | Both |
 | Corrupted | **Yes - works on corrupted items** |
 | Effect | Corrupts the item with unpredictable effects |
@@ -438,7 +571,7 @@ The high-risk, high-reward Stone. Corruption is permanent and irreversible. The 
 
 | Property | Value |
 |----------|-------|
-| Rarity | Epic |
+| Rarity | [Epic](gear-rarities#epic) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Fills ALL remaining Modifier slots with random Modifiers |
@@ -454,7 +587,7 @@ A one-shot version of Gaia's Gift that fills **every** empty Modifier slot at on
 
 | Property | Value |
 |----------|-------|
-| Rarity | Legendary |
+| Rarity | [Legendary](gear-rarities#legendary) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Upgrades Epic → Legendary + adds 1 Modifier |
@@ -470,7 +603,7 @@ Only works on Epic items. Upgrades to Legendary and adds 1 Modifier. This is the
 
 | Property | Value |
 |----------|-------|
-| Rarity | **Legendary** |
+| Rarity | [Legendary](gear-rarities#legendary) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Locks one random unlocked Modifier |
@@ -489,7 +622,7 @@ Locked Modifiers are protected from :
 
 | Property | Value |
 |----------|-------|
-| Rarity | **Mythic** |
+| Rarity | [Mythic](gear-rarities#mythic) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Unlocks one random locked Modifier |
@@ -502,7 +635,7 @@ Reverses a Warden's Seal. As a Mythic Stone, this is one of the two rarest Stone
 
 | Property | Value |
 |----------|-------|
-| Rarity | **Mythic** |
+| Rarity | [Mythic](gear-rarities#mythic) |
 | Target | Both |
 | Corrupted | No |
 | Effect | Sets Quality to 101 (perfect) |

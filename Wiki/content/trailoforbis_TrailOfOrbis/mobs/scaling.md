@@ -60,11 +60,11 @@ Each tier applies a stat multiplier that scales the mob's overall power :
 
 | Tier | Stat Multiplier | Effect |
 |:-----|----------------:|:-------|
-| Passive | 0.1x | Minimal combat stats |
-| Minor | 1.0x | Standard stats |
-| Hostile | 1.0x | Standard stats |
-| Elite | 1.5x | 50% stronger |
-| Boss | 3.0x | Triple stats |
+| Passive | **0.1x** | Minimal combat stats |
+| Minor | **1.0x** | Standard stats |
+| [Hostile](elites-bosses#normal) | **1.0x** | Standard stats |
+| [Elite](elites-bosses#elite) | **1.5x** | 50% stronger |
+| [Boss](elites-bosses#boss) | **3.0x** | Triple stats |
 
 ---
 
@@ -115,56 +115,56 @@ Each tier applies a stat multiplier that scales the mob's overall power :
 
 | Stat | Range |
 |:-----|:------|
-| Fire Damage | 0-5000 |
-| Water Damage | 0-5000 |
-| Lightning Damage | 0-5000 |
-| Earth Damage | 0-5000 |
-| Wind Damage | 0-5000 |
-| Void Damage | 0-5000 |
+| [Fire](attributes#fire) Damage | 0-5000 |
+| [Water](attributes#water) Damage | 0-5000 |
+| [Lightning](attributes#lightning) Damage | 0-5000 |
+| [Earth](attributes#earth) Damage | 0-5000 |
+| [Wind](attributes#wind) Damage | 0-5000 |
+| [Void](attributes#void) Damage | 0-5000 |
 
 ### Elemental Resistance (6 stats)
 
 | Stat | Range |
 |:-----|:------|
-| Fire Resistance | 0-90% |
-| Water Resistance | 0-90% |
-| Lightning Resistance | 0-90% |
-| Earth Resistance | 0-90% |
-| Wind Resistance | 0-90% |
-| Void Resistance | 0-90% |
+| [Fire](attributes#fire) Resistance | 0-90% |
+| [Water](attributes#water) Resistance | 0-90% |
+| [Lightning](attributes#lightning) Resistance | 0-90% |
+| [Earth](attributes#earth) Resistance | 0-90% |
+| [Wind](attributes#wind) Resistance | 0-90% |
+| [Void](attributes#void) Resistance | 0-90% |
 
 ### Elemental Penetration (6 stats)
 
 | Stat | Range |
 |:-----|:------|
-| Fire Penetration | 0-75% |
-| Water Penetration | 0-75% |
-| Lightning Penetration | 0-75% |
-| Earth Penetration | 0-75% |
-| Wind Penetration | 0-75% |
-| Void Penetration | 0-75% |
+| [Fire](attributes#fire) Penetration | 0-75% |
+| [Water](attributes#water) Penetration | 0-75% |
+| [Lightning](attributes#lightning) Penetration | 0-75% |
+| [Earth](attributes#earth) Penetration | 0-75% |
+| [Wind](attributes#wind) Penetration | 0-75% |
+| [Void](attributes#void) Penetration | 0-75% |
 
 ### Elemental Increased Damage (6 stats)
 
 | Stat | Range | Type |
 |:-----|:------|:-----|
-| Fire Increased Damage | 0-200% | Additive |
-| Water Increased Damage | 0-200% | Additive |
-| Lightning Increased Damage | 0-200% | Additive |
-| Earth Increased Damage | 0-200% | Additive |
-| Wind Increased Damage | 0-200% | Additive |
-| Void Increased Damage | 0-200% | Additive |
+| [Fire](attributes#fire) Increased Damage | 0-200% | Additive |
+| [Water](attributes#water) Increased Damage | 0-200% | Additive |
+| [Lightning](attributes#lightning) Increased Damage | 0-200% | Additive |
+| [Earth](attributes#earth) Increased Damage | 0-200% | Additive |
+| [Wind](attributes#wind) Increased Damage | 0-200% | Additive |
+| [Void](attributes#void) Increased Damage | 0-200% | Additive |
 
 ### Elemental More Damage (6 stats)
 
 | Stat | Range | Type |
 |:-----|:------|:-----|
-| Fire More Damage | 0-100% | Multiplicative |
-| Water More Damage | 0-100% | Multiplicative |
-| Lightning More Damage | 0-100% | Multiplicative |
-| Earth More Damage | 0-100% | Multiplicative |
-| Wind More Damage | 0-100% | Multiplicative |
-| Void More Damage | 0-100% | Multiplicative |
+| [Fire](attributes#fire) More Damage | 0-100% | Multiplicative |
+| [Water](attributes#water) More Damage | 0-100% | Multiplicative |
+| [Lightning](attributes#lightning) More Damage | 0-100% | Multiplicative |
+| [Earth](attributes#earth) More Damage | 0-100% | Multiplicative |
+| [Wind](attributes#wind) More Damage | 0-100% | Multiplicative |
+| [Void](attributes#void) More Damage | 0-100% | Multiplicative |
 
 > [!IMPORTANT]
 > **Increased vs More** : "Increased" damage is additive (multiple sources stack linearly). "More" damage is multiplicative (each source multiplies the total independently). This mirrors the Path of Exile distinction. A mob with 50% Increased Fire Damage and 20% More Fire Damage deals `baseDamage x 1.50 x 1.20` fire damage.

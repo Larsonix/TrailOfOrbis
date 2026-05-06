@@ -12,19 +12,93 @@ published: true
 
 7 rarity tiers define how powerful a piece of gear can be. Higher rarity means more modifier slots, a higher stat multiplier, better durability, and guaranteed minimum rolls at the top tiers.
 
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/51f7b15a-75d8-456b-960b-ae3d7b0bdad0" alt="Epic sword tooltip showing rarity color, modifiers, and stat multiplier">
+</figure>
+
+An Epic-rarity sword with its purple name, stat multiplier, and four modifier slots filled.
+
+<div class="too-figure-end"></div>
+
 ---
 
 ## The 7 Tiers
 
-| Rarity | Color | Max Mods | Max Prefix | Max Suffix | Stat Mult | Durability Mult | Drop Weight | Approx. Chance |
-|:------:|:------|---------:|-----------:|-----------:|----------:|----------------:|------------:|---------------:|
-| [**Common**](#common) | #C9D2DD | 1 | 1 | 1 | 0.3x | 1.0x | 64.0 | 75.0% |
-| [**Uncommon**](#uncommon) | #3E9049 | 2 | 1 | 2 | 0.5x | 1.2x | 16.0 | 18.75% |
-| [**Rare**](#rare) | #2770B7 | 3 | 2 | 2 | 0.8x | 1.5x | 4.0 | 4.69% |
-| [**Epic**](#epic) | #8B339E | 4 | 2 | 2 | 1.2x | 2.0x | 1.0 | 1.17% |
-| [**Legendary**](#legendary) | #BB8A2C | 5 | 2 | 3 | 1.7x | 3.0x | 0.25 | 0.29% |
-| [**Mythic**](#mythic) | #FF4500 | 6 | 3 | 3 | 2.3x | 5.0x | 0.0625 | 0.073% |
-| [**Unique**](#unique) | #AF6025 | 6 | 3 | 3 | 2.8x | 5.0x | 0.016 | 0.018% |
+<div class="too-rarity-table">
+  <div class="too-rarity-header">
+    <span>Rarity</span><span>Max Mods</span><span>Max Prefix</span><span>Max Suffix</span><span>Stat Mult</span><span>Durability</span><span>Drop Weight</span><span>Approx. Chance</span>
+  </div>
+  <div class="too-rarity-row too-r-common">
+    <span class="too-rarity-name"><a href="gear-rarities#common">Common</a></span>
+    <span>1</span>
+    <span>1</span>
+    <span>1</span>
+    <span class="too-mult">0.3x</span>
+    <span class="too-mult">1.0x</span>
+    <span>64.0</span>
+    <span class="too-chance too-chance-max">75.0%</span>
+  </div>
+  <div class="too-rarity-row too-r-uncommon">
+    <span class="too-rarity-name"><a href="gear-rarities#uncommon">Uncommon</a></span>
+    <span>2</span>
+    <span>1</span>
+    <span>2</span>
+    <span class="too-mult">0.5x</span>
+    <span class="too-mult">1.2x</span>
+    <span>16.0</span>
+    <span class="too-chance too-chance-mid">18.75%</span>
+  </div>
+  <div class="too-rarity-row too-r-rare">
+    <span class="too-rarity-name"><a href="gear-rarities#rare">Rare</a></span>
+    <span>3</span>
+    <span>2</span>
+    <span>2</span>
+    <span class="too-mult">0.8x</span>
+    <span class="too-mult">1.5x</span>
+    <span>4.0</span>
+    <span class="too-chance too-chance-low">4.69%</span>
+  </div>
+  <div class="too-rarity-row too-r-epic">
+    <span class="too-rarity-name"><a href="gear-rarities#epic">Epic</a></span>
+    <span>4</span>
+    <span>2</span>
+    <span>2</span>
+    <span class="too-mult">1.2x</span>
+    <span class="too-mult">2.0x</span>
+    <span>1.0</span>
+    <span class="too-chance too-chance-rare">1.17%</span>
+  </div>
+  <div class="too-rarity-row too-r-legendary">
+    <span class="too-rarity-name"><a href="gear-rarities#legendary">Legendary</a></span>
+    <span>5</span>
+    <span>2</span>
+    <span>3</span>
+    <span class="too-mult">1.7x</span>
+    <span class="too-mult">3.0x</span>
+    <span>0.25</span>
+    <span class="too-chance too-chance-rare">0.29%</span>
+  </div>
+  <div class="too-rarity-row too-r-mythic">
+    <span class="too-rarity-name"><a href="gear-rarities#mythic">Mythic</a></span>
+    <span>6</span>
+    <span>3</span>
+    <span>3</span>
+    <span class="too-mult">2.3x</span>
+    <span class="too-mult">5.0x</span>
+    <span>0.0625</span>
+    <span class="too-chance too-chance-rare">0.073%</span>
+  </div>
+  <div class="too-rarity-row too-r-unique">
+    <span class="too-rarity-name"><a href="gear-rarities#unique">Unique</a></span>
+    <span>6</span>
+    <span>3</span>
+    <span>3</span>
+    <span class="too-mult">2.8x</span>
+    <span class="too-mult">5.0x</span>
+    <span>0.016</span>
+    <span class="too-chance too-chance-rare">0.018%</span>
+  </div>
+</div>
 
 ---
 
@@ -63,13 +137,13 @@ The max prefix and max suffix columns define the ceiling for each rarity :
 
 | Rarity | Max Prefix | Max Suffix | Max Total |
 |:------:|-----------:|-----------:|----------:|
-| Common | 1 | 1 | 1 |
-| Uncommon | 1 | 2 | 2 |
-| Rare | 2 | 2 | 3 |
-| Epic | 2 | 2 | 4 |
-| Legendary | 2 | 3 | 5 |
-| Mythic | 3 | 3 | 6 |
-| Unique | 3 | 3 | 6 |
+| [Common](gear-rarities#common) | 1 | 1 | 1 |
+| [Uncommon](gear-rarities#uncommon) | 1 | 2 | 2 |
+| [Rare](gear-rarities#rare) | 2 | 2 | 3 |
+| [Epic](gear-rarities#epic) | 2 | 2 | 4 |
+| [Legendary](gear-rarities#legendary) | 2 | 3 | 5 |
+| [Mythic](gear-rarities#mythic) | 3 | 3 | 6 |
+| [Unique](gear-rarities#unique) | 3 | 3 | 6 |
 
 Mythic and Unique items always roll the maximum 3 prefixes + 3 suffixes = 6 total modifiers.
 
@@ -79,12 +153,12 @@ Mythic and Unique items always roll the maximum 3 prefixes + 3 suffixes = 6 tota
 
 Both Mythic and Unique share the same modifier cap (6) and durability multiplier (5.0x), but they differ in raw power :
 
-| Property | Mythic | Unique |
+| Property | [Mythic](gear-rarities#mythic) | [Unique](gear-rarities#unique) |
 |:---------|:------:|:------:|
-| Stat Multiplier | 2.3x | 2.8x |
+| Stat Multiplier | **2.3x** | **2.8x** |
 | Drop Weight | 0.0625 | 0.016 |
-| Approx. Drop Chance | 0.073% | 0.018% |
-| Relative Rarity | Baseline | ~3.9x rarer than Mythic |
+| Approx. Drop Chance | **0.073%** | **0.018%** |
+| Relative Rarity | Baseline | ~3.9x rarer than [Mythic](gear-rarities#mythic) |
 
 A Unique item's 2.8x multiplier means every modifier is **22% stronger** than the same modifier on a Mythic item. Combined with identical modifier slots, a Unique is a strict upgrade in raw stat power.
 
@@ -99,13 +173,13 @@ Each rarity has a distinct color used in tooltips, item names, and UI badges :
 
 | Rarity | Hex Color | Appearance |
 |--------|-----------|------------|
-| Common | `#C9D2DD` | Silver-gray |
-| Uncommon | `#3E9049` | Green |
-| Rare | `#2770B7` | Blue |
-| Epic | `#8B339E` | Purple |
-| Legendary | `#BB8A2C` | Gold |
-| Mythic | `#FF4500` | Orange-red |
-| Unique | `#AF6025` | Copper-brown |
+| [Common](gear-rarities#common) | `#C9D2DD` | Silver-gray |
+| [Uncommon](gear-rarities#uncommon) | `#3E9049` | Green |
+| [Rare](gear-rarities#rare) | `#2770B7` | Blue |
+| [Epic](gear-rarities#epic) | `#8B339E` | Purple |
+| [Legendary](gear-rarities#legendary) | `#BB8A2C` | Gold |
+| [Mythic](gear-rarities#mythic) | `#FF4500` | Orange-red |
+| [Unique](gear-rarities#unique) | `#AF6025` | Copper-brown |
 
 ---
 

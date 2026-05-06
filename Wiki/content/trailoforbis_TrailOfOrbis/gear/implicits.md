@@ -54,11 +54,11 @@ Armor implicits provide a base defensive stat determined by the item's **materia
 
 | Material | Implicit Stat |
 |----------|--------------|
-| **Plate** | Armor |
-| **Leather** | Evasion |
-| **Cloth** | Energy Shield |
-| **Wood** | Max Health |
-| **Special** | Armor (default) |
+| **Plate** | **Armor** |
+| **Leather** | **Evasion** |
+| **Cloth** | **Energy Shield** |
+| **Wood** | **Max Health** |
+| **Special** | **Armor** (default) |
 
 Like weapon implicits, armor implicits have a `[min-max]` range that is level-scaled and slot-scaled.
 

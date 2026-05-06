@@ -16,8 +16,6 @@ sub-topics:
 
 AI has been and is my main and sole tool for creating projects the past 3-5 years. If you're not fine with it, I apologise.
 
-![Trail of Orbis](https://wiki.hytalemodding.dev/storage/mods/icons/e6d65dd0-3f80-47aa-ba66-1ff41af30e19.png)
-
 > **Pre-Release** - ModJam Build
 
 ## What is Trail of Orbis ?
@@ -86,29 +84,29 @@ You craft starter gear, kill mobs near spawn, and maps start dropping almost imm
 
 | Element | Stats (per point) |
 |:--------|:------------------|
-| [**Fire**](attributes#fire) | +0.4% Physical Damage, +0.3% Charged Attack Damage, +0.6% Crit Multiplier, +0.4% [Burn](burn-fire-dot) Damage, +0.1% Ignite Chance |
-| [**Water**](attributes#water) | +0.5% Spell Damage, +1.5 Max Mana, +2.0 Energy Shield, +0.15/s Mana Regen, +0.1% [Freeze](freeze-water-slow) Chance |
-| [**Lightning**](attributes#lightning) | +0.3% Attack Speed, +0.15% Move Speed, +0.1% Crit Chance, +0.1/s Stamina Regen, +0.1% [Shock](shock-lightning-damage-amp) Chance |
-| [**Earth**](attributes#earth) | +0.5% Max Health, +5.0 Armor, +0.2/s Health Regen, +0.2% Passive Block Chance, +0.3% Knockback Resistance |
-| [**Wind**](attributes#wind) | +5.0 Evasion, +3.0 Accuracy, +0.5% Projectile Damage, +0.15% Jump Force, +0.3% Projectile Speed |
-| [**Void**](attributes#void) | +0.1% Life Steal, +0.05% True Damage, +0.3% *DoT* Damage, +0.5 Mana on Kill, +0.3% Effect Duration |
+| [Fire](attributes#fire) | +0.4% Physical Damage, +0.3% Charged Attack Damage, +0.6% Crit Multiplier, +0.4% [Burn](burn-fire-dot) Damage, +0.1% Ignite Chance |
+| [Water](attributes#water) | +0.5% Spell Damage, +1.5 Max Mana, +2.0 Energy Shield, +0.15/s Mana Regen, +0.1% [Freeze](freeze-water-slow) Chance |
+| [Lightning](attributes#lightning) | +0.3% Attack Speed, +0.15% Move Speed, +0.1% Crit Chance, +0.1/s Stamina Regen, +0.1% [Shock](shock-lightning-damage-amp) Chance |
+| [Earth](attributes#earth) | +0.5% Max Health, +5.0 Armor, +0.2/s Health Regen, +0.2% Passive Block Chance, +0.3% Knockback Resistance |
+| [Wind](attributes#wind) | +5.0 Evasion, +3.0 Accuracy, +0.5% Projectile Damage, +0.15% Jump Force, +0.3% Projectile Speed |
+| [Void](attributes#void) | +0.1% Life Steal, +0.05% True Damage, +0.3% *DoT* Damage, +0.5 Mana on Kill, +0.3% Effect Duration |
 
 | Rarity | Drop Weight | Stat Multiplier |
 |:-------|------------:|----------------:|
-| [Common](gear-rarities#common) | 64 | 0.3x |
-| [Uncommon](gear-rarities#uncommon) | 16 | 0.5x |
-| [Rare](gear-rarities#rare) | 4 | 0.8x |
-| [Epic](gear-rarities#epic) | 1 | 1.2x |
-| [Legendary](gear-rarities#legendary) | 0.25 | 1.7x |
-| [Mythic](gear-rarities#mythic) | 0.0625 | 2.3x |
-| [Unique](gear-rarities#unique) | 0.016 | 2.8x |
+| [Common](gear-rarities#common) | 64 | **0.3x** |
+| [Uncommon](gear-rarities#uncommon) | 16 | **0.5x** |
+| [Rare](gear-rarities#rare) | 4 | **0.8x** |
+| [Epic](gear-rarities#epic) | 1 | **1.2x** |
+| [Legendary](gear-rarities#legendary) | 0.25 | **1.7x** |
+| [Mythic](gear-rarities#mythic) | 0.0625 | **2.3x** |
+| [Unique](gear-rarities#unique) | 0.016 | **2.8x** |
 
 | Realm Size | Mob Count | Time Limit |
 |:-----------|----------:|:-----------|
-| Small | 15 | 5 min |
-| Medium | 25 | 10 min |
-| Large | 40 | 15 min |
-| Massive | 70 | 20 min |
+| [Small](realm-sizes#small) | 15 | 5 min |
+| [Medium](realm-sizes#medium) | 25 | 10 min |
+| [Large](realm-sizes#large) | 40 | 15 min |
+| [Massive](realm-sizes#huge) | 70 | 20 min |
 
 ---
 

@@ -68,7 +68,7 @@ Flat modifiers are added early in calculations. They benefit from all percentage
 ## Level Scaling
 
 Modifier values scale with **item level**. The same modifier definition produces larger numbers on higher-level gear. This is further multiplied by :
-1. The item's **rarity** stat multiplier (0.3x to 2.8x)
+1. The item's **rarity** stat multiplier (**0.3x** to **2.8x**)
 2. The item's **quality** multiplier
 
 A modifier on a Level 50 [Mythic](gear-rarities#mythic) item with Q100 is dramatically stronger than the same modifier on a Level 10 [Common](gear-rarities#common) item with Q25.

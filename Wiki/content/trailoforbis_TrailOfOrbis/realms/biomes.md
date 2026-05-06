@@ -12,22 +12,135 @@ published: true
 
 14 biome types define the environment of each Realm. 10 standard biomes, 3 high difficulty biomes with environmental hazards, and 1 utility biome.
 
-| Biome | Hazards | High Difficulty | Theme |
-|:------|:-------:|:---------------:|:------|
-| [Forest](#forest) | No | No | Trork Tribal Territory |
-| [Desert](#desert) | No | No | Scorched Ruins |
-| [Tundra](#tundra) | No | No | Outlander Frontier |
-| [Beach](#beach) | No | No | Pirate Cove |
-| [Jungle](#jungle) | No | No | The Living Wilds |
-| [Mountains](#mountains) | No | No | Goblin Stronghold |
-| [Caverns](#caverns) | No | No | The Scarak Hive |
-| [Frozen Crypts](#frozen-crypts) | No | No | Underground Ice Tomb |
-| [Sand Tombs](#sand-tombs) | No | No | Underground Sandstone Pyramid |
-| [Swamp](#swamp) | **Yes** | No | Fetid Marshlands |
-| [**Volcano**](#volcano) | **Yes** | **Yes** | Infernal Wasteland |
-| [**Void**](#void) | **Yes** | **Yes** | Eldritch Dimension |
-| [**Corrupted**](#corrupted) | **Yes** | **Yes** | Dark Cult Territory |
-| Skill Sanctum | No | No | Utility (no combat) |
+<div class="too-biome-table">
+  <div class="too-biome-header">
+    <span>Biome</span>
+    <span>Hazards</span>
+    <span>High Difficulty</span>
+    <span>Theme</span>
+  </div>
+  <a class="too-biome-row" href="#forest">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/aeb8933f-6886-4c83-8c93-4f37abd6b777" alt="Forest">
+      <span class="too-biome-name">Forest</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Trork Tribal Territory</span>
+  </a>
+  <a class="too-biome-row" href="#desert">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/03df9491-348c-46a5-a9ba-c0a4340bff01" alt="Desert">
+      <span class="too-biome-name">Desert</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Scorched Ruins</span>
+  </a>
+  <a class="too-biome-row" href="#tundra">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/ecff1abb-8477-41fc-9662-480ffe0445fb" alt="Tundra">
+      <span class="too-biome-name">Tundra</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Outlander Frontier</span>
+  </a>
+  <a class="too-biome-row" href="#beach">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/44478b88-37f8-4de9-b9bf-2b1be459da5e" alt="Beach">
+      <span class="too-biome-name">Beach</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Pirate Cove</span>
+  </a>
+  <a class="too-biome-row" href="#jungle">
+    <div class="too-biome-cell">
+      <span class="too-biome-name">Jungle</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>The Living Wilds</span>
+  </a>
+  <a class="too-biome-row" href="#mountains">
+    <div class="too-biome-cell">
+      <span class="too-biome-name">Mountains</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Goblin Stronghold</span>
+  </a>
+  <a class="too-biome-row" href="#caverns">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/3ebd9437-eac5-4d4f-b219-b916790a5c45" alt="Caverns">
+      <span class="too-biome-name">Caverns</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>The Scarak Hive</span>
+  </a>
+  <a class="too-biome-row" href="#frozen-crypts">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/dd23b3a8-1f6c-415d-bdec-63f4cb58210b" alt="Frozen Crypts">
+      <span class="too-biome-name">Frozen Crypts</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Underground Ice Tomb</span>
+  </a>
+  <a class="too-biome-row" href="#sand-tombs">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/9e95e90f-52e2-4161-9715-0dce31b38f45" alt="Sand Tombs">
+      <span class="too-biome-name">Sand Tombs</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Underground Sandstone Pyramid</span>
+  </a>
+  <a class="too-biome-row too-biome-hazard" href="#swamp">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/88c4deaf-2bc5-4833-a7c5-6835b3399669" alt="Swamp">
+      <span class="too-biome-name">Swamp</span>
+    </div>
+    <span><strong>Yes</strong></span>
+    <span>No</span>
+    <span>Fetid Marshlands</span>
+  </a>
+  <a class="too-biome-row too-biome-high" href="#volcano">
+    <div class="too-biome-cell">
+      <img class="too-biome-icon" src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/0830e55b-08b3-44f5-9e3d-6bd8e08d8484" alt="Volcano">
+      <span class="too-biome-name"><strong>Volcano</strong></span>
+    </div>
+    <span><strong>Yes</strong></span>
+    <span><strong>Yes</strong></span>
+    <span>Infernal Wasteland</span>
+  </a>
+  <a class="too-biome-row too-biome-high" href="#void">
+    <div class="too-biome-cell">
+      <span class="too-biome-name"><strong>Void</strong></span>
+    </div>
+    <span><strong>Yes</strong></span>
+    <span><strong>Yes</strong></span>
+    <span>Eldritch Dimension</span>
+  </a>
+  <a class="too-biome-row too-biome-high" href="#corrupted">
+    <div class="too-biome-cell">
+      <span class="too-biome-name"><strong>Corrupted</strong></span>
+    </div>
+    <span><strong>Yes</strong></span>
+    <span><strong>Yes</strong></span>
+    <span>Dark Cult Territory</span>
+  </a>
+  <div class="too-biome-row too-biome-utility">
+    <div class="too-biome-cell">
+      <span class="too-biome-name">Skill Sanctum</span>
+    </div>
+    <span>No</span>
+    <span>No</span>
+    <span>Utility (no combat)</span>
+  </div>
+</div>
 
 ---
 
@@ -43,13 +156,11 @@ Use **Alterverse Key** (Stone) to change a map's biome randomly. The reroll also
 
 Each biome has two pools : **regular** (standard enemies, weighted random selection) and **boss** (spawned at designated points or by chance).
 
-Elite is **not** a separate pool. Any mob can roll elite status at spawn time. The elite roll happens independently of the mob pool selection. Base elite chance is 5%, scaling to 25% max with realm level.
+Elite is **not** a separate pool. Any mob can roll elite status at spawn time. The elite roll happens independently of the mob pool selection. Base elite chance is **5%**, scaling to **25%** max with realm level.
 
 ---
 
 ## Forest
-
-![Forest](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/forest.png)
 
 Trork Tribal Territory. Open clearings and temperate terrain.
 
@@ -68,8 +179,6 @@ Trork Tribal Territory. Open clearings and temperate terrain.
 
 ## Desert
 
-![Desert](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/desert.png)
-
 Scorched Ruins. Fire undead and desert creatures.
 
 | Mob | Weight |
@@ -86,8 +195,6 @@ Scorched Ruins. Fire undead and desert creatures.
 ---
 
 ## Tundra
-
-![Tundra](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/tundra.png)
 
 Outlander Frontier. Ice-tribe raiders and arctic wildlife.
 
@@ -107,8 +214,6 @@ Outlander Frontier. Ice-tribe raiders and arctic wildlife.
 
 ## Beach
 
-![Beach](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/beach.png)
-
 Pirate Cove. Undead pirates and coastal predators.
 
 | Mob | Weight |
@@ -125,8 +230,6 @@ Pirate Cove. Undead pirates and coastal predators.
 ---
 
 ## Jungle
-
-![Jungle](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/jungle.png)
 
 The Living Wilds. Apex predators and dangerous beasts.
 
@@ -168,8 +271,6 @@ Goblin Stronghold. Mining operations and defenses.
 
 ## Caverns
 
-![Caverns](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/caverns.png)
-
 The Scarak Hive. Insectoid colony infesting the crystal caves.
 
 | Mob | Weight |
@@ -185,8 +286,6 @@ The Scarak Hive. Insectoid colony infesting the crystal caves.
 ---
 
 ## Frozen Crypts
-
-![Frozen Crypts](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/frozenCrypts.png)
 
 Underground Ice Tomb. Ancient frost warriors frozen in time. All 8 Frost Skeleton roles are exclusive to this biome.
 
@@ -207,8 +306,6 @@ Underground Ice Tomb. Ancient frost warriors frozen in time. All 8 Frost Skeleto
 
 ## Sand Tombs
 
-![Sand Tombs](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/sandTombs.png)
-
 Underground Sandstone Pyramid. Ancient tomb guardians. All 8 Sand Skeleton roles are exclusive to this biome.
 
 | Mob | Weight |
@@ -228,8 +325,6 @@ Underground Sandstone Pyramid. Ancient tomb guardians. All 8 Sand Skeleton roles
 
 ## Swamp
 
-![Swamp](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/swamp.png)
-
 Fetid Marshlands. Undead and swamp horrors. **Environmental hazards.**
 
 | Mob | Weight |
@@ -246,8 +341,6 @@ Fetid Marshlands. Undead and swamp horrors. **Environmental hazards.**
 ---
 
 ## Volcano
-
-![Volcano](https://raw.githubusercontent.com/Larsonix/TrailOfOrbis/main/Wiki/content/Larsonix_TrailOfOrbis/images/biomes/volcano.png)
 
 Infernal Wasteland. Fire undead, elemental creatures, and incandescent risen. **Environmental hazards. High difficulty.**
 

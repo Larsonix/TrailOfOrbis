@@ -21,13 +21,20 @@ sub-topics:
 
 Realms are the core game loop. You open consumable Realm Maps to create portals into procedural instanced arenas with scaled mobs, timed objectives, and loot rewards. Maps drop at **12% per kill from level 1** - you'll enter your first Realm almost immediately. Every Realm is unique : biome, size, level, shape, and modifiers are all determined by the map.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/fde371b3-b724-4d48-8a49-1cefc2acad5d.png" alt="Realm entrance UI showing portal activation with map properties">
+</figure>
+
+<div class="too-figure-end"></div>
+
 | | |
 |:--|:--|
 | **Biomes** | 14 (13 combat + 1 utility) |
-| **Sizes** | 4 (Small 15 mobs → Massive 70 mobs) |
+| **Sizes** | 4 ([Small](realm-sizes#small) 15 mobs → [Massive](realm-sizes#huge) 70 mobs) |
 | **Map Modifiers** | 13 (7 difficulty + 6 reward) |
-| **Reward Multiplier** | 1.0x (Small) to 4.0x (Massive) |
-| **Max IIQ from Compass** | +20% (4 uses) |
+| **Reward Multiplier** | **1.0x** ([Small](realm-sizes#small)) to **4.0x** ([Massive](realm-sizes#huge)) |
+| **Max IIQ from Compass** | **+20%** (4 uses) |
 | **Shapes** | 3 (Circular, Rectangular, Irregular) |
 
 ---
@@ -56,7 +63,7 @@ Every Realm Map has these properties :
 | **Rarity** | [Common](gear-rarities#common) through [Unique](gear-rarities#unique), determines max modifier count |
 | **Quality** | 1-101, affects modifier value scaling |
 | **Biome** | 14 biome types with varying hazards and difficulty |
-| **Size** | Small, Medium, Large, or Massive, determines arena radius, mob count, timeout |
+| **Size** | [Small](realm-sizes#small), [Medium](realm-sizes#medium), [Large](realm-sizes#large), or [Massive](realm-sizes#huge), determines arena radius, mob count, timeout |
 | **Shape** | Circular, Rectangular, or Irregular, affects arena geometry |
 | **Prefixes** | Difficulty modifiers that make the Realm harder |
 | **Suffixes** | Reward modifiers that improve drops |
@@ -70,10 +77,10 @@ Every Realm Map has these properties :
 
 | Size | Arena Radius | Base Mobs | Timeout | Guaranteed Bosses | Reward Mult |
 |:-----|-------------:|----------:|:--------|------------------:|------------:|
-| Small | 25 | 15 | 5 min | 0 | 1.0x |
-| Medium | 49 | 25 | 10 min | 1 | 1.5x |
-| Large | 100 | 40 | 15 min | 1 | 2.5x |
-| Massive | 200 | 70 | 20 min | 2 | 4.0x |
+| [Small](realm-sizes#small) | 25 | 15 | 5 min | 0 | **1.0x** |
+| [Medium](realm-sizes#medium) | 49 | 25 | 10 min | 1 | **1.5x** |
+| [Large](realm-sizes#large) | 100 | 40 | 15 min | 1 | **2.5x** |
+| [Massive](realm-sizes#huge) | 200 | 70 | 20 min | 2 | **4.0x** |
 
 Mob count scales with level : `baseCount * (1 + level * 0.02)`
 
@@ -108,9 +115,9 @@ qualityMultiplier = 0.5 + quality / 100.0
 
 | Quality | Multiplier | Effect |
 |--------:|-----------:|:-------|
-| 1 | 0.51x | Modifier values at ~half strength |
-| 50 | 1.00x | Baseline modifier values |
-| 101 | 1.51x | Modifier values at ~150% strength |
+| 1 | **0.51x** | Modifier values at ~half strength |
+| 50 | **1.00x** | Baseline modifier values |
+| 101 | **1.51x** | Modifier values at ~150% strength |
 
 High quality amplifies both prefix (difficulty) and suffix (reward) modifiers equally.
 

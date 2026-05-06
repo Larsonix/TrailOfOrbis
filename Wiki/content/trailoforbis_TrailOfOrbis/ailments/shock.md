@@ -24,11 +24,11 @@ damageIncrease = clamp(hitDamage / targetMaxHealth x 100, 5%, 50%)
 
 | Parameter | Value |
 |-----------|-------|
-| Minimum amplification | 5% |
-| Maximum amplification | 50% |
+| Minimum amplification | **5%** |
+| Maximum amplification | **50%** |
 | Base duration | 2 seconds |
 | Max stacks | 1 (refreshes, stronger magnitude wins) |
-| Base application chance | 10% |
+| Base application chance | **10%** |
 | Damage threshold | Yes (minimum hit damage required) |
 
 ---
@@ -51,9 +51,9 @@ damageIncrease = clamp(hitDamage / targetMaxHealth x 100, 5%, 50%)
 | Your Hit | Target Max HP | Damage Amp |
 |---------|---------------|-----------|
 | 50 | 100 | **50% (capped)** |
-| 50 | 500 | 10% |
+| 50 | 500 | **10%** |
 | 50 | 1000 | **5% (floor)** |
-| 200 | 1000 | 20% |
+| 200 | 1000 | **20%** |
 | 500 | 1000 | **50% (capped)** |
 
 Like [Freeze](freeze-water-slow), Shock uses HP-proportional scaling so it self-balances against different enemy types. Against bosses, the amplification naturally drops to the 5-10% range rather than trivializing the fight.
@@ -82,11 +82,11 @@ Shock has the **shortest base duration** of all Ailments (2 seconds), making [Vo
 finalDuration = 2.0 x (1 + statusEffectDuration / 100)
 ```
 
-| Void Points | Duration Bonus | Shock Duration |
+| [Void](attributes#void) Points | Duration Bonus | [Shock](shock) Duration |
 |------------:|---------------:|---------------:|
-| 0 | +0% | 2.0s |
-| 50 | +15% | 2.3s |
-| 100 | +30% | 2.6s |
+| 0 | **+0%** | 2.0s |
+| 50 | **+15%** | 2.3s |
+| 100 | **+30%** | 2.6s |
 
 > [!WARNING]
 > At only 2 seconds base duration, Shock expires fast. Without [Void](attributes#void) investment or rapid reapplication from Lightning's Attack Speed, you'll have significant downtime between Shock windows.
@@ -99,11 +99,11 @@ finalDuration = 2.0 x (1 + statusEffectDuration / 100)
 finalChance = 10% (base) + shockChance (from Lightning attribute + gear)
 ```
 
-| Lightning Points | Shock Chance Bonus | Total Shock Chance |
+| [Lightning](attributes#lightning) Points | [Shock](shock) Chance Bonus | Total [Shock](shock) Chance |
 |-----------------:|-------------------:|-------------------:|
-| 0 | +0% | 10% |
-| 50 | +5% | 15% |
-| 100 | +10% | 20% |
+| 0 | **+0%** | **10%** |
+| 50 | **+5%** | **15%** |
+| 100 | **+10%** | **20%** |
 
 ---
 
@@ -125,10 +125,10 @@ At 100 Lightning, you attack 30% faster with 20% Shock chance. Combined with Sho
 
 ## Shock vs Freeze
 
-| Property | Shock | [Freeze](freeze-water-slow) |
+| Property | [Shock](shock) | [Freeze](freeze-water-slow) |
 |----------|-------|--------|
 | Effect type | Increases target damage taken | Reduces target speed |
-| Magnitude range | 5-50% | 5-30% |
+| Magnitude range | **5%**-**50%** | **5%**-**30%** |
 | Scaling | Hit / target max HP | Hit / target max HP |
 | Duration | 2.0s | 3.0s |
 | Best for | DPS amplification | Survivability, kiting |

@@ -131,10 +131,10 @@ One roll per attack - if it crits, ALL damage types (physical AND elemental) get
 
 | Property | Value |
 |----------|-------|
-| Base crit chance | 5.0% |
-| Base crit multiplier | 150% (1.5x damage) |
-| Lightning attribute | +0.1% crit chance per point |
-| Fire attribute | +0.6% crit multiplier per point |
+| Base crit chance | **5.0%** |
+| Base crit multiplier | **1.5x** damage |
+| [Lightning](attributes#lightning) attribute | +0.1% crit chance per point |
+| [Fire](attributes#fire) attribute | +0.6% crit multiplier per point |
 
 See [Critical Strikes](critical-strikes) for details.
 
@@ -220,8 +220,8 @@ Weapon : 80 base damage, +20 flat physical from gear
 | 6 - % Elemental | No elemental mods | 116 |
 | 7 - % More | No more multipliers | 116 |
 | 8 - Conditionals | No conditionals | 116 |
-| 9 - **Crit !** | 174% multiplier | **201.8** |
-| 10 - Defenses | 300 armor = 12.9% reduction | **175.8** |
+| 9 - **Crit !** | **1.74x** multiplier | **201.8** |
+| 10 - Defenses | 300 armor = **12.9%** reduction | **175.8** |
 | 11 - True Damage | None | **175.8 final** |
 
 Without the crit, the hit would have been 116 with armor reducing to ~102. The crit bumped your output by roughly 72%.

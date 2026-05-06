@@ -25,11 +25,11 @@ totalBurnDamage = magnitude x duration
 
 | Parameter | Value |
 |-----------|-------|
-| Damage ratio | 50% of the triggering fire hit |
+| Damage ratio | **50%** of the triggering [fire](attributes#fire) hit |
 | Base duration | 4 seconds |
 | Tick rate | Every 0.25s (250ms) |
 | Max stacks | 1 (refreshes on reapplication) |
-| Base application chance | 10% |
+| Base application chance | **10%** |
 | Damage threshold | Yes (minimum hit damage required) |
 
 ---
@@ -71,8 +71,8 @@ Two stats directly increase your Burn damage :
 
 | Stat | Source | Effect |
 |------|--------|--------|
-| **Burn Damage %** | [Fire](attributes#fire) attribute (+0.4% per point) | Increases the flat burn damage component |
-| **DoT Damage %** | [Void](attributes#void) attribute (+0.3% per point) | Multiplies ALL *DoT* damage including Burn |
+| **Burn Damage %** | [Fire](attributes#fire) attribute (**+0.4%** per point) | Increases the flat burn damage component |
+| **DoT Damage %** | [Void](attributes#void) attribute (**+0.3%** per point) | Multiplies ALL *DoT* damage including [Burn](burn) |
 
 ### Worked Example - 50 Fire + 50 Void, hitting for 200 fire damage
 
@@ -108,11 +108,11 @@ Burn duration is extended by [Void](attributes#void)'s Status Effect Duration (+
 finalDuration = 4.0 x (1 + statusEffectDuration / 100)
 ```
 
-| Void Points | Duration Bonus | Burn Duration | Total Ticks |
+| [Void](attributes#void) Points | Duration Bonus | [Burn](burn) Duration | Total Ticks |
 |------------:|---------------:|--------------:|------------:|
-| 0 | +0% | 4.0s | 16 |
-| 50 | +15% | 4.6s | ~18 |
-| 100 | +30% | 5.2s | ~21 |
+| 0 | **+0%** | 4.0s | 16 |
+| 50 | **+15%** | 4.6s | ~18 |
+| 100 | **+30%** | 5.2s | ~21 |
 
 Longer duration means more total damage from the same DPS, and more time for the *DoT* to work before it expires.
 
@@ -137,11 +137,11 @@ Burn does not stack. When you apply a new Burn to a target that already has one 
 finalChance = 10% (base) + igniteChance (from Fire attribute + gear)
 ```
 
-| Fire Points | Ignite Chance Bonus | Total Burn Chance |
+| [Fire](attributes#fire) Points | Ignite Chance Bonus | Total [Burn](burn) Chance |
 |------------:|--------------------:|------------------:|
-| 0 | +0% | 10% |
-| 50 | +5% | 15% |
-| 100 | +10% | 20% |
+| 0 | **+0%** | **10%** |
+| 50 | **+5%** | **15%** |
+| 100 | **+10%** | **20%** |
 
 ---
 

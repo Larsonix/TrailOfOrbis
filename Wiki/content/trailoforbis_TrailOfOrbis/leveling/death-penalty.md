@@ -26,7 +26,7 @@ This is the XP you've accumulated *toward* the next level, not your total lifeti
 
 | Rule | Details |
 |------|---------|
-| XP lost | 50% of progress within current level |
+| XP lost | **50%** of progress within current level |
 | Can you lose a level ? | **No**, you can never drop below your current level |
 | Can you lose multiple levels ? | **No**, loss is capped to progress within the current level |
 | Minimum XP | Never drops below level 20's XP threshold |
@@ -40,11 +40,11 @@ This is the XP you've accumulated *toward* the next level, not your total lifeti
 
 **Level 45, dying at different progress points :**
 
-| Scenario | Progress XP | Penalty (50%) | Remaining | Verdict |
+| Scenario | Progress XP | Penalty (**50%**) | Remaining | Verdict |
 |:---------|------------:|--------------:|----------:|:--------|
-| Mid-bar | 2,000 / 5,000 | 1,000 lost | 1,000 XP | Lost progress, kept level |
-| Nearly full | 4,900 / 5,000 | 2,450 lost | 2,450 XP | Painful - almost half a level gone |
-| Just leveled | 100 / 5,000 | 50 lost | 50 XP | Almost nothing - safest time to take risks |
+| Mid-bar | 2,000 / 5,000 | **1,000 lost** | 1,000 XP | Lost progress, kept level |
+| Nearly full | 4,900 / 5,000 | **2,450 lost** | 2,450 XP | Painful - almost half a level gone |
+| Just leveled | 100 / 5,000 | **50 lost** | 50 XP | Almost nothing - safest time to take risks |
 
 ---
 

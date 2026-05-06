@@ -12,6 +12,13 @@ published: true
 
 As you level up, lower-rarity drops become clutter. The loot filter lets you configure exactly what items you want to see, using profiles with ordered rules and granular conditions.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/515373c1-3d26-42b7-9dcd-0c6cad4ca15f.png" alt="Loot filter UI showing filter profiles, rules, and condition configuration">
+</figure>
+
+<div class="too-figure-end"></div>
+
 ---
 
 ## Quick Start

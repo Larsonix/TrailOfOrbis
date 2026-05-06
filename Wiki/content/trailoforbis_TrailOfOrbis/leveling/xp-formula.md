@@ -49,9 +49,9 @@ The tier multiplier depends on the mob's classification :
 
 | Classification | Tier Multiplier |
 |----------------|-----------------|
-| Boss | 5.0x |
-| Elite | 1.5x |
-| All others | 1.0x |
+| [Boss](elites-bosses#boss) | **5.0x** |
+| [Elite](elites-bosses#elite) | **1.5x** |
+| All others | **1.0x** |
 
 > [!NOTE]
 > The tier multiplier comes from `mob-classification.yml` via `classificationConfig.getXpMultiplier()`. Boss = 5.0x XP, Elite = 1.5x XP. The stat multiplier (Boss = 3.0x, Elite = 1.5x) is separate and affects combat stats, not XP.
@@ -62,10 +62,10 @@ The tier multiplier depends on the mob's classification :
 
 | Mob | Level | Pool | Tier | Distance | Base + Pool | x Tier x 1.2 x Distance | **Result** |
 |:----|------:|-----:|:----:|---------:|:------------|:-------------------------|----------:|
-| Hostile at spawn | 10 | 150 | 1.0x | 0 | 50 + 15 = 65 | 65 x 1.0 x 1.2 x 1.0 | **78 XP** |
-| Elite far out | 50 | 800 | 1.5x | 20 | 250 + 80 = 330 | 330 x 1.5 x 1.2 x 1.56 | **927 XP** |
-| Boss deep | 100 | 2000 | 5.0x | 50 | 500 + 200 = 700 | 700 x 5.0 x 1.2 x 2.4 | **10,080 XP** |
-| Passive critter | 5 | 30 | 1.0x | 0 | 25 + 3 = 28 | 28 x 1.0 x 1.2 x 1.0 | **34 XP** |
+| [Hostile](elites-bosses#normal) at spawn | 10 | 150 | **1.0x** | 0 | 50 + 15 = 65 | 65 x 1.0 x 1.2 x 1.0 | **78 XP** |
+| [Elite](elites-bosses#elite) far out | 50 | 800 | **1.5x** | 20 | 250 + 80 = 330 | 330 x 1.5 x 1.2 x 1.56 | **927 XP** |
+| [Boss](elites-bosses#boss) deep | 100 | 2000 | **5.0x** | 50 | 500 + 200 = 700 | 700 x 5.0 x 1.2 x 2.4 | **10,080 XP** |
+| Passive critter | 5 | 30 | **1.0x** | 0 | 25 + 3 = 28 | 28 x 1.0 x 1.2 x 1.0 | **34 XP** |
 > [!NOTE]
 > Passive mobs have a 0.1x XP class multiplier applied at the classification level (see [Mob System](mob-system)), but in the core XP formula shown here, the tier multiplier for non-elite, non-boss mobs is 1.0x. The classification multiplier is applied separately.
 

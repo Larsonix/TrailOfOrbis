@@ -18,8 +18,8 @@ The overworld is your base. Realms are where the action is. Realm Maps drop at 1
 
 | System | Overworld | Realms | Difference |
 |--------|-----------|--------|------------|
-| Elite XP Multiplier | 1.5x | 3.0x | **Double** |
-| Elite Stat Multiplier | 1.5x | 2.0x | **+33%** |
+| Elite XP Multiplier | **1.5x** | **3.0x** | **Double** |
+| Elite Stat Multiplier | **1.5x** | **2.0x** | **+33%** |
 | Loot IIQ Bonuses | None | From map suffixes + Fortune's Compass | **Realm-only** |
 | Loot IIR Bonuses | None | From map suffixes | **Realm-only** |
 | Damage Bonus | None | Realm Damage conditional | **Realm-only** |
@@ -35,11 +35,11 @@ The overworld is your base. Realms are where the action is. Realm Maps drop at 1
 
 | Classification | Overworld XP | Overworld Stats | Realm XP | Realm Stats |
 |----------------|-------------|----------------|----------|-------------|
-| Passive | 0.1x | 0.1x | - | - |
-| Minor | 0.5x | 1.0x | - | - |
-| Hostile | 1.0x | 1.0x | 1.0x | 1.0x |
-| **Elite** | 1.5x | 1.5x | **3.0x** | **2.0x** |
-| Boss | 5.0x | 3.0x | 5.0x | 3.0x |
+| Passive | **0.1x** | **0.1x** | - | - |
+| Minor | **0.5x** | **1.0x** | - | - |
+| Hostile | **1.0x** | **1.0x** | **1.0x** | **1.0x** |
+| [Elite](elites-bosses#elite) | **1.5x** | **1.5x** | **3.0x** | **2.0x** |
+| [Boss](elites-bosses#boss) | **5.0x** | **3.0x** | **5.0x** | **3.0x** |
 
 Realm Elites also get a separate **1.5x Health Multiplier** on top of their stat multiplier. Elite Bosses are possible and receive both elite AND boss multipliers stacked.
 
@@ -51,16 +51,16 @@ Realm Elites also get a separate **1.5x Health Multiplier** on top of their stat
 
 | Drop Type | Base Chance |
 |-----------|------------|
-| Gear | 8% per kill |
-| Stone | 5% per kill |
+| Gear | **8%** per kill |
+| Stone | **5%** per kill |
 
 ### Mob Type Bonuses (same everywhere)
 
 | Mob Type | Quantity Bonus | Rarity Bonus |
 |----------|---------------|-------------|
-| Normal | +0% | +0% |
-| Elite | +50% | +25% |
-| Boss | +100% | +50% |
+| [Normal](elites-bosses#normal) | +0% | +0% |
+| [Elite](elites-bosses#elite) | **+50%** | **+25%** |
+| [Boss](elites-bosses#boss) | **+100%** | **+50%** |
 
 ### Realm-Only Bonuses (stacked on top)
 
@@ -68,9 +68,9 @@ Realms add Item Quantity (IIQ) and Item Rarity (IIR) from map modifiers :
 
 | Source | Bonus Type | Range |
 |--------|-----------|-------|
-| Item Quantity suffix | IIQ | +5-50% |
-| Item Rarity suffix | IIR | +5-40% |
-| Fortune's Compass stone | IIQ | +5% each, max +20% |
+| Item Quantity suffix | IIQ | **+5-50%** |
+| Item Rarity suffix | IIR | **+5-40%** |
+| Fortune's Compass stone | IIQ | **+5%** each, max **+20%** |
 
 These stack additively with mob type bonuses. A Boss in a Realm with +30% IIQ suffix and +20% Fortune's Compass gets +100% (boss) + 30% + 20% = **+150% total quantity bonus**.
 
@@ -92,7 +92,7 @@ Realms have a completion system that the overworld does not :
 - Kill all mobs in the Realm to trigger completion
 - `RealmRewardService` distributes bonus rewards to all participants
 - Rewards scale with map level, rarity, and modifier bonuses
-- Reward multiplier scales with size : Small 1.0x, Medium 1.5x, Large 2.5x, Massive 4.0x
+- Reward multiplier scales with size : [Small](realm-sizes#small) **1.0x**, [Medium](realm-sizes#medium) **1.5x**, [Large](realm-sizes#large) **2.5x**, [Massive](realm-sizes#huge) **4.0x**
 
 There is no equivalent mechanic in the overworld. You only get per-kill drops there.
 

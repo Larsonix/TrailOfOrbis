@@ -12,13 +12,20 @@ published: true
 
 Realm Maps are items you can modify with [Stones](consumable-currency) before activation. Preparing a map is one of the most effective ways to boost rewards and control difficulty.
 
+
+<figure class="too-figure">
+  <img src="https://wiki.hytalemodding.dev/storage/mods/019da288-1a74-71ad-bb01-6e0ae3d015c6/files/20cb9ed1-151f-4266-af81-17b4c47125b4.png" alt="Rare realm map tooltip showing level, biome, size, modifiers, and Fortune's Compass bonus">
+</figure>
+
+<div class="too-figure-end"></div>
+
 ---
 
 ## Stones That Work on Maps
 
 | Stone | Effect on Maps |
 |-------|---------------|
-| **Fortune's Compass** | +5% Item Quantity per use (stacks to max 20%) |
+| **Fortune's Compass** | **+5%** Item Quantity per use (stacks to max **20%**) |
 | **Alterverse Key** | Changes biome randomly (excludes Corrupted and Skill Sanctum) |
 | **Cartographer's Polish** | Improves quality (max 100) |
 | **Orbisian Blessing** | Rerolls quality (1-100) |

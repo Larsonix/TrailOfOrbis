@@ -37,7 +37,7 @@ Mob kills only. No quests, no crafting XP, no passive gains. The amount depends 
 1 Attribute Point and 1 Skill Point per level, every level.
 
 **Q : What are mob classifications ?**
-5 classes with different XP multipliers : Passive (0.1x), Minor (0.5x), Hostile (1.0x), Elite (1.5x), Boss (5.0x).
+5 classes with different XP multipliers : Passive (**0.1x**), Minor (**0.5x**), [Hostile](elites-bosses#normal) (**1.0x**), [Elite](elites-bosses#elite) (**1.5x**), [Boss](elites-bosses#boss) (**5.0x**).
 
 ---
 
@@ -75,10 +75,10 @@ Check your Death Recap. It tells you what killed you. Common issues :
 Base crit chance is 5%, base crit multiplier is 150%. [Lightning](attributes#lightning) increases crit chance, [Fire](attributes#fire) increases crit multiplier. Gear Modifiers and Skill Tree nodes can boost both.
 
 **Q : What are the 4 ailments ?**
-- **[Burn](burn-fire-dot)** ([Fire](attributes#fire)) Damage over time
-- **[Freeze](freeze-water-slow)** ([Water](attributes#water)) Slows the target
-- **[Shock](shock-lightning-damage-amp)** ([Lightning](attributes#lightning)) Amplifies damage taken
-- **[Poison](poison-void-stacking-dot)** ([Void](attributes#void)) Stacking damage over time
+- **[Burn](burn)** ([Fire](attributes#fire)) Damage over time
+- **[Freeze](freeze)** ([Water](attributes#water)) Slows the target
+- **[Shock](shock)** ([Lightning](attributes#lightning)) Amplifies damage taken
+- **[Poison](poison)** ([Void](attributes#void)) Stacking damage over time
 
 **Q : How does the damage pipeline work ?**
 Every hit passes through multiple stages in order : Base, Flat, Elemental, Conversion, % Physical, % Elemental, % More, Conditionals, Crit, Defenses, True Damage. Use `/too combat detail` to see the full breakdown per hit. See [Damage Pipeline](the-11-step-damage-pipeline).
@@ -91,7 +91,7 @@ Every hit passes through multiple stages in order : Base, Flat, Elemental, Conve
 The asset pack is missing from the server. This is a server deployment issue. The admin needs to deploy the asset pack alongside the plugin.
 
 **Q : What do the Rarity colors mean ?**
-7 tiers : [Common](gear-rarities#common) (white), Uncommon (green), [Rare](gear-rarities#rare) (blue), [Epic](gear-rarities#epic) (purple), [Legendary](gear-rarities#legendary) (orange), [Mythic](gear-rarities#mythic) (red), [Unique](gear-rarities#unique) (gold). See [Rarities](gear-rarities).
+7 tiers : [Common](gear-rarities#common) (white), [Uncommon](gear-rarities#uncommon) (green), [Rare](gear-rarities#rare) (blue), [Epic](gear-rarities#epic) (purple), [Legendary](gear-rarities#legendary) (orange), [Mythic](gear-rarities#mythic) (red), [Unique](gear-rarities#unique) (gold). See [Rarities](gear-rarities).
 
 **Q : What is Quality ?**
 A number from 1 to 101 that multiplies all Modifier values on a piece of Gear. Formula : `multiplier = 0.5 + quality / 100`. Q1 is 0.51x, Q50 is baseline (1.0x), Q101 is perfect (1.51x).
@@ -113,10 +113,10 @@ This tag marks it as RPG-generated equipment with Modifiers, Quality, and Rarity
 8% chance for Gear, 5% chance for a Stone, and 12% chance for a Realm Map, per mob kill. These are independent rolls.
 
 **Q : How does Rarity distribution work ?**
-Drop weights follow a 4x geometric progression : Common (64), Uncommon (16), Rare (4), Epic (1), Legendary (0.25), Mythic (0.0625), Unique (0.016).
+Drop weights follow a 4x geometric progression : [Common](gear-rarities#common) (64), [Uncommon](gear-rarities#uncommon) (16), [Rare](gear-rarities#rare) (4), [Epic](gear-rarities#epic) (1), [Legendary](gear-rarities#legendary) (0.25), [Mythic](gear-rarities#mythic) (0.0625), [Unique](gear-rarities#unique) (0.016).
 
 **Q : What are container tiers ?**
-4 tiers : Basic, Dungeon, Boss, Special. Each has different loot tables and drop quality.
+4 tiers : [Basic](container-loot#basic), [Dungeon](container-loot#dungeon), [Boss](container-loot#boss), [Special](container-loot#special). Each has different loot tables and drop quality.
 
 ---
 
@@ -139,7 +139,7 @@ Hold a Realm Map and activate it. The map is consumed and a portal opens. Walk t
 Almost immediately. Maps drop from your very first mob kills at 12% base chance. Craft some basic gear and you're ready for a Small Realm.
 
 **Q : What sizes are available ?**
-4 sizes : Small (15 mobs, 5 min), Medium (25 mobs, 10 min), Large (40 mobs, 15 min), Massive (70 mobs, 20 min).
+4 sizes : [Small](realm-sizes#small) (15 mobs, 5 min), [Medium](realm-sizes#medium) (25 mobs, 10 min), [Large](realm-sizes#large) (40 mobs, 15 min), [Massive](realm-sizes#huge) (70 mobs, 20 min).
 
 **Q : How many biomes are there ?**
 14 total : 13 combat biomes and 1 utility biome (Skill Sanctum).

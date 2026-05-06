@@ -14,10 +14,10 @@ published: true
 
 The initial public release of Trail of Orbis, featuring :
 
-- **6 Elemental Attributes** Fire, Water, Lightning, Earth, Wind, Void with 30 unique stats
+- **6 Elemental Attributes** [Fire](attributes#fire), [Water](attributes#water), [Lightning](attributes#lightning), [Earth](attributes#earth), [Wind](attributes#wind), [Void](attributes#void) with 30 unique stats
 - **11-Step Damage Pipeline** Full PoE-inspired damage calculation
-- **4 Ailments** Burn, Freeze, Shock, Poison with HP-proportional scaling
-- **7 Gear Rarities** Common through Unique with 101 Modifier definitions
+- **4 Ailments** [Burn](burn), [Freeze](freeze), [Shock](shock), [Poison](poison) with HP-proportional scaling
+- **7 Gear Rarities** [Common](gear-rarities#common) through [Unique](gear-rarities#unique) with 101 Modifier definitions
 - **Quality System** 1-101 Quality multiplier on all Gear
 - **25 Consumable Stones** Reroll, enhance, remove, lock, and corrupt Gear
 - **485-Node Skill Tree** 6 elemental arms, 8 octant hybrid arms, 12 bridge paths, and keystones
