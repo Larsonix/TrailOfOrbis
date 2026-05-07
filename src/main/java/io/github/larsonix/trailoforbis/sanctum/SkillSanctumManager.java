@@ -522,10 +522,30 @@ public class SkillSanctumManager {
             ServiceRegistry.get(io.github.larsonix.trailoforbis.gear.GearService.class).ifPresent(svc -> {
                 if (svc instanceof io.github.larsonix.trailoforbis.gear.GearManager mgr) {
                     cachedSyncCoordinator = mgr.getSyncCoordinator();
+
+                    // Register reactive resync callback: when a sanctum player's equipment
+                    // changes (hotbar scroll), immediately resync node visuals instead of
+                    // waiting for the 2s keepalive. Corrects Hytale's invalidateEquipmentNetwork()
+                    // corruption in the same tick — zero visible glitch.
+                    if (cachedSyncCoordinator != null) {
+                        cachedSyncCoordinator.setSanctumResyncCallback(this::onSanctumPlayerEquipmentDirty);
+                    }
                 }
             });
         }
         return cachedSyncCoordinator;
+    }
+
+    /**
+     * Called by {@code ItemSyncCoordinator.markEquipmentDirty()} when a sanctum player's
+     * equipment changes (hotbar scroll, item pickup, etc.). Triggers immediate resync
+     * of all node visual components to correct Hytale engine corruption.
+     */
+    private void onSanctumPlayerEquipmentDirty(@Nonnull UUID playerId) {
+        SkillSanctumInstance instance = activeInstances.get(playerId);
+        if (instance == null || !instance.isActive()) return;
+
+        instance.reactiveVisualResync();
     }
 
     // ═══════════════════════════════════════════════════════════════════

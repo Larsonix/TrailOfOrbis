@@ -20,6 +20,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Appends RPG crafting preview info to vanilla weapon/armor tooltips.
@@ -62,6 +64,19 @@ public class CraftingPreviewService {
     /** Reskin translations (static, same for all players). */
     private Map<String, String> reskinTranslations;
 
+    // ==================== Per-Player Bench Session State ====================
+
+    /** Per-player active bench session. Present only while a crafting bench window is open. */
+    private final Map<UUID, ActiveBenchState> activeSessions = new ConcurrentHashMap<>();
+
+    /** Players whose bench session has a window close callback registered. */
+    private final ConcurrentHashMap.KeySetView<UUID, Boolean> closeCallbackRegistered = ConcurrentHashMap.newKeySet();
+
+    /** Players currently viewing reskin overlay translations (Builder's Workbench). */
+    private final ConcurrentHashMap.KeySetView<UUID, Boolean> reskinActive = ConcurrentHashMap.newKeySet();
+
+    private record ActiveBenchState(int lastSyncedLevel) {}
+
     public CraftingPreviewService(
             @Nonnull MaterialTierMapper materialMapper,
             @Nonnull DistanceBonusCalculator distanceCalculator,
@@ -92,6 +107,13 @@ public class CraftingPreviewService {
 
             String itemId = item.getId();
             if (itemId == null || itemId.isEmpty()) continue;
+
+            // Skip our own RPG items (gear: rpg_gear_*, maps: rpg_map_*, etc.).
+            // These are registered in the asset map by ItemRegistryService.loadCachedRegistrations()
+            // at startup, and they have weapon/armor properties cloned from vanilla — so they'd
+            // pass all subsequent filters. Giving them crafting preview text overwrites their
+            // real RPG definitions on every syncToPlayer() call.
+            if (itemId.startsWith("rpg_")) continue;
 
             // Use the same classification as our crafting conversion pipeline
             if (item.getWeapon() == null && item.getArmor() == null) continue;
@@ -165,71 +187,186 @@ public class CraftingPreviewService {
      * @param playerRef The player to sync to
      * @param playerLevel The player's current RPG level
      */
-    public void syncToPlayer(@Nonnull PlayerRef playerRef, int playerLevel) {
-        if (itemPreviews == null || itemPreviews.isEmpty()) {
-            return;
-        }
-
-        try {
-            // Send UpdateItems to strip vanilla stats and redirect description
-            // keys to rpg.crafting.* (server.items.* can't be overridden at
-            // runtime). This changes the base item definition — RPG variants
-            // (variant=true) will inherit unless re-sent after this packet.
-            if (cachedDefinitions != null && !cachedDefinitions.isEmpty()) {
-                UpdateItems itemPacket = new UpdateItems();
-                itemPacket.type = UpdateType.AddOrUpdate;
-                itemPacket.items = new HashMap<>(cachedDefinitions);
-                itemPacket.updateModels = false;
-                itemPacket.updateIcons = false;
-                playerRef.getPacketHandler().writeNoCache(itemPacket);
-            }
-
-            // Compute per-player translations based on their level
-            Map<String, String> translations = buildTranslationsForPlayer(playerLevel);
-
-            UpdateTranslations transPacket = new UpdateTranslations();
-            transPacket.type = UpdateType.AddOrUpdate;
-            transPacket.translations = translations;
-            playerRef.getPacketHandler().writeNoCache(transPacket);
-
-            LOGGER.atFine().log("Sent crafting preview tooltips to %s (level=%d, %d items)",
-                    playerRef.getUuid().toString().substring(0, 8),
-                    playerLevel,
-                    translations.size());
-        } catch (Exception e) {
-            LOGGER.atWarning().withCause(e).log("Failed to send crafting preview to %s",
-                    playerRef.getUuid());
-        }
-    }
-
-    /**
-     * Backwards-compatible overload — uses level 1 as fallback.
-     * Prefer {@link #syncToPlayer(PlayerRef, int)} when player level is available.
-     */
-    public void syncToPlayer(@Nonnull PlayerRef playerRef) {
-        syncToPlayer(playerRef, 1);
-    }
-
     /**
      * Rebuilds cached data after config reload.
+     * Active bench sessions are not affected — they will pick up new data
+     * on their next open/close cycle.
      */
     public void reload() {
         initialize();
     }
 
+    public boolean isInitialized() {
+        return cachedDefinitions != null && !cachedDefinitions.isEmpty();
+    }
+
+    // ==================== Bench Session Lifecycle ====================
+
     /**
-     * Resyncs preview data to all online players after a config reload.
+     * Called when a crafting bench window opens. Sends modified definitions
+     * (stripped stats, {@code rpg.crafting.*} keys) and per-player translations
+     * to the player. Registers the session so the definitions can be restored
+     * when the bench closes.
+     *
+     * <p>Idempotent — returns early if the player already has an active session.
+     *
+     * @param playerId The player's UUID
+     * @param playerRef The player reference for packet sending
+     * @param playerLevel The player's current RPG level
+     * @return true if definitions were sent, false if skipped (already active or not initialized)
      */
-    public void resyncToAll(@Nonnull Iterable<PlayerRef> onlinePlayers) {
-        for (PlayerRef playerRef : onlinePlayers) {
-            if (playerRef.isValid()) {
-                syncToPlayer(playerRef);
-            }
+    public boolean onBenchOpen(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef, int playerLevel) {
+        if (!isInitialized()) return false;
+        if (activeSessions.containsKey(playerId)) return false;
+
+        try {
+            sendDefinitions(playerRef);
+            sendTranslations(playerRef, playerLevel);
+            activeSessions.put(playerId, new ActiveBenchState(playerLevel));
+
+            LOGGER.atFine().log("Bench session opened for %s (level=%d, %d items)",
+                    playerId.toString().substring(0, 8), playerLevel,
+                    cachedDefinitions.size());
+            return true;
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to open bench session for %s", playerId);
+            return false;
         }
     }
 
-    public boolean isInitialized() {
-        return cachedDefinitions != null && !cachedDefinitions.isEmpty();
+    /**
+     * Called when a crafting bench window closes. Sends original vanilla
+     * definitions back to the player and clears the session.
+     *
+     * <p>Idempotent — returns early if no active session exists.
+     *
+     * @param playerId The player's UUID
+     * @param playerRef The player reference for packet sending
+     */
+    public void onBenchClose(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef) {
+        if (activeSessions.remove(playerId) == null) return;
+        closeCallbackRegistered.remove(playerId);
+        reskinActive.remove(playerId);
+
+        try {
+            restoreVanillaDefinitions(playerRef);
+            LOGGER.atFine().log("Bench session closed for %s — vanilla definitions restored",
+                    playerId.toString().substring(0, 8));
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to close bench session for %s", playerId);
+        }
+    }
+
+    /**
+     * Whether the player currently has an active bench session (definitions overridden).
+     */
+    public boolean isActiveBenchSession(@Nonnull UUID playerId) {
+        return activeSessions.containsKey(playerId);
+    }
+
+    /**
+     * Whether the player has an active session that still needs a window close callback.
+     * The UseBlockEvent.Post handler sends definitions immediately but can't register
+     * the callback (window doesn't exist yet). The InventoryChangeEvent handler
+     * registers it on the first interaction.
+     */
+    public boolean needsCloseCallback(@Nonnull UUID playerId) {
+        return activeSessions.containsKey(playerId) && !closeCallbackRegistered.contains(playerId);
+    }
+
+    /**
+     * Mark that a close callback has been registered for this player's bench session.
+     */
+    public void markCloseCallbackRegistered(@Nonnull UUID playerId) {
+        closeCallbackRegistered.add(playerId);
+    }
+
+    /**
+     * Updates translations for a player with an active bench session (e.g., after level-up).
+     * Only sends if the level actually changed from the last synced value.
+     *
+     * @return true if translations were re-sent
+     */
+    public boolean updateTranslationsForActiveSession(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef, int playerLevel) {
+        ActiveBenchState session = activeSessions.get(playerId);
+        if (session == null) return false;
+        if (session.lastSyncedLevel == playerLevel) return false;
+
+        try {
+            sendTranslations(playerRef, playerLevel);
+            activeSessions.put(playerId, new ActiveBenchState(playerLevel));
+            LOGGER.atFine().log("Updated crafting translations for %s (level %d→%d)",
+                    playerId.toString().substring(0, 8), session.lastSyncedLevel, playerLevel);
+            return true;
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to update translations for %s", playerId);
+            return false;
+        }
+    }
+
+    /**
+     * Clears the bench session without sending packets. Used during world transitions
+     * where the client's asset registry is wiped by {@code JoinWorld(clearWorld=true)}.
+     */
+    public void onWorldTransition(@Nonnull UUID playerId) {
+        activeSessions.remove(playerId);
+        closeCallbackRegistered.remove(playerId);
+        reskinActive.remove(playerId);
+    }
+
+    /**
+     * Clears all state for a disconnecting player. No packets sent — client is gone.
+     */
+    public void onPlayerDisconnect(@Nonnull UUID playerId) {
+        activeSessions.remove(playerId);
+        closeCallbackRegistered.remove(playerId);
+        reskinActive.remove(playerId);
+    }
+
+    // ==================== Reskin Overlay State ====================
+
+    /** Mark that reskin translations are active for a player (Builder's Workbench open). */
+    public void markReskinActive(@Nonnull UUID playerId) {
+        reskinActive.add(playerId);
+    }
+
+    /** Mark that reskin translations are no longer active. */
+    public void markReskinInactive(@Nonnull UUID playerId) {
+        reskinActive.remove(playerId);
+    }
+
+    /** Whether reskin overlay translations are currently active for a player. */
+    public boolean isReskinActive(@Nonnull UUID playerId) {
+        return reskinActive.contains(playerId);
+    }
+
+    // ==================== Packet Sending (Internal) ====================
+
+    /**
+     * Sends modified item definitions (stripped stats, redirected description keys).
+     */
+    private void sendDefinitions(@Nonnull PlayerRef playerRef) {
+        if (cachedDefinitions == null || cachedDefinitions.isEmpty()) return;
+
+        UpdateItems packet = new UpdateItems();
+        packet.type = UpdateType.AddOrUpdate;
+        packet.items = new HashMap<>(cachedDefinitions);
+        packet.updateModels = false;
+        packet.updateIcons = false;
+        playerRef.getPacketHandler().writeNoCache(packet);
+    }
+
+    /**
+     * Sends per-player crafting translations based on level.
+     */
+    private void sendTranslations(@Nonnull PlayerRef playerRef, int playerLevel) {
+        if (itemPreviews == null || itemPreviews.isEmpty()) return;
+
+        Map<String, String> translations = buildTranslationsForPlayer(playerLevel);
+        UpdateTranslations packet = new UpdateTranslations();
+        packet.type = UpdateType.AddOrUpdate;
+        packet.translations = translations;
+        playerRef.getPacketHandler().writeNoCache(packet);
     }
 
     // ==================== Vanilla Definition Restore ====================
@@ -238,10 +375,11 @@ public class CraftingPreviewService {
      * Sends original unmodified vanilla item definitions back to the player,
      * undoing the crafting preview overrides.
      *
-     * <p>Used by {@code ReskinDataPreserver} when the Builder's Workbench closes
-     * to restore item definitions to their pre-modified state.
+     * <p>Called internally by {@link #onBenchClose(UUID, PlayerRef)} when a
+     * crafting bench window closes. Not intended for direct use — use the
+     * bench session lifecycle methods instead.
      */
-    public void restoreVanillaDefinitions(@Nonnull PlayerRef playerRef) {
+    void restoreVanillaDefinitions(@Nonnull PlayerRef playerRef) {
         if (originalDefinitions == null || originalDefinitions.isEmpty()) {
             return;
         }

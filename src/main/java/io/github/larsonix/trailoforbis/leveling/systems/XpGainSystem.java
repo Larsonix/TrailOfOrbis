@@ -19,6 +19,8 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
@@ -208,19 +210,19 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         LOGGER.at(Level.INFO).log("SUCCESS: %s %d XP to %s from %s mob",
             distributed ? "Distributed" : "Granted", xp, attackerUuid, mobInfo);
 
-        // Send XP gain chat message to player (killer always sees their XP)
-        sendXpGainMessage(attackerRef, xp);
+        // Send XP gain notification to player (killer always sees their XP)
+        if (config.getUi().isShowXpGainNotification()) {
+            sendXpGainMessage(attackerRef, xp);
+        }
     }
 
-    /** Sends an XP gain chat message to the player. */
+    /** Sends an XP gain notification toast to the player. */
     private void sendXpGainMessage(@Nonnull PlayerRef playerRef, long xp) {
-        // Format: "+50 XP" in a nice color
-        Message xpMessage = Message.empty()
-            .insert(Message.raw("+").color(MessageColors.XP_GAIN))
-            .insert(Message.raw(String.valueOf(xp)).color(MessageColors.XP_GAIN))
-            .insert(Message.raw(" XP").color(MessageColors.XP_GAIN));
-
-        playerRef.sendMessage(xpMessage);
+        NotificationUtil.sendNotification(
+            playerRef.getPacketHandler(),
+            Message.raw("+" + xp + " XP").color(MessageColors.XP_GAIN),
+            NotificationStyle.Default
+        );
     }
 
     /**

@@ -187,7 +187,7 @@ public class SkillSanctumInstance {
     private long lastVisualKeepAliveAt = 0;
 
     /** Interval between periodic visual keep-alive resyncs (ms). */
-    private static final long VISUAL_KEEPALIVE_INTERVAL_MS = 500;
+    private static final long VISUAL_KEEPALIVE_INTERVAL_MS = 2000;
 
     /**
      * Whether the delayed (safety-net) component resync has been performed.
@@ -2406,6 +2406,25 @@ public class SkillSanctumInstance {
         if (world == null || !world.isAlive()) return;
 
         resyncAllVisualComponents(world, "KeepAlive");
+    }
+
+    /**
+     * Triggers an immediate visual resync in response to a hotbar change.
+     *
+     * <p>Called by {@code SkillSanctumManager} when {@code ItemSyncCoordinator.markEquipmentDirty()}
+     * fires for a sanctum player. Hytale's {@code invalidateEquipmentNetwork()} (from hotbar
+     * scroll) corrupts node entity visuals. This resync re-flags all components in the same
+     * tick, so the entity tracker sends corrected values before the client renders corruption.
+     *
+     * @implNote Must be called from the sanctum world thread.
+     */
+    public void reactiveVisualResync() {
+        if (!active || !nodesSpawned) return;
+
+        World world = getSanctumWorld();
+        if (world == null || !world.isAlive()) return;
+
+        resyncAllVisualComponents(world, "HotbarReactive");
     }
 
     /**

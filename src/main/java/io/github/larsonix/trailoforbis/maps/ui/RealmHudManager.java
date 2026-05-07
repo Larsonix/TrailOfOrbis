@@ -1,8 +1,11 @@
 package io.github.larsonix.trailoforbis.maps.ui;
 
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.utils.MultiHudWrapper;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -83,7 +86,7 @@ public class RealmHudManager {
 
     private void applyToHud(@Nullable HyUIHud hud, boolean hide) {
         if (hud == null) return;
-        if (hide) hud.hide(); else hud.unhide();
+        HudRefreshHelper.safeSetVisibility(hud, !hide);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -134,17 +137,22 @@ public class RealmHudManager {
             try {
                 HyUIHud hud = RealmCombatHud.create(freshPlayerRef, realm, store);
 
-                // CRITICAL: Defer map registration by 1 tick. HyUIHud.add() → safeAdd()
-                // defers the Append packet via world.execute(). If we put the HUD in the
-                // map NOW, tickCombatHuds() fires BEFORE the Append reaches the client and
-                // sends commands referencing non-existent elements → client crash.
-                world.execute(() -> {
-                    combatHuds.put(playerId, hud);
-                    if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
-                    LOGGER.atInfo().log("Showed combat HUD for player %s in realm %s",
-                        playerId.toString().substring(0, 8),
-                        realm.getRealmId().toString().substring(0, 8));
-                });
+                // Direct MultiHud registration — bypasses safeAdd()'s getReference()
+                // null check that can fail during world transitions. With synchronous
+                // registration, we can track the HUD immediately (no second world.execute deferral).
+                Ref<EntityStore> entityRef = freshPlayerRef.getReference();
+                if (entityRef != null && entityRef.isValid()) {
+                    Player resolvedPlayer = store.getComponent(entityRef, Player.getComponentType());
+                    if (resolvedPlayer != null) {
+                        MultiHudWrapper.setCustomHud(resolvedPlayer, freshPlayerRef, hud.name, hud);
+                    }
+                }
+
+                combatHuds.put(playerId, hud);
+                if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
+                LOGGER.atInfo().log("Showed combat HUD for player %s in realm %s",
+                    playerId.toString().substring(0, 8),
+                    realm.getRealmId().toString().substring(0, 8));
             } catch (Exception e) {
                 LOGGER.atSevere().withCause(e).log("Failed to show combat HUD for player %s",
                     playerId.toString().substring(0, 8));
@@ -174,9 +182,10 @@ public class RealmHudManager {
         Objects.requireNonNull(player, "player cannot be null");
         Objects.requireNonNull(realm, "realm cannot be null");
 
-        // Explicitly discard combat HUD first — NOT hide() which sends Set commands
-        // to elements that may have been cleared during world transition.
-        discardHud(playerId, combatHuds, "combat");
+        // Remove combat HUD using hide()+remove() — player is still in the realm
+        // world (not transitioning), so getStore() is valid and packets are safe.
+        // discardHud() would only cancel the refresh task without removing from client.
+        removeHudSync(playerId, combatHuds, "combat");
 
         World world = realm.getWorld();
         if (world == null || !world.isAlive()) {
@@ -223,8 +232,8 @@ public class RealmHudManager {
         Objects.requireNonNull(player, "player cannot be null");
         Objects.requireNonNull(realm, "realm cannot be null");
 
-        // Explicitly discard combat HUD first
-        discardHud(playerId, combatHuds, "combat");
+        // Remove combat HUD using hide()+remove() — same-world operation (not transitioning)
+        removeHudSync(playerId, combatHuds, "combat");
 
         World world = realm.getWorld();
         if (world == null || !world.isAlive()) {
@@ -295,6 +304,10 @@ public class RealmHudManager {
 
     /**
      * Discards a single HUD type — remove from map + cancel refresh, no hide().
+     *
+     * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
+     * early-returns when {@code getStore()} returns null during transitions, skipping
+     * {@code refreshTask.cancel()}.
      */
     private void discardHud(
             @Nonnull UUID playerId,
@@ -306,16 +319,9 @@ public class RealmHudManager {
             return;
         }
 
-        try {
-            // ONLY remove() — cancels refresh task. No hide() — that sends Set commands
-            // to elements already cleared by resetManagers(), crashing the client.
-            hud.remove();
-            LOGGER.atFine().log("Discarded stale %s HUD for player %s (world transition)",
-                hudType, playerId.toString().substring(0, 8));
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to discard stale %s HUD for player %s: %s",
-                hudType, playerId.toString().substring(0, 8), e.getMessage());
-        }
+        HudRefreshHelper.cancelRefreshTask(hud);
+        LOGGER.atFine().log("Discarded stale %s HUD for player %s (world transition)",
+            hudType, playerId.toString().substring(0, 8));
     }
 
     /**
@@ -332,7 +338,6 @@ public class RealmHudManager {
         }
 
         try {
-            hud.hide();
             hud.remove();
             LOGGER.atFine().log("Removed %s HUD for player %s",
                 hudType, playerId.toString().substring(0, 8));
@@ -347,24 +352,39 @@ public class RealmHudManager {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Ticks all active combat HUDs. Called from the realm's world-thread tick loop.
+     * Ticks combat HUDs for players in a specific realm.
+     *
+     * <p>Only refreshes HUDs for players in {@code realmPlayers}. This is critical
+     * because each realm dispatches its tick to its own world thread, but this
+     * manager is a singleton with a global {@code combatHuds} map. Without scoping,
+     * realm A's tick would refresh HUDs created on realm B's thread, triggering
+     * HyUI's thread assertion ({@code "Assert not in thread!"}) and evicting the HUD.
      *
      * <p>Uses {@link HudRefreshHelper#safeRefreshWithToggle} for atomic Clear+Append
      * rerenders. See {@link HudRefreshHelper} for why diff-based refresh is unsafe.
+     *
+     * @param realmPlayers the set of player UUIDs currently in the ticking realm
      */
-    public void tickCombatHuds() {
+    public void tickCombatHuds(@Nonnull Set<UUID> realmPlayers) {
         var iterator = combatHuds.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
+            UUID playerId = entry.getKey();
+
+            // Only tick HUDs belonging to this realm's players
+            if (!realmPlayers.contains(playerId)) {
+                continue;
+            }
+
             HyUIHud hud = entry.getValue();
             try {
-                HudRefreshHelper.safeRefreshWithToggle(hud, entry.getKey(), hudToggleService);
+                HudRefreshHelper.safeRefreshWithToggle(hud, playerId, hudToggleService);
             } catch (Exception e) {
                 // Evict stale HUD to prevent repeated crash on every tick
                 iterator.remove();
-                try { hud.remove(); } catch (Exception ignored) {}
+                HudRefreshHelper.cancelRefreshTask(hud);
                 LOGGER.atWarning().log("Evicted stale combat HUD for player %s: %s",
-                    entry.getKey().toString().substring(0, 8), e.getMessage());
+                    playerId.toString().substring(0, 8), e.getMessage());
             }
         }
     }

@@ -113,15 +113,23 @@ class LootGeneratorTest {
             GearGenerator mockGenerator = mock(GearGenerator.class);
             RarityRoller mockRarityRoller = mock(RarityRoller.class);
             when(mockGenerator.getRarityRoller()).thenReturn(mockRarityRoller);
-            when(mockRarityRoller.roll(anyDouble(), any())).thenReturn(GearRarity.COMMON);
+            when(mockRarityRoller.roll(anyDouble())).thenReturn(GearRarity.COMMON);
 
             DynamicLootRegistry registry = createMockRegistry();
+            // Add skin fallback support for the new pipeline
+            lenient().when(registry.selectSkinForWeaponType(any(), any()))
+                .thenReturn("Weapon_Sword_Iron");
+            lenient().when(registry.selectSkinForMaterial(any(), any(), any()))
+                .thenReturn("Armor_Iron_Chest");
+
             LootGenerator lootGen = spy(new LootGenerator(mockGenerator, registry, new Random(12345)));
             ItemStack baseItem = mock(ItemStack.class);
             ItemStack generatedItem = mock(ItemStack.class);
 
             doReturn(baseItem).when(lootGen).createBaseItem(anyString());
-            when(mockGenerator.generate(eq(baseItem), eq(50), anyString(), any(GearRarity.class)))
+            when(mockGenerator.generateFromCategory(
+                    eq(baseItem), eq(50), anyString(), any(GearRarity.class),
+                    any(), any(), any()))
                 .thenReturn(generatedItem);
 
             LootRoll roll = new LootRoll(true, 3, 25.0, 50);
@@ -137,15 +145,22 @@ class LootGeneratorTest {
             GearGenerator mockGenerator = mock(GearGenerator.class);
             RarityRoller mockRarityRoller = mock(RarityRoller.class);
             when(mockGenerator.getRarityRoller()).thenReturn(mockRarityRoller);
-            when(mockRarityRoller.roll(anyDouble(), any())).thenReturn(GearRarity.RARE);
+            when(mockRarityRoller.roll(anyDouble())).thenReturn(GearRarity.RARE);
 
             DynamicLootRegistry registry = createMockRegistry();
+            lenient().when(registry.selectSkinForWeaponType(any(), any()))
+                .thenReturn("Weapon_Sword_Iron");
+            lenient().when(registry.selectSkinForMaterial(any(), any(), any()))
+                .thenReturn("Armor_Iron_Chest");
+
             LootGenerator lootGen = spy(new LootGenerator(mockGenerator, registry, new Random(12345)));
             ItemStack baseItem = mock(ItemStack.class);
             ItemStack generatedItem = mock(ItemStack.class);
 
             doReturn(baseItem).when(lootGen).createBaseItem(anyString());
-            when(mockGenerator.generate(eq(baseItem), eq(50), anyString(), any(GearRarity.class)))
+            when(mockGenerator.generateFromCategory(
+                    eq(baseItem), eq(50), anyString(), any(GearRarity.class),
+                    any(), any(), any()))
                 .thenReturn(generatedItem);
 
             ItemStack drop = lootGen.generateSingleDrop(50, 25.0);

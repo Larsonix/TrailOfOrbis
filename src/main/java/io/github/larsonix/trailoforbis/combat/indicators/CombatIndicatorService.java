@@ -354,7 +354,7 @@ public class CombatIndicatorService {
         } else if (params.isParried()) {
             damageText = "Parried";
         } else {
-            damageText = String.valueOf((int) Math.floor(damage));
+            damageText = String.valueOf(Math.max(1, (int) Math.floor(damage)));
             if (params.isCrit()) {
                 damageText = damageText + " !";
             }

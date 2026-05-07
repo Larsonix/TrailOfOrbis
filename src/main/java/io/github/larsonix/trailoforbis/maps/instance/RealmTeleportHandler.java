@@ -9,6 +9,7 @@ import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.modules.entity.player.ChunkTracker;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.maps.event.RealmPlayerEnteredEvent;
@@ -115,6 +116,17 @@ public class RealmTeleportHandler {
         currentWorld.execute(() -> {
             try {
                 Store<EntityStore> store = currentWorld.getEntityStore().getStore();
+
+                // Boost chunk transfer rate for realm transition. Remote players are
+                // throttled to 36 chunks/sec by ChunkTracker (vs 256 local). Complex
+                // biomes like Swamp (CellNoise2D) produce chunks that compress poorly,
+                // causing 30s+ black screens at 36/sec. Boosting to 128 (LAN speed)
+                // reduces this to <10s. Restored in RealmPlayerEnterListener.onPlayerReady().
+                ChunkTracker chunkTracker = store.getComponent(entityRef, ChunkTracker.getComponentType());
+                if (chunkTracker != null) {
+                    chunkTracker.setMaxChunksPerSecond(128);
+                    LOGGER.atFine().log("Boosted chunk rate to 128/sec for realm transition (player %s)", playerId);
+                }
 
                 // Use InstancesPlugin's direct teleport for already-existing worlds.
                 // CRITICAL: teleportPlayerToLoadingInstance is for NOT-YET-CREATED worlds

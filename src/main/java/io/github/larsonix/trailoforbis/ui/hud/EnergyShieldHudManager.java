@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -102,7 +103,6 @@ public class EnergyShieldHudManager implements PersistentHud {
         }
 
         try {
-            hud.hide();
             hud.remove();
             if (player != null && playerRef != null) {
                 player.getHudManager().showHudComponents(playerRef, HudComponent.Health);
@@ -126,7 +126,6 @@ public class EnergyShieldHudManager implements PersistentHud {
                 HyUIHud hud = activeHuds.remove(playerId);
                 if (hud != null) {
                     try {
-                        hud.hide();
                         hud.remove();
                     } catch (Exception ignored) {}
                 }
@@ -182,11 +181,9 @@ public class EnergyShieldHudManager implements PersistentHud {
     public void onCreativeModeEnter(@Nonnull UUID playerId,
                                     @Nonnull Player player,
                                     @Nonnull PlayerRef playerRef) {
-        // Cannot use removeHud() here — the game mode switch triggers
-        // Player.resetManagers() which sends CustomHud(clear=true) to the client,
-        // destroying all HyUI elements. removeHud()'s hide() then sends Set commands
-        // referencing elements that no longer exist, crashing the client.
-        // Use discardStaleHud() which only calls remove() (no hide/Set packets).
+        // Use discardStaleHud() instead of removeHud() — safe path that cancels
+        // the refresh task without sending any packets to the client. During game mode
+        // switches the client UI state may be transitional, so avoid hide()/Set commands.
         discardStaleHud(playerId);
         healthRatios.remove(playerId);
 
@@ -209,9 +206,9 @@ public class EnergyShieldHudManager implements PersistentHud {
     /**
      * Discards stale HUD during world transitions WITHOUT sending packets.
      *
-     * <p>Removes from tracking map AND cancels the refresh task via {@code hud.remove()}.
-     * Without cancelling the task, the orphaned refresh can fire after the client has
-     * cleared its HyUI state, causing phantom updates or interference with new HUDs.
+     * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
+     * early-returns when {@code getStore()} returns null during transitions, skipping
+     * {@code refreshTask.cancel()}.
      */
     public void discardStaleHud(@Nonnull UUID playerId) {
         HyUIHud hud = activeHuds.remove(playerId);
@@ -219,12 +216,7 @@ public class EnergyShieldHudManager implements PersistentHud {
             return;
         }
 
-        try {
-            hud.remove();
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to discard stale shield HUD for player %s: %s",
-                playerId.toString().substring(0, 8), e.getMessage());
-        }
+        HudRefreshHelper.cancelRefreshTask(hud);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -285,18 +277,40 @@ public class EnergyShieldHudManager implements PersistentHud {
     @Override
     public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
                         @Nonnull Store<EntityStore> store) {
-        // Get entity ref for game mode check — may be null during early transitions
-        Ref<EntityStore> entityRef = playerRef.getReference();
-        if (entityRef == null || !entityRef.isValid()) {
-            return; // Entity not ready yet — safety net will retry in 1 second
-        }
+        restore(playerId, playerRef, store, null);
+    }
 
-        // Skip creative mode players — they keep vanilla health bar
-        Player player = store.getComponent(entityRef, Player.getComponentType());
-        if (player == null || player.getGameMode() == GameMode.Creative) {
+    @Override
+    public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                        @Nonnull Store<EntityStore> store, @Nullable Player player) {
+        if (player != null) {
+            // Event Player available — bypass getReference() null check.
+            // The event Player is guaranteed valid at PlayerReadyEvent time.
+            if (player.getGameMode() == GameMode.Creative) {
+                return;
+            }
+            showHud(playerId, playerRef, player);
+
+            // Direct MultiHud registration — bypasses HyUI safeAdd()'s internal
+            // getReference() check which returns null during early world transitions.
+            HyUIHud hud = activeHuds.get(playerId);
+            if (hud != null) {
+                MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
+            }
             return;
         }
-        showHud(playerId, playerRef, player);
+
+        // Safety net path — resolve Player from store. By 1-3s after transition,
+        // getReference() should be valid.
+        Ref<EntityStore> entityRef = playerRef.getReference();
+        if (entityRef == null || !entityRef.isValid()) {
+            return;
+        }
+        Player resolved = store.getComponent(entityRef, Player.getComponentType());
+        if (resolved == null || resolved.getGameMode() == GameMode.Creative) {
+            return;
+        }
+        showHud(playerId, playerRef, resolved);
     }
 
     @Override

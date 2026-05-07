@@ -106,21 +106,19 @@ public final class ReskinDataPreserver {
             // Fallback: if reskin tooltips were active but window is now closed
             // (covers edge cases where the close event didn't fire)
             if (craftingPreviewService != null && reskinTooltipActive.remove(playerId)) {
-                craftingPreviewService.restoreVanillaDefinitions(playerRef);
+                craftingPreviewService.markReskinInactive(playerId);
+                // Definitions are managed by CraftingBenchPreviewSystem's close callback.
+                // Just clean up reskin state — translations will be correct when defs restore.
             }
             return; // Not a workbench event — silent skip (very frequent)
         }
 
-        // Tooltip swap: on first detection of workbench, send modified definitions
-        // (with rpg.crafting.* keys) + reskin translations, then register close event.
-        // Under window-scoped architecture, base items aren't modified until a crafting
-        // window opens — so we must send definitions first, then overlay reskin text.
+        // Reskin overlay: on first detection of workbench, overlay reskin translations
+        // on top of the crafting preview definitions (already sent by CraftingBenchPreviewSystem).
         if (craftingPreviewService != null && reskinTooltipActive.add(playerId)) {
-            int playerLevel = io.github.larsonix.trailoforbis.api.ServiceRegistry
-                    .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
-                    .map(ls -> ls.getLevel(playerId))
-                    .orElse(1);
-            craftingPreviewService.syncToPlayer(playerRef, playerLevel);
+            craftingPreviewService.markReskinActive(playerId);
+            // Definitions are already sent by CraftingBenchPreviewSystem (UseBlockEvent.Post).
+            // Just overlay reskin translations on the same rpg.crafting.* keys.
             craftingPreviewService.sendReskinPreview(playerRef);
 
             Window workbenchWindow = findStructuralCraftingWindow(player);
@@ -129,8 +127,15 @@ public final class ReskinDataPreserver {
                 final UUID pid = playerId;
                 workbenchWindow.registerCloseEvent(closeEvent -> {
                     reskinTooltipActive.remove(pid);
-                    if (craftingPreviewService != null && capturedRef.isValid()) {
-                        craftingPreviewService.restoreVanillaDefinitions(capturedRef);
+                    craftingPreviewService.markReskinInactive(pid);
+                    // Restore crafting translations (undo reskin overlay).
+                    // Definitions are restored by CraftingBenchPreviewSystem's close callback.
+                    if (capturedRef.isValid()) {
+                        int level = io.github.larsonix.trailoforbis.api.ServiceRegistry
+                                .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
+                                .map(ls -> ls.getLevel(pid))
+                                .orElse(1);
+                        craftingPreviewService.restoreCraftingPreview(capturedRef, level);
                     }
                 });
             }

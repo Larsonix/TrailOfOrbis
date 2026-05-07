@@ -56,6 +56,14 @@ public class LootDiscoveryConfig {
 
     private Map<String, String> sound_set_overrides = new LinkedHashMap<>();
 
+    // =========================================================================
+    // IMPLICIT-DRIVEN LOOT CATEGORIES (new pipeline)
+    // =========================================================================
+
+    private Map<String, Object> super_category_weights = new LinkedHashMap<>();
+    private Map<String, Object> categories = new LinkedHashMap<>();
+    private Map<String, String> implicit_material_map = new LinkedHashMap<>();
+
     /**
      * Default constructor for YAML deserialization.
      */
@@ -233,6 +241,46 @@ public class LootDiscoveryConfig {
         return normalized;
     }
 
+    /**
+     * Gets the super-category weights for the implicit-driven pipeline.
+     */
+    public Map<String, Object> getSuper_category_weights() {
+        return super_category_weights;
+    }
+
+    /**
+     * Gets the category definitions for the implicit-driven pipeline.
+     */
+    public Map<String, Object> getCategories() {
+        return categories;
+    }
+
+    /**
+     * Gets the implicit → material mapping for skin selection.
+     */
+    public Map<String, String> getImplicit_material_map() {
+        return implicit_material_map;
+    }
+
+    /**
+     * Whether the implicit-driven category pipeline is configured.
+     * Returns true if the categories section exists and is non-empty.
+     */
+    public boolean hasCategoryConfig() {
+        return categories != null && !categories.isEmpty();
+    }
+
+    /**
+     * Builds a {@link LootCategoryConfig} from this discovery config's
+     * category pipeline sections. Uses defaults if not configured.
+     */
+    public LootCategoryConfig buildCategoryConfig() {
+        if (!hasCategoryConfig()) {
+            return LootCategoryConfig.createDefaults();
+        }
+        return LootCategoryConfig.fromYaml(super_category_weights, categories, implicit_material_map);
+    }
+
     // =========================================================================
     // SETTERS (for YAML deserialization)
     // =========================================================================
@@ -271,6 +319,18 @@ public class LootDiscoveryConfig {
 
     public void setSound_set_overrides(Map<String, String> sound_set_overrides) {
         this.sound_set_overrides = sound_set_overrides;
+    }
+
+    public void setSuper_category_weights(Map<String, Object> super_category_weights) {
+        this.super_category_weights = super_category_weights;
+    }
+
+    public void setCategories(Map<String, Object> categories) {
+        this.categories = categories;
+    }
+
+    public void setImplicit_material_map(Map<String, String> implicit_material_map) {
+        this.implicit_material_map = implicit_material_map;
     }
 
     // =========================================================================

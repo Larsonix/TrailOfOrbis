@@ -4,8 +4,11 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
+import io.github.larsonix.trailoforbis.gear.loot.LootCategory.ImplicitRoll;
+import io.github.larsonix.trailoforbis.gear.loot.LootCategory.SuperCategory;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import javax.annotation.Nonnull;
@@ -51,59 +54,83 @@ public final class LootGenerator {
     }
 
     private final DynamicLootRegistry dynamicRegistry;
+    private final LootCategoryConfig categoryConfig;
 
-    // Slot weights for random selection
+    // Slot weights for random selection (legacy — kept for DropBuilder.slot() forced path)
     private final Map<EquipmentSlot, Integer> slotWeights;
 
     private final GearGenerator gearGenerator;
     private final Random random;
 
     // =========================================================================
-    // CONSTRUCTORS - DYNAMIC REGISTRY (PREFERRED)
+    // CONSTRUCTORS
     // =========================================================================
 
     /**
-     * Creates a LootGenerator using dynamic item discovery.
+     * Creates a LootGenerator using the implicit-driven category pipeline.
      *
-     * <p>This is the preferred constructor for production use. It automatically
-     * discovers droppable items from Hytale's item registry, making the plugin
-     * compatible with any mod that properly registers weapons/armor.
-     *
-     * @param gearGenerator The gear generation system
-     * @param registry      The dynamic loot registry (must have discoverItems() called)
+     * @param gearGenerator  The gear generation system
+     * @param registry       The dynamic loot registry (for skin selection)
+     * @param categoryConfig The loot category configuration (for 3-tier rolling)
      */
-    public LootGenerator(@Nonnull GearGenerator gearGenerator, @Nonnull DynamicLootRegistry registry) {
-        this(gearGenerator, registry, ThreadLocalRandom.current());
+    public LootGenerator(
+            @Nonnull GearGenerator gearGenerator,
+            @Nonnull DynamicLootRegistry registry,
+            @Nonnull LootCategoryConfig categoryConfig
+    ) {
+        this(gearGenerator, registry, categoryConfig, ThreadLocalRandom.current());
     }
 
     /**
-     * Creates a LootGenerator using dynamic item discovery with custom random.
+     * Creates a LootGenerator with custom random.
      *
-     * @param gearGenerator The gear generation system
-     * @param registry      The dynamic loot registry
-     * @param random        The random number generator (for testing)
+     * @param gearGenerator  The gear generation system
+     * @param registry       The dynamic loot registry
+     * @param categoryConfig The loot category configuration
+     * @param random         The random number generator (for testing)
      */
-    public LootGenerator(@Nonnull GearGenerator gearGenerator, @Nonnull DynamicLootRegistry registry, @Nonnull Random random) {
+    public LootGenerator(
+            @Nonnull GearGenerator gearGenerator,
+            @Nonnull DynamicLootRegistry registry,
+            @Nonnull LootCategoryConfig categoryConfig,
+            @Nonnull Random random
+    ) {
         this.gearGenerator = Objects.requireNonNull(gearGenerator, "gearGenerator cannot be null");
         this.dynamicRegistry = Objects.requireNonNull(registry, "registry cannot be null");
+        this.categoryConfig = Objects.requireNonNull(categoryConfig, "categoryConfig cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
         this.slotWeights = registry.getSlotWeights();
     }
 
+    /**
+     * Legacy constructor — creates a default category config.
+     * Used by tests and backward-compatible callers.
+     */
+    public LootGenerator(@Nonnull GearGenerator gearGenerator, @Nonnull DynamicLootRegistry registry) {
+        this(gearGenerator, registry, LootCategoryConfig.createDefaults());
+    }
+
+    /**
+     * Legacy constructor with custom random.
+     */
+    public LootGenerator(@Nonnull GearGenerator gearGenerator, @Nonnull DynamicLootRegistry registry, @Nonnull Random random) {
+        this(gearGenerator, registry, LootCategoryConfig.createDefaults(), random);
+    }
+
     // =========================================================================
-    // DROP GENERATION — RARITY-FIRST PIPELINE
+    // DROP GENERATION — IMPLICIT-DRIVEN PIPELINE
     // =========================================================================
     //
-    // The loot table is existence-gated: only (slot, category, rarity) combos
-    // with real Hytale skins can be rolled. The pipeline is:
+    // Three-tier selection where the implicit roll defines item identity:
     //
-    //   1. RARITY   → Roll independently (geometric weights + bonuses)
-    //   2. SLOT     → Roll from slots that have items at this rarity
-    //   3. CATEGORY → Roll from categories that have items at this (rarity, slot)
-    //   4. SKIN     → Pick random from matching (rarity, slot, category) skins
-    //   5. GENERATE → GearGenerator creates stats
-    //
-    // Every step is constrained to what exists. No invalid combinations.
+    //   1. RARITY         → Roll independently (geometric weights + bonuses)
+    //   2. SUPER-CATEGORY → WEAPON / ARMOR / OFFHAND (weighted)
+    //   3. CATEGORY       → Specific type within super (sword, chest, shield, etc.)
+    //   4. IMPLICIT       → Random from category pool — THE identity moment
+    //                        Armor: armor/evasion/ES/health → determines material + skin
+    //                        Weapon: physical/fire/water/etc. → determines damage element
+    //   5. SKIN           → Matched from DynamicLootRegistry using resolved identity
+    //   6. GENERATE       → GearGenerator creates stats with pre-resolved types
 
     /**
      * Generates loot drops based on a loot roll result.
@@ -132,19 +159,16 @@ public final class LootGenerator {
     }
 
     /**
-     * Generates a single gear drop using the rarity-first pipeline.
+     * Generates a single gear drop using the implicit-driven pipeline.
      *
      * <p>Pipeline:
      * <ol>
-     *   <li>Roll rarity (independent, geometric 4× weights + bonus)</li>
-     *   <li>Select slot constrained to what has items at this rarity</li>
-     *   <li>Select category constrained to what has items at this rarity + slot</li>
-     *   <li>Select skin from the exact (slot, category, rarity) match</li>
-     *   <li>Generate gear with the pre-rolled rarity</li>
+     *   <li>Roll rarity (unconstrained, geometric weights + bonus)</li>
+     *   <li>Roll super-category → category → implicit (3-tier selection)</li>
+     *   <li>Resolve identity: EquipmentType + ArmorMaterial/WeaponType + Element</li>
+     *   <li>Select skin from DynamicLootRegistry (with quality-tier fallback)</li>
+     *   <li>Generate gear with pre-resolved identity via GearGenerator</li>
      * </ol>
-     *
-     * <p>Only combinations that have a real Hytale skin can be rolled.
-     * If a rarity has no items in any slot, this returns null.
      *
      * @param itemLevel The level of the gear
      * @param rarityBonus The rarity bonus to apply (percentage, e.g. 25.0 for +25%)
@@ -159,137 +183,107 @@ public final class LootGenerator {
     }
 
     /**
-     * Rarity-first pipeline using the availability matrix.
+     * Implicit-driven pipeline: rarity → super-category → category → implicit → skin.
+     *
+     * <p>The implicit roll defines the item's identity (what defense/damage type),
+     * determines the EquipmentType for modifier filtering, and drives skin selection.
      */
     private ItemStack generateSingleDropDynamic(int itemLevel, double rarityBonus) {
-        // 1. Roll RARITY — constrained to rarities that actually have items
+        // 1. Roll RARITY — unconstrained (no longer gated by skin availability)
         double decimalBonus = rarityBonus / 100.0;
-        Set<GearRarity> availableRarities = dynamicRegistry.getAvailableRarities();
-        if (availableRarities.isEmpty()) {
-            LOGGER.atWarning().log("No rarities have items — cannot generate drop");
-            return null;
-        }
-        GearRarity rarity = gearGenerator.getRarityRoller().roll(decimalBonus, availableRarities);
+        GearRarity rarity = gearGenerator.getRarityRoller().roll(decimalBonus);
 
-        // 2. Select SLOT from slots that have items at this rarity
-        EquipmentSlot slot = selectSlotForRarity(rarity);
-        if (slot == null) {
-            LOGGER.atWarning().log("No slots available at rarity %s — skipping drop", rarity);
-            return null;
-        }
+        // 2. Roll SUPER-CATEGORY (weapon / armor / offhand)
+        SuperCategory superCat = categoryConfig.rollSuperCategory(random);
 
-        // 3. Select CATEGORY from categories with items at this (rarity, slot)
-        String category = selectCategoryForRaritySlot(rarity, slot);
+        // 3. Roll CATEGORY within the super (e.g., sword, chest, shield)
+        LootCategory category = categoryConfig.rollCategory(superCat, random);
         if (category == null) {
-            LOGGER.atWarning().log("No categories for slot %s at rarity %s — skipping drop", slot, rarity);
+            LOGGER.atWarning().log("No categories in super-category %s — skipping drop", superCat);
             return null;
         }
 
-        // 4. Select SKIN from the exact (slot, category, rarity) match
-        String baseItemId = dynamicRegistry.selectSkin(slot, category, rarity);
-        if (baseItemId == null) {
-            LOGGER.atWarning().log("No skin for %s/%s at %s — skipping drop", slot, category, rarity);
+        // 4. Roll IMPLICIT — THE identity-defining moment
+        ImplicitRoll implicitRoll = categoryConfig.rollImplicit(category, random);
+        if (implicitRoll == null) {
+            LOGGER.atWarning().log("No implicits for category %s — skipping drop", category.id());
             return null;
         }
 
-        // 5. Create base item and generate gear
-        ItemStack baseItem = createBaseItem(baseItemId);
-        if (baseItem == null) {
-            LOGGER.atWarning().log("Failed to create base item: %s", baseItemId);
+        // 5. Select SKIN based on resolved identity + rarity (with fallback)
+        String skinItemId = selectSkinFromImplicit(implicitRoll, rarity);
+        if (skinItemId == null) {
+            LOGGER.atWarning().log("No skin for %s at %s — skipping drop", category.id(), rarity);
             return null;
         }
 
-        String slotString = mapSlotToString(slot);
-        ItemStack gearItem = gearGenerator.generate(baseItem, itemLevel, slotString, rarity);
+        // 6. Create base item from skin
+        ItemStack skinItem = createBaseItem(skinItemId);
+        if (skinItem == null) {
+            LOGGER.atWarning().log("Failed to create skin item: %s", skinItemId);
+            return null;
+        }
 
-        // Log result
-        Optional<GearData> gearData = GearUtils.readGearData(gearItem);
-        if (gearData.isPresent()) {
-            GearData data = gearData.get();
-            int modCount = data.prefixes().size() + data.suffixes().size();
-            LOGGER.atInfo().log("Generated RPG gear: %s %s [%s] (Lv%d, Q%d, %d mods)",
-                    data.rarity(), baseItemId, category, data.level(), data.quality(), modCount);
-        } else {
-            LOGGER.atWarning().log("FAILED to apply gear data to %s - item has no RPG metadata!", baseItemId);
+        // 7. Generate gear using the pre-resolved identity
+        ItemStack gearItem = gearGenerator.generateFromCategory(
+                skinItem, itemLevel, implicitRoll.slotString(), rarity,
+                implicitRoll.equipmentType(),
+                implicitRoll.skinWeaponType(),
+                implicitRoll.element()
+        );
+
+        // 8. Log result
+        if (gearItem != null) {
+            Optional<GearData> gearData = GearUtils.readGearData(gearItem);
+            if (gearData.isPresent()) {
+                GearData data = gearData.get();
+                int modCount = data.prefixes().size() + data.suffixes().size();
+                LOGGER.atInfo().log("Generated RPG gear: %s %s [%s→%s] (Lv%d, Q%d, %d mods, element=%s)",
+                        data.rarity(), skinItemId, category.id(),
+                        implicitRoll.entry().implicitType(),
+                        data.level(), data.quality(), modCount,
+                        implicitRoll.element() != null ? implicitRoll.element().name() : "none");
+            } else {
+                LOGGER.atWarning().log("FAILED to apply gear data to %s - item has no RPG metadata!", skinItemId);
+            }
         }
 
         return gearItem;
     }
 
-    // =========================================================================
-    // CONSTRAINED SELECTION (rarity-first pipeline)
-    // =========================================================================
-
     /**
-     * Selects a random slot from slots that have items at the given rarity.
-     * Weights from config are applied, but only to available slots.
+     * Selects a skin item ID based on the implicit roll's resolved identity.
      *
-     * @param rarity The rolled rarity
-     * @return A random available slot, or null if none exist
+     * <p>For armor: looks up by (slot, ArmorMaterial, rarity).
+     * For weapons/offhand: looks up by (WeaponType, rarity).
      */
     @Nullable
-    private EquipmentSlot selectSlotForRarity(GearRarity rarity) {
-        Set<EquipmentSlot> available = dynamicRegistry.getAvailableSlotsForRarity(rarity);
-        if (available.isEmpty()) return null;
-
-        // Build weighted pool from available slots only
-        int totalWeight = 0;
-        List<Map.Entry<EquipmentSlot, Integer>> pool = new ArrayList<>();
-        for (Map.Entry<EquipmentSlot, Integer> entry : slotWeights.entrySet()) {
-            if (available.contains(entry.getKey()) && entry.getValue() > 0) {
-                pool.add(entry);
-                totalWeight += entry.getValue();
-            }
+    private String selectSkinFromImplicit(@Nonnull ImplicitRoll roll, @Nonnull GearRarity rarity) {
+        if (roll.skinMaterial() != null) {
+            // Armor — look up by material + slot
+            EquipmentSlot slot = mapStringToSlot(roll.slotString());
+            return dynamicRegistry.selectSkinForMaterial(slot, roll.skinMaterial(), rarity);
+        } else if (roll.skinWeaponType() != null) {
+            // Weapon/offhand — look up by weapon type
+            return dynamicRegistry.selectSkinForWeaponType(roll.skinWeaponType(), rarity);
         }
-        if (pool.isEmpty()) return null;
-
-        int roll = random.nextInt(totalWeight);
-        int cumulative = 0;
-        for (Map.Entry<EquipmentSlot, Integer> entry : pool) {
-            cumulative += entry.getValue();
-            if (roll < cumulative) {
-                return entry.getKey();
-            }
-        }
-        return pool.getLast().getKey();
+        LOGGER.atWarning().log("ImplicitRoll has no skin material or weapon type: %s", roll);
+        return null;
     }
 
     /**
-     * Selects a random category from categories that have items at the given (rarity, slot).
-     * Uses configured category weights (weapon or armor weights), only for available categories.
-     *
-     * @param rarity The rolled rarity
-     * @param slot   The selected slot
-     * @return A random available category name, or null if none exist
+     * Maps a slot string to EquipmentSlot enum.
      */
-    @Nullable
-    private String selectCategoryForRaritySlot(GearRarity rarity, EquipmentSlot slot) {
-        Set<String> available = dynamicRegistry.getAvailableCategoriesForRaritySlot(rarity, slot);
-        if (available.isEmpty()) return null;
-
-        Map<String, Double> weights = dynamicRegistry.getCategoryWeights(slot);
-
-        // Build weighted pool — only categories that EXIST, not influenced by skin count
-        double totalWeight = 0;
-        List<Map.Entry<String, Double>> pool = new ArrayList<>();
-        for (String cat : available) {
-            double w = weights.getOrDefault(cat, 1.0);
-            if (w > 0) {
-                pool.add(Map.entry(cat, w));
-                totalWeight += w;
-            }
-        }
-        if (pool.isEmpty()) return null;
-
-        double roll = random.nextDouble() * totalWeight;
-        double cumulative = 0;
-        for (Map.Entry<String, Double> entry : pool) {
-            cumulative += entry.getValue();
-            if (roll < cumulative) {
-                return entry.getKey();
-            }
-        }
-        return pool.getLast().getKey();
+    private static EquipmentSlot mapStringToSlot(String slotString) {
+        return switch (slotString.toLowerCase()) {
+            case "weapon" -> EquipmentSlot.WEAPON;
+            case "head" -> EquipmentSlot.HEAD;
+            case "chest" -> EquipmentSlot.CHEST;
+            case "legs" -> EquipmentSlot.LEGS;
+            case "hands" -> EquipmentSlot.HANDS;
+            case "shield", "off_hand" -> EquipmentSlot.OFF_HAND;
+            default -> EquipmentSlot.WEAPON;
+        };
     }
 
     /**
@@ -341,9 +335,9 @@ public final class LootGenerator {
     /**
      * Builder for customized loot generation.
      *
-     * <p>Uses the rarity-first pipeline: rarity → slot → category → skin.
-     * Forced values bypass their respective selection step. If rarity is forced,
-     * slot and category are constrained to what exists at that rarity.
+     * <p>Uses the implicit-driven pipeline: rarity → super-category → category → implicit → skin.
+     * Forced values bypass their respective selection step. When slot is forced,
+     * falls back to the legacy skin-based selection path.
      */
     public class DropBuilder {
         private int itemLevel = 1;
@@ -424,48 +418,68 @@ public final class LootGenerator {
         }
 
         private ItemStack buildDynamic() {
-            // 1. Determine rarity — constrained to available
+            // 1. Determine rarity — unconstrained
             GearRarity effectiveRarity;
             if (forcedRarity != null) {
                 effectiveRarity = forcedRarity;
             } else {
-                Set<GearRarity> availableRarities = dynamicRegistry.getAvailableRarities();
-                if (availableRarities.isEmpty()) return null;
                 double decimalBonus = rarityBonus / 100.0;
-                effectiveRarity = gearGenerator.getRarityRoller().roll(decimalBonus, availableRarities);
+                effectiveRarity = gearGenerator.getRarityRoller().roll(decimalBonus);
             }
 
-            // 2. Select slot (forced or constrained by rarity)
-            EquipmentSlot slot;
+            // If slot is forced, use the legacy skin-based path
             if (forcedSlot != null) {
-                slot = forcedSlot;
-            } else {
-                slot = selectSlotForRarity(effectiveRarity);
-                if (slot == null) {
-                    LOGGER.atWarning().log("DropBuilder: no slots at rarity %s", effectiveRarity);
-                    return null;
-                }
+                return buildWithForcedSlot(effectiveRarity);
             }
 
-            // 3. Select category (constrained by rarity + slot)
-            String category = selectCategoryForRaritySlot(effectiveRarity, slot);
-            if (category == null) {
-                LOGGER.atWarning().log("DropBuilder: no categories for %s at %s", slot, effectiveRarity);
+            // 2. Roll super-category → category → implicit (new pipeline)
+            SuperCategory superCat = categoryConfig.rollSuperCategory(random);
+            LootCategory category = categoryConfig.rollCategory(superCat, random);
+            if (category == null) return null;
+
+            ImplicitRoll implicitRoll = categoryConfig.rollImplicit(category, random);
+            if (implicitRoll == null) return null;
+
+            // 3. Select skin
+            String skinItemId = selectSkinFromImplicit(implicitRoll, effectiveRarity);
+            if (skinItemId == null) return null;
+
+            ItemStack skinItem = createBaseItem(skinItemId);
+            if (skinItem == null) return null;
+
+            // 4. Generate with resolved identity
+            return gearGenerator.generateFromCategory(
+                    skinItem, itemLevel, implicitRoll.slotString(), effectiveRarity,
+                    implicitRoll.equipmentType(),
+                    implicitRoll.skinWeaponType(),
+                    implicitRoll.element()
+            );
+        }
+
+        /**
+         * Legacy path for when slot is forced — uses old selectSkin from the slot's availability.
+         */
+        private ItemStack buildWithForcedSlot(GearRarity effectiveRarity) {
+            Set<String> availableCats = dynamicRegistry.getAvailableCategoriesForRaritySlot(
+                    effectiveRarity, forcedSlot);
+            if (availableCats.isEmpty()) {
+                LOGGER.atWarning().log("DropBuilder: no categories for forced slot %s at %s",
+                        forcedSlot, effectiveRarity);
                 return null;
             }
+            // Pick random category from available
+            String category = availableCats.stream()
+                    .skip(random.nextInt(availableCats.size()))
+                    .findFirst().orElse(null);
+            if (category == null) return null;
 
-            // 4. Select skin
-            String baseItemId = dynamicRegistry.selectSkin(slot, category, effectiveRarity);
-            if (baseItemId == null) {
-                LOGGER.atWarning().log("DropBuilder: no skin for %s/%s at %s", slot, category, effectiveRarity);
-                return null;
-            }
+            String baseItemId = dynamicRegistry.selectSkin(forcedSlot, category, effectiveRarity);
+            if (baseItemId == null) return null;
 
-            // 5. Generate
             ItemStack baseItem = createBaseItem(baseItemId);
             if (baseItem == null) return null;
 
-            String slotString = mapSlotToString(slot);
+            String slotString = mapSlotToString(forcedSlot);
             return gearGenerator.generate(baseItem, itemLevel, slotString, effectiveRarity);
         }
 

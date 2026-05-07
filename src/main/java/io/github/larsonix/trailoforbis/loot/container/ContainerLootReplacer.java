@@ -7,10 +7,13 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import io.github.larsonix.trailoforbis.gear.conversion.ItemClassifier;
 import io.github.larsonix.trailoforbis.gear.conversion.ItemClassifier.Classification;
 import io.github.larsonix.trailoforbis.gear.conversion.ItemClassifier.ItemType;
+import io.github.larsonix.trailoforbis.gear.model.GearData;
+import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -82,10 +85,11 @@ public final class ContainerLootReplacer {
      *   <li>Removes vanilla weapons/armor per config</li>
      *   <li>Preserves materials/consumables/tools per config</li>
      *   <li>Generates and adds RPG loot to empty slots</li>
+     *   <li>Applies realm quality bonus if applicable</li>
      * </ol>
      *
      * @param container   The container to modify
-     * @param playerLevel The opening player's level (for loot scaling)
+     * @param lootContext Zone-level context (source level, player level, realm bonuses)
      * @param tier        The container tier (for loot bonuses)
      * @param playerId    The opening player's UUID (for rarity bonus calculation)
      * @return Result containing statistics about the replacement
@@ -93,11 +97,12 @@ public final class ContainerLootReplacer {
     @Nonnull
     public ReplacementResult replace(
             @Nonnull ItemContainer container,
-            int playerLevel,
+            @Nonnull ContainerLootContext lootContext,
             @Nonnull ContainerTier tier,
             @Nonnull UUID playerId) {
 
         Objects.requireNonNull(container, "container cannot be null");
+        Objects.requireNonNull(lootContext, "lootContext cannot be null");
         Objects.requireNonNull(tier, "tier cannot be null");
         Objects.requireNonNull(playerId, "playerId cannot be null");
 
@@ -111,18 +116,23 @@ public final class ContainerLootReplacer {
         }
 
         // Step 2: Build the new slot contents
-        Map<Short, ItemStack> newContents = buildNewContents(analysis, playerLevel, tier, playerId);
+        Map<Short, ItemStack> newContents = buildNewContents(analysis, lootContext, tier, playerId);
 
         // Step 3: Apply changes via replaceAll
         int removed = applyReplacements(container, analysis, newContents);
+
+        // Step 4: Apply realm quality bonus to generated gear
+        if (lootContext.qualityBonus() > 0) {
+            applyQualityBonus(container, analysis.totalSlots, lootContext.qualityBonus());
+        }
 
         int added = (int) newContents.values().stream()
             .filter(item -> item != null && !ItemStack.isEmpty(item))
             .count();
 
         if (config.getAdvanced().isDebugLogging()) {
-            LOGGER.atInfo().log("Replacement complete: removed %d items, added %d RPG items",
-                removed, added);
+            LOGGER.atInfo().log("Replacement complete: removed %d items, added %d RPG items (quality+%d)",
+                removed, added, lootContext.qualityBonus());
         }
 
         return new ReplacementResult(
@@ -147,13 +157,14 @@ public final class ContainerLootReplacer {
      *   <li>Rolls a target item count from the tier's min/max range, capped at capacity</li>
      *   <li>Generates RPG loot (gear, stones, maps) to fill those slots</li>
      *   <li>Shuffles placement across the container for visual variety</li>
+     *   <li>Applies realm quality bonus if applicable</li>
      * </ol>
      *
      * <p>Used when {@code clear_all_vanilla: true} for realm containers where
      * no vanilla items should remain.
      *
      * @param container   The container to completely replace
-     * @param playerLevel The opening player's level (for loot scaling)
+     * @param lootContext Zone-level context (source level, player level, realm bonuses)
      * @param tier        The container tier (for loot bonuses and item count)
      * @param playerId    The opening player's UUID (for rarity bonus)
      * @return Result containing statistics about the replacement
@@ -161,11 +172,12 @@ public final class ContainerLootReplacer {
     @Nonnull
     public ReplacementResult replaceTotal(
             @Nonnull ItemContainer container,
-            int playerLevel,
+            @Nonnull ContainerLootContext lootContext,
             @Nonnull ContainerTier tier,
             @Nonnull UUID playerId) {
 
         Objects.requireNonNull(container, "container cannot be null");
+        Objects.requireNonNull(lootContext, "lootContext cannot be null");
         Objects.requireNonNull(tier, "tier cannot be null");
         Objects.requireNonNull(playerId, "playerId cannot be null");
 
@@ -192,7 +204,7 @@ public final class ContainerLootReplacer {
         targetCount = Math.min(targetCount, capacity);
 
         // Generate RPG loot to fill target slots
-        List<ItemStack> rpgLoot = lootGenerator.generateLootForSlots(playerLevel, tier, playerId, targetCount);
+        List<ItemStack> rpgLoot = lootGenerator.generateLootForSlots(lootContext, tier, playerId, targetCount);
 
         // Clear the entire container
         container.replaceAll((slot, existing) -> null);
@@ -211,9 +223,14 @@ public final class ContainerLootReplacer {
             placed++;
         }
 
+        // Apply realm quality bonus to generated gear
+        if (lootContext.qualityBonus() > 0) {
+            applyQualityBonus(container, capacity, lootContext.qualityBonus());
+        }
+
         if (config.getAdvanced().isDebugLogging()) {
-            LOGGER.atInfo().log("Total replacement: cleared %d items, placed %d RPG items in %d-slot container (tier: %s)",
-                existingItems, placed, capacity, tier);
+            LOGGER.atInfo().log("Total replacement: cleared %d items, placed %d RPG items in %d-slot container (tier: %s, quality+%d)",
+                existingItems, placed, capacity, tier, lootContext.qualityBonus());
         }
 
         return new ReplacementResult(existingItems, placed, 0, tier);
@@ -373,14 +390,14 @@ public final class ContainerLootReplacer {
      * Builds the new container contents map.
      *
      * @param analysis    The container analysis
-     * @param playerLevel The player's level
+     * @param lootContext Zone-level context (source level, player level, realm bonuses)
      * @param tier        The container tier
      * @return Map of slot -> new ItemStack (null for preserved items)
      */
     @Nonnull
     private Map<Short, ItemStack> buildNewContents(
             @Nonnull ContainerAnalysis analysis,
-            int playerLevel,
+            @Nonnull ContainerLootContext lootContext,
             @Nonnull ContainerTier tier,
             @Nonnull UUID playerId) {
 
@@ -395,7 +412,7 @@ public final class ContainerLootReplacer {
         }
 
         // Generate RPG loot (with player rarity bonus from WIND attribute)
-        List<ItemStack> rpgLoot = lootGenerator.generateLoot(playerLevel, tier, playerId);
+        List<ItemStack> rpgLoot = lootGenerator.generateLoot(lootContext, tier, playerId);
 
         // Calculate available slots (cleared + empty)
         List<Short> availableSlots = new ArrayList<>();
@@ -454,6 +471,35 @@ public final class ContainerLootReplacer {
         });
 
         return removedCount;
+    }
+
+    // =========================================================================
+    // QUALITY BONUS
+    // =========================================================================
+
+    /**
+     * Applies realm GEAR_QUALITY_BONUS to all gear items in the container.
+     *
+     * <p>Mirrors the quality bonus application in
+     * {@link io.github.larsonix.trailoforbis.gear.loot.LootListener#applyQualityBonus}.
+     *
+     * @param container The container with placed items
+     * @param capacity  The container capacity
+     * @param bonus     The quality bonus to apply (must be > 0)
+     */
+    private void applyQualityBonus(@Nonnull ItemContainer container, int capacity, int bonus) {
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack item = container.getItemStack(slot);
+            if (item == null || ItemStack.isEmpty(item)) continue;
+            Optional<GearData> gearOpt = GearUtils.getGearData(item);
+            if (gearOpt.isPresent()) {
+                GearData data = gearOpt.get();
+                int boosted = Math.min(101, data.quality() + bonus);
+                if (boosted != data.quality()) {
+                    container.setItemStackForSlot(slot, GearUtils.setGearData(item, data.withQuality(boosted)));
+                }
+            }
+        }
     }
 
     // =========================================================================

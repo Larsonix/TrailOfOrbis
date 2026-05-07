@@ -107,6 +107,15 @@ public final class VanillaItemConverter {
         String slot = classification.slot();
         ItemStack rpgGear = gearGenerator.generate(itemStack, clampedLevel, slot, finalRarity);
 
+        // Safety: verify the generator actually produced RPG gear.
+        // If it returns the unchanged base item (e.g., unrecognized weapon type),
+        // returning it as "converted" would create an infinite re-conversion loop.
+        if (!GearUtils.isRpgGear(rpgGear)) {
+            LOGGER.atWarning().log("GearGenerator returned non-RPG item for '%s' (slot=%s) — skipping conversion",
+                itemId, slot);
+            return Optional.empty();
+        }
+
         LOGGER.atInfo().log("Converted vanilla item '%s' to RPG gear: level=%d, slot=%s, rarity=%s (rolled %s, max %s)",
             itemId, clampedLevel, slot, finalRarity, rolledRarity, maxRarity);
 

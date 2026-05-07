@@ -13,7 +13,6 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentType;
@@ -37,6 +36,11 @@ import java.util.UUID;
 public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /** Accumulation interval — fire damage every 0.5s instead of every ECS tick (~50ms).
+     *  Without this, each tick deals DPS×dt (micro-damage) which floors to "0" in combat text
+     *  and gets over-reduced by per-tick defense application. 0.5s matches PoE/D4 DOT cadence. */
+    private static final float DOT_TICK_INTERVAL = 0.5f;
 
     private final AilmentTracker tracker;
     private volatile DamageCause poisonCause;
@@ -65,21 +69,32 @@ public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
         Ref<EntityStore> ref = archetypeChunk.getReferenceTo(index);
         if (ref == null || !ref.isValid()) return;
 
-        // Calculate combined damage from all stacks
-        float damage = poison.calculateDamageThisTick(dt);
-
-        // Fire single damage event for all stacks
-        if (damage > 0) {
-            Damage.Source source = resolveSource(poison.getPrimarySourceUuid(), store);
-            Damage dmgEvent = new Damage(source, getPoisonCause(), damage);
-            DamageSystems.executeDamage(ref, commandBuffer, dmgEvent);
-        }
+        // Snapshot DPS and source BEFORE ticking (tickStacks may remove expired stacks)
+        float currentDps = poison.getTotalDps();
+        UUID primarySource = poison.getPrimarySourceUuid();
 
         // Tick all stack durations (removes expired stacks internally)
         poison.tickStacks(dt);
 
+        // Accumulate time — only fire damage at intervals (not every ECS tick)
+        float elapsed = poison.getElapsedSinceTick() + dt;
+        boolean allExpired = poison.isEmpty();
+
+        if (elapsed >= DOT_TICK_INTERVAL || allExpired) {
+            // Fire accumulated damage using pre-tick DPS snapshot
+            float damage = currentDps * elapsed;
+            if (damage > 0) {
+                Damage.Source source = DotSourceResolver.resolveSource(primarySource, store);
+                Damage dmgEvent = new Damage(source, getPoisonCause(), damage);
+                DamageSystems.executeDamage(ref, commandBuffer, dmgEvent);
+            }
+            poison.setElapsedSinceTick(0f);
+        } else {
+            poison.setElapsedSinceTick(elapsed);
+        }
+
         // Remove component if all stacks expired
-        if (poison.isEmpty()) {
+        if (allExpired) {
             commandBuffer.removeComponent(ref, RpgPoisonComponent.TYPE);
 
             // Sync tracker
@@ -90,28 +105,6 @@ public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
 
             LOGGER.atFine().log("All poison stacks expired, component removed");
         }
-    }
-
-    @Nonnull
-    private Damage.Source resolveSource(@Nonnull UUID sourceUuid, @Nonnull Store<EntityStore> store) {
-        try {
-            PlayerRef playerRef = Universe.get().getPlayer(sourceUuid);
-            if (playerRef != null) {
-                Ref<EntityStore> ref = playerRef.getReference();
-                if (ref != null && ref.isValid()) {
-                    return new Damage.EntitySource(ref);
-                }
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            Ref<EntityStore> ref = store.getExternalData().getRefFromUUID(sourceUuid);
-            if (ref != null && ref.isValid()) {
-                return new Damage.EntitySource(ref);
-            }
-        } catch (Exception ignored) {}
-
-        return Damage.NULL_SOURCE;
     }
 
     @javax.annotation.Nullable

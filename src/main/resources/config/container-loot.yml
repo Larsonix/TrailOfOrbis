@@ -24,13 +24,18 @@ sources:
 # ═══════════════════════════════════════════════════════════════════════════════
 # LOOT SCALING
 # ═══════════════════════════════════════════════════════════════════════════════
-# Determines gear level and rarity based on the opening player's level
+# Determines gear level based on the opening player's level.
+#
+# RARITY: Uses the shared gear-balance.yml geometric weights (same as mob drops).
+# Container tier rarity_bonus shifts the distribution — see CONTAINER TIERS below.
+# The rarity_weights fields below are UNUSED (kept for backward compatibility).
 
 loot_scaling:
   # Level ranges for gear scaling
   # player_level_range: [min, max] inclusive
   # gear_level_range: [min, max] - gear will be generated within this range
-  # rarity_weights: weighted chances for each rarity tier
+  #   (only used when level_blending is disabled in gear-balance.yml)
+  # rarity_weights: UNUSED — rarity now comes from gear-balance.yml via RarityRoller
   level_ranges:
     - player_level_range: [1, 10]
       gear_level_range: [1, 5]
@@ -105,7 +110,11 @@ loot_scaling:
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONTAINER TIERS
 # ═══════════════════════════════════════════════════════════════════════════════
-# Different container types have different loot quality
+# Different container types have different loot quality.
+#
+# rarity_bonus: Decimal shift applied to the shared RarityRoller (gear-balance.yml).
+#   0.0 = same rarity as mob drops, 0.25 = like elite mobs, 0.50 = like boss mobs.
+#   Chests are already more valuable than mobs via guaranteed item count.
 #
 # min_items / max_items: Total RPG items placed when clear_all_vanilla is true.
 #   Stones and maps roll first, gear fills the remaining slots.
@@ -136,7 +145,7 @@ container_tiers:
       - "Hidden_*"
       - "Cave_*"
     loot_multiplier: 1.5
-    rarity_bonus: 0.15
+    rarity_bonus: 0.25
     map_chance_multiplier: 2.0
     stone_chance_multiplier: 1.5
     min_gear_drops: 2
@@ -152,7 +161,7 @@ container_tiers:
       - "Raid_*"
       - "Altar_*"
     loot_multiplier: 2.0
-    rarity_bonus: 0.30
+    rarity_bonus: 0.50
     map_chance_multiplier: 4.0
     stone_chance_multiplier: 2.0
     min_gear_drops: 3
@@ -168,7 +177,7 @@ container_tiers:
       - "Reward_*"
       - "Artifact_*"
     loot_multiplier: 1.75
-    rarity_bonus: 0.25
+    rarity_bonus: 0.35
     map_chance_multiplier: 3.0
     stone_chance_multiplier: 2.0
     min_gear_drops: 2
@@ -187,7 +196,7 @@ stone_drops:
   base_chance: 0.30
   # Maximum stone rolls per container
   max_per_container: 2
-  # Stone rarity weights (uses GearRarity)
+  # UNUSED — stone rarity now uses gear-balance.yml via shared RarityRoller
   rarity_weights:
     common: 40
     uncommon: 35

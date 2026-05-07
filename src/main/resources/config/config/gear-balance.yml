@@ -257,6 +257,16 @@ implicit_damage:
   # Two-handed weapons get this multiplier applied to the final range
   two_handed_multiplier: 1.5
 
+  # Element weights for weapon implicit damage type.
+  # When generating gear without a pre-resolved element (crafting, admin commands,
+  # vanilla conversion), these weights control the chance of elemental vs physical.
+  # Magic weapons (staves, wands) always get elemental — these weights are ignored.
+  # The loot pipeline (mob drops, containers) has its own per-category weights in
+  # loot-discovery.yml that override these defaults.
+  element_weights:
+    physical: 70              # Weight for physical damage
+    elemental_each: 5         # Weight PER element (fire, water, lightning, earth, wind, void)
+
   # Spellbook implicit: mana_regen (support identity, not damage)
   # Tuned so implicit_avg ≈ of_the_arcane max × 1.5 quality at L50
   spellbook:

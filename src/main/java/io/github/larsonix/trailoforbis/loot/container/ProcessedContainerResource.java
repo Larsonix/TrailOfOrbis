@@ -177,12 +177,24 @@ public class ProcessedContainerResource implements Resource<ChunkStore> {
         return x + "," + y + "," + z;
     }
 
+    /**
+     * Builds a per-player position key.
+     * Format: {@code "x,y,z:playerUuid"} — each player gets a separate entry.
+     */
+    @Nonnull
+    private static String playerKey(int x, int y, int z, @Nonnull UUID playerId) {
+        return x + "," + y + "," + z + ":" + playerId;
+    }
+
     // =========================================================================
     // QUERIES
     // =========================================================================
 
     /**
-     * Checks if a container at the given position has been processed.
+     * Checks if a container at the given position has been processed by any player.
+     *
+     * <p>This checks the legacy per-position key only (for admin/info display).
+     * For gameplay checks, use {@link #isProcessedByPlayer}.
      *
      * @param x Block X coordinate
      * @param y Block Y coordinate
@@ -191,6 +203,19 @@ public class ProcessedContainerResource implements Resource<ChunkStore> {
      */
     public boolean isProcessed(int x, int y, int z) {
         return processed.containsKey(key(x, y, z));
+    }
+
+    /**
+     * Checks if a container has been processed for a specific player.
+     *
+     * @param x Block X coordinate
+     * @param y Block Y coordinate
+     * @param z Block Z coordinate
+     * @param playerId The player's UUID
+     * @return true if this player has already triggered loot replacement at this position
+     */
+    public boolean isProcessedByPlayer(int x, int y, int z, @Nonnull UUID playerId) {
+        return processed.containsKey(playerKey(x, y, z, playerId));
     }
 
     /**
@@ -211,22 +236,22 @@ public class ProcessedContainerResource implements Resource<ChunkStore> {
     // =========================================================================
 
     /**
-     * Marks a container as processed.
+     * Marks a container as processed for a specific player.
      *
-     * <p>Uses {@code putIfAbsent} for thread safety — if two players open the same
-     * container simultaneously, only the first one succeeds.
+     * <p>Uses per-player keys ({@code "x,y,z:uuid"}) so each player gets their
+     * own loot replacement pass. Thread-safe via {@code putIfAbsent}.
      *
      * @param x Block X coordinate
      * @param y Block Y coordinate
      * @param z Block Z coordinate
-     * @param firstOpenerId UUID of the player who triggered the loot replacement
-     * @return true if this was the first time marking (the caller should run replacement)
+     * @param openerId UUID of the player who triggered the loot replacement
+     * @return true if this was the first time this player opened this container
      */
-    public boolean markProcessed(int x, int y, int z, @Nonnull UUID firstOpenerId) {
-        String k = key(x, y, z);
+    public boolean markProcessed(int x, int y, int z, @Nonnull UUID openerId) {
+        String k = playerKey(x, y, z, openerId);
         ProcessedEntry entry = new ProcessedEntry(
             System.currentTimeMillis(),
-            firstOpenerId.toString()
+            openerId.toString()
         );
         return processed.putIfAbsent(k, entry) == null;
     }

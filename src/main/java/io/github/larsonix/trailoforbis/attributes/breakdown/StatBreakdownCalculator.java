@@ -119,6 +119,7 @@ public class StatBreakdownCalculator {
             if (!treeData.getAllocatedNodes().isEmpty()) {
                 if (skillService instanceof SkillTreeManager manager && manager.getTreeConfig() != null) {
                     SkillTreeStatAggregator aggregator = new SkillTreeStatAggregator(manager.getTreeConfig());
+                    aggregator.setPlayerData(realData); // For ATTRIBUTE_SUM_SCALING nexus hubs
                     StatsCombiner combiner = new StatsCombiner();
                     AggregatedModifiers treeMods = aggregator.aggregate(treeData);
                     afterSkillTree = combiner.combine(afterAttributes, treeMods);

@@ -289,6 +289,10 @@ BIOMES: list[BiomeSpec] = [
             {"block": "Plant_Flower_Common_Yellow", "weight": 1},
             {"block": "Plant_Flower_Common_Blue", "weight": 1},
             {"block": "Plant_Flower_Common_White", "weight": 1},
+            # Light-emitting ground cover — woodland bioluminescence
+            {"block": "Plant_Crop_Mushroom_Glowing_Green", "weight": 2},
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 1},
+            {"block": "Plant_Moss_Blue", "weight": 1},
         ],
         grass_noise_scale=30, grass_seed="forest_grass",
 
@@ -396,6 +400,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 5},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 3},
+            # Light-emitting ground cover — desert night glow
+            {"block": "Plant_Flower_Hemlock", "weight": 1},
+            {"block": "Plant_Crop_Mushroom_Glowing_Orange", "weight": 1},
         ],
         grass_noise_scale=40, grass_seed="desert_scrub",
         grass_skip_sparse=0.97, grass_skip_moderate=0.85, grass_skip_dense=0.55,
@@ -492,6 +499,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 3},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 2},
+            # Light-emitting ground cover — frostlit crystals
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 1},
+            {"block": "Plant_Moss_Blue", "weight": 1},
         ],
         grass_noise_scale=35, grass_seed="tundra_scrub",
         grass_skip_sparse=0.96, grass_skip_moderate=0.82, grass_skip_dense=0.50,
@@ -561,12 +571,17 @@ BIOMES: list[BiomeSpec] = [
             # StructureBoundsRegistry. Compound Outlander layouts → BossStructurePlacer.
         ],
     ),
-    # ─── SWAMP: The Rotting Marsh — CellNoise2D island terrain (FIRST USE) ───
-    # New WorldGenV2 mechanic: CellNoise2D (Voronoi cellular noise) replaces SimplexNoise2D
-    # for terrain. Distance2Div creates wells at cell centers and ridges at boundaries.
-    # With cellnoise_invert=True, the Normalizer flips this: cell centers become raised
-    # islands, cell boundaries become depressed channels filled by waterlogged fluid.
+    # ─── SWAMP: The Rotting Marsh — waterlogged SimplexNoise2D terrain ───
+    # Smooth rolling terrain with water-filled depressions. amplitude=0.15 creates
+    # ±2.25 blocks of variation around base Y=64. With fluid_top_y=-1 (water at Y=63),
+    # low terrain areas (below Y=63) fill with water → scattered marsh pools.
+    # SimplexNoise2D smooth gradients create gentle land-to-water transitions.
     # Also debuts: path_material (organic mud trails) and ClusterProp (reed clusters).
+    #
+    # NOTE: Previously used CellNoise2D (Voronoi). Switched to SimplexNoise2D because
+    # CellNoise2D's sharp cell boundaries create high-entropy block patterns that defeat
+    # GZIP compression in SetChunk packets. Remote players (36 chunks/sec) experienced
+    # 30s+ black screens. SimplexNoise2D compresses well → normal 2-3s load times.
     BiomeSpec(
         name="Swamp",
         biome_prefix="Realm_Swamp",
@@ -577,19 +592,12 @@ BIOMES: list[BiomeSpec] = [
         fog_distance=[-20, 45], fog_color="#2a3a20", sky_top_color="#3a4a30ff", sky_bottom_color="#1a2a10ff", fog_density=0.85,
         particle_id="Dust_Cave_Flies", particle_color="#405030",
         tint_colors=["#2E4E2E", "#1F3F1F", "#3A5A3A", "#2A4A1A"],
-        # ═══ CellNoise2D terrain — FIRST BIOME TO USE VORONOI NOISE ═══
-        # Distance2Div output [-1, 0]: cell centers=-1, boundaries=0.
-        # cellnoise_invert=True flips it: centers→islands (+amp), boundaries→channels (-amp).
-        # Scale=40 creates ~40-block islands. Jitter=0.6 for organic irregularity.
-        # amplitude=0.15 * 15 = ±2.25 blocks → islands rise ~2 blocks above water,
-        # channels dip ~2 blocks into the fluid band (Y=59-63). Perfect interaction.
-        noise_amplitude=0.15, noise_scale=40, noise_octaves=2,
-        terrain_noise_type="cellnoise",
-        cellnoise_cell_type="Distance2Div",
-        cellnoise_jitter=0.6,
-        cellnoise_invert=True,
+        # ═══ SimplexNoise2D terrain — smooth marsh terrain with water pools ═══
+        # amplitude=0.15 * 15 = ±2.25 blocks. Scale=35 for intimate terrain features.
+        # Low points fill with water (fluid_top_y=-1), high points form muddy hummocks.
+        noise_amplitude=0.15, noise_scale=35, noise_octaves=2,
         boundary_type="rising", boundary_transition=0.50, boundary_density=3, boundary_height=5,
-        signature_type="waterlogged", fluid_material="Water_Source", fluid_bottom_y=-5, fluid_top_y=0,
+        signature_type="waterlogged", fluid_material="Water_Source", fluid_bottom_y=-5, fluid_top_y=-1,
         water_tint="#3d5c3a",  # Murky greenish-brown swamp water
         # Geological bands in the low boundary walls
         wall_strata=[
@@ -610,6 +618,10 @@ BIOMES: list[BiomeSpec] = [
             {"block": "Plant_Fern_Wet_Big", "weight": 10},
             {"block": "Plant_Bush_Wet", "weight": 8},
             {"block": "Plant_Flower_Water_Green", "weight": 5},
+            # Light-emitting ground cover — swamp bioluminescence
+            {"block": "Plant_Crop_Mushroom_Glowing_Violet", "weight": 3},
+            {"block": "Plant_Crop_Mushroom_Glowing_Green", "weight": 2},
+            {"block": "Plant_Moss_Blue", "weight": 2},
         ],
         grass_noise_scale=20, grass_seed="swamp_moss",
         grass_skip_sparse=0.80, grass_skip_moderate=0.40, grass_skip_dense=0.10,
@@ -811,6 +823,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 15},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 10},
+            # Light-emitting ground cover — tropical shore glow
+            {"block": "Plant_Flower_Orchid_Cyan", "weight": 2},
+            {"block": "Plant_Petals_Azure", "weight": 1},
         ],
         grass_noise_scale=35, grass_seed="beach_grass",
         grass_skip_sparse=0.95, grass_skip_moderate=0.80, grass_skip_dense=0.50,
@@ -1040,6 +1055,11 @@ BIOMES: list[BiomeSpec] = [
             {"block": "Plant_Flower_Orchid_Purple", "weight": 2},
             {"block": "Plant_Flower_Tall_Pink", "weight": 1},
             {"block": "Plant_Flower_Tall_Purple", "weight": 1},
+            # Light-emitting ground cover — tropical bioluminescence
+            {"block": "Plant_Fruit_Azure", "weight": 2},
+            {"block": "Plant_Flower_Orchid_Cyan", "weight": 2},
+            {"block": "Plant_Crop_Mushroom_Glowing_Purple", "weight": 1},
+            {"block": "Plant_Petals_Azure", "weight": 1},
         ],
         grass_noise_scale=25, grass_seed="jungle_floor",
         # Jungle is the DENSEST biome — ground cover everywhere
@@ -1252,6 +1272,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 5},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 2},
+            # Light-emitting ground cover — volcanic ember glow
+            {"block": "Plant_Crop_Mushroom_Glowing_Red", "weight": 1},
+            {"block": "Plant_Crop_Mushroom_Glowing_Orange", "weight": 1},
         ],
         grass_noise_scale=35, grass_seed="volcanic_ash",
         grass_skip_sparse=0.97, grass_skip_moderate=0.92, grass_skip_dense=0.80,
@@ -1444,6 +1467,10 @@ BIOMES: list[BiomeSpec] = [
             {"block": "Plant_Moss_Block_Green", "weight": 20},
             {"block": "Plant_Moss_Green_Dark", "weight": 15},
             {"block": "Plant_Fern", "weight": 5},  # Unverified — fallback: Plant_Moss_Rug_Lime
+            # Light-emitting ground cover — mine bioluminescence
+            {"block": "Plant_Crop_Mushroom_Glowing_Green", "weight": 3},
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 2},
+            {"block": "Plant_Moss_Blue", "weight": 2},
         ],
         grass_noise_scale=25, grass_seed="mine_moss",
         grass_skip_sparse=0.95, grass_skip_moderate=0.80, grass_skip_dense=0.50,
@@ -1582,6 +1609,11 @@ BIOMES: list[BiomeSpec] = [
             {"block": "Plant_Moss_Rug_Lime", "weight": 15},
             {"block": "Plant_Fern", "weight": 10},
             {"block": "Plant_Fern_Wet_Big", "weight": 5},
+            # Light-emitting ground cover — cave bioluminescence
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 4},
+            {"block": "Plant_Crop_Mushroom_Glowing_Purple", "weight": 3},
+            {"block": "Plant_Crop_Mushroom_Glowing_Green", "weight": 3},
+            {"block": "Plant_Moss_Blue", "weight": 3},
         ],
         grass_noise_scale=25, grass_seed="cave_moss",
         grass_skip_sparse=0.90, grass_skip_moderate=0.55, grass_skip_dense=0.20,
@@ -1761,6 +1793,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 3},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 2},
+            # Light-emitting ground cover — frozen crypt glow
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 2},
+            {"block": "Plant_Moss_Blue", "weight": 1},
         ],
         grass_noise_scale=30, grass_seed="crypt_frost",
         grass_skip_sparse=0.95, grass_skip_moderate=0.80, grass_skip_dense=0.50,
@@ -1914,6 +1949,9 @@ BIOMES: list[BiomeSpec] = [
         grass_blocks=[
             {"block": "Plant_Grass_Sharp", "weight": 2},
             {"block": "Plant_Grass_Sharp_Wild", "weight": 1},
+            # Light-emitting ground cover — ancient tomb glow
+            {"block": "Plant_Crop_Mushroom_Glowing_Red", "weight": 1},
+            {"block": "Plant_Crop_Mushroom_Glowing_Orange", "weight": 1},
         ],
         grass_noise_scale=35, grass_seed="tomb_scrub",
         grass_skip_sparse=0.97, grass_skip_moderate=0.85, grass_skip_dense=0.55,
@@ -2052,6 +2090,14 @@ BIOMES: list[BiomeSpec] = [
         boundary_type="textured", boundary_transition=0.20, boundary_density=5, boundary_height=15,
         boundary_noise_scale=8, boundary_noise_amp=0.6,
         signature_type="fractured", fracture_noise_scale_xz=12, fracture_noise_scale_y=8, fracture_max_depth=-0.8,
+        # Corrupted ground cover — void-touched sparse vegetation
+        grass_blocks=[
+            {"block": "Plant_Crop_Mushroom_Glowing_Violet", "weight": 3},
+            {"block": "Plant_Crop_Mushroom_Glowing_Purple", "weight": 2},
+            {"block": "Plant_Petals_Storm", "weight": 1},
+        ],
+        grass_noise_scale=30, grass_seed="corrupt_glow",
+        grass_skip_sparse=0.96, grass_skip_moderate=0.85, grass_skip_dense=0.60,
 
         prop_layers=[
             PropLayer("dead_trees", [
@@ -2098,6 +2144,15 @@ BIOMES: list[BiomeSpec] = [
         boundary_type="floating", boundary_transition=0.10, boundary_density=-5, boundary_height=0,
         boundary_noise_scale=8, boundary_noise_amp=0.3,
         surface_thickness=1,
+        # Void ground cover — eerie arcane glow from cracks in reality
+        grass_blocks=[
+            {"block": "Plant_Crop_Mushroom_Glowing_Purple", "weight": 3},
+            {"block": "Plant_Crop_Mushroom_Glowing_Blue", "weight": 2},
+            {"block": "Plant_Petals_Storm", "weight": 1},
+            {"block": "Plant_Moss_Blue", "weight": 1},
+        ],
+        grass_noise_scale=25, grass_seed="void_glow",
+        grass_skip_sparse=0.95, grass_skip_moderate=0.80, grass_skip_dense=0.50,
         prop_layers=[
             PropLayer("crystal_clusters", [
                 {"Path": "Rock_Formations/Rocks/Geodes/Purple", "Weight": 4},

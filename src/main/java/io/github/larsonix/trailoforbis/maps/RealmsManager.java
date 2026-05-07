@@ -1728,7 +1728,8 @@ public class RealmsManager implements RealmsService {
             World world = realm.getWorld();
             if (world == null || !world.isAlive()) continue;
 
-            world.execute(() -> hudManager.tickCombatHuds());
+            Set<UUID> realmPlayers = realm.getCurrentPlayers();
+            world.execute(() -> hudManager.tickCombatHuds(realmPlayers));
         }
     }
 

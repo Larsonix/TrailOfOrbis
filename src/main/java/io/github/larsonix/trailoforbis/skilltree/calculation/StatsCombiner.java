@@ -178,6 +178,7 @@ public class StatsCombiner {
 
         // True Damage
         depositStandalone(builder, modifiers, StatType.PERCENT_HIT_AS_TRUE_DAMAGE, baseStats.getPercentHitAsTrueDamage());
+        depositStandalone(builder, modifiers, StatType.VOID_TO_TRUE_DAMAGE_PERCENT, baseStats.getVoidToTrueDamagePercent());
 
         // Leech & Sustain
         depositStandalone(builder, modifiers, StatType.LIFE_LEECH, baseStats.getLifeLeech());
@@ -397,6 +398,22 @@ public class StatsCombiner {
             ComputedStats intermediate = builder.build();
             float bonusArmor = intermediate.getEvasion() * (convertPct / 100f);
             builder.armor(intermediate.getArmor() + bonusArmor);
+        }
+
+        // DAMAGE_FROM_MANA_PERCENT: bonus spellDmg% from max mana pool
+        // Formula: bonusSpellDmg% = statValue (which is the total % bonus from mana)
+        // The stat value is pre-computed by the keystone: e.g., Arcane Reservoir sets 20.0
+        // meaning at 100 mana you get +20% spell damage (1% per 5 mana = 100/5 = 20%).
+        // Since this stat grows with max mana, we derive it here from the current max mana.
+        {
+            ComputedStats intermediate = builder.build();
+            float manaToSpell = intermediate.getDamageFromManaPercent();
+            if (manaToSpell > 0) {
+                // Interpret as "1% spell damage per (100/manaToSpell) mana"
+                // e.g., value=20 means 1% per 5 mana → at 150 mana: 150/5 = 30% spell dmg
+                float bonusPct = intermediate.getMaxMana() * (manaToSpell / 100f);
+                builder.spellDamagePercent(intermediate.getSpellDamagePercent() + bonusPct);
+            }
         }
 
         return builder.build();

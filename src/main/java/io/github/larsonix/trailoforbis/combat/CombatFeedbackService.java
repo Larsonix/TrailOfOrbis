@@ -32,10 +32,10 @@ public final class CombatFeedbackService {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     // ── Particle IDs ─────────────────────────────────────────────────
-    // NOTE: Most combat particles are defined in Hytale's decompiled Assets.zip but are
-    // NOT shipped in the live client build. Referencing them causes "Could not find particle
-    // system settings" warnings on every hit (903+ per session). Only particles confirmed
-    // to exist in the live client are kept here.
+    // NOTE: Most combat particles are defined in Hytale's Assets.zip but are NOT shipped
+    // in the live client build. Referencing them causes "Could not find particle system
+    // settings" warnings on every hit (903+ per session). Only particles confirmed to
+    // exist in the live client are kept here.
     //
     // Disabled particles (exist in Assets.zip, not in live client):
     //   Combat/Sword/Basic/Impact_Blade_01, Combat/Impact/Critical/Impact_Critical,
@@ -106,9 +106,8 @@ public final class CombatFeedbackService {
             @Nonnull DamageBreakdown breakdown,
             float rpgDamage) {
         // All combat impact particles (Impact_Blade_01, Impact_Critical, elemental impacts,
-        // Effect_Heal) are defined in Hytale's decompiled Assets.zip but NOT shipped in the
-        // live client build. Re-enable when Hytale ships these particles or when we create
-        // custom replacements.
+        // Effect_Heal) are defined in Hytale's Assets.zip but NOT shipped in the live client
+        // build. Re-enable when Hytale ships these particles or when we create custom replacements.
     }
 
     /**

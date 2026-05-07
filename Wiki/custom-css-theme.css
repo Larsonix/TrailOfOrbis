@@ -740,14 +740,13 @@ aside a,
    ================================================================ */
 
 .prose .too-rarity-badge {
-  display: inline-flex;
-  align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.78em;
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  justify-self: center;
 }
 
 .prose .too-r-common    { color: #C9D2DD; border: 1px solid #C9D2DD; }
@@ -774,8 +773,8 @@ aside a,
 
 .prose .too-item-header {
   display: grid;
-  grid-template-columns: 1fr 100px 70px 2fr;
-  gap: 8px;
+  grid-template-columns: 1fr 110px 70px 2fr;
+  gap: 0 12px;
   padding: 6px 12px;
   color: oklch(0.55 0.03 70);
   font-size: 0.75em;
@@ -787,8 +786,8 @@ aside a,
 
 .prose .too-item-row {
   display: grid;
-  grid-template-columns: 1fr 100px 70px 2fr;
-  gap: 8px;
+  grid-template-columns: 1fr 110px 70px 2fr;
+  gap: 0 12px;
   align-items: center;
   padding: 6px 12px;
   border-bottom: 1px solid oklch(0.22 0.008 55);

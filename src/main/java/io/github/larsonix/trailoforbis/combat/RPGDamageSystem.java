@@ -58,6 +58,8 @@ import io.github.larsonix.trailoforbis.combat.deathrecap.CombatSnapshot;
 import io.github.larsonix.trailoforbis.combat.deathrecap.DeathRecapRecorder;
 import io.github.larsonix.trailoforbis.combat.detection.DamageTypeClassifier;
 import io.github.larsonix.trailoforbis.combat.durability.DurabilityHandler;
+import io.github.larsonix.trailoforbis.combat.effects.CombatEffectContext;
+import io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry;
 import io.github.larsonix.trailoforbis.combat.indicators.CombatIndicatorService;
 import io.github.larsonix.trailoforbis.combat.indicators.CombatIndicatorService.CombatTextParams;
 import io.github.larsonix.trailoforbis.combat.modifiers.ConditionalMultiplierCalculator;
@@ -190,8 +192,19 @@ public class RPGDamageSystem extends DamageEventSystem {
     private volatile DeathRecapRecorder deathRecapRecorder;
     private volatile CombatRequirementNotifier requirementNotifier;
 
+    /** Combat effect registry for keystone behavioral effects. */
+    @Nullable
+    private volatile CombatEffectRegistry combatEffectRegistry;
+
     public RPGDamageSystem(@Nonnull TrailOfOrbis plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Sets the combat effect registry. Called from TrailOfOrbis after registry initialization.
+     */
+    public void setCombatEffectRegistry(@Nullable CombatEffectRegistry registry) {
+        this.combatEffectRegistry = registry;
     }
 
     // ==================== Lazy Initialization ====================
@@ -541,7 +554,7 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // ========== PHASE 5.5: ACTIVE BLOCKING REDUCTION ==========
         // Must run BEFORE Phase 6 (indicators) so damage numbers reflect the reduced amount.
-        applyActiveBlockingReduction(store, ctx);
+        applyActiveBlockingReduction(store, damage, commandBuffer, ctx);
 
         // ========== PHASE 6: METADATA & TRIGGERS ==========
         emitCombatFeedback(index, archetypeChunk, store, commandBuffer, damage, ctx);
@@ -566,6 +579,7 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Entity references
         Ref<EntityStore> defenderRef;
         @Nullable UUID defenderUuid;
+        @Nullable UUID attackerUuid;
 
         // Health state
         EntityStatMap statMap;
@@ -616,6 +630,40 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Post-calc state
         float rpgDamage;
         boolean wasParried;
+
+        /** Builds a CombatEffectContext from this DamageContext for the effect registry. */
+        CombatEffectContext toEffectContext(Damage damage, Store<EntityStore> store,
+                                            @Nullable CommandBuffer<EntityStore> commandBuffer) {
+            // Resolve attacker ref and health for effects that need it
+            Ref<EntityStore> atkRef = null;
+            float atkHealthPct = -1f;
+            try {
+                if (attackerUuid != null) {
+                    atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
+                    if (atkRef != null && atkRef.isValid()) {
+                        var atkStatMap = store.getComponent(atkRef, EntityStatMap.getComponentType());
+                        if (atkStatMap != null) {
+                            int hpIdx = DefaultEntityStatTypes.getHealth();
+                            EntityStatValue hpStat = atkStatMap.get(hpIdx);
+                            if (hpStat != null) {
+                                atkHealthPct = hpStat.getMax() > 0 ? hpStat.get() / hpStat.getMax() : 1f;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Best-effort — some damage sources may not have valid refs
+            }
+            return new CombatEffectContext(
+                attackerUuid, defenderUuid, attackerStats, defenderStats,
+                attackerElemental, defenderElemental, breakdown, trace,
+                attackType != null ? attackType : AttackType.UNKNOWN,
+                spellElement, rpgDamage, rpgBaseDamage,
+                healthBefore, maxHealth,
+                breakdown != null && breakdown.wasCritical(),
+                damage, store, defenderRef, atkRef, commandBuffer, atkHealthPct
+            );
+        }
     }
 
     // ==================== Damage Pipeline Phase Methods ====================
@@ -639,6 +687,7 @@ public class RPGDamageSystem extends DamageEventSystem {
         ctx.defenderElemental = statsResolver.getDefenderElementalStats(index, archetypeChunk, store, ctx.defenderStats);
         ctx.defenderHealthPercent = entityResolver.getDefenderHealthPercent(index, archetypeChunk, store);
         ctx.defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
+        ctx.attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
 
         // Check if this is a hex spell routed through the main pipeline.
         // Gate on HEX_SPELL_BASE_DAMAGE (always set for hex spells), not element
@@ -746,6 +795,19 @@ public class RPGDamageSystem extends DamageEventSystem {
                         weaponItemId, ctx.spellElement != null ? ctx.spellElement.name() : "NONE",
                         fixedElement != null);
                 }
+            }
+        }
+
+        // Elemental physical weapon: base damage goes into element slot, attack type stays as-is.
+        // This is separate from the magic weapon override above — swords/axes/bows with
+        // elemental implicits (from loot discovery) keep MELEE/PROJECTILE attack type but
+        // place their base damage in the element slot so it's mitigated by resistance, not armor.
+        if (ctx.hasRpgWeapon && ctx.attackerStats != null && ctx.spellElement == null) {
+            ElementType weaponElement = ctx.attackerStats.getWeaponSpellElement();
+            if (weaponElement != null) {
+                ctx.spellElement = weaponElement;
+                LOGGER.at(Level.FINE).log("[DmgPipeline] Elemental weapon override: element=%s, attackType=%s",
+                    weaponElement.name(), ctx.attackType);
             }
         }
 
@@ -882,6 +944,15 @@ public class RPGDamageSystem extends DamageEventSystem {
         ctx.breakdown = modResult.breakdown();
         ctx.wasParried = modResult.wasParried();
 
+        // ── Combat Effect Hooks: Post-Calculation ──
+        // Runs after calculator + defense modifications (parry, shield, shock) but before
+        // realm modifiers and post-modification effects. Used by keystones that modify
+        // the player's own damage (BerserkersRage, Rampage, SkyPiercer, BladeDance).
+        if (combatEffectRegistry != null && ctx.attackerUuid != null) {
+            CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, commandBuffer);
+            ctx.rpgDamage = combatEffectRegistry.runPostCalculation(ctx.attackerUuid, effectCtx);
+        }
+
         // Unarmed damage penalty — players without weapons deal reduced damage (not for spells)
         if (!ctx.hasRpgWeapon && ctx.attackType != AttackType.SPELL
                 && ctx.attackerStats != null && !ctx.attackerStats.isMobStats()) {
@@ -936,47 +1007,12 @@ public class RPGDamageSystem extends DamageEventSystem {
         ctx.trace.setManaBuffer(modResult.manaBufferPercent(), modResult.manaAbsorbed());
         ctx.trace.setShockAmplification(modResult.shockBonusPercent(), modResult.damageBeforeShock());
 
-        // DETONATE_DOT_ON_CRIT: crits on DoT targets burst remaining DoT as true damage
-        if (ctx.breakdown.wasCritical() && ctx.attackerStats != null && ctx.attackerStats.getDetonateDotOnCrit() > 0
-                && ctx.defenderUuid != null) {
-            var ailmentTracker = plugin.getAilmentTracker();
-            if (ailmentTracker != null) {
-                float remainingDot = ailmentTracker.getRemainingDotDamage(ctx.defenderUuid);
-                if (remainingDot > 0) {
-                    float burstPct = ctx.attackerStats.getDetonateDotOnCrit();
-                    float burstDamage = remainingDot * (burstPct / 100f);
-                    ctx.rpgDamage += burstDamage;
-                    ailmentTracker.detonateAllDots(ctx.defenderUuid);
-
-                    // Sync ECS components — remove burn/poison components since DOTs were detonated
-                    if (ctx.defenderRef != null && ctx.defenderRef.isValid()) {
-                        if (io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent.TYPE != null) {
-                            commandBuffer.removeComponent(ctx.defenderRef,
-                                io.github.larsonix.trailoforbis.ailments.component.RpgBurnComponent.TYPE);
-                        }
-                        if (io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent.TYPE != null) {
-                            commandBuffer.removeComponent(ctx.defenderRef,
-                                io.github.larsonix.trailoforbis.ailments.component.RpgPoisonComponent.TYPE);
-                        }
-                    }
-
-                    LOGGER.at(Level.FINE).log("DoT detonation: %.1f remaining DoT × %.0f%% = %.1f burst damage",
-                        remainingDot, burstPct, burstDamage);
-                }
-            }
-        }
-
-        // SPELL_ECHO_CHANCE: spell attacks have X% chance to repeat for 50% as Void damage
-        // Gates on AttackType.SPELL (not DamageType.MAGIC) so all spell elements can echo
-        if (ctx.attackerStats != null && ctx.attackerStats.getSpellEchoChance() > 0
-                && ctx.attackType == AttackType.SPELL) {
-            float echoPct = ctx.attackerStats.getSpellEchoChance();
-            if (ThreadLocalRandom.current().nextFloat() * 100f < echoPct) {
-                float echoDamage = ctx.rpgDamage * 0.5f;
-                ctx.rpgDamage += echoDamage;
-                LOGGER.at(Level.FINE).log("Spell Echo: %.0f%% chance proc — %.1f echo damage (50%% of %.1f)",
-                    echoPct, echoDamage, ctx.rpgDamage - echoDamage);
-            }
+        // ── Combat Effect Hooks: Post-Modifications ──
+        // ChainDetonation (DoT burst on crit) and SpellEcho (spell repeat as Void)
+        // are now handled by CombatEffect implementations registered in the registry.
+        if (combatEffectRegistry != null) {
+            CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, commandBuffer);
+            ctx.rpgDamage = combatEffectRegistry.runPostModifications(ctx.attackerUuid, effectCtx);
         }
 
         // Log damage breakdown (FINE-level)
@@ -1011,10 +1047,22 @@ public class RPGDamageSystem extends DamageEventSystem {
             }
         }
 
-        // Apply ailments BEFORE indicators so the trace has ailment data for display
-        if (ctx.attackerElemental != null && ctx.attackerElemental.hasAnyElementalDamage()) {
+        // Apply ailments BEFORE indicators so the trace has ailment data for display.
+        // Gate on the ACTUAL hit damage (preDefenseElemental), not the player's flat elemental
+        // stat sheet. Elemental weapons place base damage in the element slot and conversion
+        // moves physical→elemental — neither appears in ElementalStats.flatDamage, so the old
+        // hasAnyElementalDamage() gate blocked ailments for elemental weapons and conversion builds.
+        EnumMap<ElementType, Float> preDefElem = ctx.breakdown.preDefenseElemental();
+        boolean hitDealtElemental = false;
+        for (float v : preDefElem.values()) {
+            if (v > 0) { hitDealtElemental = true; break; }
+        }
+        if (hitDealtElemental) {
+            ElementalStats elemForAilment = ctx.attackerElemental != null
+                ? ctx.attackerElemental : new ElementalStats();
             AilmentSummary ailmentSummary = ailmentApplicator.tryApplyAilments(index, archetypeChunk, store, damage,
-                ctx.attackerElemental, ctx.attackerStats, ctx.maxHealth, ctx.defenderStats, commandBuffer);
+                elemForAilment, ctx.attackerStats, ctx.maxHealth, ctx.defenderStats, commandBuffer,
+                preDefElem);
             ctx.trace.setAilmentSummary(ailmentSummary);
         }
 
@@ -1123,6 +1171,9 @@ public class RPGDamageSystem extends DamageEventSystem {
             UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
             float realmHealMult = getRealmHealingMultiplier(attackerUuid);
 
+            // Berserker's Rage: life steal capped at 50% max HP
+            float leechCap = getBerserkersRageLeechCap(attackerUuid, store, damage);
+
             // Life Leech - always heals from damage dealt
             float lifeLeech = ctx.attackerStats.getLifeLeech();
             if (lifeLeech > 0) {
@@ -1131,9 +1182,12 @@ public class RPGDamageSystem extends DamageEventSystem {
                     healAmount *= (1.0f + healthRecoveryPct / 100.0f);
                 }
                 healAmount *= realmHealMult;
+                healAmount = Math.min(healAmount, leechCap);
                 ctx.trace.setLifeLeech(lifeLeech, healAmount);
-                recoveryProcessor.applyLifeLeech(store, damage, healAmount);
-                didHealHealth = true;
+                if (healAmount > 0) {
+                    recoveryProcessor.applyLifeLeech(store, damage, healAmount);
+                    didHealHealth = true;
+                }
             }
 
             // Mana Leech - always restores mana from damage dealt
@@ -1152,9 +1206,12 @@ public class RPGDamageSystem extends DamageEventSystem {
                     healAmount *= (1.0f + healthRecoveryPct / 100.0f);
                 }
                 healAmount *= realmHealMult;
+                healAmount = Math.min(healAmount, leechCap);
                 ctx.trace.setLifeSteal(lifeSteal, healAmount);
-                recoveryProcessor.applyLifeSteal(store, damage, healAmount);
-                didHealHealth = true;
+                if (healAmount > 0) {
+                    recoveryProcessor.applyLifeSteal(store, damage, healAmount);
+                    didHealHealth = true;
+                }
             }
 
             // Mana Steal - attacker gains AND enemy loses mana (only if enemy has mana)
@@ -1197,6 +1254,53 @@ public class RPGDamageSystem extends DamageEventSystem {
             }
 
             // Block heal/counter handled in emitCombatFeedback (Phase 6) which has index/archetypeChunk
+        }
+
+        // ── Combat Effect Hooks: Recovery ──
+        if (combatEffectRegistry != null && ctx.rpgDamage > 0) {
+            CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, null);
+            float extraRecovery = combatEffectRegistry.runOnRecovery(ctx.attackerUuid, effectCtx);
+            if (extraRecovery > 0 && ctx.attackerStats != null) {
+                recoveryProcessor.applyLifeLeech(store, damage, extraRecovery);
+            }
+        }
+    }
+
+    /**
+     * Returns the maximum HP that can be recovered via leech/steal for this attacker.
+     * If Berserker's Rage is active, caps recovery to not exceed 50% max HP.
+     * Returns Float.MAX_VALUE if no cap applies.
+     */
+    private float getBerserkersRageLeechCap(@Nullable UUID attackerUuid,
+                                             @Nonnull Store<EntityStore> store,
+                                             @Nonnull Damage damage) {
+        if (attackerUuid == null || combatEffectRegistry == null) return Float.MAX_VALUE;
+
+        // Check if berserkers_rage is active for this player
+        boolean hasRage = combatEffectRegistry.getActiveEffects(attackerUuid).stream()
+            .anyMatch(e -> "berserkers_rage".equals(e.getId()));
+        if (!hasRage) return Float.MAX_VALUE;
+
+        // Resolve attacker HP to enforce the 50% cap
+        Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
+        if (atkRef == null || !atkRef.isValid()) return Float.MAX_VALUE;
+
+        try {
+            EntityStatMap statMap = store.getComponent(atkRef, EntityStatMap.getComponentType());
+            if (statMap == null) return Float.MAX_VALUE;
+            EntityStatValue hpStat = statMap.get(DefaultEntityStatTypes.getHealth());
+            if (hpStat == null) return Float.MAX_VALUE;
+
+            float currentHp = hpStat.get();
+            float maxHp = hpStat.getMax();
+            float capHp = maxHp * 0.50f;
+
+            if (currentHp >= capHp) {
+                return 0f; // Already at or above 50% — no leech allowed
+            }
+            return capHp - currentHp; // Only heal up to the 50% threshold
+        } catch (Exception e) {
+            return Float.MAX_VALUE;
         }
     }
 
@@ -1397,6 +1501,12 @@ public class RPGDamageSystem extends DamageEventSystem {
                     }
                 }
                 triggerHandler.fireOnKillTrigger(store, damage);
+                // ── Combat Effect Hooks: On Kill ──
+                if (combatEffectRegistry != null && ctx.attackerUuid != null) {
+                    float overkill = ctx.rpgDamage - ctx.healthBefore;
+                    CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, commandBuffer);
+                    combatEffectRegistry.runOnKill(ctx.attackerUuid, ctx.defenderUuid != null ? ctx.defenderUuid : new UUID(0,0), overkill, effectCtx);
+                }
             } else {
                 triggerHandler.fireWhenHitTrigger(index, archetypeChunk, store);
             }
@@ -1414,6 +1524,15 @@ public class RPGDamageSystem extends DamageEventSystem {
             processEntityStatsOnHitManually(store, commandBuffer, damage);
 
             applyFinalDamage(store, commandBuffer, damage, ctx.statMap, ctx.healthIndex, ctx.healthBefore, ctx.rpgDamage, index, archetypeChunk);
+
+            // ── Combat Effect Hooks: On Kill (melee/projectile/staff-spell) ──
+            if (combatEffectRegistry != null && ctx.attackerUuid != null && ctx.rpgDamage >= ctx.healthBefore) {
+                float overkill = ctx.rpgDamage - ctx.healthBefore;
+                CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, commandBuffer);
+                combatEffectRegistry.runOnKill(ctx.attackerUuid,
+                    ctx.defenderUuid != null ? ctx.defenderUuid : new UUID(0, 0),
+                    overkill, effectCtx);
+            }
         }
     }
 
@@ -1537,11 +1656,34 @@ public class RPGDamageSystem extends DamageEventSystem {
         damage.putMetaObject(ATTACK_TYPE, AttackType.UNKNOWN);
         damage.setAmount(0);
 
-        indicatorService.sendDamageIndicatorsVisualOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
+        // Only show combat text if damage is positive — fully resisted DOTs (0.0) are silent
+        if (rpgDamage > 0f) {
+            indicatorService.sendDamageIndicatorsVisualOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
+        }
         damage.putMetaObject(INDICATORS_SENT, true);
 
         // SHIELD_REGEN_ON_DOT: restore energy shield to the DOT applicator
         processShieldRegenOnDot(damage, rpgDamage, store);
+
+        // Combat Effect Hooks: DoT recovery (burn leech, DoT heal, etc.)
+        if (combatEffectRegistry != null && rpgDamage > 0) {
+            UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
+            if (attackerUuid != null) {
+                // Build minimal context for DoT recovery
+                Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
+                CombatEffectContext dotCtx = new CombatEffectContext(
+                    attackerUuid, defenderUuid, null, defenderStats,
+                    null, defenderElemental, breakdown, null,
+                    AttackType.UNKNOWN, dotElement, rpgDamage, baseDamage,
+                    healthBefore, healthStat.getMax(), false,
+                    damage, store, defenderRef, atkRef, commandBuffer, -1f
+                );
+                float dotRecovery = combatEffectRegistry.runOnRecovery(attackerUuid, dotCtx);
+                if (dotRecovery > 0) {
+                    recoveryProcessor.applyLifeLeech(store, damage, dotRecovery);
+                }
+            }
+        }
 
         float newHealth = Math.max(0f, healthBefore - rpgDamage);
         if (newHealth <= 0) {
@@ -2071,6 +2213,23 @@ public class RPGDamageSystem extends DamageEventSystem {
             }
             default -> {} // PARRIED, MISSED - no special handling
         }
+
+        // ── Combat Effect Hooks: Avoidance ──
+        // Notify effects that an attack was avoided (BladeDance charges on evade, LifeStream heals).
+        if (combatEffectRegistry != null) {
+            UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
+            UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
+            if (defenderUuid != null) {
+                Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
+                CombatEffectContext avoidCtx = new CombatEffectContext(
+                    attackerUuid, defenderUuid, null, null, null, null,
+                    null, null, AttackType.UNKNOWN, null,
+                    0f, result.estimatedDamage(), 0f, 0f, false,
+                    damage, store, defenderRef, atkRef, null, -1f
+                );
+                combatEffectRegistry.runOnAvoidance(attackerUuid, defenderUuid, result.reason(), avoidCtx);
+            }
+        }
     }
 
     private void setDamageMetadata(
@@ -2159,6 +2318,8 @@ public class RPGDamageSystem extends DamageEventSystem {
      */
     private void applyActiveBlockingReduction(
         @Nonnull Store<EntityStore> store,
+        @Nonnull Damage damage,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
         @Nonnull DamageContext ctx
     ) {
         // Check if defender is actively blocking
@@ -2208,6 +2369,14 @@ public class RPGDamageSystem extends DamageEventSystem {
             hasShield ? "SHIELD" : "WEAPON",
             totalReduction * 100, baseReduction * 100, statBonus * 100,
             preDamage, ctx.rpgDamage);
+
+        // ── Combat Effect Hooks: Block ──
+        // Notify effects that damage was blocked (BloodFortress charges, LivingFortress heals).
+        float blockedDamage = preDamage - ctx.rpgDamage;
+        if (combatEffectRegistry != null && blockedDamage > 0 && ctx.defenderUuid != null) {
+            CombatEffectContext blockCtx = ctx.toEffectContext(damage, store, commandBuffer);
+            combatEffectRegistry.runOnBlock(ctx.defenderUuid, blockedDamage, ctx.rpgDamage, blockCtx);
+        }
     }
 
     private void applyFinalDamage(

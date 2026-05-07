@@ -24,8 +24,8 @@ public enum MobArchetype {
     /** Fragile, evasive, ranged. Low HP and armor, high evasion and speed. */
     RANGER("Ranger", 0.7, 1.1, 0.5, 1.5, 1.1, 15, 170, 0, 0, 0),
 
-    /** Glass cannon, elemental focus. Very low armor, high damage. */
-    CASTER("Caster", 0.6, 1.3, 0.3, 0.8, 0.9, 10, 180, 0, 0, 0),
+    /** Glass cannon, elemental focus. Very low armor, armor bypass via 100% conversion. */
+    CASTER("Caster", 0.6, 1.0, 0.3, 0.8, 0.9, 10, 180, 0, 0, 0),
 
     /** High crit, fast, evasive. Burst damage from critical strikes. */
     ASSASSIN("Assassin", 0.8, 1.4, 0.4, 1.8, 1.3, 30, 250, 20, 10, 0),

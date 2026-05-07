@@ -1,8 +1,10 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingEvents;
@@ -87,22 +89,42 @@ public class XpBarHudManager implements PersistentHud {
      * @param playerId  The player's UUID
      * @param playerRef The player reference
      * @param store     The entity store
+     * @param player    The Player component for direct MultiHud registration (null for safety-net paths)
      */
     public void showHud(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
-                        @Nonnull Store<EntityStore> store) {
+                        @Nonnull Store<EntityStore> store, @Nullable Player player) {
         // Discard any existing HUD — NOT hide()+remove() which sends Set commands
-        // to elements that may have been cleared by resetManagers() during world transition.
+        // to elements that may have been cleared by JoinWorld(clearWorld=true) during world transition.
         discardStaleHud(playerId);
 
         try {
             HyUIHud hud = XpBarHud.create(playerRef, store, levelingService);
             activeHuds.put(playerId, hud);
+
+            // Direct MultiHud registration — bypasses HyUI safeAdd()'s internal
+            // getReference() check which returns null during early world transitions.
+            // The event Player is guaranteed valid at PlayerReadyEvent time.
+            // HyUI's deferred safeAdd() still runs next tick as a harmless redundant rebuild.
+            if (player != null) {
+                MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
+            }
+
             if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
-            LOGGER.atInfo().log("Showed XP bar HUD for player %s", playerId.toString().substring(0, 8));
+            LOGGER.atInfo().log("Showed XP bar HUD for player %s (direct=%b)",
+                playerId.toString().substring(0, 8), player != null);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to show XP bar HUD for player %s",
                 playerId.toString().substring(0, 8));
         }
+    }
+
+    /**
+     * Shows the XP bar HUD without direct MultiHud registration.
+     * Used by non-restore callers where safeAdd() timing is acceptable.
+     */
+    public void showHud(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                        @Nonnull Store<EntityStore> store) {
+        showHud(playerId, playerRef, store, null);
     }
 
     /**
@@ -198,7 +220,7 @@ public class XpBarHudManager implements PersistentHud {
      * Removes a HUD synchronously using the hide + remove pattern.
      *
      * <p><b>Do NOT use during world transitions!</b> Use {@link #discardStaleHud(UUID)}
-     * instead. During world transitions, {@code Player.resetManagers()} has already
+     * instead. During world transitions, {@code JoinWorld(clearWorld=true)} has already
      * sent {@code CustomHud(clear=true)} to the client, destroying all HyUI elements.
      * Calling {@code hide()} sends {@code Set} commands referencing those cleared
      * elements, crashing the client.
@@ -210,7 +232,6 @@ public class XpBarHudManager implements PersistentHud {
         }
 
         try {
-            hud.hide();
             hud.remove();
             LOGGER.atFine().log("Removed XP bar HUD for player %s", playerId.toString().substring(0, 8));
         } catch (Exception e) {
@@ -222,6 +243,12 @@ public class XpBarHudManager implements PersistentHud {
     /**
      * Discards a stale HUD during world transitions WITHOUT sending packets.
      *
+     * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
+     * early-returns when {@code getStore()} returns null during transitions, skipping
+     * both {@code hideCustomHud} and {@code refreshTask.cancel()}. No MHUD cleanup
+     * needed: {@code JoinWorld(clearWorld=true)} clears the wrapper, and {@code restoreAll()}
+     * creates a fresh one.
+     *
      * @param playerId The player's UUID
      */
     public void discardStaleHud(@Nonnull UUID playerId) {
@@ -230,14 +257,9 @@ public class XpBarHudManager implements PersistentHud {
             return;
         }
 
-        try {
-            hud.remove();
-            LOGGER.atFine().log("Discarded stale XP bar HUD for player %s (world transition)",
-                playerId.toString().substring(0, 8));
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to discard stale XP bar HUD for player %s: %s",
-                playerId.toString().substring(0, 8), e.getMessage());
-        }
+        HudRefreshHelper.cancelRefreshTask(hud);
+        LOGGER.atFine().log("Discarded stale XP bar HUD for player %s (world transition)",
+            playerId.toString().substring(0, 8));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -283,7 +305,13 @@ public class XpBarHudManager implements PersistentHud {
     @Override
     public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
                         @Nonnull Store<EntityStore> store) {
-        showHud(playerId, playerRef, store);
+        showHud(playerId, playerRef, store, null);
+    }
+
+    @Override
+    public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                        @Nonnull Store<EntityStore> store, @Nullable Player player) {
+        showHud(playerId, playerRef, store, player);
     }
 
     @Override

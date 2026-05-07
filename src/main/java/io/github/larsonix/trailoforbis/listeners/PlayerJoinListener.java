@@ -48,6 +48,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.modules.interaction.Interactions;
+import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
 import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
 import io.github.larsonix.trailoforbis.sanctum.interactions.SkillNodeInteraction;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -323,6 +324,18 @@ public class PlayerJoinListener {
                             .insert(Message.raw("Updated ").color(MessageColors.WHITE))
                             .insert(Message.raw(String.valueOf(integrityResult.total())).color(MessageColors.WARNING))
                             .insert(Message.raw(" item(s) to the latest version.").color(MessageColors.WHITE)));
+                }
+            }
+
+            // Skill tree migration: auto-reset if allocated nodes no longer exist in current tree
+            if (rpgForMigration != null && rpgForMigration.getSkillTreeManager() != null) {
+                int orphaned = rpgForMigration.getSkillTreeManager().migrateOrphanedNodes(uuid);
+                if (orphaned > 0) {
+                    playerRef.sendMessage(Message.empty()
+                            .insert(Message.raw("[Trail of Orbis] ").color(MessageColors.GRAY))
+                            .insert(Message.raw("Skill tree has been reworked! Your ").color(MessageColors.WHITE))
+                            .insert(Message.raw(String.valueOf(orphaned)).color(MessageColors.WARNING))
+                            .insert(Message.raw(" allocated node(s) were reset and all points refunded.").color(MessageColors.WHITE)));
                 }
             }
         }
@@ -798,6 +811,11 @@ public class PlayerJoinListener {
         // Clean up ailment effects (Freeze slow)
         if (rpg != null && rpg.getAilmentEffectManager() != null) {
             rpg.getAilmentEffectManager().cleanup(uuid);
+        }
+
+        // Clean up combat effect registry state
+        if (rpg != null && rpg.getCombatEffectRegistry() != null) {
+            rpg.getCombatEffectRegistry().cleanup(uuid);
         }
 
         // Clean up combat trackers to prevent memory leaks

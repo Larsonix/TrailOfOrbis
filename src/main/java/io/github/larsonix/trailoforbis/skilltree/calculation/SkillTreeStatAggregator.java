@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.skilltree.calculation;
 
+import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeConfig;
 import io.github.larsonix.trailoforbis.skilltree.model.SkillTreeData;
@@ -7,6 +8,7 @@ import io.github.larsonix.trailoforbis.skilltree.model.StatModifier;
 import io.github.larsonix.trailoforbis.skilltree.synergy.SynergyNodeCalculator;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -39,6 +41,14 @@ public class SkillTreeStatAggregator {
     public SkillTreeStatAggregator(@Nonnull SkillTreeConfig config) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.synergyCalculator = new SynergyNodeCalculator(config);
+    }
+
+    /**
+     * Sets the player attribute data for ATTRIBUTE_SUM_SCALING synergy calculations.
+     * Must be called before aggregate() if octant nexus hubs use this synergy type.
+     */
+    public void setPlayerData(@Nullable PlayerData playerData) {
+        synergyCalculator.setPlayerData(playerData);
     }
 
     /**

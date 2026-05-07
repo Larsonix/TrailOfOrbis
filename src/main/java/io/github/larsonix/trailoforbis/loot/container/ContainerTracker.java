@@ -3,6 +3,7 @@ package io.github.larsonix.trailoforbis.loot.container;
 import com.hypixel.hytale.logger.HytaleLogger;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -93,7 +94,10 @@ public final class ContainerTracker {
     }
 
     /**
-     * Checks if a container has been processed.
+     * Checks if a container has been processed by any player.
+     *
+     * <p>Legacy per-position check (for admin/info use). For gameplay, use
+     * {@link #isProcessedByPlayer}.
      *
      * @param worldName The world name
      * @param x Block X coordinate
@@ -102,7 +106,7 @@ public final class ContainerTracker {
      * @return true if already processed and still in memory
      */
     public boolean isProcessed(@Nonnull String worldName, int x, int y, int z) {
-        ContainerKey key = new ContainerKey(worldName, x, y, z);
+        ContainerKey key = new ContainerKey(worldName, x, y, z, null);
         ProcessedState state = processedContainers.get(key);
 
         if (state == null) {
@@ -119,25 +123,51 @@ public final class ContainerTracker {
     }
 
     /**
-     * Marks a container as processed.
+     * Checks if a container has been processed for a specific player.
      *
      * @param worldName The world name
      * @param x Block X coordinate
      * @param y Block Y coordinate
      * @param z Block Z coordinate
-     * @param firstOpenerId UUID of the first player to open the container
-     * @return true if this was the first time marking (not already processed)
+     * @param playerId The player's UUID
+     * @return true if this player has already triggered loot replacement here
      */
-    public boolean markProcessed(@Nonnull String worldName, int x, int y, int z, @Nonnull UUID firstOpenerId) {
-        ContainerKey key = new ContainerKey(worldName, x, y, z);
-        ProcessedState newState = new ProcessedState(System.currentTimeMillis(), firstOpenerId);
+    public boolean isProcessedByPlayer(@Nonnull String worldName, int x, int y, int z, @Nonnull UUID playerId) {
+        ContainerKey key = new ContainerKey(worldName, x, y, z, playerId);
+        ProcessedState state = processedContainers.get(key);
+
+        if (state == null) {
+            return false;
+        }
+
+        if (isExpired(state)) {
+            processedContainers.remove(key);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Marks a container as processed for a specific player.
+     *
+     * @param worldName The world name
+     * @param x Block X coordinate
+     * @param y Block Y coordinate
+     * @param z Block Z coordinate
+     * @param openerId UUID of the player who triggered the loot replacement
+     * @return true if this was the first time this player opened this container
+     */
+    public boolean markProcessed(@Nonnull String worldName, int x, int y, int z, @Nonnull UUID openerId) {
+        ContainerKey key = new ContainerKey(worldName, x, y, z, openerId);
+        ProcessedState newState = new ProcessedState(System.currentTimeMillis(), openerId);
 
         // putIfAbsent returns null if the key wasn't present
         ProcessedState existing = processedContainers.putIfAbsent(key, newState);
 
         if (existing == null) {
-            LOGGER.atFine().log("Marked container as processed: %s at (%d, %d, %d)",
-                worldName, x, y, z);
+            LOGGER.atFine().log("Marked container as processed for %s: %s at (%d, %d, %d)",
+                openerId, worldName, x, y, z);
             return true;
         }
 
@@ -145,8 +175,8 @@ public final class ContainerTracker {
         if (isExpired(existing)) {
             // Replace expired entry
             processedContainers.put(key, newState);
-            LOGGER.atFine().log("Replaced expired container entry: %s at (%d, %d, %d)",
-                worldName, x, y, z);
+            LOGGER.atFine().log("Replaced expired container entry for %s: %s at (%d, %d, %d)",
+                openerId, worldName, x, y, z);
             return true;
         }
 
@@ -163,7 +193,7 @@ public final class ContainerTracker {
      * @return The processed state, or null if not processed
      */
     public ProcessedState getProcessedState(@Nonnull String worldName, int x, int y, int z) {
-        ContainerKey key = new ContainerKey(worldName, x, y, z);
+        ContainerKey key = new ContainerKey(worldName, x, y, z, null);
         ProcessedState state = processedContainers.get(key);
 
         if (state != null && isExpired(state)) {
@@ -183,7 +213,7 @@ public final class ContainerTracker {
      * @param z Block Z coordinate
      */
     public void remove(@Nonnull String worldName, int x, int y, int z) {
-        ContainerKey key = new ContainerKey(worldName, x, y, z);
+        ContainerKey key = new ContainerKey(worldName, x, y, z, null);
         processedContainers.remove(key);
     }
 
@@ -261,18 +291,23 @@ public final class ContainerTracker {
     // =========================================================================
 
     /**
-     * Unique key for a container based on its world position.
+     * Unique key for a container based on its world position and optionally a player.
+     *
+     * <p>When {@code playerId} is non-null, this key is per-player-per-container.
+     * When null, it's per-container only (legacy/admin use).
      *
      * @param worldName The world name
      * @param x Block X coordinate
      * @param y Block Y coordinate
      * @param z Block Z coordinate
+     * @param playerId The player UUID (nullable for position-only keys)
      */
     public record ContainerKey(
         @Nonnull String worldName,
         int x,
         int y,
-        int z
+        int z,
+        @Nullable UUID playerId
     ) {
         public ContainerKey {
             Objects.requireNonNull(worldName, "worldName cannot be null");

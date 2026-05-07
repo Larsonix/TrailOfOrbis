@@ -53,12 +53,16 @@ public class HudToggleService {
     /**
      * Hides a HUD if the player has toggled HUDs off.
      *
-     * <p>Call after {@code hud.show()} (initial creation) and after full
-     * rerender ({@code refreshOrRerender(true, true)}) which resets visibility.
+     * <p>Call after {@code hud.show()} (initial creation). Uses safe visibility
+     * via full rerender instead of {@code hud.hide()} which sends raw
+     * {@code Set} commands with stale selectors.
+     *
+     * <p><b>Not needed</b> after {@link HudRefreshHelper#safeRefreshWithToggle}
+     * — that method bakes visibility into the rerender atomically.
      */
     public void applyToggleState(@Nonnull UUID playerId, @Nonnull HyUIHud hud) {
         if (hiddenPlayers.contains(playerId)) {
-            hud.hide();
+            HudRefreshHelper.safeSetVisibility(hud, false);
         }
     }
 

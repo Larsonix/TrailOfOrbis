@@ -50,7 +50,8 @@ public final class GearConfigLoader {
      * their config files. The mapping follows a single rule: "the element that
      * grants the stat owns the requirement."
      *
-     * <p>Stats not in this map keep whatever the YAML specifies (or null).
+     * <p>Stats not in this map (and not in {@link #NO_REQUIREMENT_STATS}) keep
+     * whatever the YAML specifies (or null).
      */
     private static final Map<String, AttributeType> STAT_REQUIREMENT_OVERRIDES = Map.ofEntries(
             // FIRE — Glass Cannon: phys dmg, charged atk, crit mult, burn, ignite
@@ -60,22 +61,37 @@ public final class GearConfigLoader {
             Map.entry("crit_multiplier", AttributeType.FIRE),
             Map.entry("armor_penetration", AttributeType.FIRE),
             Map.entry("fire_damage", AttributeType.FIRE),
+            Map.entry("fire_penetration", AttributeType.FIRE),
             Map.entry("ignite_chance", AttributeType.FIRE),
             Map.entry("burn_damage", AttributeType.FIRE),
             Map.entry("burn_damage_percent", AttributeType.FIRE),
             Map.entry("charged_attack_damage_percent", AttributeType.FIRE),
-            Map.entry("thorns_damage", AttributeType.FIRE),
-            Map.entry("thorns_damage_percent", AttributeType.FIRE),
             Map.entry("damage_at_low_life", AttributeType.FIRE),
             Map.entry("execute_damage_percent", AttributeType.FIRE),
-            Map.entry("max_stamina", AttributeType.FIRE),
-            Map.entry("max_stamina_percent", AttributeType.FIRE),
+            Map.entry("burn_threshold", AttributeType.FIRE),
+            Map.entry("fire_conversion", AttributeType.FIRE),
+            Map.entry("signature_energy_max_percent", AttributeType.FIRE),
 
             // WATER — Arcane Mage: spell dmg, mana, ES, mana regen, freeze
+            Map.entry("spell_damage", AttributeType.WATER),
+            Map.entry("spell_damage_percent", AttributeType.WATER),
+            Map.entry("spell_penetration", AttributeType.WATER),
+            Map.entry("spell_crit_chance", AttributeType.WATER),
+            Map.entry("max_mana", AttributeType.WATER),
+            Map.entry("max_mana_percent", AttributeType.WATER),
+            Map.entry("mana_regen", AttributeType.WATER),
+            Map.entry("mana_cost_reduction", AttributeType.WATER),
+            Map.entry("energy_shield", AttributeType.WATER),
+            Map.entry("energy_shield_regen", AttributeType.WATER),
             Map.entry("water_damage", AttributeType.WATER),
             Map.entry("freeze_chance", AttributeType.WATER),
             Map.entry("freeze_damage", AttributeType.WATER),
             Map.entry("frost_damage_percent", AttributeType.WATER),
+            Map.entry("freeze_threshold", AttributeType.WATER),
+            Map.entry("water_conversion", AttributeType.WATER),
+            Map.entry("damage_vs_frozen_percent", AttributeType.WATER),
+            Map.entry("magic_power", AttributeType.WATER),
+            Map.entry("volatility_max", AttributeType.WATER),
 
             // LIGHTNING — Storm Blitz: atk speed, move speed, crit chance, stam regen, shock
             Map.entry("crit_chance", AttributeType.LIGHTNING),
@@ -91,18 +107,37 @@ public final class GearConfigLoader {
             Map.entry("stamina_regen", AttributeType.LIGHTNING),
             Map.entry("stamina_regen_percent", AttributeType.LIGHTNING),
             Map.entry("stamina_regen_start_delay", AttributeType.LIGHTNING),
+            Map.entry("max_stamina", AttributeType.LIGHTNING),
+            Map.entry("max_stamina_percent", AttributeType.LIGHTNING),
             Map.entry("cast_speed", AttributeType.LIGHTNING),
+            Map.entry("lightning_conversion", AttributeType.LIGHTNING),
+            Map.entry("damage_vs_shocked_percent", AttributeType.LIGHTNING),
+            Map.entry("shock_threshold", AttributeType.LIGHTNING),
+            Map.entry("signature_energy_per_hit", AttributeType.LIGHTNING),
 
-            // EARTH — Iron Fortress: max HP, armor, HP regen, block, KB resist
+            // EARTH — Iron Fortress: max HP, armor, HP regen, block, KB resist, tank mechanics
             Map.entry("max_health", AttributeType.EARTH),
             Map.entry("max_health_percent", AttributeType.EARTH),
             Map.entry("armor", AttributeType.EARTH),
             Map.entry("armor_percent", AttributeType.EARTH),
+            Map.entry("health_regen", AttributeType.EARTH),
+            Map.entry("health_regen_percent", AttributeType.EARTH),
+            Map.entry("health_recovery_percent", AttributeType.EARTH),
             Map.entry("block_chance", AttributeType.EARTH),
             Map.entry("block_damage_reduction", AttributeType.EARTH),
+            Map.entry("block_heal_percent", AttributeType.EARTH),
+            Map.entry("shield_effectiveness_percent", AttributeType.EARTH),
             Map.entry("knockback_resistance", AttributeType.EARTH),
             Map.entry("earth_damage", AttributeType.EARTH),
             Map.entry("earth_damage_percent", AttributeType.EARTH),
+            Map.entry("thorns_damage", AttributeType.EARTH),
+            Map.entry("thorns_damage_percent", AttributeType.EARTH),
+            Map.entry("reflect_damage_percent", AttributeType.EARTH),
+            Map.entry("crit_nullify_chance", AttributeType.EARTH),
+            Map.entry("critical_reduction", AttributeType.EARTH),
+            Map.entry("physical_resistance", AttributeType.EARTH),
+            Map.entry("stamina_drain_reduction", AttributeType.EARTH),
+            Map.entry("earth_conversion", AttributeType.EARTH),
 
             // WIND — Ghost Ranger: evasion, accuracy, proj dmg, jump, proj speed
             Map.entry("projectile_damage_percent", AttributeType.WIND),
@@ -118,20 +153,30 @@ public final class GearConfigLoader {
             Map.entry("wind_damage", AttributeType.WIND),
             Map.entry("wind_damage_percent", AttributeType.WIND),
             Map.entry("draw_accuracy", AttributeType.WIND),
+            Map.entry("wind_conversion", AttributeType.WIND),
+            Map.entry("fall_damage_reduction", AttributeType.WIND),
 
             // VOID — Life Devourer: life steal, true dmg, DoT, mana/kill, effect duration
             Map.entry("life_leech", AttributeType.VOID),
             Map.entry("life_steal", AttributeType.VOID),
             Map.entry("void_damage", AttributeType.VOID),
             Map.entry("dot_damage_percent", AttributeType.VOID),
-            Map.entry("spell_damage", AttributeType.VOID),
-            Map.entry("spell_damage_percent", AttributeType.VOID),
-            Map.entry("spell_penetration", AttributeType.VOID),
             Map.entry("mana_leech", AttributeType.VOID),
             Map.entry("mana_steal", AttributeType.VOID),
-            Map.entry("mana_cost_reduction", AttributeType.VOID),
             Map.entry("poison_damage", AttributeType.VOID),
-            Map.entry("status_effect_chance", AttributeType.VOID)
+            Map.entry("status_effect_chance", AttributeType.VOID),
+            Map.entry("all_elemental_damage_percent", AttributeType.VOID),
+            Map.entry("void_conversion", AttributeType.VOID)
+    );
+
+    /**
+     * Stats that should explicitly have NO attribute requirement, even if the
+     * YAML specifies one. Elemental resistances are universally accessible —
+     * any build can use resistance gear without attribute investment.
+     */
+    private static final Set<String> NO_REQUIREMENT_STATS = Set.of(
+            "fire_resistance", "water_resistance", "lightning_resistance",
+            "earth_resistance", "wind_resistance", "void_resistance"
     );
 
     private final Yaml yaml = new Yaml();
@@ -654,13 +699,24 @@ public final class GearConfigLoader {
             spellbookScaleFactor = ctx.getDouble(sb, "scale_factor");
         }
 
+        // Element weights — optional, defaults to 70/5 (matching loot-discovery.yml defaults)
+        double physicalWeight = 70.0;
+        double elementalWeightEach = 5.0;
+        if (data.containsKey("element_weights")) {
+            Map<String, Object> ew = (Map<String, Object>) data.get("element_weights");
+            physicalWeight = ctx.getDoubleOrDefault(ew, "physical", 70.0);
+            elementalWeightEach = ctx.getDoubleOrDefault(ew, "elemental_each", 5.0);
+        }
+
         LOGGER.at(Level.FINE).log(
-                "Parsed implicit damage config: enabled=%s, base=%.1f-%.1f, scale=%.1f, 2H=%.1fx, spellbook=%.2f-%.2f(s%.1f)",
+                "Parsed implicit damage config: enabled=%s, base=%.1f-%.1f, scale=%.1f, 2H=%.1fx, spellbook=%.2f-%.2f(s%.1f), elements=%.0f/%.0f",
                 enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier,
-                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor);
+                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor,
+                physicalWeight, elementalWeightEach);
 
         return new ImplicitDamageConfig(enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier,
-                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor);
+                spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor,
+                physicalWeight, elementalWeightEach);
     }
 
     @SuppressWarnings("unchecked")
@@ -973,9 +1029,12 @@ public final class GearConfigLoader {
         }
         // Authoritative override: ensures existing installs get corrected mappings
         // even if their YAML has the old wrong value (or is missing the key entirely)
-        AttributeType override = STAT_REQUIREMENT_OVERRIDES.get(stat.toLowerCase());
+        String statLower = stat.toLowerCase();
+        AttributeType override = STAT_REQUIREMENT_OVERRIDES.get(statLower);
         if (override != null) {
             requiredAttr = override;
+        } else if (NO_REQUIREMENT_STATS.contains(statLower)) {
+            requiredAttr = null;
         }
 
         // Optional: allowed slots

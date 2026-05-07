@@ -434,6 +434,10 @@ public class SkillTreeManager implements SkillTreeService {
         }
         Set<String> allocated = getAllocatedNodes(playerId);
         SynergyNodeCalculator calculator = new SynergyNodeCalculator(treeConfig);
+        // Provide player attribute data for ATTRIBUTE_SUM_SCALING synergies
+        ServiceRegistry.get(io.github.larsonix.trailoforbis.api.services.AttributeService.class)
+            .ifPresent(svc -> svc.getPlayerDataRepository().get(playerId)
+                .ifPresent(calculator::setPlayerData));
         return calculator.calculateProgress(node, node.getSynergy(), allocated);
     }
 
@@ -543,6 +547,57 @@ public class SkillTreeManager implements SkillTreeService {
             // Fire respec event for other systems to react (e.g., sanctum visual update)
             int pointsRefunded = updated.getSkillPoints() - pointsBeforeReset;
             eventDispatcher.dispatchRespec(playerId, clearedNodes, pointsRefunded, -1); // -1 = admin reset (unlimited)
+        }
+    }
+
+    /**
+     * Checks if a player's allocated nodes are orphaned (don't exist in the current tree config)
+     * and auto-resets if so. Returns the number of orphaned nodes found, or 0 if no migration needed.
+     *
+     * <p>This handles the case where the skill tree YAML is completely reworked (e.g., 1.0.6 → 1.0.7)
+     * and all old node IDs no longer exist. Without this, players would silently lose all their
+     * skill tree bonuses with no indication of what happened.
+     *
+     * <p>The reset uses the same logic as {@link #adminReset}: refunds totalPointsEarned as
+     * available skillPoints, resets to origin only, does NOT consume a free respec.
+     *
+     * @param playerId The player UUID
+     * @return Number of orphaned nodes found (0 = no migration needed)
+     */
+    public int migrateOrphanedNodes(@Nonnull UUID playerId) {
+        if (treeConfig == null) return 0;
+
+        synchronized (getLock(playerId)) {
+            SkillTreeData data = getSkillTreeData(playerId);
+            Set<String> allocated = data.getAllocatedNodes();
+
+            // Count nodes that don't exist in the current tree config
+            int orphanCount = 0;
+            for (String nodeId : allocated) {
+                if (ORIGIN_NODE_ID.equals(nodeId)) continue;
+                if (treeConfig.getNode(nodeId) == null) {
+                    orphanCount++;
+                }
+            }
+
+            if (orphanCount == 0) return 0;
+
+            // Auto-reset: same as adminReset but without event dispatch
+            int refundedPoints = data.getTotalPointsEarned();
+            SkillTreeData reset = data.toBuilder()
+                .allocatedNodes(Set.of(ORIGIN_NODE_ID))
+                .skillPoints(refundedPoints)
+                .lastModified(java.time.Instant.now())
+                .build();
+
+            repository.save(reset);
+            invalidatePlayerStats(playerId);
+
+            LOGGER.at(Level.INFO).log(
+                "Skill tree migration for %s: %d orphaned nodes reset, %d points refunded",
+                playerId, orphanCount, refundedPoints);
+
+            return orphanCount;
         }
     }
 

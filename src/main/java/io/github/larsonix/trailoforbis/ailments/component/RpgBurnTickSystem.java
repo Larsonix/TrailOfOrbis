@@ -13,7 +13,6 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentType;
@@ -37,6 +36,11 @@ import java.util.UUID;
 public class RpgBurnTickSystem extends EntityTickingSystem<EntityStore> {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /** Accumulation interval — fire damage every 0.5s instead of every ECS tick (~50ms).
+     *  Without this, each tick deals DPS×dt (micro-damage) which floors to "0" in combat text
+     *  and gets over-reduced by per-tick defense application. 0.5s matches PoE/D4 DOT cadence. */
+    private static final float DOT_TICK_INTERVAL = 0.5f;
 
     private final AilmentTracker tracker;
     private volatile DamageCause burnCause;
@@ -68,16 +72,25 @@ public class RpgBurnTickSystem extends EntityTickingSystem<EntityStore> {
         // Decrement duration
         burn.setRemainingDuration(burn.getRemainingDuration() - dt);
 
-        // Fire damage
-        float damage = burn.getDps() * dt;
-        if (damage > 0) {
-            Damage.Source source = resolveSource(burn.getSourceUuid(), store);
-            Damage dmgEvent = new Damage(source, getBurnCause(), damage);
-            DamageSystems.executeDamage(ref, commandBuffer, dmgEvent);
+        // Accumulate time — only fire damage at intervals (not every ECS tick)
+        float elapsed = burn.getElapsedSinceTick() + dt;
+        boolean expired = burn.isExpired();
+
+        if (elapsed >= DOT_TICK_INTERVAL || expired) {
+            // Fire accumulated damage as a single chunk
+            float damage = burn.getDps() * elapsed;
+            if (damage > 0) {
+                Damage.Source source = DotSourceResolver.resolveSource(burn.getSourceUuid(), store);
+                Damage dmgEvent = new Damage(source, getBurnCause(), damage);
+                DamageSystems.executeDamage(ref, commandBuffer, dmgEvent);
+            }
+            burn.setElapsedSinceTick(0f);
+        } else {
+            burn.setElapsedSinceTick(elapsed);
         }
 
         // Remove if expired
-        if (burn.isExpired()) {
+        if (expired) {
             commandBuffer.removeComponent(ref, RpgBurnComponent.TYPE);
 
             // Sync tracker
@@ -88,28 +101,6 @@ public class RpgBurnTickSystem extends EntityTickingSystem<EntityStore> {
 
             LOGGER.atFine().log("Burn expired on entity, component removed");
         }
-    }
-
-    @Nonnull
-    private Damage.Source resolveSource(@Nonnull UUID sourceUuid, @Nonnull Store<EntityStore> store) {
-        try {
-            PlayerRef playerRef = Universe.get().getPlayer(sourceUuid);
-            if (playerRef != null) {
-                Ref<EntityStore> ref = playerRef.getReference();
-                if (ref != null && ref.isValid()) {
-                    return new Damage.EntitySource(ref);
-                }
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            Ref<EntityStore> ref = store.getExternalData().getRefFromUUID(sourceUuid);
-            if (ref != null && ref.isValid()) {
-                return new Damage.EntitySource(ref);
-            }
-        } catch (Exception ignored) {}
-
-        return Damage.NULL_SOURCE;
     }
 
     @javax.annotation.Nullable

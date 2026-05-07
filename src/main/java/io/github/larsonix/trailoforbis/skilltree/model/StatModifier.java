@@ -178,4 +178,67 @@ public class StatModifier {
         String actualPrefix = (value >= 0) ? prefix : "";
         return actualPrefix + valueStr + suffix + " " + stat.getShortName();
     }
+
+    /**
+     * Returns a readable string using the full display name for detail HUDs and pages.
+     *
+     * <p>Same value formatting as {@link #toShortString()} but uses
+     * {@link StatType#getDisplayName()} for player-friendly readability.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>FLAT: "+3 Physical Damage"</li>
+     *   <li>PERCENT: "+5% Critical Chance"</li>
+     *   <li>MULTIPLIER: "50% more Fire Damage"</li>
+     * </ul>
+     */
+    @Nonnull
+    public String toDisplayString() {
+        if (type == null || stat == null) {
+            return "???";
+        }
+
+        String valueStr = value == (int) value
+            ? String.valueOf((int) value)
+            : String.format("%.1f", value);
+
+        String prefix;
+        String suffix;
+        switch (type) {
+            case FLAT:
+                prefix = "+";
+                suffix = stat.isInherentlyPercent() ? "%" : "";
+                break;
+            case PERCENT:
+                prefix = "+";
+                suffix = "%";
+                break;
+            case MULTIPLIER:
+                prefix = "";
+                suffix = "% more";
+                break;
+            case PENETRATION:
+                prefix = "+";
+                suffix = "%";
+                break;
+            case CONVERSION:
+                prefix = "";
+                suffix = "%";
+                break;
+            case STATUS_CHANCE:
+                prefix = "+";
+                suffix = "%";
+                break;
+            case STATUS_DURATION:
+                prefix = "+";
+                suffix = "%";
+                break;
+            default:
+                prefix = "";
+                suffix = "";
+        }
+
+        String actualPrefix = (value >= 0) ? prefix : "";
+        return actualPrefix + valueStr + suffix + " " + stat.getDisplayName();
+    }
 }

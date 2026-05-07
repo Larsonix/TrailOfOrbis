@@ -29,6 +29,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -201,6 +202,31 @@ public class CombatAilmentApplicator {
         @Nullable ComputedStats defenderStats,
         @Nullable CommandBuffer<EntityStore> commandBuffer
     ) {
+        return tryApplyAilments(index, archetypeChunk, store, damage,
+            attackerElemental, attackerStats, defenderMaxHealth, defenderStats, commandBuffer, null);
+    }
+
+    /**
+     * Attempts to apply ailments from elemental damage, using actual hit damage values.
+     *
+     * @param hitElementalDamage Per-element damage from the actual hit (pre-defense).
+     *        When provided, ailment magnitude scales from the real hit damage instead of
+     *        the attacker's flat elemental stat. This is the PoE model: a 50-damage fire
+     *        hit produces a meaningful burn, not a 5-flat-fire-stat burn.
+     */
+    @Nonnull
+    public AilmentSummary tryApplyAilments(
+        int index,
+        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Damage damage,
+        @Nullable ElementalStats attackerElemental,
+        @Nullable ComputedStats attackerStats,
+        float defenderMaxHealth,
+        @Nullable ComputedStats defenderStats,
+        @Nullable CommandBuffer<EntityStore> commandBuffer,
+        @Nullable EnumMap<ElementType, Float> hitElementalDamage
+    ) {
         if (attackerElemental == null) {
             return AilmentSummary.EMPTY;
         }
@@ -235,7 +261,10 @@ public class CombatAilmentApplicator {
 
         // Try to apply ailment for each element
         for (ElementType element : ElementType.values()) {
-            float elementalDamage = (float) attackerElemental.getFlatDamage(element);
+            // Use actual hit damage when available, fall back to flat stat
+            float elementalDamage = hitElementalDamage != null
+                ? hitElementalDamage.getOrDefault(element, 0f)
+                : (float) attackerElemental.getFlatDamage(element);
             if (elementalDamage <= 0) {
                 continue;
             }

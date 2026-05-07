@@ -334,9 +334,9 @@ class ContainerTierClassifierTest {
         @DisplayName("getRarityBonus falls back to enum default")
         void rarityBonusDefault() {
             assertEquals(0.0, classifier.getRarityBonus(ContainerTier.BASIC));
-            assertEquals(0.15, classifier.getRarityBonus(ContainerTier.DUNGEON));
-            assertEquals(0.30, classifier.getRarityBonus(ContainerTier.BOSS));
-            assertEquals(0.25, classifier.getRarityBonus(ContainerTier.SPECIAL));
+            assertEquals(0.25, classifier.getRarityBonus(ContainerTier.DUNGEON));
+            assertEquals(0.50, classifier.getRarityBonus(ContainerTier.BOSS));
+            assertEquals(0.35, classifier.getRarityBonus(ContainerTier.SPECIAL));
         }
 
         @Test

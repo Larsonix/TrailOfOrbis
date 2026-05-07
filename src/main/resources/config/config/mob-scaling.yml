@@ -244,15 +244,17 @@ dynamic_refresh:
 #   Flat fire damage:     100 × 2.0 = 200
 #   Fire resistance:      min(100 × 0.5, 50) + 15 = 65% (capped at 70%)
 #   Other resistances:    min(100 × 0.5, 50) = 50%
-#   Fire penetration:     min(100 × 0.3, 30) + 10 = 40% (capped at 50%)
+#   Fire penetration:     min(100 × 0.015, 2) + 1 = 3% (capped at 3%)
 
 elemental:
   # ==================== Damage Scaling ====================
 
-  # Flat elemental damage per mob level for affinity element
-  # Level 50 mob = 50 × 2.0 = 100 flat elemental damage
-  # Default: 2.0
-  damage_per_level: 2.0
+  # Flat elemental damage per mob level for affinity element.
+  # Set to 0 — caster mobs get elemental identity from 100% damage conversion
+  # (armor bypass), not from free flat damage outside the pool budget.
+  # Non-zero values add damage ON TOP of pool-based damage, breaking the curve.
+  # Default: 0.0
+  damage_per_level: 0.0
 
   # ==================== Resistance Scaling ====================
 
@@ -280,22 +282,22 @@ elemental:
 
   # Base penetration gain per mob level for affinity element only
   # Non-affinity mobs get no penetration
-  # Level 100 mob = 100 × 0.3 = 30% base penetration
-  # Default: 0.3
-  penetration_per_level: 0.3
+  # Level 100 mob = 100 × 0.015 = 1.5% base penetration
+  # Default: 0.015
+  penetration_per_level: 0.015
 
   # Maximum base penetration before affinity bonus (%)
-  # Default: 30.0
-  max_base_penetration: 30.0
+  # Default: 2.0
+  max_base_penetration: 2.0
 
   # Extra penetration for mob's primary affinity element (%)
-  # Default: 10.0
-  affinity_penetration_bonus: 10.0
+  # Default: 1.0
+  affinity_penetration_bonus: 1.0
 
   # Maximum penetration with affinity bonus (%)
   # Hard cap prevents mobs from fully bypassing resistances
-  # Default: 50.0
-  max_affinity_penetration: 50.0
+  # Default: 3.0
+  max_affinity_penetration: 3.0
 
   # NOTE: Elemental affinity assignment is now configured in mob-elements.yml
   # which provides NPCGroup detection (e.g., Void creatures → VOID damage),

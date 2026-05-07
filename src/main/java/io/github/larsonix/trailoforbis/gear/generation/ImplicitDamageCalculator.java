@@ -168,18 +168,19 @@ public final class ImplicitDamageCalculator {
         if (weaponType == WeaponType.SPELLBOOK) {
             return Set.of(MANA_REGEN);
         }
-        if (weaponType.isMagic()) {
-            // Magic weapons can have any element's damage type
-            Set<String> types = new HashSet<>();
-            for (ElementType element : ElementType.values()) {
-                types.add(element.getDamageTypeId());
-            }
-            // Also accept spell_damage (legacy/Hexcode display mode)
-            types.add(SPELL_DAMAGE);
-            return Set.copyOf(types);
+        // All weapons can have physical or any elemental damage type.
+        // Physical weapons get elemental implicits via loot discovery (30% chance).
+        // Magic weapons always get elemental implicits.
+        Set<String> types = new HashSet<>();
+        types.add(PHYSICAL_DAMAGE);
+        for (ElementType element : ElementType.values()) {
+            types.add(element.getDamageTypeId());
         }
-        // Physical weapons: only physical_damage
-        return Set.of(PHYSICAL_DAMAGE);
+        if (weaponType.isMagic()) {
+            // Also accept spell_damage (legacy items from before element storage)
+            types.add(SPELL_DAMAGE);
+        }
+        return Set.copyOf(types);
     }
 
     /**
@@ -193,6 +194,62 @@ public final class ImplicitDamageCalculator {
         // Only thrown consumables (BOMB, DART, KUNAI) are excluded — but they
         // don't reach generation at all (filtered in GearGenerator).
         return weaponType != WeaponType.UNKNOWN;
+    }
+
+    /**
+     * Rolls an element for a weapon using the configured element weights.
+     *
+     * <p>This is the single source of truth for element rolling when no external
+     * element is pre-resolved (crafting, admin commands, vanilla conversion).
+     * The loot pipeline pre-resolves elements via its own per-category weights
+     * in loot-discovery.yml, bypassing this method.
+     *
+     * <p>Behavior by weapon type:
+     * <ul>
+     *   <li>Magic weapons (staff, wand): Always elemental (uniform random)</li>
+     *   <li>Spellbooks: Always null (they get mana_regen, not damage)</li>
+     *   <li>Physical weapons: Weighted roll — default 70% physical, 30% elemental</li>
+     * </ul>
+     *
+     * @param weaponType The weapon type
+     * @param random The random source
+     * @return The rolled element, or null for physical damage
+     */
+    @Nullable
+    public ElementType rollElement(@Nonnull WeaponType weaponType, @Nonnull Random random) {
+        Objects.requireNonNull(weaponType, "weaponType cannot be null");
+        Objects.requireNonNull(random, "random cannot be null");
+
+        // Magic weapons always get elemental damage
+        if (weaponType.isMagic()) {
+            ElementType[] elements = ElementType.values();
+            return elements[random.nextInt(elements.length)];
+        }
+
+        // Spellbooks get mana_regen, not an element
+        if (weaponType == WeaponType.SPELLBOOK) {
+            return null;
+        }
+
+        // Physical weapons: weighted roll from config
+        double physWeight = config.physicalWeight();
+        double elemEach = config.elementalWeightEach();
+        ElementType[] elements = ElementType.values();
+        double totalWeight = physWeight + (elemEach * elements.length);
+
+        if (totalWeight <= 0) {
+            return null;
+        }
+
+        double roll = random.nextDouble() * totalWeight;
+        if (roll < physWeight) {
+            return null; // Physical
+        }
+
+        // Map to specific element
+        int index = (int) ((roll - physWeight) / elemEach);
+        index = Math.min(index, elements.length - 1);
+        return elements[index];
     }
 
     /**

@@ -177,14 +177,22 @@ public class SkillNodeDetailHud {
             content.append(buildDescription());
         }
 
-        // Stat bonuses
-        if (!node.getModifiers().isEmpty()) {
-            content.append(buildModifiersSection("Stat Bonuses", node.getModifiers(), RPGStyles.POSITIVE));
+        // Stat bonuses — filter internal-only stats (keystone effects described in description)
+        List<StatModifier> visibleMods = node.getModifiers().stream()
+            .filter(m -> m.getStat() == null || m.getStat().hasAccessor())
+            .toList();
+        if (!visibleMods.isEmpty()) {
+            content.append(buildModifiersSection("Stat Bonuses", visibleMods, RPGStyles.POSITIVE));
         }
 
-        // Drawbacks (keystones only)
+        // Drawbacks — also filter internal-only
         if (node.hasDrawbacks()) {
-            content.append(buildModifiersSection("Drawbacks", node.getDrawbacks(), RPGStyles.NEGATIVE));
+            List<StatModifier> visibleDrawbacks = node.getDrawbacks().stream()
+                .filter(m -> m.getStat() == null || m.getStat().hasAccessor())
+                .toList();
+            if (!visibleDrawbacks.isEmpty()) {
+                content.append(buildModifiersSection("Drawbacks", visibleDrawbacks, RPGStyles.NEGATIVE));
+            }
         }
 
         // Synergy info
@@ -249,27 +257,37 @@ public class SkillNodeDetailHud {
         // Type badge row
         height += 22 + SECTION_SPACING;
 
-        // Description (only for flavor-only nodes)
+        // Description
         if (shouldShowDescription()) {
             String description = node.getDescription();
-            int lines = Math.max(1, (description.length() + CHARS_PER_LINE - 1) / CHARS_PER_LINE);
-            height += lines * LINE_HEIGHT + SECTION_SPACING;
+            String[] sentences = description.split("(?<=\\.) ");
+            int descLines = 0;
+            for (String s : sentences) {
+                descLines += Math.max(1, (s.length() + CHARS_PER_LINE - 1) / CHARS_PER_LINE);
+            }
+            height += descLines * LINE_HEIGHT + SECTION_SPACING;
         }
 
         // Stat bonuses section (header font-size 10 + 4px spacing + lines font-size 12)
-        if (!node.getModifiers().isEmpty()) {
-            height += 10 + 4 + (node.getModifiers().size() * 14) + SECTION_SPACING;
+        long visibleModCount = node.getModifiers().stream()
+            .filter(m -> m.getStat() == null || m.getStat().hasAccessor()).count();
+        if (visibleModCount > 0) {
+            height += 10 + 4 + ((int) visibleModCount * 14) + SECTION_SPACING;
         }
 
         // Drawbacks section (keystones)
         if (node.hasDrawbacks()) {
-            height += 10 + 4 + (node.getDrawbacks().size() * 14) + SECTION_SPACING;
+            long visibleDrawbackCount = node.getDrawbacks().stream()
+                .filter(m -> m.getStat() == null || m.getStat().hasAccessor()).count();
+            if (visibleDrawbackCount > 0) {
+                height += 10 + 4 + ((int) visibleDrawbackCount * 14) + SECTION_SPACING;
+            }
         }
 
         // Synergy section: box with padding(6), label(font-size 10), description(font-size 11, may wrap), progress line
         if (node.hasSynergy()) {
             String synergyText = buildSynergyDescription(node.getSynergy(), node);
-            if (node.getSynergy().hasCap()) {
+            if (node.getSynergy().hasCap() && node.getSynergy().getCap() < 100.0) {
                 synergyText += " (cap: " + NumberFormatter.percent((float) node.getSynergy().getCap()) + ")";
             }
             // Synergy box is narrower: panel(320) - panel padding(32) - synergy padding(12) = ~276px
@@ -333,12 +351,29 @@ public class SkillNodeDetailHud {
      * Builds the description section.
      */
     private String buildDescription() {
+        String color = (node.isKeystone() || hasInternalStats()) ? RPGStyles.TEXT_PRIMARY : RPGStyles.TEXT_GRAY;
+        String desc = node.getDescription();
+
+        String[] sentences = desc.split("(?<=\\.) ");
+        StringBuilder lines = new StringBuilder();
+        for (String sentence : sentences) {
+            lines.append("<p style=\"font-size: 12; color: ").append(color)
+                 .append("; white-space: wrap;\">").append(escapeHtml(sentence)).append("</p>");
+        }
+
         return """
-            <div style="anchor-horizontal: 0;">
-                <p style="font-size: 12; color: %s; white-space: wrap;">%s</p>
+            <div style="anchor-horizontal: 0; layout-mode: Top;">
+                %s
             </div>
             <div style="anchor-height: %d;"></div>
-            """.formatted(RPGStyles.TEXT_GRAY, escapeHtml(node.getDescription()), SECTION_SPACING);
+            """.formatted(lines.toString(), SECTION_SPACING);
+    }
+
+    private boolean hasInternalStats() {
+        for (var mod : node.getModifiers()) {
+            if (mod.getStat() != null && !mod.getStat().hasAccessor()) return true;
+        }
+        return false;
     }
 
     /**
@@ -347,7 +382,7 @@ public class SkillNodeDetailHud {
     private String buildModifiersSection(String title, List<StatModifier> modifiers, String color) {
         StringBuilder lines = new StringBuilder();
         for (StatModifier mod : modifiers) {
-            String formatted = mod.toShortString();
+            String formatted = mod.toDisplayString();
             lines.append("""
                 <p style="font-size: 12; color: %s;">%s</p>
                 """.formatted(color, escapeHtml(formatted)));
@@ -368,7 +403,7 @@ public class SkillNodeDetailHud {
      */
     private String buildSynergySection(SynergyConfig synergy) {
         String description = buildSynergyDescription(synergy, node);
-        String capText = synergy.hasCap()
+        String capText = (synergy.hasCap() && synergy.getCap() < 100.0)
             ? " (cap: " + NumberFormatter.percent((float) synergy.getCap()) + ")"
             : "";
 
@@ -420,7 +455,7 @@ public class SkillNodeDetailHud {
         } else {
             // Node not allocated ->show preview
             if (synergyProgress.hasBonus()) {
-                text = String.format("%d %s -> would grant %s",
+                text = String.format("%d %s -> %s if allocated",
                     synergyProgress.currentCount(),
                     synergyProgress.countLabel(),
                     NumberFormatter.signedPercent((float) synergyProgress.currentBonus()));
@@ -474,6 +509,21 @@ public class SkillNodeDetailHud {
                 "%s %s per %d total nodes",
                 valueStr, statName, perCount
             );
+            case ATTRIBUTE_SUM_SCALING -> {
+                SkillTreeRegion[] adjacent = node.getSkillTreeRegion().getAdjacentRegions();
+                StringBuilder elements = new StringBuilder();
+                boolean first = true;
+                for (SkillTreeRegion adj : adjacent) {
+                    if (adj == SkillTreeRegion.CORE) continue;
+                    if (!first) elements.append("+");
+                    elements.append(adj.getDisplayName());
+                    first = false;
+                }
+                yield String.format(
+                    "%s %s per %s attribute point",
+                    valueStr, statName, elements
+                );
+            }
         };
     }
 
@@ -578,17 +628,24 @@ public class SkillNodeDetailHud {
 
     /**
      * Checks if we should show the description field.
-     * Only show for special nodes (Origin, Entry) that have flavor text.
-     * All other nodes have descriptions that duplicate their effect sections.
+     * Shows for: Origin, Entry nodes, Keystones, and any node with internal-only stats.
      */
     private boolean shouldShowDescription() {
-        // Don't show if empty
-        if (node.getDescription().isEmpty()) {
+        if (node.getDescription() == null || node.getDescription().isEmpty()) {
             return false;
         }
-        // Show for special nodes (Origin or Entry nodes)
-        // These have unique flavor text that doesn't duplicate the effect sections
-        return node.isStartNode() || node.getId().endsWith("_entry");
+        if (node.isStartNode() || node.getId().endsWith("_entry")) {
+            return true;
+        }
+        if (node.isKeystone()) {
+            return true;
+        }
+        for (var mod : node.getModifiers()) {
+            if (mod.getStat() != null && !mod.getStat().hasAccessor()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String getTypeBadge() {

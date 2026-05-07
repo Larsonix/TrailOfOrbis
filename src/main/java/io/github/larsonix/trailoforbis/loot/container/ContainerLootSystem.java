@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.gear.conversion.ItemClassifier;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaConversionConfig;
+import io.github.larsonix.trailoforbis.gear.generation.RarityRoller;
 import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
 import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
@@ -79,6 +80,7 @@ public final class ContainerLootSystem {
      * @param conversionConfig        The vanilla conversion config for item classification
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
+     * @param rarityRoller            Shared rarity roller (same as mob drops)
      */
     public ContainerLootSystem(
             @Nonnull ContainerLootConfig config,
@@ -86,20 +88,22 @@ public final class ContainerLootSystem {
             @Nullable RealmMapGenerator mapGenerator,
             @Nonnull VanillaConversionConfig conversionConfig,
             @Nonnull DropLevelBlender dropLevelBlender,
-            @Nullable RarityBonusCalculator rarityBonusCalculator) {
+            @Nullable RarityBonusCalculator rarityBonusCalculator,
+            @Nonnull RarityRoller rarityRoller) {
 
         this.config = Objects.requireNonNull(config, "config cannot be null");
         Objects.requireNonNull(lootGenerator, "lootGenerator cannot be null");
         // mapGenerator is nullable - map drops disabled if RealmsManager not available
         Objects.requireNonNull(conversionConfig, "conversionConfig cannot be null");
         Objects.requireNonNull(dropLevelBlender, "dropLevelBlender cannot be null");
+        Objects.requireNonNull(rarityRoller, "rarityRoller cannot be null");
 
         // Initialize components
         this.tracker = new ContainerTracker(config);
         this.tierClassifier = new ContainerTierClassifier(config);
         this.itemClassifier = new ItemClassifier(conversionConfig);
         this.lootGenerator = new ContainerLootGenerator(
-            config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator);
+            config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller);
         this.replacer = new ContainerLootReplacer(
             config, this.lootGenerator, itemClassifier, tierClassifier);
 
@@ -122,19 +126,21 @@ public final class ContainerLootSystem {
      * @param rewardChestManager          The reward chest manager (to skip reward chests), or null
      * @param realmsManager               The realms manager (for realm world detection), or null
      * @param processedContainerResType   The persistent resource type for tracking processed containers
+     * @param l4eBridge                   The L4E component bridge for stale lock cleanup, or null
      * @return The interceptor, or null if the system is disabled
      */
     @Nullable
     public ContainerLootInterceptor createInterceptor(
             @Nullable RewardChestManager rewardChestManager,
             @Nullable io.github.larsonix.trailoforbis.maps.RealmsManager realmsManager,
-            @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType) {
+            @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType,
+            @Nullable io.github.larsonix.trailoforbis.compat.L4EComponentBridge l4eBridge) {
         if (!enabled) {
             LOGGER.atInfo().log("Container loot system is disabled, not creating interceptor");
             return null;
         }
 
-        return new ContainerLootInterceptor(this, rewardChestManager, realmsManager, processedContainerResType);
+        return new ContainerLootInterceptor(this, rewardChestManager, realmsManager, processedContainerResType, l4eBridge);
     }
 
     /**
@@ -199,21 +205,17 @@ public final class ContainerLootSystem {
             return null;
         }
 
-        // Check if already processed
-        if (tracker.isProcessed(worldName, blockX, blockY, blockZ)) {
+        // Check if already processed for THIS player
+        if (tracker.isProcessedByPlayer(worldName, blockX, blockY, blockZ, playerId)) {
             if (config.getAdvanced().isDebugLogging()) {
-                LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed",
-                    blockX, blockY, blockZ, worldName);
+                LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed for player %s",
+                    blockX, blockY, blockZ, worldName, playerId);
             }
             return null;
         }
 
-        // Mark as processed first (prevents race conditions)
-        boolean wasFirstOpener = tracker.markProcessed(worldName, blockX, blockY, blockZ, playerId);
-        if (!wasFirstOpener) {
-            // Another thread processed it first
-            return null;
-        }
+        // Mark as processed for this player
+        tracker.markProcessed(worldName, blockX, blockY, blockZ, playerId);
 
         // Get player level
         int playerLevel = getPlayerLevel(playerId);
@@ -221,8 +223,11 @@ public final class ContainerLootSystem {
         // Classify container tier
         ContainerTier tier = tierClassifier.classify(blockTypeId);
 
+        // Admin/API path — no world context available, use player level as both source and target
+        ContainerLootContext lootContext = ContainerLootContext.overworld(playerLevel, playerLevel);
+
         // Perform replacement (player rarity bonus applied via playerId)
-        ContainerLootReplacer.ReplacementResult result = replacer.replace(container, playerLevel, tier, playerId);
+        ContainerLootReplacer.ReplacementResult result = replacer.replace(container, lootContext, tier, playerId);
 
         LOGGER.atInfo().log("Processed container at (%d, %d, %d): %s",
             blockX, blockY, blockZ, result.summary());

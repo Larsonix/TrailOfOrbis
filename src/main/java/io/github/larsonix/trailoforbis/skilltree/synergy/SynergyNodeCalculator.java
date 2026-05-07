@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.skilltree.synergy;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import io.github.larsonix.trailoforbis.database.models.PlayerData;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeRegion;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeConfig;
@@ -36,6 +37,10 @@ public class SynergyNodeCalculator {
 
     private final SkillTreeConfig config;
 
+    /** Player attribute data for ATTRIBUTE_SUM_SCALING synergies. Null if not provided. */
+    @Nullable
+    private PlayerData playerData;
+
     /**
      * Creates a new synergy calculator with the given skill tree configuration.
      *
@@ -43,6 +48,14 @@ public class SynergyNodeCalculator {
      */
     public SynergyNodeCalculator(@Nonnull SkillTreeConfig config) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
+    }
+
+    /**
+     * Sets the player attribute data for ATTRIBUTE_SUM_SCALING calculations.
+     * Must be called before calculateSynergyBonuses if any octant nexus hubs use this type.
+     */
+    public void setPlayerData(@Nullable PlayerData playerData) {
+        this.playerData = playerData;
     }
 
     /**
@@ -114,6 +127,19 @@ public class SynergyNodeCalculator {
                 }
             }
             case TOTAL_COUNT -> "total nodes";
+            case ATTRIBUTE_SUM_SCALING -> {
+                SkillTreeRegion octantRegion = node.getSkillTreeRegion();
+                SkillTreeRegion[] adjacent = octantRegion.getAdjacentRegions();
+                StringBuilder label = new StringBuilder();
+                boolean first = true;
+                for (SkillTreeRegion adj : adjacent) {
+                    if (adj == SkillTreeRegion.CORE) continue;
+                    if (!first) label.append("+");
+                    label.append(adj.getDisplayName());
+                    first = false;
+                }
+                yield label + " attribute points";
+            }
         };
     }
 
@@ -250,6 +276,43 @@ public class SynergyNodeCalculator {
                 }
             }
             case TOTAL_COUNT -> context.totalCount;
+            case ATTRIBUTE_SUM_SCALING -> {
+                // Sum attribute points from the octant's 3 parent elements
+                if (playerData == null) {
+                    yield 0;
+                }
+                SkillTreeRegion octantRegion = node.getSkillTreeRegion();
+                yield getAttributePointSum(octantRegion, playerData);
+            }
+        };
+    }
+
+    /**
+     * Gets the sum of attribute points in the 3 parent elements of an octant region.
+     * For elemental regions, returns that single element's points.
+     */
+    private int getAttributePointSum(@Nonnull SkillTreeRegion region, @Nonnull PlayerData data) {
+        SkillTreeRegion[] adjacent = region.getAdjacentRegions();
+        int sum = 0;
+        for (SkillTreeRegion adj : adjacent) {
+            if (adj == SkillTreeRegion.CORE) continue; // Skip CORE, only count elemental
+            sum += getElementPoints(adj, data);
+        }
+        return sum;
+    }
+
+    /**
+     * Maps a SkillTreeRegion to the player's attribute points for that element.
+     */
+    private int getElementPoints(@Nonnull SkillTreeRegion region, @Nonnull PlayerData data) {
+        return switch (region) {
+            case FIRE -> data.getFire();
+            case WATER -> data.getWater();
+            case LIGHTNING -> data.getLightning();
+            case EARTH -> data.getEarth();
+            case WIND -> data.getWind();
+            case VOID -> data.getVoidAttr();
+            default -> 0; // CORE and octant regions have no direct attribute points
         };
     }
 

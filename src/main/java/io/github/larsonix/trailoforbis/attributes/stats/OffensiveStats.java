@@ -45,6 +45,8 @@ public final class OffensiveStats {
     private float trueDamagePercent;
     /** X% of total dealt damage bypasses armor as true damage. */
     private float percentHitAsTrueDamage;
+    /** X% of Void damage dealt is also added as True Damage (bypasses all defenses). */
+    private float voidToTrueDamagePercent;
 
     // ==================== Damage Type Bonuses ====================
     private float meleeDamagePercent;
@@ -261,6 +263,7 @@ public final class OffensiveStats {
         this.chargedAttackDamagePercent = builder.chargedAttackDamagePercent;
         this.trueDamagePercent = builder.trueDamagePercent;
         this.percentHitAsTrueDamage = builder.percentHitAsTrueDamage;
+        this.voidToTrueDamagePercent = builder.voidToTrueDamagePercent;
         this.meleeDamagePercent = builder.meleeDamagePercent;
         this.projectileDamagePercent = builder.projectileDamagePercent;
         this.attackSpeedPercent = builder.attackSpeedPercent;
@@ -374,6 +377,10 @@ public final class OffensiveStats {
 
     public float getPercentHitAsTrueDamage() {
         return percentHitAsTrueDamage;
+    }
+
+    public float getVoidToTrueDamagePercent() {
+        return voidToTrueDamagePercent;
     }
 
     public float getMeleeDamagePercent() {
@@ -671,6 +678,10 @@ public final class OffensiveStats {
         this.percentHitAsTrueDamage = percentHitAsTrueDamage;
     }
 
+    public void setVoidToTrueDamagePercent(float voidToTrueDamagePercent) {
+        this.voidToTrueDamagePercent = voidToTrueDamagePercent;
+    }
+
     public void setMeleeDamagePercent(float meleeDamagePercent) {
         this.meleeDamagePercent = meleeDamagePercent;
     }
@@ -932,6 +943,7 @@ public final class OffensiveStats {
         chargedAttackDamagePercent = 0;
         trueDamagePercent = 0;
         percentHitAsTrueDamage = 0;
+        voidToTrueDamagePercent = 0;
         meleeDamagePercent = 0;
         projectileDamagePercent = 0;
         attackSpeedPercent = 0;
@@ -1011,6 +1023,7 @@ public final class OffensiveStats {
             .chargedAttackDamagePercent(chargedAttackDamagePercent)
             .trueDamagePercent(trueDamagePercent)
             .percentHitAsTrueDamage(percentHitAsTrueDamage)
+            .voidToTrueDamagePercent(voidToTrueDamagePercent)
             .meleeDamagePercent(meleeDamagePercent)
             .projectileDamagePercent(projectileDamagePercent)
             .attackSpeedPercent(attackSpeedPercent)
@@ -1083,6 +1096,7 @@ public final class OffensiveStats {
         private float chargedAttackDamagePercent;
         private float trueDamagePercent;
         private float percentHitAsTrueDamage;
+        private float voidToTrueDamagePercent;
         private float meleeDamagePercent;
         private float projectileDamagePercent;
         private float attackSpeedPercent;
@@ -1208,6 +1222,11 @@ public final class OffensiveStats {
 
         public Builder percentHitAsTrueDamage(float value) {
             this.percentHitAsTrueDamage = value;
+            return this;
+        }
+
+        public Builder voidToTrueDamagePercent(float value) {
+            this.voidToTrueDamagePercent = value;
             return this;
         }
 

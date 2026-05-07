@@ -20,7 +20,7 @@ import javax.annotation.Nullable;
  */
 public enum StatType {
     // Core Stats
-    MAX_HEALTH("maxHealth", "HP", "Max Health", false,
+    MAX_HEALTH("maxHealth", "Max Health", "Max Health", false,
         ComputedStats::getMaxHealth, ComputedStats.Builder::maxHealth),
     MAX_MANA("maxMana", "Mana", "Max Mana", false,
         ComputedStats::getMaxMana, ComputedStats.Builder::maxMana),
@@ -28,107 +28,107 @@ public enum StatType {
         ComputedStats::getMaxStamina, ComputedStats.Builder::maxStamina),
 
     // Flat Damage
-    PHYSICAL_DAMAGE("physicalDamage", "Phys DMG", "Physical Damage", false,
+    PHYSICAL_DAMAGE("physicalDamage", "Physical Damage", "Physical Damage", false,
         ComputedStats::getPhysicalDamage, ComputedStats.Builder::physicalDamage),
-    SPELL_DAMAGE("spellDamage", "Spell DMG", "Spell Damage", false,
+    SPELL_DAMAGE("spellDamage", "Spell Damage", "Spell Damage", false,
         ComputedStats::getSpellDamage, ComputedStats.Builder::spellDamage),
-    FIRE_DAMAGE("fireDamage", "Fire DMG", "Fire Damage", false,
+    FIRE_DAMAGE("fireDamage", "Fire Damage", "Fire Damage", false,
         ComputedStats::getFireDamage, ComputedStats.Builder::fireDamage),
-    WATER_DAMAGE("waterDamage", "Water DMG", "Water Damage", false,
+    WATER_DAMAGE("waterDamage", "Water Damage", "Water Damage", false,
         ComputedStats::getWaterDamage, ComputedStats.Builder::waterDamage),
-    LIGHTNING_DAMAGE("lightningDamage", "Light DMG", "Lightning Damage", false,
+    LIGHTNING_DAMAGE("lightningDamage", "Lightning Damage", "Lightning Damage", false,
         ComputedStats::getLightningDamage, ComputedStats.Builder::lightningDamage),
-    EARTH_DAMAGE("earthDamage", "Earth DMG", "Earth Damage", false,
+    EARTH_DAMAGE("earthDamage", "Earth Damage", "Earth Damage", false,
         ComputedStats::getEarthDamage, ComputedStats.Builder::earthDamage),
-    WIND_DAMAGE("windDamage", "Wind DMG", "Wind Damage", false,
+    WIND_DAMAGE("windDamage", "Wind Damage", "Wind Damage", false,
         ComputedStats::getWindDamage, ComputedStats.Builder::windDamage),
-    VOID_DAMAGE("voidDamage", "Void DMG", "Void Damage", false,
+    VOID_DAMAGE("voidDamage", "Void Damage", "Void Damage", false,
         ComputedStats::getVoidDamage, ComputedStats.Builder::voidDamage),
 
     // Percent Damage
-    PHYSICAL_DAMAGE_PERCENT("physicalDamagePercent", "Phys DMG", "Physical Damage", false,
+    PHYSICAL_DAMAGE_PERCENT("physicalDamagePercent", "Physical Damage", "Physical Damage", false,
         ComputedStats::getPhysicalDamagePercent, ComputedStats.Builder::physicalDamagePercent),
-    SPELL_DAMAGE_PERCENT("spellDamagePercent", "Spell DMG", "Spell Damage", false,
+    SPELL_DAMAGE_PERCENT("spellDamagePercent", "Spell Damage", "Spell Damage", false,
         ComputedStats::getSpellDamagePercent, ComputedStats.Builder::spellDamagePercent),
-    FIRE_DAMAGE_PERCENT("fireDamagePercent", "Fire DMG", "Fire Damage", false,
+    FIRE_DAMAGE_PERCENT("fireDamagePercent", "Fire Damage", "Fire Damage", false,
         ComputedStats::getFireDamagePercent, ComputedStats.Builder::fireDamagePercent),
-    WATER_DAMAGE_PERCENT("waterDamagePercent", "Water DMG", "Water Damage", false,
+    WATER_DAMAGE_PERCENT("waterDamagePercent", "Water Damage", "Water Damage", false,
         ComputedStats::getWaterDamagePercent, ComputedStats.Builder::waterDamagePercent),
-    LIGHTNING_DAMAGE_PERCENT("lightningDamagePercent", "Light DMG", "Lightning Damage", false,
+    LIGHTNING_DAMAGE_PERCENT("lightningDamagePercent", "Lightning Damage", "Lightning Damage", false,
         ComputedStats::getLightningDamagePercent, ComputedStats.Builder::lightningDamagePercent),
-    EARTH_DAMAGE_PERCENT("earthDamagePercent", "Earth DMG", "Earth Damage", false,
+    EARTH_DAMAGE_PERCENT("earthDamagePercent", "Earth Damage", "Earth Damage", false,
         ComputedStats::getEarthDamagePercent, ComputedStats.Builder::earthDamagePercent),
-    WIND_DAMAGE_PERCENT("windDamagePercent", "Wind DMG", "Wind Damage", false,
+    WIND_DAMAGE_PERCENT("windDamagePercent", "Wind Damage", "Wind Damage", false,
         ComputedStats::getWindDamagePercent, ComputedStats.Builder::windDamagePercent),
-    VOID_DAMAGE_PERCENT("voidDamagePercent", "Void DMG", "Void Damage", false,
+    VOID_DAMAGE_PERCENT("voidDamagePercent", "Void Damage", "Void Damage", false,
         ComputedStats::getVoidDamagePercent, ComputedStats.Builder::voidDamagePercent),
 
     // Damage Multipliers (PoE-style "more" damage)
-    FIRE_DAMAGE_MULTIPLIER("fireDamageMultiplier", "Fire DMG", "Fire Damage", true,
+    FIRE_DAMAGE_MULTIPLIER("fireDamageMultiplier", "Fire Damage", "Fire Damage", true,
         ComputedStats::getFireDamageMultiplier, ComputedStats.Builder::fireDamageMultiplier),
-    WATER_DAMAGE_MULTIPLIER("waterDamageMultiplier", "Water DMG", "Water Damage", true,
+    WATER_DAMAGE_MULTIPLIER("waterDamageMultiplier", "Water Damage", "Water Damage", true,
         ComputedStats::getWaterDamageMultiplier, ComputedStats.Builder::waterDamageMultiplier),
-    LIGHTNING_DAMAGE_MULTIPLIER("lightningDamageMultiplier", "Light DMG", "Lightning Damage", true,
+    LIGHTNING_DAMAGE_MULTIPLIER("lightningDamageMultiplier", "Lightning Damage", "Lightning Damage", true,
         ComputedStats::getLightningDamageMultiplier, ComputedStats.Builder::lightningDamageMultiplier),
-    EARTH_DAMAGE_MULTIPLIER("earthDamageMultiplier", "Earth DMG", "Earth Damage", true,
+    EARTH_DAMAGE_MULTIPLIER("earthDamageMultiplier", "Earth Damage", "Earth Damage", true,
         ComputedStats::getEarthDamageMultiplier, ComputedStats.Builder::earthDamageMultiplier),
-    WIND_DAMAGE_MULTIPLIER("windDamageMultiplier", "Wind DMG", "Wind Damage", true,
+    WIND_DAMAGE_MULTIPLIER("windDamageMultiplier", "Wind Damage", "Wind Damage", true,
         ComputedStats::getWindDamageMultiplier, ComputedStats.Builder::windDamageMultiplier),
-    VOID_DAMAGE_MULTIPLIER("voidDamageMultiplier", "Void DMG", "Void Damage", true,
+    VOID_DAMAGE_MULTIPLIER("voidDamageMultiplier", "Void Damage", "Void Damage", true,
         ComputedStats::getVoidDamageMultiplier, ComputedStats.Builder::voidDamageMultiplier),
 
     // Penetration (ignore enemy resistance)
-    FIRE_PENETRATION("firePenetration", "Fire Pen", "Fire Penetration", true,
+    FIRE_PENETRATION("firePenetration", "Fire Penetration", "Fire Penetration", true,
         ComputedStats::getFirePenetration, ComputedStats.Builder::firePenetration),
-    WATER_PENETRATION("waterPenetration", "Water Pen", "Water Penetration", true,
+    WATER_PENETRATION("waterPenetration", "Water Penetration", "Water Penetration", true,
         ComputedStats::getWaterPenetration, ComputedStats.Builder::waterPenetration),
-    LIGHTNING_PENETRATION("lightningPenetration", "Light Pen", "Lightning Penetration", true,
+    LIGHTNING_PENETRATION("lightningPenetration", "Lightning Pen", "Lightning Penetration", true,
         ComputedStats::getLightningPenetration, ComputedStats.Builder::lightningPenetration),
-    EARTH_PENETRATION("earthPenetration", "Earth Pen", "Earth Penetration", true,
+    EARTH_PENETRATION("earthPenetration", "Earth Penetration", "Earth Penetration", true,
         ComputedStats::getEarthPenetration, ComputedStats.Builder::earthPenetration),
-    WIND_PENETRATION("windPenetration", "Wind Pen", "Wind Penetration", true,
+    WIND_PENETRATION("windPenetration", "Wind Penetration", "Wind Penetration", true,
         ComputedStats::getWindPenetration, ComputedStats.Builder::windPenetration),
-    VOID_PENETRATION("voidPenetration", "Void Pen", "Void Penetration", true,
+    VOID_PENETRATION("voidPenetration", "Void Penetration", "Void Penetration", true,
         ComputedStats::getVoidPenetration, ComputedStats.Builder::voidPenetration),
-    ARMOR_PENETRATION("armorPenetration", "Armor Pen", "Armor Penetration", true,
+    ARMOR_PENETRATION("armorPenetration", "Armor Penetration", "Armor Penetration", true,
         ComputedStats::getArmorPenetration, ComputedStats.Builder::armorPenetration),
 
     // Conversion (convert source element to target)
-    FIRE_CONVERSION("fireConversion", "Fire Conv", "Fire Conversion", true,
+    FIRE_CONVERSION("fireConversion", "Fire Conversion", "Fire Conversion", true,
         ComputedStats::getFireConversion, ComputedStats.Builder::fireConversion),
-    WATER_CONVERSION("waterConversion", "Water Conv", "Water Conversion", true,
+    WATER_CONVERSION("waterConversion", "Water Conversion", "Water Conversion", true,
         ComputedStats::getWaterConversion, ComputedStats.Builder::waterConversion),
-    LIGHTNING_CONVERSION("lightningConversion", "Light Conv", "Lightning Conversion", true,
+    LIGHTNING_CONVERSION("lightningConversion", "Lightning Conv", "Lightning Conversion", true,
         ComputedStats::getLightningConversion, ComputedStats.Builder::lightningConversion),
-    EARTH_CONVERSION("earthConversion", "Earth Conv", "Earth Conversion", true,
+    EARTH_CONVERSION("earthConversion", "Earth Conversion", "Earth Conversion", true,
         ComputedStats::getEarthConversion, ComputedStats.Builder::earthConversion),
-    WIND_CONVERSION("windConversion", "Wind Conv", "Wind Conversion", true,
+    WIND_CONVERSION("windConversion", "Wind Conversion", "Wind Conversion", true,
         ComputedStats::getWindConversion, ComputedStats.Builder::windConversion),
-    VOID_CONVERSION("voidConversion", "Void Conv", "Void Conversion", true,
+    VOID_CONVERSION("voidConversion", "Void Conversion", "Void Conversion", true,
         ComputedStats::getVoidConversion, ComputedStats.Builder::voidConversion),
 
     // Status Effects
-    STATUS_EFFECT_CHANCE("statusEffectChance", "Status%", "Status Effect Chance", true,
+    STATUS_EFFECT_CHANCE("statusEffectChance", "Status Chance", "Status Effect Chance", true,
         ComputedStats::getStatusEffectChance, ComputedStats.Builder::statusEffectChance),
-    STATUS_EFFECT_DURATION("statusEffectDuration", "Status Dur", "Status Effect Duration", true,
+    STATUS_EFFECT_DURATION("statusEffectDuration", "Status Duration", "Status Effect Duration", true,
         ComputedStats::getStatusEffectDuration, ComputedStats.Builder::statusEffectDuration),
 
     // Elemental Ailment Damage
-    BURN_DAMAGE("burnDamage", "Burn DMG", "Burn Damage", false,
+    BURN_DAMAGE("burnDamage", "Burn Damage", "Burn Damage", false,
         ComputedStats::getBurnDamage, ComputedStats.Builder::burnDamage),
-    FREEZE_DAMAGE("freezeDamage", "Freeze DMG", "Freeze Damage", false,
+    FREEZE_DAMAGE("freezeDamage", "Freeze Damage", "Freeze Damage", false,
         ComputedStats::getFreezeDamage, ComputedStats.Builder::freezeDamage),
-    SHOCK_DAMAGE("shockDamage", "Shock DMG", "Shock Damage", false,
+    SHOCK_DAMAGE("shockDamage", "Shock Damage", "Shock Damage", false,
         ComputedStats::getShockDamage, ComputedStats.Builder::shockDamage),
-    POISON_DAMAGE("poisonDamage", "Poison DMG", "Poison Damage", false,
+    POISON_DAMAGE("poisonDamage", "Poison Damage", "Poison Damage", false,
         ComputedStats::getPoisonDamage, ComputedStats.Builder::poisonDamage),
 
     // Elemental Ailment Damage Percent
-    BURN_DAMAGE_PERCENT("burnDamagePercent", "Burn DMG", "Burn Damage", true,
+    BURN_DAMAGE_PERCENT("burnDamagePercent", "Burn Damage", "Burn Damage", true,
         ComputedStats::getBurnDamagePercent, ComputedStats.Builder::burnDamagePercent),
-    FROST_DAMAGE_PERCENT("frostDamagePercent", "Frost DMG", "Frost Damage", true,
+    FROST_DAMAGE_PERCENT("frostDamagePercent", "Frost Damage", "Frost Damage", true,
         ComputedStats::getFrostDamagePercent, ComputedStats.Builder::frostDamagePercent),
-    SHOCK_DAMAGE_PERCENT("shockDamagePercent", "Shock DMG", "Shock Damage", true,
+    SHOCK_DAMAGE_PERCENT("shockDamagePercent", "Shock Damage", "Shock Damage", true,
         ComputedStats::getShockDamagePercent, ComputedStats.Builder::shockDamagePercent),
 
     // Elemental Ailment Threshold
@@ -140,35 +140,35 @@ public enum StatType {
         ComputedStats::getShockThreshold, ComputedStats.Builder::shockThreshold),
 
     // Critical
-    CRITICAL_CHANCE("criticalChance", "Crit", "Critical Chance", true,
+    CRITICAL_CHANCE("criticalChance", "Crit Chance", "Critical Chance", true,
         ComputedStats::getCriticalChance, ComputedStats.Builder::criticalChance),
-    CRITICAL_MULTIPLIER("criticalMultiplier", "Crit Multi", "Crit Damage", true,
+    CRITICAL_MULTIPLIER("criticalMultiplier", "Crit Multiplier", "Critical Multiplier", true,
         ComputedStats::getCriticalMultiplier, ComputedStats.Builder::criticalMultiplier),
 
     // Attack Type Modifiers
-    MELEE_DAMAGE_PERCENT("meleeDamagePercent", "Melee DMG", "Melee Damage", false,
+    MELEE_DAMAGE_PERCENT("meleeDamagePercent", "Melee Damage", "Melee Damage", false,
         ComputedStats::getMeleeDamagePercent, ComputedStats.Builder::meleeDamagePercent),
-    PROJECTILE_DAMAGE_PERCENT("projectileDamagePercent", "Proj DMG", "Projectile Damage", false,
+    PROJECTILE_DAMAGE_PERCENT("projectileDamagePercent", "Projectile Damage", "Projectile Damage", false,
         ComputedStats::getProjectileDamagePercent, ComputedStats.Builder::projectileDamagePercent),
-    CHARGED_ATTACK_DAMAGE_PERCENT("chargedAttackDamagePercent", "Charged DMG", "Charged Attack Damage", false,
+    CHARGED_ATTACK_DAMAGE_PERCENT("chargedAttackDamagePercent", "Charged Attack Dmg", "Charged Attack Damage", false,
         ComputedStats::getChargedAttackDamagePercent, ComputedStats.Builder::chargedAttackDamagePercent),
 
     // Speed & Movement
-    MOVEMENT_SPEED_PERCENT("movementSpeedPercent", "Move Spd", "Movement Speed", false,
+    MOVEMENT_SPEED_PERCENT("movementSpeedPercent", "Movement Speed", "Movement Speed", false,
         ComputedStats::getMovementSpeedPercent, ComputedStats.Builder::movementSpeedPercent),
-    WALK_SPEED_PERCENT("walkSpeedPercent", "Walk Spd", "Walk Speed", false,
+    WALK_SPEED_PERCENT("walkSpeedPercent", "Walk Speed", "Walk Speed", false,
         ComputedStats::getWalkSpeedPercent, ComputedStats.Builder::walkSpeedPercent),
-    ATTACK_SPEED_PERCENT("attackSpeedPercent", "Atk Spd", "Attack Speed", false,
+    ATTACK_SPEED_PERCENT("attackSpeedPercent", "Attack Speed", "Attack Speed", false,
         ComputedStats::getAttackSpeedPercent, ComputedStats.Builder::attackSpeedPercent),
-    JUMP_FORCE_BONUS("jumpForceBonus", "Jump", "Jump Force", false,
+    JUMP_FORCE_BONUS("jumpForceBonus", "Jump Force", "Jump Force", false,
         ComputedStats::getJumpForceBonus, ComputedStats.Builder::jumpForceBonus),
-    JUMP_FORCE_PERCENT("jumpForcePercent", "Jump", "Jump Force", false,
+    JUMP_FORCE_PERCENT("jumpForcePercent", "Jump Force", "Jump Force", false,
         ComputedStats::getJumpForcePercent, ComputedStats.Builder::jumpForcePercent),
-    SPRINT_SPEED_BONUS("sprintSpeedBonus", "Sprint Spd", "Sprint Speed", false,
+    SPRINT_SPEED_BONUS("sprintSpeedBonus", "Sprint Speed", "Sprint Speed", false,
         ComputedStats::getSprintSpeedBonus, ComputedStats.Builder::sprintSpeedBonus),
-    CLIMB_SPEED_BONUS("climbSpeedBonus", "Climb Spd", "Climb Speed", false,
+    CLIMB_SPEED_BONUS("climbSpeedBonus", "Climb Speed", "Climb Speed", false,
         ComputedStats::getClimbSpeedBonus, ComputedStats.Builder::climbSpeedBonus),
-    CROUCH_SPEED_PERCENT("crouchSpeedPercent", "Crouch Spd", "Crouch Speed", false,
+    CROUCH_SPEED_PERCENT("crouchSpeedPercent", "Crouch Speed", "Crouch Speed", false,
         ComputedStats::getCrouchSpeedPercent, ComputedStats.Builder::crouchSpeedPercent),
 
     // Defense
@@ -178,51 +178,51 @@ public enum StatType {
         ComputedStats::getArmorPercent, ComputedStats.Builder::armorPercent),
     EVASION("evasion", "Evasion", "Evasion", false,
         ComputedStats::getEvasion, ComputedStats.Builder::evasion),
-    ENERGY_SHIELD("energyShield", "ES", "Energy Shield", false,
+    ENERGY_SHIELD("energyShield", "Energy Shield", "Energy Shield", false,
         ComputedStats::getEnergyShield, ComputedStats.Builder::energyShield),
-    ENERGY_SHIELD_PERCENT("energyShieldPercent", "ES", "Energy Shield", false,
+    ENERGY_SHIELD_PERCENT("energyShieldPercent", "Energy Shield", "Energy Shield", false,
         ComputedStats::getEnergyShieldPercent, ComputedStats.Builder::energyShieldPercent),
-    KNOCKBACK_RESISTANCE("knockbackResistance", "KB Res", "Knockback Resistance", true,
+    KNOCKBACK_RESISTANCE("knockbackResistance", "Knockback Res", "Knockback Resistance", true,
         ComputedStats::getKnockbackResistance, ComputedStats.Builder::knockbackResistance),
-    PARRY_CHANCE("parryChance", "Parry", "Parry Chance", true,
+    PARRY_CHANCE("parryChance", "Parry Chance", "Parry Chance", true,
         ComputedStats::getParryChance, ComputedStats.Builder::parryChance),
 
     // Resistances
-    FIRE_RESISTANCE("fireResistance", "Fire Res", "Fire Resistance", true,
+    FIRE_RESISTANCE("fireResistance", "Fire Resistance", "Fire Resistance", true,
         ComputedStats::getFireResistance, ComputedStats.Builder::fireResistance),
-    WATER_RESISTANCE("waterResistance", "Water Res", "Water Resistance", true,
+    WATER_RESISTANCE("waterResistance", "Water Resistance", "Water Resistance", true,
         ComputedStats::getWaterResistance, ComputedStats.Builder::waterResistance),
-    LIGHTNING_RESISTANCE("lightningResistance", "Light Res", "Lightning Resistance", true,
+    LIGHTNING_RESISTANCE("lightningResistance", "Lightning Res", "Lightning Resistance", true,
         ComputedStats::getLightningResistance, ComputedStats.Builder::lightningResistance),
-    EARTH_RESISTANCE("earthResistance", "Earth Res", "Earth Resistance", true,
+    EARTH_RESISTANCE("earthResistance", "Earth Resistance", "Earth Resistance", true,
         ComputedStats::getEarthResistance, ComputedStats.Builder::earthResistance),
-    WIND_RESISTANCE("windResistance", "Wind Res", "Wind Resistance", true,
+    WIND_RESISTANCE("windResistance", "Wind Resistance", "Wind Resistance", true,
         ComputedStats::getWindResistance, ComputedStats.Builder::windResistance),
-    VOID_RESISTANCE("voidResistance", "Void Res", "Void Resistance", true,
+    VOID_RESISTANCE("voidResistance", "Void Resistance", "Void Resistance", true,
         ComputedStats::getVoidResistance, ComputedStats.Builder::voidResistance),
 
     // Regeneration
-    HEALTH_REGEN("healthRegen", "HP Regen", "Health Regen", false,
+    HEALTH_REGEN("healthRegen", "Health Regen", "Health Regeneration", false,
         ComputedStats::getHealthRegen, ComputedStats.Builder::healthRegen),
-    MANA_REGEN("manaRegen", "Mana Regen", "Mana Regen", false,
+    MANA_REGEN("manaRegen", "Mana Regen", "Mana Regeneration", false,
         ComputedStats::getManaRegen, ComputedStats.Builder::manaRegen),
-    STAMINA_REGEN("staminaRegen", "Stam Regen", "Stamina Regen", false,
+    STAMINA_REGEN("staminaRegen", "Stamina Regen", "Stamina Regeneration", false,
         ComputedStats::getStaminaRegen, ComputedStats.Builder::staminaRegen),
-    HEALTH_REGEN_PERCENT("healthRegenPercent", "HP Regen", "Health Regen", false,
+    HEALTH_REGEN_PERCENT("healthRegenPercent", "Health Regen", "Health Regeneration", false,
         ComputedStats::getHealthRegenPercent, ComputedStats.Builder::healthRegenPercent),
-    MANA_REGEN_PERCENT("manaRegenPercent", "Mana Regen %", "Mana Regen", true,
+    MANA_REGEN_PERCENT("manaRegenPercent", "Mana Regen", "Mana Regeneration", true,
         ComputedStats::getManaRegenPercent, ComputedStats.Builder::manaRegenPercent),
-    ENERGY_SHIELD_REGEN("energyShieldRegen", "ES Regen", "Energy Shield Regen", false,
+    ENERGY_SHIELD_REGEN("energyShieldRegen", "ES Regen", "Energy Shield Regeneration", false,
         ComputedStats::getEnergyShieldRegen, ComputedStats.Builder::energyShieldRegen),
-    ENERGY_SHIELD_REGEN_PERCENT("energyShieldRegenPercent", "ES Regen %", "Energy Shield Regen", true,
+    ENERGY_SHIELD_REGEN_PERCENT("energyShieldRegenPercent", "ES Regen", "Energy Shield Regeneration", true,
         ComputedStats::getEnergyShieldRegenPercent, ComputedStats.Builder::energyShieldRegenPercent),
-    ENERGY_SHIELD_REGEN_DELAY("energyShieldRegenDelay", "ES Delay", "Energy Shield Regen Delay", false,
+    ENERGY_SHIELD_REGEN_DELAY("energyShieldRegenDelay", "ES Regen Delay", "Energy Shield Regen Delay", false,
         ComputedStats::getEnergyShieldRegenDelay, ComputedStats.Builder::energyShieldRegenDelay),
 
     // Global Damage
-    ALL_DAMAGE_PERCENT("allDamagePercent", "All DMG", "All Damage", false,
+    ALL_DAMAGE_PERCENT("allDamagePercent", "All Damage", "All Damage", false,
         ComputedStats::getAllDamagePercent, ComputedStats.Builder::allDamagePercent),
-    MELEE_DAMAGE("meleeDamage", "Melee DMG", "Melee Damage", false,
+    MELEE_DAMAGE("meleeDamage", "Melee Damage", "Melee Damage", false,
         ComputedStats::getMeleeDamage, ComputedStats.Builder::meleeDamage),
 
     // Accuracy & Evasion
@@ -232,7 +232,7 @@ public enum StatType {
         ComputedStats::getAccuracyPercent, ComputedStats.Builder::accuracyPercent),
     EVASION_PERCENT("evasionPercent", "Evasion", "Evasion", false,
         null, null),
-    DODGE_CHANCE("dodgeChance", "Dodge", "Dodge Chance", true,
+    DODGE_CHANCE("dodgeChance", "Dodge Chance", "Dodge Chance", true,
         ComputedStats::getDodgeChance, ComputedStats.Builder::dodgeChance),
 
     // Leech & Sustain
@@ -242,39 +242,39 @@ public enum StatType {
         ComputedStats::getManaLeech, ComputedStats.Builder::manaLeech),
 
     // Conditional
-    DAMAGE_AT_LOW_LIFE("damageAtLowLife", "Low Life DMG", "Damage at Low Life", false,
+    DAMAGE_AT_LOW_LIFE("damageAtLowLife", "Low Life Damage", "Damage at Low Life", false,
         ComputedStats::getDamageAtLowLife, ComputedStats.Builder::damageAtLowLife),
 
     // Cost
-    MANA_COST_REDUCTION("manaCostReduction", "Mana Cost", "Mana Cost Reduction", true,
+    MANA_COST_REDUCTION("manaCostReduction", "Mana Cost Reduce", "Mana Cost Reduction", true,
         ComputedStats::getManaCostReduction, ComputedStats.Builder::manaCostReduction),
 
     // Special
-    MANA_AS_DAMAGE_BUFFER("manaAsDamageBuffer", "Mana Shield", "Mana as Damage Buffer", false,
+    MANA_AS_DAMAGE_BUFFER("manaAsDamageBuffer", "Mana Buffer", "Mana as Damage Buffer", false,
         ComputedStats::getManaAsDamageBuffer, ComputedStats.Builder::manaAsDamageBuffer),
     EXPERIENCE_GAIN("experienceGain", "XP Gain", "Experience Gain", true,
         ComputedStats::getExperienceGainPercent, ComputedStats.Builder::experienceGainPercent),
-    CRIT_NULLIFY_CHANCE("critNullifyChance", "Crit Null", "Crit Nullify Chance", true,
+    CRIT_NULLIFY_CHANCE("critNullifyChance", "Crit Nullify", "Critical Nullification Chance", true,
         ComputedStats::getCritNullifyChance, ComputedStats.Builder::critNullifyChance),
-    CRITICAL_REDUCTION("criticalReduction", "Crit Red", "Critical Reduction", true,
+    CRITICAL_REDUCTION("criticalReduction", "Crit Reduction", "Critical Damage Reduction", true,
         ComputedStats::getCriticalReduction, ComputedStats.Builder::criticalReduction),
 
     // Active Block Modifiers
-    BLOCK_CHANCE("blockChance", "Block", "Block Chance", true,
+    BLOCK_CHANCE("blockChance", "Block Chance", "Block Chance", true,
         ComputedStats::getBlockChance, ComputedStats.Builder::blockChance),
-    BLOCK_DAMAGE_REDUCTION("blockDamageReduction", "Block Red", "Block Damage Reduction", true,
+    BLOCK_DAMAGE_REDUCTION("blockDamageReduction", "Block Reduction", "Block Damage Reduction", true,
         ComputedStats::getBlockDamageReduction, ComputedStats.Builder::blockDamageReduction),
-    STAMINA_DRAIN_REDUCTION("staminaDrainReduction", "Stam Drain", "Stamina Drain Reduction", true,
+    STAMINA_DRAIN_REDUCTION("staminaDrainReduction", "Stamina Drain Red", "Stamina Drain Reduction", true,
         ComputedStats::getStaminaDrainReduction, ComputedStats.Builder::staminaDrainReduction),
 
     // Resistances
-    ELEMENTAL_RESISTANCE("elementalResistance", "Elem Res", "Elemental Resistance", true,
+    ELEMENTAL_RESISTANCE("elementalResistance", "Elemental Res", "Elemental Resistance", true,
         null, null),
-    PHYSICAL_RESISTANCE("physicalResistance", "Phys Res", "Physical Resistance", true,
+    PHYSICAL_RESISTANCE("physicalResistance", "Physical Res", "Physical Resistance", true,
         ComputedStats::getPhysicalResistance, ComputedStats.Builder::physicalResistance),
 
     // Damage Reduction
-    FALL_DAMAGE_REDUCTION("fallDamageReduction", "Fall Red", "Fall Damage Reduction", true,
+    FALL_DAMAGE_REDUCTION("fallDamageReduction", "Fall Damage Red", "Fall Damage Reduction", true,
         ComputedStats::getFallDamageReduction, ComputedStats.Builder::fallDamageReduction),
 
     // ═══════════════════════════════════════════════════════════════════
@@ -283,53 +283,53 @@ public enum StatType {
     // ═══════════════════════════════════════════════════════════════════
 
     // Advanced Conversion (source-to-target type)
-    SPELL_TO_PHYSICAL_CONVERSION("spellToPhysicalConversion", "Spell>Phys", "Spell to Physical Conversion", true,
+    SPELL_TO_PHYSICAL_CONVERSION("spellToPhysicalConversion", "Spell ->Physical", "Spell to Physical Conversion", true,
         null, null),
-    PHYSICAL_TO_SPELL_CONVERSION("physicalToSpellConversion", "Phys>Spell", "Physical to Spell Conversion", true,
+    PHYSICAL_TO_SPELL_CONVERSION("physicalToSpellConversion", "Physical ->Spell", "Physical to Spell Conversion", true,
         null, null),
-    PHYSICAL_TO_FIRE_CONVERSION("physicalToFireConversion", "Phys>Fire", "Physical to Fire Conversion", true,
+    PHYSICAL_TO_FIRE_CONVERSION("physicalToFireConversion", "Physical ->Fire", "Physical to Fire Conversion", true,
         null, null),
-    DAMAGE_TO_MANA_CONVERSION("damageToManaConversion", "DMG>Mana", "Damage to Mana Conversion", true,
+    DAMAGE_TO_MANA_CONVERSION("damageToManaConversion", "Damage ->Mana", "Damage to Mana Conversion", true,
         null, null),
-    DAMAGE_TO_VOID_CONVERSION("damageToVoidConversion", "DMG>Void", "Damage to Void Conversion", true,
+    DAMAGE_TO_VOID_CONVERSION("damageToVoidConversion", "Damage ->Void", "Damage to Void Conversion", true,
         null, null),
 
     // Enemy Debuffs
-    ENEMY_ELEMENTAL_VULNERABILITY("enemyElementalVulnerability", "Elem Vuln", "Enemy Elemental Vulnerability", true,
+    ENEMY_ELEMENTAL_VULNERABILITY("enemyElementalVulnerability", "Elemental Vuln", "Enemy Elemental Vulnerability", true,
         null, null),
-    ENEMY_RESISTANCE_REDUCTION("enemyResistanceReduction", "Res Shred", "Enemy Resistance Reduction", true,
+    ENEMY_RESISTANCE_REDUCTION("enemyResistanceReduction", "Resistance Shred", "Enemy Resistance Reduction", true,
         null, null),
 
     // Percent Stats
-    MAX_HEALTH_PERCENT("maxHealthPercent", "HP", "Max Health", false,
+    MAX_HEALTH_PERCENT("maxHealthPercent", "Max Health", "Max Health", false,
         ComputedStats::getMaxHealthPercent, ComputedStats.Builder::maxHealthPercent),
-    MAX_MANA_PERCENT("maxManaPercent", "Mana", "Max Mana", false,
+    MAX_MANA_PERCENT("maxManaPercent", "Max Mana", "Max Mana", false,
         ComputedStats::getMaxManaPercent, ComputedStats.Builder::maxManaPercent),
-    DAMAGE_PERCENT("damagePercent", "DMG", "Damage", false,
+    DAMAGE_PERCENT("damagePercent", "All Damage", "All Damage", false,
         ComputedStats::getDamagePercent, ComputedStats.Builder::damagePercent),
-    DAMAGE_MULTIPLIER("damageMultiplier", "DMG", "Damage", true,
+    DAMAGE_MULTIPLIER("damageMultiplier", "All Damage", "All Damage", true,
         ComputedStats::getDamageMultiplier, ComputedStats.Builder::damageMultiplier),
-    DAMAGE_TAKEN_PERCENT("damageTakenPercent", "DMG Taken", "Damage Taken", false,
+    DAMAGE_TAKEN_PERCENT("damageTakenPercent", "Damage Taken", "Damage Taken", false,
         ComputedStats::getDamageTakenPercent, ComputedStats.Builder::damageTakenPercent),
-    DAMAGE_WHEN_HIT_PERCENT("damageWhenHitPercent", "DMG on Hit", "Damage When Hit", false,
+    DAMAGE_WHEN_HIT_PERCENT("damageWhenHitPercent", "Damage on Hit", "Damage When Hit", false,
         ComputedStats::getDamageWhenHitPercent, ComputedStats.Builder::damageWhenHitPercent),
-    THORNS_DAMAGE_PERCENT("thornsDamagePercent", "Thorns", "Thorns Damage", false,
+    THORNS_DAMAGE_PERCENT("thornsDamagePercent", "Thorns Damage", "Thorns Damage", false,
         ComputedStats::getThornsDamagePercent, ComputedStats.Builder::thornsDamagePercent),
-    EXECUTE_DAMAGE_PERCENT("executeDamagePercent", "Execute", "Execute Damage", false,
+    EXECUTE_DAMAGE_PERCENT("executeDamagePercent", "Execute Damage", "Execute Damage", false,
         ComputedStats::getExecuteDamagePercent, ComputedStats.Builder::executeDamagePercent),
-    DOT_DAMAGE_PERCENT("dotDamagePercent", "DoT DMG", "DoT Damage", false,
+    DOT_DAMAGE_PERCENT("dotDamagePercent", "DoT Damage", "Damage over Time", false,
         ComputedStats::getDotDamagePercent, ComputedStats.Builder::dotDamagePercent),
-    PERCENT_HIT_AS_TRUE_DAMAGE("percentHitAsTrueDamage", "True DMG", "True Damage", true,
+    PERCENT_HIT_AS_TRUE_DAMAGE("percentHitAsTrueDamage", "True Damage", "True Damage", true,
         ComputedStats::getPercentHitAsTrueDamage, ComputedStats.Builder::percentHitAsTrueDamage),
-    NON_CRIT_DAMAGE_PERCENT("nonCritDamagePercent", "Non-Crit", "Non-Crit Damage", false,
+    NON_CRIT_DAMAGE_PERCENT("nonCritDamagePercent", "Non-Crit Damage", "Non-Critical Damage", false,
         ComputedStats::getNonCritDamagePercent, ComputedStats.Builder::nonCritDamagePercent),
 
     // Conditional Damage
-    DAMAGE_VS_FROZEN_PERCENT("damageVsFrozenPercent", "vs Frozen", "Damage vs Frozen", false,
+    DAMAGE_VS_FROZEN_PERCENT("damageVsFrozenPercent", "Dmg vs Frozen", "Damage vs Frozen Enemies", false,
         ComputedStats::getDamageVsFrozenPercent, ComputedStats.Builder::damageVsFrozenPercent),
-    DAMAGE_VS_SHOCKED_PERCENT("damageVsShockedPercent", "vs Shocked", "Damage vs Shocked", false,
+    DAMAGE_VS_SHOCKED_PERCENT("damageVsShockedPercent", "Dmg vs Shocked", "Damage vs Shocked Enemies", false,
         ComputedStats::getDamageVsShockedPercent, ComputedStats.Builder::damageVsShockedPercent),
-    DAMAGE_FROM_MANA_PERCENT("damageFromManaPercent", "Mana>DMG", "Damage from Mana", false,
+    DAMAGE_FROM_MANA_PERCENT("damageFromManaPercent", "Damage from Mana", "Damage from Mana", false,
         ComputedStats::getDamageFromManaPercent, ComputedStats.Builder::damageFromManaPercent),
 
     // Status Chances
@@ -349,27 +349,27 @@ public enum StatType {
         ComputedStats::getLifeSteal, ComputedStats.Builder::lifeSteal),
     MANA_STEAL("manaSteal", "Mana Steal", "Mana Steal", true,
         ComputedStats::getManaSteal, ComputedStats.Builder::manaSteal),
-    MANA_ON_KILL("manaOnKill", "Mana/Kill", "Mana on Kill", false,
+    MANA_ON_KILL("manaOnKill", "Mana on Kill", "Mana on Kill", false,
         ComputedStats::getManaOnKill, ComputedStats.Builder::manaOnKill),
 
     // Recovery & Regen
-    HEALTH_RECOVERY_PERCENT("healthRecoveryPercent", "HP Recovery", "Health Recovery", false,
+    HEALTH_RECOVERY_PERCENT("healthRecoveryPercent", "Health Recovery", "Health Recovery", false,
         ComputedStats::getHealthRecoveryPercent, ComputedStats.Builder::healthRecoveryPercent),
 
     // Passive Block & Shield
-    PASSIVE_BLOCK_CHANCE("passiveBlockChance", "Pass Block", "Passive Block Chance", true,
+    PASSIVE_BLOCK_CHANCE("passiveBlockChance", "Passive Block", "Passive Block Chance", true,
         ComputedStats::getPassiveBlockChance, ComputedStats.Builder::passiveBlockChance),
-    BLOCK_RECOVERY_PERCENT("blockRecoveryPercent", "Block Rec", "Block Recovery", false,
+    BLOCK_RECOVERY_PERCENT("blockRecoveryPercent", "Block Recovery", "Block Recovery", false,
         ComputedStats::getBlockRecoveryPercent, ComputedStats.Builder::blockRecoveryPercent),
     BLOCK_HEAL_PERCENT("blockHealPercent", "Block Heal", "Block Heal", false,
         ComputedStats::getBlockHealPercent, ComputedStats.Builder::blockHealPercent),
-    SHIELD_EFFECTIVENESS_PERCENT("shieldEffectivenessPercent", "Shield Eff", "Shield Effectiveness", false,
+    SHIELD_EFFECTIVENESS_PERCENT("shieldEffectivenessPercent", "Shield Effect", "Shield Effectiveness", false,
         ComputedStats::getShieldEffectivenessPercent, ComputedStats.Builder::shieldEffectivenessPercent),
 
     // Projectile
-    PROJECTILE_SPEED_PERCENT("projectileSpeedPercent", "Proj Spd", "Projectile Speed", false,
+    PROJECTILE_SPEED_PERCENT("projectileSpeedPercent", "Projectile Speed", "Projectile Speed", false,
         ComputedStats::getProjectileSpeedPercent, ComputedStats.Builder::projectileSpeedPercent),
-    PROJECTILE_GRAVITY_PERCENT("projectileGravityPercent", "Proj Grav", "Projectile Gravity", false,
+    PROJECTILE_GRAVITY_PERCENT("projectileGravityPercent", "Projectile Gravity", "Projectile Gravity", false,
         ComputedStats::getProjectileGravityPercent, ComputedStats.Builder::projectileGravityPercent),
 
     // Mana Cost
@@ -377,23 +377,23 @@ public enum StatType {
         ComputedStats::getManaCostPercent, ComputedStats.Builder::manaCostPercent),
 
     // Elemental Combined
-    ALL_ELEMENTAL_DAMAGE_PERCENT("allElementalDamagePercent", "Elem DMG", "Elemental Damage", false,
+    ALL_ELEMENTAL_DAMAGE_PERCENT("allElementalDamagePercent", "Elemental Damage", "Elemental Damage", false,
         ComputedStats::getAllElementalDamagePercent, null),
-    SPELL_PENETRATION("spellPenetration", "Spell Pen", "Spell Penetration", true,
+    SPELL_PENETRATION("spellPenetration", "Spell Penetration", "Spell Penetration", true,
         ComputedStats::getSpellPenetration, ComputedStats.Builder::spellPenetration),
 
     // Signature Energy
-    SIGNATURE_ENERGY_MAX_PERCENT("signatureEnergyMaxPercent", "Sig Energy", "Signature Energy", true,
+    SIGNATURE_ENERGY_MAX_PERCENT("signatureEnergyMaxPercent", "Signature Energy", "Signature Energy", true,
         ComputedStats::getSignatureEnergyMaxPercent, ComputedStats.Builder::signatureEnergyMaxPercent),
-    SIGNATURE_ENERGY_PER_HIT("signatureEnergyPerHit", "Sig/Hit", "Signature Energy per Hit", false,
+    SIGNATURE_ENERGY_PER_HIT("signatureEnergyPerHit", "Sig Energy/Hit", "Signature Energy per Hit", false,
         ComputedStats::getSignatureEnergyPerHit, ComputedStats.Builder::signatureEnergyPerHit),
 
     // Stamina Percent Stats
-    MAX_STAMINA_PERCENT("maxStaminaPercent", "Stamina", "Max Stamina", true,
+    MAX_STAMINA_PERCENT("maxStaminaPercent", "Max Stamina", "Max Stamina", true,
         ComputedStats::getMaxStaminaPercent, ComputedStats.Builder::maxStaminaPercent),
-    STAMINA_REGEN_PERCENT("staminaRegenPercent", "Stam Regen", "Stamina Regen", true,
+    STAMINA_REGEN_PERCENT("staminaRegenPercent", "Stamina Regen", "Stamina Regeneration", true,
         ComputedStats::getStaminaRegenPercent, ComputedStats.Builder::staminaRegenPercent),
-    STAMINA_REGEN_START_DELAY("staminaRegenStartDelay", "Stam Delay", "Stamina Regen Delay", true,
+    STAMINA_REGEN_START_DELAY("staminaRegenStartDelay", "Stamina Recovery", "Stamina Recovery Speed", true,
         ComputedStats::getStaminaRegenStartDelay, ComputedStats.Builder::staminaRegenStartDelay),
 
     // ═══════════════════════════════════════════════════════════════════
@@ -401,54 +401,116 @@ public enum StatType {
     // ═══════════════════════════════════════════════════════════════════
 
     /** Havoc KS2: Crits on DoT-affected targets deal remaining DoT as burst damage */
-    DETONATE_DOT_ON_CRIT("detonateDotOnCrit", "Detonate", "Detonate DoT on Crit", false,
+    DETONATE_DOT_ON_CRIT("detonateDotOnCrit", "DoT Detonation", "Detonate DoT on Critical Hit", false,
         ComputedStats::getDetonateDotOnCrit, ComputedStats.Builder::detonateDotOnCrit),
     /** Juggernaut KS2: Bonus Physical Damage % per 100 Max HP */
-    HP_SCALING_DAMAGE("hpScalingDamage", "HP>DMG", "HP Scaling Damage", false,
+    HP_SCALING_DAMAGE("hpScalingDamage", "HP ->Damage", "Health Scaling Damage", false,
         null, null),
     /** Striker KS2: Each consecutive hit within 2s grants stacking damage bonus */
-    CONSECUTIVE_HIT_BONUS("consecutiveHitBonus", "Combo DMG", "Consecutive Hit Bonus", false,
+    CONSECUTIVE_HIT_BONUS("consecutiveHitBonus", "Combo Damage", "Consecutive Hit Bonus", false,
         ComputedStats::getConsecutiveHitBonus, ComputedStats.Builder::consecutiveHitBonus),
     /** Warden KS2: Successful blocks deal % of blocked damage back to attacker */
-    BLOCK_COUNTER_DAMAGE("blockCounterDamage", "Counter", "Block Counter Damage", false,
+    BLOCK_COUNTER_DAMAGE("blockCounterDamage", "Block Counter", "Block Counter Damage", false,
         ComputedStats::getBlockCounterDamage, ComputedStats.Builder::blockCounterDamage),
     /** Warlock KS2: X% chance spell/magic damage repeats for 50% as Void damage */
     SPELL_ECHO_CHANCE("spellEchoChance", "Spell Echo", "Spell Echo Chance", false,
         ComputedStats::getSpellEchoChance, ComputedStats.Builder::spellEchoChance),
     /** Lich KS2: DoTs inflicted restore Energy Shield proportional to tick damage */
-    SHIELD_REGEN_ON_DOT("shieldRegenOnDot", "ES on DoT", "Shield Regen on DoT", false,
+    SHIELD_REGEN_ON_DOT("shieldRegenOnDot", "ES Regen on DoT", "Energy Shield Regen on DoT", false,
         ComputedStats::getShieldRegenOnDot, ComputedStats.Builder::shieldRegenOnDot),
     /** Tempest KS2: Movement Speed bonus converts to Spell Damage % */
-    SPEED_TO_SPELL_POWER("speedToSpellPower", "Spd>Spell", "Speed to Spell Power", false,
+    SPEED_TO_SPELL_POWER("speedToSpellPower", "Speed ->Spell", "Movement Speed to Spell Power", false,
         null, null),
     /** Tempest KS1: Attack Speed bonus converts to Spell Damage % */
-    ATK_SPEED_TO_SPELL_POWER("atkSpeedToSpellPower", "Atk>Spell", "Attack Speed to Spell Power", false,
+    ATK_SPEED_TO_SPELL_POWER("atkSpeedToSpellPower", "AtkSpd ->Spell", "Attack Speed to Spell Power", false,
         null, null),
     /** Sentinel KS2: Gain element resistance when hit by corresponding ailment */
-    IMMUNITY_ON_AILMENT("immunityOnAilment", "Ailment Imm", "Immunity on Ailment", false,
+    IMMUNITY_ON_AILMENT("immunityOnAilment", "Ailment Immunity", "Ailment Immunity", false,
         ComputedStats::getImmunityOnAilment, ComputedStats.Builder::immunityOnAilment),
     /** Sentinel KS1: Convert X% of Evasion into bonus Armor */
-    EVASION_TO_ARMOR("evasionToArmor", "Eva>Armor", "Evasion to Armor", false,
+    EVASION_TO_ARMOR("evasionToArmor", "Evasion ->Armor", "Evasion to Armor Conversion", false,
         ComputedStats::getEvasionToArmor, ComputedStats.Builder::evasionToArmor),
+
+    // ═══════════════════════════════════════════════════════════════════
+    // REWORK KEYSTONE + BRIDGE EFFECT STATS (enum-only, no ComputedStats fields)
+    // These exist so the YAML loader recognizes the stat names and deposits
+    // them into AggregatedModifiers. CombatEffect implementations read
+    // values via the effect's own state, not from ComputedStats getters.
+    // ═══════════════════════════════════════════════════════════════════
+
+    AILMENT_RESISTANCE_PER_TYPE("ailmentResistancePerType", "Ailment Resist", "Ailment Resistance per Type", false, null, null),
+    ALL_ELEMENTAL_RESISTANCE("allElementalResistance", "All Resistance", "All Elemental Resistance", false, null, null),
+    ARMOR_TO_THORNS_PERCENT("armorToThornsPercent", "Armor ->Thorns", "Armor to Thorns Conversion", false, null, null),
+    ATK_SPEED_CONVERSION_THRESHOLD("atkSpeedConversionThreshold", "AtkSpd Threshold", "Attack Speed Conversion Threshold", false, null, null),
+    ATTACK_SELF_DAMAGE_PERCENT("attackSelfDamagePercent", "Self Damage", "Attack Self Damage", false, null, null),
+    BLOCK_CHARGE_COUNT("blockChargeCount", "Block Charges", "Block Charges", false, null, null),
+    BLOCK_CHARGE_LIFE_STEAL("blockChargeLifeSteal", "Block Life Steal", "Block Charge Life Steal", false, null, null),
+    BLOCK_CHARGE_TEMP_HP("blockChargeTempHp", "Block Temp HP", "Block Charge Temporary HP", false, null, null),
+    BLOCK_ES_REGEN_UNINTERRUPTED("blockEsRegenUninterrupted", "Block ES Protect", "Block Protects Energy Shield Regen", false, null, null),
+    BLOCK_SHOOT_DAMAGE_PENALTY("blockShootDamagePenalty", "Block Shot Pen", "Block and Shoot Damage Penalty", false, null, null),
+    BLOCK_SHOOT_ENABLED("blockShootEnabled", "Block + Shoot", "Block and Shoot", false, null, null),
+    BULWARK_ARMOR_PER_HIT("bulwarkArmorPerHit", "Bulwark Armor", "Bulwark Armor per Hit Taken", false, null, null),
+    BULWARK_MAX_STACKS("bulwarkMaxStacks", "Bulwark Stacks", "Bulwark Max Stacks", false, null, null),
+    BURN_LEECH_PERCENT("burnLeechPercent", "Burn Leech", "Burn Damage Leech", false, null, null),
+    CHARGED_PROJECTILE_FIRE_BONUS("chargedProjectileFireBonus", "Charged Proj Fire", "Charged Projectile Fire Bonus", false, null, null),
+    CRIT_SHOCK_CHANCE("critShockChance", "Crit Shock Chance", "Critical Strike Shock Chance", false, null, null),
+    DOT_LEECH_PERCENT("dotLeechPercent", "DoT Leech", "Damage over Time Leech", false, null, null),
+    EVADE_CRIT_MULT_BONUS("evadeCritMultBonus", "Evade Crit Mult", "Evade Critical Multiplier Bonus", false, null, null),
+    EVADE_GUARANTEED_CRIT("evadeGuaranteedCrit", "Evade ->Crit", "Evade Grants Guaranteed Critical", false, null, null),
+    EVADE_HP_RESTORE_PERCENT("evadeHpRestorePercent", "Evade Heal", "Evade Health Restore", false, null, null),
+    FIRE_DAMAGE_VS_SHOCKED("fireDamageVsShocked", "Fire vs Shocked", "Fire Damage vs Shocked Enemies", false, null, null),
+    FOCUSED_SHOT_CHARGE_TIME("focusedShotChargeTime", "Focus Charge", "Focused Shot Charge Time", false, null, null),
+    FOCUSED_SHOT_DAMAGE_BONUS("focusedShotDamageBonus", "Focus Damage", "Focused Shot Damage Bonus", false, null, null),
+    FOCUSED_SHOT_RESIST_IGNORE("focusedShotResistIgnore", "Focus Penetrate", "Focused Shot Resistance Ignore", false, null, null),
+    FORTIFIED_ARMOR_BONUS("fortifiedArmorBonus", "Fortified Armor", "Fortified Armor Bonus", false, null, null),
+    FORTIFIED_BLOCK_BONUS("fortifiedBlockBonus", "Fortified Block", "Fortified Block Chance Bonus", false, null, null),
+    FORTIFIED_BLOCK_HEAL("fortifiedBlockHeal", "Fortified Heal", "Fortified Block Heal", false, null, null),
+    FREEZE_COOLDOWN("freezeCooldown", "Freeze Cooldown", "Freeze Cooldown", false, null, null),
+    FREEZE_SHATTER_MULTIPLIER("freezeShatterMultiplier", "Shatter Burst", "Freeze Shatter Burst Damage", false, null, null),
+    HEALTH_REGEN_DISABLED("healthRegenDisabled", "No Health Regen", "Health Regeneration Disabled", false, null, null),
+    LIFE_STEAL_HP_CAP_PERCENT("lifeStealHpCapPercent", "Life Steal Cap", "Life Steal Health Cap", false, null, null),
+    LIFE_STEAL_REDUCTION("lifeStealReduction", "Life Steal Red", "Life Steal Reduction", false, null, null),
+    MISSING_HP_DAMAGE_SCALING("missingHpDamageScaling", "MissHP ->Damage", "Missing Health Damage Scaling", false, null, null),
+    NON_FROZEN_DAMAGE_PENALTY("nonFrozenDamagePenalty", "vs Non-Frozen Pen", "Non-Frozen Damage Penalty", false, null, null),
+    NON_SPELL_DAMAGE_PENALTY("nonSpellDamagePenalty", "Non-Spell Penalty", "Non-Spell Damage Penalty", false, null, null),
+    OVERKILL_CHARGE_ENABLED("overkillChargeEnabled", "Overkill Charge", "Overkill Charge", false, null, null),
+    PROJECTILE_ATTACK_SPEED_BONUS("projectileAttackSpeedBonus", "Proj Attack Spd", "Projectile Attack Speed Bonus", false, null, null),
+    PROJECTILE_FREEZE_CHANCE("projectileFreezeChance", "Proj Freeze", "Projectile Freeze Chance", false, null, null),
+    PROJECTILE_SPELL_DAMAGE_BONUS("projectileSpellDamageBonus", "Proj Spell Dmg", "Projectile Spell Damage Bonus", false, null, null),
+    RAMPAGE_DURATION("rampageDuration", "Rampage Duration", "Rampage Duration", false, null, null),
+    RAMPAGE_MAX_STACKS("rampageMaxStacks", "Rampage Stacks", "Rampage Max Stacks", false, null, null),
+    RAMPAGE_STACK_ATK_SPEED("rampageStackAtkSpeed", "Rampage AtkSpd", "Rampage Attack Speed per Stack", false, null, null),
+    RAMPAGE_STACK_CRIT_MULT("rampageStackCritMult", "Rampage Crit", "Rampage Critical Multiplier per Stack", false, null, null),
+    RAMPAGE_STACK_DOT("rampageStackDot", "Rampage DoT", "Rampage DoT Damage per Stack", false, null, null),
+    SHOCK_CHAIN_COUNT("shockChainCount", "Chain Count", "Shock Chain Count", false, null, null),
+    SHOCK_CHAIN_STRENGTH("shockChainStrength", "Chain Strength", "Shock Chain Strength", false, null, null),
+    SHOCK_VOID_DAMAGE_BONUS("shockVoidDamageBonus", "Shock + Void Dmg", "Shock Void Damage Bonus", false, null, null),
+    SINGLE_TARGET_DAMAGE_PERCENT("singleTargetDamagePercent", "Single Target Dmg", "Single Target Damage", false, null, null),
+    SPELL_CRIT_HEAL_PERCENT("spellCritHealPercent", "Spell Crit Heal", "Spell Critical Hit Heal", false, null, null),
+    SPELL_CRIT_VS_FROZEN_LIGHTNING_BONUS("spellCritVsFrozenLightningBonus", "SpCrit Frozen Ltn", "Spell Crit vs Frozen Lightning Bonus", false, null, null),
+    SPELL_KILL_MANA_RESTORE("spellKillManaRestore", "Spell Kill Mana", "Spell Kill Mana Restore", false, null, null),
+    VOID_DAMAGE_VS_FROZEN("voidDamageVsFrozen", "Void vs Frozen", "Void Damage vs Frozen Enemies", false, null, null),
+    VOID_TO_TRUE_DAMAGE_PERCENT("voidToTrueDamagePercent", "Void ->True Dmg", "Void to True Damage Conversion", false,
+        ComputedStats::getVoidToTrueDamagePercent, ComputedStats.Builder::voidToTrueDamagePercent),
 
     // ═══════════════════════════════════════════════════════════════════
     // HEXCODE COMPATIBILITY STATS (overlay-only — active when Hexcode loaded)
     // ═══════════════════════════════════════════════════════════════════
 
     /** Hexcode: Maximum volatility budget for spell crafting */
-    VOLATILITY_MAX("volatilityMax", "Vol Max", "Volatility Max", false,
+    VOLATILITY_MAX("volatilityMax", "Volatility Max", "Volatility Max", false,
         ComputedStats::getVolatilityMax, ComputedStats.Builder::volatilityMax),
     /** Hexcode: Amplifies hex construct magnitude */
-    MAGIC_POWER("magicPower", "Mag Pwr", "Magic Power", true,
+    MAGIC_POWER("magicPower", "Magic Power", "Magic Power", true,
         ComputedStats::getMagicPower, ComputedStats.Builder::magicPower),
     /** Hexcode: Precision bonus for drawn glyphs */
-    DRAW_ACCURACY("drawAccuracy", "Draw Acc", "Draw Accuracy", true,
+    DRAW_ACCURACY("drawAccuracy", "Draw Accuracy", "Draw Accuracy", true,
         ComputedStats::getDrawAccuracy, ComputedStats.Builder::drawAccuracy),
     /** Hexcode: Speed of hex deployment */
-    CAST_SPEED("castSpeed", "Cast Spd", "Cast Speed", true,
+    CAST_SPEED("castSpeed", "Cast Speed", "Cast Speed", true,
         ComputedStats::getCastSpeed, ComputedStats.Builder::castSpeed),
     /** Hexcode: Number of simultaneously active hex constructs */
-    MAGIC_CHARGES("magicCharges", "Charges", "Magic Charges", false,
+    MAGIC_CHARGES("magicCharges", "Magic Charges", "Magic Charges", false,
         stats -> (float) stats.getMagicCharges(),
         (builder, value) -> builder.magicCharges((int) value));
 

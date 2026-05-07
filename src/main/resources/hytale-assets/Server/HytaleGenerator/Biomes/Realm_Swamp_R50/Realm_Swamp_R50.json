@@ -51,28 +51,21 @@
                   "Distance": true
                 },
                 {
-                  "Type": "Inverter",
+                  "Type": "Normalizer",
                   "Skip": false,
+                  "FromMin": -1,
+                  "FromMax": 1,
+                  "ToMin": -2.25,
+                  "ToMax": 2.25,
                   "Inputs": [
                     {
-                      "Type": "Normalizer",
+                      "Type": "SimplexNoise2D",
                       "Skip": false,
-                      "FromMin": -1,
-                      "FromMax": 0,
-                      "ToMin": -2.25,
-                      "ToMax": 2.25,
-                      "Inputs": [
-                        {
-                          "Type": "CellNoise2D",
-                          "Skip": false,
-                          "ScaleX": 40,
-                          "ScaleZ": 40,
-                          "Jitter": 0.6,
-                          "Octaves": 2,
-                          "Seed": "terrain",
-                          "CellType": "Distance2Div"
-                        }
-                      ]
+                      "Lacunarity": 2,
+                      "Persistence": 0.5,
+                      "Octaves": 2,
+                      "Scale": 35,
+                      "Seed": "terrain"
                     }
                   ]
                 }
@@ -289,7 +282,7 @@
         {
           "Type": "SimpleHorizontal",
           "BottomY": 59,
-          "TopY": 64,
+          "TopY": 63,
           "Material": {
             "Type": "Constant",
             "Material": {
@@ -2625,6 +2618,207 @@
                       }
                     }
                   }
+                },
+                {
+                  "Weight": 3,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Violet"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Blue"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
                 }
               ]
             }
@@ -3106,6 +3300,207 @@
                       }
                     }
                   }
+                },
+                {
+                  "Weight": 3,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Violet"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Blue"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
                 }
               ]
             }
@@ -3534,6 +3929,207 @@
                           "Y": 0,
                           "Material": {
                             "Solid": "Plant_Flower_Water_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 3,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Violet"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Crop_Mushroom_Glowing_Green"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Mud"
+                                },
+                                {
+                                  "Solid": "Soil_Dirt"
+                                },
+                                {
+                                  "Solid": "Soil_Grass"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Moss_Blue"
                           }
                         }
                       ],

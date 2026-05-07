@@ -198,9 +198,11 @@ public class RPGDamageCalculator {
     ) {
         boolean isSpell = (attackType == AttackType.SPELL && spellElement != null);
 
-        // Initialize damage distribution — spells place base into the element slot
+        // Initialize damage distribution — elemental weapons place base into the element slot.
+        // This applies to both magic weapons (spells) and elemental physical weapons (fire sword, etc.).
+        // For elemental melee: isSpell stays false, so spell-specific scaling doesn't apply.
         DamageDistribution dist = new DamageDistribution();
-        if (isSpell) {
+        if (spellElement != null) {
             dist.setElemental(spellElement, baseDamage);
         } else {
             dist.setPhysical(baseDamage);
@@ -245,8 +247,10 @@ public class RPGDamageCalculator {
                 }
             }
 
-            // ==== STEP 2: Add flat elemental damage (skip for DOT) ====
-            if (attackerElemental != null && !isDOT) {
+            // ==== STEP 2: Add flat elemental damage (skip for DOT and mobs) ====
+            // Mob damage budget comes entirely from the pool via calculateWeightedMobDamage().
+            // Flat elemental on top would add damage outside the pool budget, breaking the curve.
+            if (attackerElemental != null && !isDOT && !attackerStats.isMobStats()) {
                 if (tb != null) {
                     for (ElementType type : ElementType.values()) {
                         float flat = (float) attackerElemental.getFlatDamage(type);
@@ -309,9 +313,21 @@ public class RPGDamageCalculator {
                         dist.getElemental(ElementType.WIND), dist.getElemental(ElementType.VOID));
                 }
             } else {
+                // For spells: convert from the spell's base element to target elements
+                // e.g., Fire spell + 50% Void Conversion → 50% of fire damage becomes void
+                if (spellElement != null) {
+                    applySpellConversion(dist, attackerStats, spellElement);
+                }
                 if (tb != null) { tb.physBeforeConversion(0f); tb.physAfterConversion(0f); }
                 if (traceEnabled) {
-                    LOGGER.at(Level.FINE).log("[CALC] Step 3 - Conversion: SKIPPED (spell damage is already elemental)");
+                    float totalConv = attackerStats.getFireConversion() + attackerStats.getWaterConversion()
+                        + attackerStats.getLightningConversion() + attackerStats.getEarthConversion()
+                        + attackerStats.getWindConversion() + attackerStats.getVoidConversion();
+                    if (totalConv > 0) {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 3 - Spell conversion from %s: total=%.1f%%", spellElement, totalConv);
+                    } else {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 3 - Conversion: SKIPPED (no conversion stats)");
+                    }
                 }
             }
 
@@ -350,11 +366,28 @@ public class RPGDamageCalculator {
                     tb.globalDmgPercent(dmgPct);
                     tb.totalIncreasedPercent(totalPct);
                 }
+                // Scale physical slot: phys% + attackType% + dmg%
                 applyPercentIncreased(dist, attackerStats, attackType);
                 if (tb != null) tb.physAfterIncreased(dist.getPhysical());
+
+                // Elemental melee/ranged: also scale the element slot with attackType% + dmg%.
+                // physicalDamagePercent is NOT included — it only scales physical damage.
+                // meleeDamagePercent scales ALL melee damage (physical and elemental).
+                if (spellElement != null) {
+                    float elemPct = atkTypePct + dmgPct;
+                    if (elemPct != 0f) {
+                        dist.applyElementalPercentIncrease(spellElement, elemPct);
+                    }
+                }
                 if (traceEnabled) {
-                    LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + melee%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
-                        physPct, atkTypePct, dmgPct, totalPct, dist.getPhysical());
+                    if (spellElement != null) {
+                        float elemPct = atkTypePct + dmgPct;
+                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased elemental melee (%s): atkType%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f (phys: %.1f)",
+                            spellElement.name(), atkTypePct, dmgPct, elemPct, dist.getElemental(spellElement), dist.getPhysical());
+                    } else {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + melee%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
+                            physPct, atkTypePct, dmgPct, totalPct, dist.getPhysical());
+                    }
                 }
             }
 
@@ -489,13 +522,29 @@ public class RPGDamageCalculator {
         // ==== STEP 10: Add true damage (bypasses all defenses) ====
         if (attackerStats != null) {
             float trueDmg = attackerStats.getTrueDamage();
+
+            // percentHitAsTrueDamage: X% of total post-defense damage added as true damage
+            float pctAsTrueRate = attackerStats.getPercentHitAsTrueDamage();
+            if (pctAsTrueRate > 0) {
+                float postDefenseTotal = dist.getPhysical() + dist.getTotalElemental();
+                trueDmg += postDefenseTotal * pctAsTrueRate / 100f;
+            }
+
+            // voidToTrueDamagePercent: X% of Void damage dealt is added as true damage
+            float voidTrueRate = attackerStats.getVoidToTrueDamagePercent();
+            if (voidTrueRate > 0) {
+                float voidDamage = dist.getElemental(ElementType.VOID);
+                trueDmg += voidDamage * voidTrueRate / 100f;
+            }
+
             if (trueDmg > 0) {
                 dist.addTrueDamage(trueDmg);
                 preDefenseTotal += trueDmg;
             }
             if (tb != null) tb.trueDamage(trueDmg);
             if (traceEnabled && trueDmg > 0) {
-                LOGGER.at(Level.FINE).log("[CALC] Step 10 - True damage: +%.1f (bypasses defenses)", trueDmg);
+                LOGGER.at(Level.FINE).log("[CALC] Step 10 - True damage: +%.1f (flat=%.1f, pctHit=%.1f%%, voidTrue=%.1f%%)",
+                    trueDmg, attackerStats.getTrueDamage(), pctAsTrueRate, voidTrueRate);
             }
         }
 
@@ -665,17 +714,19 @@ public class RPGDamageCalculator {
             : isProjectile ? AttackType.PROJECTILE
             : AttackType.MELEE;
 
-        // For spells, use fixed element from weapon or fall back to dominant attribute
+        // Resolve element: spells use fixed element or dominant attribute,
+        // non-magic elemental weapons (fire sword, etc.) use their stored element.
         ElementType spellElement = null;
         if (isSpell) {
             ElementType fixedElement = stats.getWeaponSpellElement();
             spellElement = fixedElement != null ? fixedElement : findDominantSpellElement(elemental);
+        } else {
+            spellElement = stats.getWeaponSpellElement();
         }
 
-        // Create damage distribution — matches real pipeline initialization (line 168-174)
-        // Spells place weapon implicit into the element slot, not physical
+        // Create damage distribution — elemental weapons place base into element slot
         DamageDistribution dist = new DamageDistribution();
-        if (isSpell) {
+        if (spellElement != null) {
             dist.setElemental(spellElement, baseDamage);
         } else {
             dist.setPhysical(baseDamage);
@@ -692,9 +743,11 @@ public class RPGDamageCalculator {
             addFlatElemental(dist, elemental);
         }
 
-        // Step 3: Conversion (physical → elemental)
+        // Step 3: Conversion (physical → elemental, or spell element → target element)
         if (!isSpell) {
             applyConversion(dist, stats);
+        } else if (spellElement != null) {
+            applySpellConversion(dist, stats, spellElement);
         }
 
         // Step 4: % Increased
@@ -707,6 +760,18 @@ public class RPGDamageCalculator {
             }
         } else {
             applyPercentIncreased(dist, stats, attackType);
+            // Elemental melee/ranged: also scale element slot with attackType% + dmg%
+            if (spellElement != null) {
+                float atkTypePct = switch (attackType) {
+                    case MELEE -> stats.getMeleeDamagePercent();
+                    case PROJECTILE -> stats.getProjectileDamagePercent();
+                    case AREA, SPELL, UNKNOWN -> 0f;
+                };
+                float elemPct = atkTypePct + stats.getDamagePercent();
+                if (elemPct != 0f) {
+                    dist.applyElementalPercentIncrease(spellElement, elemPct);
+                }
+            }
         }
 
         // Step 5: Elemental modifiers (per-element % inc + % more)
@@ -736,6 +801,16 @@ public class RPGDamageCalculator {
 
         // Step 10: True damage (bypasses everything, added last)
         float trueDamage = stats.getTrueDamage();
+        // percentHitAsTrueDamage: X% of total damage added as true
+        float pctAsTrueRate = stats.getPercentHitAsTrueDamage();
+        if (pctAsTrueRate > 0) {
+            trueDamage += afterCrit * pctAsTrueRate / 100f;
+        }
+        // voidToTrueDamagePercent: X% of Void damage added as true
+        float voidTrueRate = stats.getVoidToTrueDamagePercent();
+        if (voidTrueRate > 0) {
+            trueDamage += dist.getElemental(ElementType.VOID) * expectedCritMult * voidTrueRate / 100f;
+        }
         float totalAverage = afterCrit + trueDamage;
 
         // Breakdown for tooltip display — matches what applyFlatDamage() actually does
@@ -1049,6 +1124,68 @@ public class RPGDamageCalculator {
     }
 
     /**
+     * STEP 3 (spell variant): Apply damage conversion from spell's base element.
+     *
+     * <p>For spells, there is no physical damage to convert. Instead, we convert
+     * from the spell's base element to other elements. For example, a Fire spell
+     * with 50% Void Conversion converts 50% of fire damage to void.
+     *
+     * <p>Conversion INTO the spell's own element is ignored (can't convert fire→fire).
+     * Only elements that differ from the source are eligible targets.
+     */
+    private void applySpellConversion(
+        @Nonnull DamageDistribution dist,
+        @Nonnull ComputedStats stats,
+        @Nonnull ElementType sourceElement
+    ) {
+        // Collect all conversion percentages that point to a DIFFERENT element
+        float totalConversion = 0f;
+        EnumMap<ElementType, Float> conversionPcts = new EnumMap<>(ElementType.class);
+
+        for (ElementType target : ElementType.values()) {
+            if (target == sourceElement) continue; // Can't convert to own element
+            float pct = getConversionForElement(stats, target);
+            if (pct > 0) {
+                conversionPcts.put(target, pct);
+                totalConversion += pct;
+            }
+        }
+
+        if (totalConversion <= 0) return;
+
+        // Cap at 100%
+        float scale = totalConversion > 100f ? 100f / totalConversion : 1f;
+
+        // Convert from the spell's base element
+        float originalAmount = dist.getElemental(sourceElement);
+        float totalConverted = 0f;
+
+        for (var entry : conversionPcts.entrySet()) {
+            float effectivePct = entry.getValue() * scale;
+            float converted = originalAmount * effectivePct / 100f;
+            dist.addElemental(entry.getKey(), converted);
+            totalConverted += converted;
+        }
+
+        // Subtract converted amount from source element
+        dist.setElemental(sourceElement, originalAmount - totalConverted);
+    }
+
+    /**
+     * Gets the conversion percentage for a specific target element from stats.
+     */
+    private float getConversionForElement(@Nonnull ComputedStats stats, @Nonnull ElementType element) {
+        return switch (element) {
+            case FIRE -> stats.getFireConversion();
+            case WATER -> stats.getWaterConversion();
+            case LIGHTNING -> stats.getLightningConversion();
+            case EARTH -> stats.getEarthConversion();
+            case WIND -> stats.getWindConversion();
+            case VOID -> stats.getVoidConversion();
+        };
+    }
+
+    /**
      * STEP 2: Add flat elemental damage.
      *
      * <p>Adds flat elemental damage from gear/skills. This is added EARLY
@@ -1227,8 +1364,8 @@ public class RPGDamageCalculator {
             // STEP 1: Flat physical damage (test helper — no spell support)
             applyFlatDamage(dist, attackerStats, attackType, null);
 
-            // STEP 2: Flat elemental damage (added early so it benefits from modifiers + crit)
-            if (attackerElemental != null) {
+            // STEP 2: Flat elemental damage (skip for mobs — pool budget only)
+            if (attackerElemental != null && !attackerStats.isMobStats()) {
                 addFlatElemental(dist, attackerElemental);
             }
 
@@ -1272,6 +1409,18 @@ public class RPGDamageCalculator {
         // STEP 10: True damage added AFTER defenses (bypasses them)
         if (attackerStats != null) {
             float trueDmg = attackerStats.getTrueDamage();
+
+            float pctAsTrueRate = attackerStats.getPercentHitAsTrueDamage();
+            if (pctAsTrueRate > 0) {
+                float postDefenseTotal = dist.getPhysical() + dist.getTotalElemental();
+                trueDmg += postDefenseTotal * pctAsTrueRate / 100f;
+            }
+
+            float voidTrueRate = attackerStats.getVoidToTrueDamagePercent();
+            if (voidTrueRate > 0) {
+                trueDmg += dist.getElemental(ElementType.VOID) * voidTrueRate / 100f;
+            }
+
             if (trueDmg > 0) {
                 dist.addTrueDamage(trueDmg);
                 preDefenseTotal += trueDmg;

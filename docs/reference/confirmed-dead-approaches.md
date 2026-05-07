@@ -253,3 +253,46 @@ Sending `UpdateItems` or `UpdateTranslations` packets between `DrainPlayerFromWo
 
 **General rule**: `InteractionEntry.setTimestamp()` acceleration only works safely on short-lived attack chains (`Simple` interactions that complete in < 1s). Long-running chains with `Repeat` loops, stat modifiers, or ammo systems break because the cumulative timestamp shift causes iteration-level desync. For ranged weapons: let vanilla timing run unmodified.
 
+## HyUI HUD Registration: addUnsafe() Does NOT Bypass getReference() (2026-05-06)
+
+**What failed**: Calling `hud.addUnsafe()` after `HudBuilder.show()` to force synchronous HUD registration during world transitions (commit `dd9d997`, reverted).
+
+**How it failed**: `addUnsafe()` calls `this.getPlayer()` internally, which resolves Player via `playerRef.getReference()` — the exact same code path as `safeAdd()`. During world transitions, `getReference()` is transiently null. Both methods silently return without registering the HUD. The "unsafe" in `addUnsafe()` only means "not deferred to world.execute()" — it does NOT bypass any null checks.
+
+**Also failed**: `refreshOrRerender(false, false)` (commit `3e42e18`). This sends diff-based `Set` commands targeting auto-generated `#HYUUIDGroupNNN` element IDs. After world transitions (or any MultiHud rebuild), these IDs become stale → client crash: `"Selected element not found"`.
+
+**Also failed**: Unconditional safety nets (`discardAll + restoreAll` on timer). Creates 3 full HUD rebuild cycles per transition, sending ~18 HUD packets. Combined with item sync and Equipment packets (especially during hotbar switching while entering portals), overwhelms the client during `OnWorldJoined` → `NullReferenceException`.
+
+**Working approach**: Pass the `Player` component from `PlayerReadyEvent.getPlayer()` (guaranteed valid — it dispatched the event) through the restore chain. Call `MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud)` directly — bypasses HyUI's internal `getReference()` resolution entirely. Safety nets must be **conditional** (check `isActive()`, send zero packets when primary succeeds).
+
+**General rule**: Never trust HyUI's internal Player/Store resolution during world transitions. `playerRef.getReference()` is transiently null. Pass known-valid references from the triggering event. Safety nets that send packets must be conditional — unconditional packet-sending timers during world transitions cause client crashes.
+
+## HUD Lifecycle: Relying on DrainPlayerFromWorldEvent for Discard (2026-05-07)
+
+**What failed**: Registering `discardAll()` ONLY on `DrainPlayerFromWorldEvent` and removing the defensive `discardAll()` from `onPlayerReady()` as "redundant" (May 7 — reverted same day).
+
+**How it failed**: `DrainPlayerFromWorldEvent` only fires from `World.drainPlayersTo()` — which is the realm close / world shutdown path. **Normal portal teleports** go through `TeleportSystems.PlayerMoveSystem` which calls `removeFromStore()` + `targetWorld.addPlayer()` directly — NO drain event is dispatched. Without `discardAll()` in `onPlayerReady`, old HUD entries stay in `activeHuds` with `isActive()=true`. `restoreAll()` checks `isActive()` → true → skips all providers → permanently invisible HUDs.
+
+**Confirmed by**: Diagnostic logging showing `restoreAll` fires on realm entry with `inStore=true, queuePackets=false, player=event` (everything looks correct), but ZERO "MultiHud registered" lines for persistent HUDs — they were silently skipped.
+
+**Working approach**: `discardAll(pid)` runs inside the `onPlayerReady` lambda, BEFORE `restoreAll()`. This is the PRIMARY discard path for all normal teleports. The `DrainPlayerFromWorldEvent` handler is a BACKUP for world shutdowns only.
+
+**General rule**: `DrainPlayerFromWorldEvent` is NOT a universal "player left world" event. It's specific to `World.drainPlayersTo()`. For lifecycle management that must cover ALL world transitions, use `PlayerReadyEvent` as the single entry point and handle both discard + restore there.
+
+---
+
+## Client Decompilation
+
+### IL Decompilation of HytaleClient.exe (ILSpy, dnSpy, dotPeek)
+
+**Date**: 2026-05-06
+
+**What failed**: Attempting to use .NET IL decompilers (ILSpy, dnSpy, dotPeek) on the Hytale client binary.
+
+**Why it fails**: HytaleClient.exe is compiled with **.NET NativeAOT** — the IL bytecode has been compiled to native x86-64 machine code. There is no IL metadata to decompile. The binary is a standard PE32+ executable, not a managed .NET assembly.
+
+**Evidence**: `pefile` analysis shows 6 native sections (.text, .rdata, .data, .pdata, .rsrc, .reloc). Only 5 RTTI entries (all C++ `std::` exceptions). No CLR header. Assembly qualified names survive as embedded resource strings only.
+
+**Working approach**: Native code analysis tools produce pseudo-C source for the majority of client functions. Use topic indexes and gameplay function references for searching.
+
+**Also working**: Binary string extraction recovers embedded property names, namespace paths, and GLSL shaders. XAML/UI parsing extracts full UI component definitions.

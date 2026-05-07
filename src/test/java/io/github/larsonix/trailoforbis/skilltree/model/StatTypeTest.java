@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link StatType} display name fields and {@link StatModifier#toShortString()}.
+ * Tests for {@link StatType} display name fields and {@link StatModifier} formatting.
  *
  * <p>Ensures all stat types have valid display names and that the formatting
- * pipeline produces clean, readable output without redundant suffixes.
+ * pipeline produces clean, readable output.
  */
 @DisplayName("StatType Display Names")
 class StatTypeTest {
@@ -58,24 +58,6 @@ class StatTypeTest {
                     stat.name() + " displayName contains 'percent': " + stat.getDisplayName());
             }
         }
-
-        @Test
-        @DisplayName("No shortName contains 'multiplier' (case-insensitive)")
-        void noShortNameContainsMultiplier() {
-            for (StatType stat : StatType.values()) {
-                assertFalse(stat.getShortName().toLowerCase().contains("multiplier"),
-                    stat.name() + " shortName contains 'multiplier': " + stat.getShortName());
-            }
-        }
-
-        @Test
-        @DisplayName("No displayName contains 'Multiplier' (case-insensitive)")
-        void noDisplayNameContainsMultiplier() {
-            for (StatType stat : StatType.values()) {
-                assertFalse(stat.getDisplayName().toLowerCase().contains("multiplier"),
-                    stat.name() + " displayName contains 'multiplier': " + stat.getDisplayName());
-            }
-        }
     }
 
     @Nested
@@ -83,9 +65,9 @@ class StatTypeTest {
     class SpecificMappings {
 
         @Test
-        @DisplayName("MAX_HEALTH_PERCENT short name is 'HP'")
+        @DisplayName("MAX_HEALTH_PERCENT short name is 'Max Health'")
         void maxHealthPercentShortName() {
-            assertEquals("HP", StatType.MAX_HEALTH_PERCENT.getShortName());
+            assertEquals("Max Health", StatType.MAX_HEALTH_PERCENT.getShortName());
         }
 
         @Test
@@ -95,9 +77,9 @@ class StatTypeTest {
         }
 
         @Test
-        @DisplayName("PROJECTILE_SPEED_PERCENT short name is 'Proj Spd'")
+        @DisplayName("PROJECTILE_SPEED_PERCENT short name is 'Projectile Speed'")
         void projectileSpeedPercentShortName() {
-            assertEquals("Proj Spd", StatType.PROJECTILE_SPEED_PERCENT.getShortName());
+            assertEquals("Projectile Speed", StatType.PROJECTILE_SPEED_PERCENT.getShortName());
         }
 
         @Test
@@ -118,6 +100,27 @@ class StatTypeTest {
                 StatType.MAX_HEALTH_PERCENT.getShortName());
             assertEquals(StatType.ARMOR.getShortName(),
                 StatType.ARMOR_PERCENT.getShortName());
+        }
+
+        @Test
+        @DisplayName("Critical Multiplier is properly named (not 'Crit Damage')")
+        void criticalMultiplierNaming() {
+            assertEquals("Crit Multiplier", StatType.CRITICAL_MULTIPLIER.getShortName());
+            assertEquals("Critical Multiplier", StatType.CRITICAL_MULTIPLIER.getDisplayName());
+        }
+
+        @Test
+        @DisplayName("Energy Shield uses full name, not 'ES'")
+        void energyShieldNaming() {
+            assertEquals("Energy Shield", StatType.ENERGY_SHIELD.getShortName());
+            assertEquals("Energy Shield", StatType.ENERGY_SHIELD.getDisplayName());
+        }
+
+        @Test
+        @DisplayName("Lightning stats use full 'Lightning' not 'Light'")
+        void lightningFullName() {
+            assertTrue(StatType.LIGHTNING_DAMAGE.getShortName().startsWith("Lightning"));
+            assertTrue(StatType.LIGHTNING_RESISTANCE.getShortName().startsWith("Lightning"));
         }
     }
 
@@ -157,59 +160,85 @@ class StatTypeTest {
     class ToShortStringFormatting {
 
         @Test
-        @DisplayName("MAX_HEALTH_PERCENT PERCENT shows '+5% HP' (not 'max health percent')")
+        @DisplayName("MAX_HEALTH_PERCENT PERCENT shows '+5% Max Health'")
         void maxHealthPercentPercent() {
             var mod = new StatModifier(StatType.MAX_HEALTH_PERCENT, 5, ModifierType.PERCENT);
-            assertEquals("+5% HP", mod.toShortString());
+            assertEquals("+5% Max Health", mod.toShortString());
         }
 
         @Test
-        @DisplayName("PROJECTILE_SPEED_PERCENT PERCENT shows '+3% Proj Spd'")
+        @DisplayName("PROJECTILE_SPEED_PERCENT PERCENT shows '+3% Projectile Speed'")
         void projectileSpeedPercentPercent() {
             var mod = new StatModifier(StatType.PROJECTILE_SPEED_PERCENT, 3, ModifierType.PERCENT);
-            assertEquals("+3% Proj Spd", mod.toShortString());
+            assertEquals("+3% Projectile Speed", mod.toShortString());
         }
 
         @Test
-        @DisplayName("PHYSICAL_DAMAGE FLAT shows '+10 Phys DMG'")
+        @DisplayName("PHYSICAL_DAMAGE FLAT shows '+10 Physical Damage'")
         void physicalDamageFlat() {
             var mod = new StatModifier(StatType.PHYSICAL_DAMAGE, 10, ModifierType.FLAT);
-            assertEquals("+10 Phys DMG", mod.toShortString());
+            assertEquals("+10 Physical Damage", mod.toShortString());
         }
 
         @Test
-        @DisplayName("PHYSICAL_DAMAGE_PERCENT PERCENT shows '+5% Phys DMG'")
+        @DisplayName("PHYSICAL_DAMAGE_PERCENT PERCENT shows '+5% Physical Damage'")
         void physicalDamagePercent() {
             var mod = new StatModifier(StatType.PHYSICAL_DAMAGE_PERCENT, 5, ModifierType.PERCENT);
-            assertEquals("+5% Phys DMG", mod.toShortString());
+            assertEquals("+5% Physical Damage", mod.toShortString());
         }
 
         @Test
-        @DisplayName("FIRE_DAMAGE_MULTIPLIER MULTIPLIER shows '50% more Fire DMG'")
+        @DisplayName("FIRE_DAMAGE_MULTIPLIER MULTIPLIER shows '50% more Fire Damage'")
         void fireDamageMultiplier() {
             var mod = new StatModifier(StatType.FIRE_DAMAGE_MULTIPLIER, 50, ModifierType.MULTIPLIER);
-            assertEquals("50% more Fire DMG", mod.toShortString());
+            assertEquals("50% more Fire Damage", mod.toShortString());
         }
 
         @Test
-        @DisplayName("CRITICAL_CHANCE FLAT shows '+5% Crit'")
+        @DisplayName("CRITICAL_CHANCE FLAT shows '+5% Crit Chance'")
         void criticalChanceFlat() {
             var mod = new StatModifier(StatType.CRITICAL_CHANCE, 5, ModifierType.FLAT);
-            assertEquals("+5% Crit", mod.toShortString());
+            assertEquals("+5% Crit Chance", mod.toShortString());
         }
 
         @Test
         @DisplayName("Negative values omit the + prefix")
         void negativeValues() {
             var mod = new StatModifier(StatType.DAMAGE_TAKEN_PERCENT, -10, ModifierType.FLAT);
-            assertEquals("-10 DMG Taken", mod.toShortString());
+            assertEquals("-10 Damage Taken", mod.toShortString());
         }
 
         @Test
         @DisplayName("Decimal values show one decimal place")
         void decimalValues() {
             var mod = new StatModifier(StatType.CRITICAL_MULTIPLIER, 1.5f, ModifierType.FLAT);
-            assertEquals("+1.5% Crit Multi", mod.toShortString());
+            assertEquals("+1.5% Crit Multiplier", mod.toShortString());
+        }
+    }
+
+    @Nested
+    @DisplayName("StatModifier.toDisplayString() formatting")
+    class ToDisplayStringFormatting {
+
+        @Test
+        @DisplayName("Uses displayName instead of shortName")
+        void usesDisplayName() {
+            var mod = new StatModifier(StatType.CRITICAL_MULTIPLIER, 5, ModifierType.FLAT);
+            assertEquals("+5% Critical Multiplier", mod.toDisplayString());
+        }
+
+        @Test
+        @DisplayName("Damage percent shows full name")
+        void damagePercentFullName() {
+            var mod = new StatModifier(StatType.PHYSICAL_DAMAGE_PERCENT, 10, ModifierType.PERCENT);
+            assertEquals("+10% Physical Damage", mod.toDisplayString());
+        }
+
+        @Test
+        @DisplayName("Energy shield uses full display name")
+        void energyShieldDisplayName() {
+            var mod = new StatModifier(StatType.ENERGY_SHIELD, 50, ModifierType.FLAT);
+            assertEquals("+50 Energy Shield", mod.toDisplayString());
         }
     }
 }

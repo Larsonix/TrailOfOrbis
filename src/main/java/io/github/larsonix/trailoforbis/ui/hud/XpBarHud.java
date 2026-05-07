@@ -94,7 +94,7 @@ public class XpBarHud {
             // thread and queues world.execute() tasks that race with world transitions.
             // cancel(false) in remove() doesn't prevent an already-running check from
             // queuing a stale safeAdd(), which then sends Set commands referencing
-            // elements cleared by resetManagers() → client crash.
+            // elements cleared by JoinWorld(clearWorld=true) → client crash.
             // All updates are event-driven via XpBarHudManager.notifyXpChanged().
             .onRefresh(hud -> {
                 int currentLevel = levelingService.getLevel(playerId);

@@ -36,7 +36,7 @@ public enum ContainerTier {
      * <p>Includes dungeon chests, treasure chests, hidden caches,
      * and other containers in cave systems or dungeons.
      */
-    DUNGEON("dungeon", 1.5, 0.15),
+    DUNGEON("dungeon", 1.5, 0.25),
 
     /**
      * Boss containers - rewards from major encounters.
@@ -44,7 +44,7 @@ public enum ContainerTier {
      * <p>Includes boss loot chests, raid reward containers,
      * legendary artifact containers, and altar rewards.
      */
-    BOSS("boss", 2.0, 0.30),
+    BOSS("boss", 2.0, 0.50),
 
     /**
      * Special containers - quest-related or unique.
@@ -52,7 +52,7 @@ public enum ContainerTier {
      * <p>Includes quest reward containers, artifact containers,
      * and other unique storage with special contents.
      */
-    SPECIAL("special", 1.75, 0.25);
+    SPECIAL("special", 1.75, 0.35);
 
     private final String configKey;
     private final double defaultLootMultiplier;

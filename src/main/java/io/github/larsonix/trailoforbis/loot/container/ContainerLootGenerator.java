@@ -3,7 +3,6 @@ package io.github.larsonix.trailoforbis.loot.container;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
-import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
 import io.github.larsonix.trailoforbis.gear.generation.RarityRoller;
 import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
@@ -64,6 +63,7 @@ public final class ContainerLootGenerator {
     private final DropLevelBlender dropLevelBlender;
     @Nullable
     private final RarityBonusCalculator rarityBonusCalculator;
+    private final RarityRoller rarityRoller;
     private final Random random;
 
     /**
@@ -75,6 +75,7 @@ public final class ContainerLootGenerator {
      * @param tierClassifier          The container tier classifier
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
+     * @param rarityRoller            Shared rarity roller (same as mob drops)
      */
     public ContainerLootGenerator(
             @Nonnull ContainerLootConfig config,
@@ -82,8 +83,9 @@ public final class ContainerLootGenerator {
             @Nullable RealmMapGenerator mapGenerator,
             @Nonnull ContainerTierClassifier tierClassifier,
             @Nonnull DropLevelBlender dropLevelBlender,
-            @Nullable RarityBonusCalculator rarityBonusCalculator) {
-        this(config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator, ThreadLocalRandom.current());
+            @Nullable RarityBonusCalculator rarityBonusCalculator,
+            @Nonnull RarityRoller rarityRoller) {
+        this(config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller, ThreadLocalRandom.current());
     }
 
     /**
@@ -95,6 +97,7 @@ public final class ContainerLootGenerator {
      * @param tierClassifier          The container tier classifier
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
+     * @param rarityRoller            Shared rarity roller (same as mob drops)
      * @param random                  The random number generator
      */
     public ContainerLootGenerator(
@@ -104,6 +107,7 @@ public final class ContainerLootGenerator {
             @Nonnull ContainerTierClassifier tierClassifier,
             @Nonnull DropLevelBlender dropLevelBlender,
             @Nullable RarityBonusCalculator rarityBonusCalculator,
+            @Nonnull RarityRoller rarityRoller,
             @Nonnull Random random) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.lootGenerator = Objects.requireNonNull(lootGenerator, "lootGenerator cannot be null");
@@ -111,6 +115,7 @@ public final class ContainerLootGenerator {
         this.tierClassifier = Objects.requireNonNull(tierClassifier, "tierClassifier cannot be null");
         this.dropLevelBlender = Objects.requireNonNull(dropLevelBlender, "dropLevelBlender cannot be null");
         this.rarityBonusCalculator = rarityBonusCalculator;  // Nullable for tests
+        this.rarityRoller = Objects.requireNonNull(rarityRoller, "rarityRoller cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
     }
 
@@ -121,13 +126,13 @@ public final class ContainerLootGenerator {
     /**
      * Generates all loot items for a container.
      *
-     * @param playerLevel The opening player's level
+     * @param lootContext Zone-level context (source level, player level, realm bonuses)
      * @param tier        The container tier
      * @param playerId    The opening player's UUID (for rarity bonus calculation)
      * @return List of generated items (gear, stones, maps)
      */
     @Nonnull
-    public List<ItemStack> generateLoot(int playerLevel, @Nonnull ContainerTier tier, @Nonnull UUID playerId) {
+    public List<ItemStack> generateLoot(@Nonnull ContainerLootContext lootContext, @Nonnull ContainerTier tier, @Nonnull UUID playerId) {
         List<ItemStack> loot = new ArrayList<>();
 
         // Calculate player's WIND-based rarity bonus once for all sub-generators
@@ -135,20 +140,21 @@ public final class ContainerLootGenerator {
             ? rarityBonusCalculator.calculatePlayerBonus(playerId) : 0.0;
 
         // Generate gear
-        List<ItemStack> gear = generateGear(playerLevel, tier, playerRarityBonus);
+        List<ItemStack> gear = generateGear(lootContext, tier, playerRarityBonus);
         loot.addAll(gear);
 
         // Generate stones
-        List<ItemStack> stones = generateStones(playerLevel, tier, playerRarityBonus);
+        List<ItemStack> stones = generateStones(lootContext.playerLevel(), tier, playerRarityBonus);
         loot.addAll(stones);
 
         // Generate maps
-        List<ItemStack> maps = generateMaps(playerLevel, tier, playerRarityBonus);
+        List<ItemStack> maps = generateMaps(lootContext, tier, playerRarityBonus);
         loot.addAll(maps);
 
         if (config.getAdvanced().isDebugLogging()) {
-            LOGGER.atInfo().log("Generated loot for tier %s (playerBonus=%.1f%%): %d gear, %d stones, %d maps",
-                tier, playerRarityBonus, gear.size(), stones.size(), maps.size());
+            LOGGER.atInfo().log("Generated loot for tier %s (srcLv%d, playerLv%d, playerBonus=%.1f%%): %d gear, %d stones, %d maps",
+                tier, lootContext.sourceLevel(), lootContext.playerLevel(), playerRarityBonus,
+                gear.size(), stones.size(), maps.size());
         }
 
         return loot;
@@ -172,14 +178,14 @@ public final class ContainerLootGenerator {
      * <p>This ensures the container is fully populated with RPG items and
      * the total count is predictable.
      *
-     * @param playerLevel The opening player's level
+     * @param lootContext Zone-level context (source level, player level, realm bonuses)
      * @param tier        The container tier
      * @param playerId    The opening player's UUID (for rarity bonus)
      * @param targetSlots Total number of items to generate (already capped at container capacity)
      * @return List of generated items (gear, stones, maps), size &lt;= targetSlots
      */
     @Nonnull
-    public List<ItemStack> generateLootForSlots(int playerLevel, @Nonnull ContainerTier tier,
+    public List<ItemStack> generateLootForSlots(@Nonnull ContainerLootContext lootContext, @Nonnull ContainerTier tier,
                                                  @Nonnull UUID playerId, int targetSlots) {
         if (targetSlots <= 0) {
             return List.of();
@@ -192,7 +198,7 @@ public final class ContainerLootGenerator {
         int slotsRemaining = targetSlots;
 
         // Phase 1: Roll stones (claim slots from budget)
-        List<ItemStack> stones = generateStones(playerLevel, tier, playerRarityBonus);
+        List<ItemStack> stones = generateStones(lootContext.playerLevel(), tier, playerRarityBonus);
         for (ItemStack stone : stones) {
             if (slotsRemaining <= 1) break; // Reserve at least 1 slot for gear
             loot.add(stone);
@@ -200,7 +206,7 @@ public final class ContainerLootGenerator {
         }
 
         // Phase 2: Roll maps (claim slots from budget)
-        List<ItemStack> maps = generateMaps(playerLevel, tier, playerRarityBonus);
+        List<ItemStack> maps = generateMaps(lootContext, tier, playerRarityBonus);
         for (ItemStack map : maps) {
             if (slotsRemaining <= 1) break; // Reserve at least 1 slot for gear
             loot.add(map);
@@ -208,22 +214,25 @@ public final class ContainerLootGenerator {
         }
 
         // Phase 3: Fill ALL remaining slots with gear
-        double rarityBonus = tierClassifier.getRarityBonus(tier) + playerRarityBonus;
+        // Convert player bonus from percentage to decimal, tier bonus already decimal
+        double rarityBonus = tierClassifier.getRarityBonus(tier) + (playerRarityBonus / 100.0);
+        // Apply realm IIR bonus (percentage → decimal)
+        rarityBonus += lootContext.realmLootContext().itemRarityBonus() / 100.0;
         boolean guaranteeRare = tierClassifier.isGuaranteedRareOrBetter(tier);
 
         for (int i = 0; i < slotsRemaining; i++) {
             int gearLevel;
             if (dropLevelBlender.getConfig().enabled()) {
-                gearLevel = dropLevelBlender.calculate(playerLevel, playerLevel, random);
+                gearLevel = dropLevelBlender.calculate(lootContext.sourceLevel(), lootContext.playerLevel(), random);
             } else {
-                int[] gearLevelRange = config.getLootScaling().getGearLevelRange(playerLevel);
+                int[] gearLevelRange = config.getLootScaling().getGearLevelRange(lootContext.sourceLevel());
                 int minLevel = gearLevelRange[0];
                 int maxLevel = gearLevelRange[1];
                 gearLevel = minLevel == maxLevel ? minLevel : minLevel + random.nextInt(maxLevel - minLevel + 1);
                 gearLevel = Math.max(1, gearLevel);
             }
 
-            GearRarity rarity = rollGearRarity(playerLevel, rarityBonus, guaranteeRare && i == 0);
+            GearRarity rarity = rollGearRarity(rarityBonus, guaranteeRare && i == 0);
             ItemStack gearItem = generateSingleGear(gearLevel, rarity, rarityBonus);
             if (gearItem != null) {
                 loot.add(gearItem);
@@ -247,14 +256,13 @@ public final class ContainerLootGenerator {
     /**
      * Generates gear items for a container.
      *
-     * @param playerLevel      The opening player's level
-     * @param tier             The container tier
+     * @param lootContext       Zone-level context (source level, player level, realm bonuses)
+     * @param tier              The container tier
      * @param playerRarityBonus Player's WIND-based rarity bonus
      * @return List of generated gear items
      */
     @Nonnull
-    private List<ItemStack> generateGear(int playerLevel, @Nonnull ContainerTier tier, double playerRarityBonus) {
-        ContainerLootConfig.TierConfig tierConfig = tierClassifier.getTierConfig(tier);
+    private List<ItemStack> generateGear(@Nonnull ContainerLootContext lootContext, @Nonnull ContainerTier tier, double playerRarityBonus) {
         int[] gearDropRange = tierClassifier.getGearDropRange(tier);
         int minDrops = gearDropRange[0];
         int maxDrops = gearDropRange[1];
@@ -267,25 +275,29 @@ public final class ContainerLootGenerator {
 
         List<ItemStack> gear = new ArrayList<>(dropCount);
 
-        double rarityBonus = tierClassifier.getRarityBonus(tier) + playerRarityBonus;
+        // Convert player bonus from percentage (e.g. 10.0) to decimal (0.10),
+        // tier bonus is already decimal (e.g. 0.25)
+        double rarityBonus = tierClassifier.getRarityBonus(tier) + (playerRarityBonus / 100.0);
+        // Apply realm IIR bonus (percentage → decimal)
+        rarityBonus += lootContext.realmLootContext().itemRarityBonus() / 100.0;
         boolean guaranteeRare = tierClassifier.isGuaranteedRareOrBetter(tier);
 
         for (int i = 0; i < dropCount; i++) {
             int gearLevel;
             if (dropLevelBlender.getConfig().enabled()) {
-                // Source = player level (gap=0), blender adds ±variance
-                gearLevel = dropLevelBlender.calculate(playerLevel, playerLevel, random);
+                // Source = zone level, blended toward player level ±variance
+                gearLevel = dropLevelBlender.calculate(lootContext.sourceLevel(), lootContext.playerLevel(), random);
             } else {
-                // Original bracket-based range
-                int[] gearLevelRange = config.getLootScaling().getGearLevelRange(playerLevel);
+                // Original bracket-based range (uses source level for zone-appropriate gear)
+                int[] gearLevelRange = config.getLootScaling().getGearLevelRange(lootContext.sourceLevel());
                 int minLevel = gearLevelRange[0];
                 int maxLevel = gearLevelRange[1];
                 gearLevel = minLevel == maxLevel ? minLevel : minLevel + random.nextInt(maxLevel - minLevel + 1);
                 gearLevel = Math.max(1, gearLevel);
             }
 
-            // Roll rarity
-            GearRarity rarity = rollGearRarity(playerLevel, rarityBonus, guaranteeRare && i == 0);
+            // Roll rarity using shared RarityRoller (same system as mob drops)
+            GearRarity rarity = rollGearRarity(rarityBonus, guaranteeRare && i == 0);
 
             // Generate gear item
             ItemStack gearItem = generateSingleGear(gearLevel, rarity, rarityBonus);
@@ -319,17 +331,31 @@ public final class ContainerLootGenerator {
     }
 
     /**
-     * Rolls gear rarity based on player level and bonuses.
+     * Rolls gear rarity using the shared RarityRoller (unified with mob drops).
      *
-     * @param playerLevel    The player's level
-     * @param rarityBonus    Bonus from container tier
+     * <p>Uses the same geometric base weights from gear-balance.yml that mob
+     * drops use. Container tier and player WIND bonus shift the distribution
+     * toward rarer items — same mechanism as mob type bonuses.
+     *
+     * @param rarityBonus    Combined bonus (tier + player WIND, in decimal)
      * @param guaranteeRare  Force at least rare quality
      * @return The rolled rarity
      */
     @Nonnull
-    private GearRarity rollGearRarity(int playerLevel, double rarityBonus, boolean guaranteeRare) {
-        Map<String, Integer> weights = config.getLootScaling().getRarityWeights(playerLevel);
-        GearRarity rarity = rollRarityFromWeights(weights, rarityBonus);
+    private GearRarity rollGearRarity(double rarityBonus, boolean guaranteeRare) {
+        // Filter to rarities that actually have skins (prevents silent drop loss)
+        Set<GearRarity> availableRarities = null;
+        DynamicLootRegistry registry = lootGenerator.getDynamicRegistry();
+        if (registry != null && registry.isDiscovered()) {
+            availableRarities = registry.getAvailableRarities();
+        }
+
+        GearRarity rarity;
+        if (availableRarities != null && !availableRarities.isEmpty()) {
+            rarity = rarityRoller.roll(rarityBonus, availableRarities);
+        } else {
+            rarity = rarityRoller.roll(rarityBonus);
+        }
 
         // Guarantee rare or better for first drop in boss containers
         if (guaranteeRare && rarity.ordinal() < GearRarity.RARE.ordinal()) {
@@ -418,15 +444,15 @@ public final class ContainerLootGenerator {
     }
 
     /**
-     * Rolls stone rarity based on config weights and player bonus.
+     * Rolls stone rarity using the shared RarityRoller (unified with mob drops).
      *
-     * @param playerRarityBonus Player's WIND-based rarity bonus
+     * @param playerRarityBonus Player's WIND-based rarity bonus (percentage)
      * @return The rolled rarity
      */
     @Nonnull
     private GearRarity rollStoneRarity(double playerRarityBonus) {
-        Map<String, Integer> weights = config.getStoneDrops().getRarityWeights();
-        return rollRarityFromWeights(weights, playerRarityBonus);
+        // Convert from percentage to decimal for RarityRoller
+        return rarityRoller.roll(playerRarityBonus / 100.0);
     }
 
     // =========================================================================
@@ -440,13 +466,13 @@ public final class ContainerLootGenerator {
      * attempts to get it from RealmsManager at generation time. This resolves the
      * circular dependency between GearManager and RealmsManager.
      *
-     * @param playerLevel       The opening player's level
+     * @param lootContext       Zone-level context (source level, player level, realm bonuses)
      * @param tier              The container tier
      * @param playerRarityBonus Player's WIND-based rarity bonus
      * @return List of generated map items
      */
     @Nonnull
-    private List<ItemStack> generateMaps(int playerLevel, @Nonnull ContainerTier tier, double playerRarityBonus) {
+    private List<ItemStack> generateMaps(@Nonnull ContainerLootContext lootContext, @Nonnull ContainerTier tier, double playerRarityBonus) {
         // Lazily resolve mapGenerator from RealmsManager if not provided at construction
         RealmMapGenerator generator = resolveMapGenerator();
         if (generator == null) {
@@ -468,7 +494,7 @@ public final class ContainerLootGenerator {
 
         for (int i = 0; i < maxMaps; i++) {
             if (random.nextDouble() < effectiveChance) {
-                ItemStack map = generateSingleMap(playerLevel, generator, playerRarityBonus);
+                ItemStack map = generateSingleMap(lootContext, generator, playerRarityBonus);
                 if (map != null) {
                     maps.add(map);
                 }
@@ -481,32 +507,32 @@ public final class ContainerLootGenerator {
     /**
      * Generates a single map item.
      *
-     * @param playerLevel       The player's level
+     * @param lootContext       Zone-level context (source level, player level, realm bonuses)
      * @param generator         The map generator to use
      * @param playerRarityBonus Player's WIND-based rarity bonus
      * @return Generated map, or null on failure
      */
     @Nullable
-    private ItemStack generateSingleMap(int playerLevel, @Nonnull RealmMapGenerator generator, double playerRarityBonus) {
+    private ItemStack generateSingleMap(@Nonnull ContainerLootContext lootContext, @Nonnull RealmMapGenerator generator, double playerRarityBonus) {
         try {
             int mapLevel;
             if (dropLevelBlender.getConfig().enabled()) {
-                // Source = player level (gap=0), blender adds ±variance
-                mapLevel = dropLevelBlender.calculate(playerLevel, playerLevel, random);
+                // Source = zone level, blended toward player level ±variance
+                mapLevel = dropLevelBlender.calculate(lootContext.sourceLevel(), lootContext.playerLevel(), random);
             } else {
-                // Original offset-based calculation
+                // Original offset-based calculation (uses source level as base)
                 ContainerLootConfig.MapDrops mapConfig = config.getMapDrops();
                 int minOffset = mapConfig.getLevelOffsetMin();
                 int maxOffset = mapConfig.getLevelOffsetMax();
                 int offset = minOffset == maxOffset ? minOffset : minOffset + random.nextInt(maxOffset - minOffset + 1);
-                mapLevel = Math.max(1, playerLevel + offset);
+                mapLevel = Math.max(1, lootContext.sourceLevel() + offset);
             }
 
             // Create base item and generate map with player rarity bonus
             ItemStack baseItem = new ItemStack(DEFAULT_MAP_BASE_ITEM, 1);
             return generator.generateItem(baseItem, mapLevel, playerRarityBonus);
         } catch (Exception e) {
-            LOGGER.atWarning().withCause(e).log("Failed to generate map for level %d", playerLevel);
+            LOGGER.atWarning().withCause(e).log("Failed to generate map for level %d", lootContext.sourceLevel());
             return null;
         }
     }
@@ -545,67 +571,6 @@ public final class ContainerLootGenerator {
         }
 
         return null;
-    }
-
-    /**
-     * Rolls a rarity from weighted map.
-     *
-     * @param weights     Map of rarity name to weight
-     * @param rarityBonus Bonus to shift toward higher rarities
-     * @return The rolled rarity
-     */
-    @Nonnull
-    private GearRarity rollRarityFromWeights(@Nonnull Map<String, Integer> weights, double rarityBonus) {
-        // Get available rarities from the loot registry's availability matrix.
-        // Only roll rarities that actually have skins — prevents silent drop loss.
-        Set<GearRarity> availableRarities = null;
-        DynamicLootRegistry registry = lootGenerator.getDynamicRegistry();
-        if (registry != null && registry.isDiscovered()) {
-            availableRarities = registry.getAvailableRarities();
-        }
-
-        // Calculate total weight with bonus adjustment
-        GearRarity[] rarities = GearRarity.values();
-        double[] adjustedWeights = new double[rarities.length];
-        double totalWeight = 0;
-
-        for (int i = 0; i < rarities.length; i++) {
-            GearRarity rarity = rarities[i];
-
-            // Skip rarities that have no items in the availability matrix
-            if (availableRarities != null && !availableRarities.contains(rarity)) {
-                adjustedWeights[i] = 0;
-                continue;
-            }
-
-            String key = rarity.name().toLowerCase();
-            int baseWeight = weights.getOrDefault(key, 0);
-
-            // Apply rarity bonus (higher rarities get boosted)
-            double positionFactor = (double) i / (rarities.length - 1);
-            double adjustment = 1.0 + (positionFactor * 2 - 1) * rarityBonus;
-            adjustment = Math.max(0.1, adjustment);
-
-            adjustedWeights[i] = baseWeight * adjustment;
-            totalWeight += adjustedWeights[i];
-        }
-
-        if (totalWeight <= 0) {
-            return GearRarity.COMMON;
-        }
-
-        // Roll
-        double roll = random.nextDouble() * totalWeight;
-        double cumulative = 0;
-
-        for (int i = 0; i < rarities.length; i++) {
-            cumulative += adjustedWeights[i];
-            if (roll < cumulative) {
-                return rarities[i];
-            }
-        }
-
-        return GearRarity.COMMON;
     }
 
     // =========================================================================

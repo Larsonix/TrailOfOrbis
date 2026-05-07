@@ -1945,10 +1945,10 @@
                 "Inclusive": true,
                 "Materials": [
                   {
-                    "Solid": "Rock_Stone"
+                    "Solid": "Rock_Sandstone"
                   },
                   {
-                    "Solid": "Rock_Sandstone"
+                    "Solid": "Rock_Stone"
                   }
                 ]
               }
@@ -2045,10 +2045,10 @@
                 "Inclusive": true,
                 "Materials": [
                   {
-                    "Solid": "Rock_Stone"
+                    "Solid": "Rock_Sandstone"
                   },
                   {
-                    "Solid": "Rock_Sandstone"
+                    "Solid": "Rock_Stone"
                   }
                 ]
               }
@@ -2145,10 +2145,10 @@
                 "Inclusive": true,
                 "Materials": [
                   {
-                    "Solid": "Rock_Stone"
+                    "Solid": "Rock_Sandstone"
                   },
                   {
-                    "Solid": "Rock_Sandstone"
+                    "Solid": "Rock_Stone"
                   }
                 ]
               }
@@ -2249,10 +2249,10 @@
                 "Inclusive": true,
                 "Materials": [
                   {
-                    "Solid": "Rock_Stone"
+                    "Solid": "Rock_Sandstone"
                   },
                   {
-                    "Solid": "Rock_Sandstone"
+                    "Solid": "Rock_Stone"
                   }
                 ]
               }
@@ -2357,10 +2357,10 @@
                 "Inclusive": true,
                 "Materials": [
                   {
-                    "Solid": "Rock_Stone"
+                    "Solid": "Rock_Sandstone"
                   },
                   {
-                    "Solid": "Rock_Sandstone"
+                    "Solid": "Rock_Stone"
                   }
                 ]
               }
@@ -2496,6 +2496,134 @@
                           "Y": 0,
                           "Material": {
                             "Solid": "Plant_Grass_Sharp_Wild"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Flower_Orchid_Cyan"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 1,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Petals_Azure"
                           }
                         }
                       ],
@@ -2686,6 +2814,134 @@
                       }
                     }
                   }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Flower_Orchid_Cyan"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 1,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Petals_Azure"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
                 }
               ]
             }
@@ -2776,6 +3032,134 @@
                           "Y": 0,
                           "Material": {
                             "Solid": "Plant_Grass_Sharp_Wild"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 2,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Flower_Orchid_Cyan"
+                          }
+                        }
+                      ],
+                      "Directionality": {
+                        "Type": "Static",
+                        "Rotation": 0,
+                        "Pattern": {
+                          "Type": "Floor",
+                          "Skip": false,
+                          "Origin": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Empty"
+                                }
+                              ]
+                            }
+                          },
+                          "Floor": {
+                            "Type": "BlockSet",
+                            "Skip": false,
+                            "BlockSet": {
+                              "Inclusive": true,
+                              "Materials": [
+                                {
+                                  "Solid": "Soil_Sand_White"
+                                },
+                                {
+                                  "Solid": "Soil_Sand_Red"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "Scanner": {
+                        "Type": "ColumnLinear",
+                        "Skip": false,
+                        "MaxY": 8,
+                        "MinY": -5,
+                        "RelativeToPosition": false,
+                        "BaseHeightName": "Base",
+                        "TopDownOrder": true,
+                        "ResultCap": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "Weight": 1,
+                  "Assignments": {
+                    "Type": "Constant",
+                    "Skip": false,
+                    "Prop": {
+                      "Type": "Column",
+                      "Skip": false,
+                      "ColumnBlocks": [
+                        {
+                          "Y": 0,
+                          "Material": {
+                            "Solid": "Plant_Petals_Azure"
                           }
                         }
                       ],

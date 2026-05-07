@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.gear.migration;
 
+import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
@@ -452,6 +453,17 @@ public final class ItemMigrationService {
 
         GearData fixed = gear;
         boolean changed = false;
+
+        // Migrate legacy spell_damage to actual element (preserves rolled value and range)
+        if (fixed.implicit() != null && "spell_damage".equals(fixed.implicit().damageType())) {
+            ElementType[] elements = ElementType.values();
+            ElementType randomElement = elements[ThreadLocalRandom.current().nextInt(elements.length)];
+            WeaponImplicit migrated = fixed.implicit().withDamageType(randomElement.getDamageTypeId());
+            fixed = fixed.withImplicit(migrated);
+            changed = true;
+            LOGGER.at(Level.INFO).log("Migration: spell_damage → %s for level %d %s",
+                    randomElement.getDamageTypeId(), fixed.level(), baseItemId);
+        }
 
         // Fix weapon implicit
         if (expected.shouldHaveWeapon()) {

@@ -2,7 +2,9 @@ package io.github.larsonix.trailoforbis.gear.stats;
 
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
+import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig.StatType;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -46,11 +48,15 @@ public final class GearStatApplier {
         // When true, damage system uses RPG path even if weaponBaseDamage is 0
         stats.setHoldingRpgGear(bonuses.isHoldingRpgGear());
 
-        // Store spell element from weapon implicit (null for physical/legacy weapons).
-        // With Hexcode: element comes from the spell being cast, not the weapon — don't set it.
-        // This makes the combat system fall back to resolveDominantSpellElement() or hex spell element.
-        if (!HexcodeCompat.isLoaded()) {
-            stats.setWeaponSpellElement(bonuses.weaponSpellElement());
+        // Store spell element from weapon implicit (null for physical weapons).
+        // With Hexcode: magic weapons (staves/wands) get element from the hex spell, not weapon.
+        // Elemental physical weapons always use their own element regardless of Hexcode.
+        ElementType weaponElement = bonuses.weaponSpellElement();
+        if (weaponElement != null) {
+            boolean isMagic = WeaponType.fromItemIdOrUnknown(bonuses.weaponItemId()).isMagic();
+            if (!HexcodeCompat.isLoaded() || !isMagic) {
+                stats.setWeaponSpellElement(weaponElement);
+            }
         }
 
         if (bonuses.isEmpty()) {

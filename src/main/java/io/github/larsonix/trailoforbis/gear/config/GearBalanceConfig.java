@@ -643,11 +643,13 @@ public final class GearBalanceConfig {
             double twoHandedMultiplier,
             double spellbookBaseMin,
             double spellbookBaseMax,
-            double spellbookScaleFactor
+            double spellbookScaleFactor,
+            double physicalWeight,
+            double elementalWeightEach
     ) {
         /** Default config with implicit damage disabled. */
         public static final ImplicitDamageConfig DISABLED =
-            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0, 0.1, 0.3, 3.0);
+            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0, 0.1, 0.3, 3.0, 70.0, 5.0);
 
         /**
          * Calculates the scaled damage range for a weapon at a given level.

@@ -32,7 +32,7 @@ class ContainerTierTest {
         void dungeonTierDefaults() {
             assertEquals("dungeon", ContainerTier.DUNGEON.getConfigKey());
             assertEquals(1.5, ContainerTier.DUNGEON.getDefaultLootMultiplier());
-            assertEquals(0.15, ContainerTier.DUNGEON.getDefaultRarityBonus());
+            assertEquals(0.25, ContainerTier.DUNGEON.getDefaultRarityBonus());
         }
 
         @Test
@@ -40,7 +40,7 @@ class ContainerTierTest {
         void bossTierDefaults() {
             assertEquals("boss", ContainerTier.BOSS.getConfigKey());
             assertEquals(2.0, ContainerTier.BOSS.getDefaultLootMultiplier());
-            assertEquals(0.30, ContainerTier.BOSS.getDefaultRarityBonus());
+            assertEquals(0.50, ContainerTier.BOSS.getDefaultRarityBonus());
         }
 
         @Test
@@ -48,7 +48,7 @@ class ContainerTierTest {
         void specialTierDefaults() {
             assertEquals("special", ContainerTier.SPECIAL.getConfigKey());
             assertEquals(1.75, ContainerTier.SPECIAL.getDefaultLootMultiplier());
-            assertEquals(0.25, ContainerTier.SPECIAL.getDefaultRarityBonus());
+            assertEquals(0.35, ContainerTier.SPECIAL.getDefaultRarityBonus());
         }
 
         @Test

@@ -32,5 +32,13 @@ public enum SynergyType {
      * Bonus scales with total allocated nodes (any type).
      * Example: "Per 10 total nodes, +50 max health"
      */
-    TOTAL_COUNT
+    TOTAL_COUNT,
+
+    /**
+     * Bonus scales with the sum of attribute points in the octant's 3 parent elements.
+     * Used by octant nexus hubs to reward multi-element attribute investment.
+     * Example: "Per 1 point in (Fire+Void+Lightning), +0.1% Crit Multiplier"
+     * The region field on SynergyConfig determines which octant (and thus which 3 elements).
+     */
+    ATTRIBUTE_SUM_SCALING
 }

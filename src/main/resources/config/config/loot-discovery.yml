@@ -140,3 +140,223 @@ sound_set_overrides: {}
   # Example:
   # "ISS_MyMod_DragonArmor": "PLATE"
   # "ISS_MyMod_SilkRobes": "CLOTH"
+
+# =============================================================================
+# LOOT CATEGORY PIPELINE (Implicit-Driven)
+# =============================================================================
+# Controls the new implicit-driven loot pipeline:
+#   1. Roll SUPER-CATEGORY (weapon/armor/offhand) using super_category_weights
+#   2. Roll CATEGORY within the super (e.g., sword, chest, shield)
+#   3. Roll IMPLICIT from the category's pool — this is THE identity moment
+#
+# For armor: the implicit determines the material (armor→plate, evasion→leather)
+# For weapons: the implicit determines the damage element (physical, fire, etc.)
+#
+# The implicit then drives:
+#   - Which skins to use (plate skins, leather skins, etc.)
+#   - Which modifier pool to draw from (cloth→mana/spell, plate→armor/health)
+# =============================================================================
+
+# How often each super-category drops (relative weights)
+super_category_weights:
+  weapon: 40
+  armor: 45
+  offhand: 15
+
+# Categories within each super-category
+# Each category has:
+#   super: which super-category (weapon/armor/offhand)
+#   weight: relative chance within its super-category
+#   implicits: map of implicit_type → weight (rolled to determine item identity)
+categories:
+  # --- WEAPONS (physical-dominant, small elemental chance) ---
+  sword:
+    super: weapon
+    weight: 10
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  axe:
+    super: weapon
+    weight: 8
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  mace:
+    super: weapon
+    weight: 6
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  dagger:
+    super: weapon
+    weight: 8
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  longsword:
+    super: weapon
+    weight: 5
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  battleaxe:
+    super: weapon
+    weight: 4
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  spear:
+    super: weapon
+    weight: 5
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  shortbow:
+    super: weapon
+    weight: 7
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  crossbow:
+    super: weapon
+    weight: 4
+    implicits:
+      physical: 70
+      fire: 5
+      water: 5
+      lightning: 5
+      earth: 5
+      wind: 5
+      void: 5
+
+  # Magic weapons: elemental only (no physical)
+  staff:
+    super: weapon
+    weight: 6
+    implicits:
+      fire: 17
+      water: 17
+      lightning: 17
+      earth: 17
+      wind: 16
+      void: 16
+
+  wand:
+    super: weapon
+    weight: 4
+    implicits:
+      fire: 17
+      water: 17
+      lightning: 17
+      earth: 17
+      wind: 16
+      void: 16
+
+  # --- ARMOR (each slot is one category, implicit determines material) ---
+  head:
+    super: armor
+    weight: 20
+    implicits:
+      armor: 30          # → Plate skin
+      evasion: 30        # → Leather skin
+      energy_shield: 25  # → Cloth skin
+      max_health: 15     # → Plate skin (tanky look)
+
+  chest:
+    super: armor
+    weight: 30
+    implicits:
+      armor: 30
+      evasion: 30
+      energy_shield: 25
+      max_health: 15
+
+  legs:
+    super: armor
+    weight: 25
+    implicits:
+      armor: 30
+      evasion: 30
+      energy_shield: 25
+      max_health: 15
+
+  hands:
+    super: armor
+    weight: 25
+    implicits:
+      armor: 30
+      evasion: 30
+      energy_shield: 25
+      max_health: 15
+
+  # --- OFFHAND (fixed implicits) ---
+  shield:
+    super: offhand
+    weight: 60
+    implicits:
+      block_chance: 100
+
+  spellbook:
+    super: offhand
+    weight: 40
+    implicits:
+      mana_regen: 100
+
+# How implicits map to visual skin materials
+# armor → PLATE means: if an item rolls "armor" implicit, use plate-looking skins
+implicit_material_map:
+  armor: PLATE
+  evasion: LEATHER
+  energy_shield: CLOTH
+  max_health: PLATE          # No WOOD armor skins exist; plate is tanky/health thematic
+  block_chance: SHIELD       # Uses shield skins
+  mana_regen: SPELLBOOK      # Uses spellbook skins

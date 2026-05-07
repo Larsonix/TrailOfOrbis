@@ -246,6 +246,7 @@ public class TrailOfOrbis extends JavaPlugin {
 
     // Combat trackers (promoted to plugin scope for disconnect cleanup)
     private io.github.larsonix.trailoforbis.combat.tracking.ConsecutiveHitTracker consecutiveHitTracker;
+    private io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry combatEffectRegistry;
     private io.github.larsonix.trailoforbis.ailments.AilmentImmunityTracker ailmentImmunityTracker;
 
     // Projectile stats system config (projectile speed/gravity modifiers)
@@ -337,6 +338,9 @@ public class TrailOfOrbis extends JavaPlugin {
     // Persistent container loot tracking (ChunkStore resource, survives restarts)
     private ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResourceType;
 
+    // L4E component bridge — stale lock cleanup + template removal (null when L4E not installed)
+    private io.github.larsonix.trailoforbis.compat.L4EComponentBridge l4eComponentBridge;
+
     // ==================== CONSTRUCTOR ====================
 
     /**
@@ -412,9 +416,9 @@ public class TrailOfOrbis extends JavaPlugin {
         );
 
         // DrainPlayerFromWorldEvent: NORMAL - Discard ALL stale HUDs during world transitions.
-        // resetManagers() sends CustomHud(clear=true) to the client, destroying all HyUI
-        // elements. Any subsequent hide()/Set commands to those cleared elements crash the
-        // client. We discard ALL HUD types here — remove from tracking + cancel refresh only.
+        // JoinWorld(clearWorld=true) clears all client-side HyUI elements. Any subsequent
+        // hide()/Set commands targeting those cleared elements crash the client. We discard
+        // ALL HUD types here — remove from tracking + cancel refresh only (zero packets).
         eventRegistry.registerGlobal(
             EventPriority.NORMAL,
             DrainPlayerFromWorldEvent.class,
@@ -439,6 +443,12 @@ public class TrailOfOrbis extends JavaPlugin {
                     }
                     if (realmsManager != null) {
                         realmsManager.getHudManager().discardAllHudsForPlayer(playerId);
+                    }
+
+                    // Remove L4E stale OpenedContainerComponent lock to prevent
+                    // "can't open any chest" after world transitions
+                    if (l4eComponentBridge != null) {
+                        l4eComponentBridge.tryRemoveOpenedContainer(event.getHolder());
                     }
 
                     // Reset Hexcode spell state to prevent crash when CraftingSystem
@@ -686,8 +696,44 @@ public class TrailOfOrbis extends JavaPlugin {
         }
 
         // RPGDamageSystem - hooks into Hytale's damage pipeline
-        getEntityStoreRegistry().registerSystem(new RPGDamageSystem(this));
+        RPGDamageSystem rpgDamageSystem = new RPGDamageSystem(this);
+        getEntityStoreRegistry().registerSystem(rpgDamageSystem);
         getLogger().atInfo().log("Registered RPGDamageSystem");
+
+        // Initialize combat effect registry for keystone behavioral effects
+        combatEffectRegistry = new io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry();
+        // Migrated effects (previously hardcoded in RPGDamageSystem)
+        if (ailmentTracker != null) {
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ChainDetonationEffect(ailmentTracker));
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.GlacialMasteryEffect(ailmentTracker));
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ThundergodEffect(ailmentTracker));
+        }
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SpellEchoEffect());
+        // New keystone effects
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BerserkersRageEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BladeDanceEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.RampageEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SoulSiphonEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.LivingFortressEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BloodFortressEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SkyPiercerEffect());
+        // Bridge payoff effects
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.LifeStreamEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.InfernalCorruptionEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SoulGardenEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BoilingCurrentsEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ArcticArcanaEffect());
+        if (ailmentTracker != null) {
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ThunderingBlowsEffect(ailmentTracker));
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.VoidChillEffect(ailmentTracker));
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.StormShatterEffect(ailmentTracker));
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.VoidStormEffect(ailmentTracker));
+        }
+        if (energyShieldTracker != null) {
+            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.GlacialFortressEffect(energyShieldTracker));
+        }
+        rpgDamageSystem.setCombatEffectRegistry(combatEffectRegistry);
+        getLogger().atInfo().log("CombatEffectRegistry initialized (%d effects registered)", combatEffectRegistry.getRegisteredCount());
 
         // Damage indicator suppressor - prevents vanilla from showing duplicate indicators
         // CRITICAL: Runs BEFORE EntityUIEvents to zero damage for already-displayed indicators
@@ -777,6 +823,13 @@ public class TrailOfOrbis extends JavaPlugin {
             inventoryChangeEventSystem.addHandler(unifiedPickupListener::onInventoryChange);
             unifiedPickupListener.register(getEventRegistry());
         }
+        // Crafting bench preview Phase 2: registers close callbacks and safety cleanup.
+        // Phase 1 (UseBlockEvent.Post, ECS) already sends definitions on bench open.
+        // MUST run BEFORE ReskinDataPreserver so close callbacks are registered before
+        // reskin overlay translations are sent.
+        if (gearManager != null && gearManager.getCraftingBenchPreviewSystem() != null) {
+            inventoryChangeEventSystem.addHandler(gearManager.getCraftingBenchPreviewSystem()::onInventoryChange);
+        }
         // Reskin data preservation: caches RPG data when items enter Builder's Workbench,
         // re-applies when crafted output appears in inventory
         if (gearManager != null && gearManager.getReskinDataPreserver() != null) {
@@ -788,9 +841,6 @@ public class TrailOfOrbis extends JavaPlugin {
         if (gearManager != null && gearManager.getTimedCraftHandler() != null) {
             inventoryChangeEventSystem.addHandler(gearManager.getTimedCraftHandler()::onInventoryChange);
         }
-        // Crafting preview is sent globally on join (via ItemSyncCoordinator.onPlayerReady).
-        // No InventoryChangeEvent handler needed — RPG items are immune to base definition
-        // changes because they don't use variant=true.
         // Sanctum visual refresh handler REMOVED — replaced by sanctum suppression
         // in ItemSyncCoordinator (prevents UpdateItems flushes entirely while in sanctum)
         getEntityStoreRegistry().registerSystem(inventoryChangeEventSystem);
@@ -1418,6 +1468,13 @@ public class TrailOfOrbis extends JavaPlugin {
             animationSpeedSyncManager = null;
         }
 
+        // Phase 1.6.8: Shutdown combat effect registry
+        if (combatEffectRegistry != null) {
+            getLogger().atInfo().log("Shutting down combat effect registry...");
+            combatEffectRegistry.shutdown();
+            combatEffectRegistry = null;
+        }
+
         // Phase 1.7: Shutdown ailment system
         if (ailmentEffectManager != null) {
             getLogger().atInfo().log("Shutting down ailment effect manager...");
@@ -1763,6 +1820,11 @@ public class TrailOfOrbis extends JavaPlugin {
         return consecutiveHitTracker;
     }
 
+    @Nullable
+    public io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry getCombatEffectRegistry() {
+        return combatEffectRegistry;
+    }
+
     /** @return null if combat system is not initialized */
     @Nullable
     public io.github.larsonix.trailoforbis.ailments.AilmentImmunityTracker getAilmentImmunityTracker() {
@@ -2058,13 +2120,17 @@ public class TrailOfOrbis extends JavaPlugin {
             rewardChestManager = realmsManager.getRewardChestManager();
         }
 
+        // Create L4E component bridge for stale lock cleanup + template removal
+        l4eComponentBridge = io.github.larsonix.trailoforbis.compat.L4EComponentBridge.tryCreate();
+
         var interceptor = containerLootSystem.createInterceptor(
-            rewardChestManager, realmsManager, processedContainerResourceType);
+            rewardChestManager, realmsManager, processedContainerResourceType, l4eComponentBridge);
         if (interceptor != null) {
             getEntityStoreRegistry().registerSystem(interceptor);
-            getLogger().atInfo().log("Registered ContainerLootInterceptor ECS system (scope: %s, clearAll: %s)",
+            getLogger().atInfo().log("Registered ContainerLootInterceptor ECS system (scope: %s, clearAll: %s, l4eBridge: %s)",
                 containerLootSystem.getConfig().getScope(),
-                containerLootSystem.getConfig().isClearAllVanilla());
+                containerLootSystem.getConfig().isClearAllVanilla(),
+                l4eComponentBridge != null ? "active" : "none");
         }
     }
 

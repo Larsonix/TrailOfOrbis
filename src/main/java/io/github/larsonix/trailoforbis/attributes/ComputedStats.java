@@ -377,6 +377,10 @@ public final class ComputedStats {
         return offensive.getPercentHitAsTrueDamage();
     }
 
+    public float getVoidToTrueDamagePercent() {
+        return offensive.getVoidToTrueDamagePercent();
+    }
+
     public float getAllDamagePercent() {
         return offensive.getAllDamagePercent();
     }
@@ -1685,6 +1689,7 @@ public final class ComputedStats {
             .chargedAttackDamagePercent(offensive.getChargedAttackDamagePercent())
             .trueDamagePercent(offensive.getTrueDamagePercent())
             .percentHitAsTrueDamage(offensive.getPercentHitAsTrueDamage())
+            .voidToTrueDamagePercent(offensive.getVoidToTrueDamagePercent())
             .allDamagePercent(offensive.getAllDamagePercent())
             .meleeDamage(offensive.getMeleeDamage())
             .lifeLeech(offensive.getLifeLeech())
@@ -2035,6 +2040,11 @@ public final class ComputedStats {
 
         public Builder percentHitAsTrueDamage(float value) {
             offensive.percentHitAsTrueDamage(value);
+            return this;
+        }
+
+        public Builder voidToTrueDamagePercent(float value) {
+            offensive.voidToTrueDamagePercent(value);
             return this;
         }
 

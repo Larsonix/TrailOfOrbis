@@ -23,6 +23,7 @@ import io.github.larsonix.trailoforbis.gear.migration.ItemMigrationService;
 import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
 import io.github.larsonix.trailoforbis.gear.loot.LootCalculator;
+import io.github.larsonix.trailoforbis.gear.loot.LootCategoryConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootDiscoveryConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
 import io.github.larsonix.trailoforbis.gear.loot.LootListener;
@@ -170,6 +171,7 @@ public final class GearManager implements GearService {
 
     // Crafting preview tooltips (RPG info on vanilla weapon/armor tooltips)
     @Nullable private io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService craftingPreviewService;
+    @Nullable private io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem craftingBenchPreviewSystem;
 
     // Timed craft conversion handler (InventoryChangeEvent fallback for queueCraft benches)
     @Nullable private io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler timedCraftHandler;
@@ -290,18 +292,22 @@ public final class GearManager implements GearService {
                     plugin.getEntityStoreRegistry().registerSystem(craftingConversionSystem);
                     // Guide trigger: fire FIRST_CRAFT on CraftRecipeEvent.Pre (before craft completes)
                     plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
+                    // Crafting bench preview: Phase 1 (UseBlockEvent.Post) sends definitions
+                    // immediately on bench open. Phase 2 (InventoryChangeEvent, registered
+                    // separately in TrailOfOrbis) handles close callback + safety cleanup.
+                    craftingBenchPreviewSystem = new io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem();
+                    plugin.getEntityStoreRegistry().registerSystem(craftingBenchPreviewSystem);
+                    LOGGER.at(Level.INFO).log("Registered CraftingBenchPreviewSystem (ECS + InventoryChange hybrid)");
                     craftingConversionPending = false;
                     LOGGER.at(Level.INFO).log("Registered deferred crafting conversion ECS system");
 
-                    // Update crafting preview tooltips on level-up so the displayed
-                    // gear level reflects the player's new RPG level.
-                    if (craftingPreviewService != null) {
+                    // Update crafting preview translations on level-up while a bench is open.
+                    // Routes through the coordinator for coalescing (100ms window) — no redundant
+                    // packets on rapid level-ups. The coordinator checks isActiveBenchSession()
+                    // and only sends translations if a bench window is currently open.
+                    if (syncCoordinator != null) {
                         levelingService.registerLevelUpListener((playerId, newLevel, oldLevel, totalXp) -> {
-                            com.hypixel.hytale.server.core.universe.PlayerRef ref =
-                                    com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(playerId);
-                            if (ref != null && ref.isValid() && craftingPreviewService.isInitialized()) {
-                                craftingPreviewService.syncToPlayer(ref, newLevel);
-                            }
+                            syncCoordinator.markCraftingPreviewDirty(playerId);
                         });
                     }
                 },
@@ -639,8 +645,11 @@ public final class GearManager implements GearService {
         // Initialize reskin system — generates StructuralCrafting recipes for Builder's Workbench
         initializeReskinSystem();
 
-        // Loot generator using dynamic registry
-        lootGenerator = new LootGenerator(gearGenerator, dynamicLootRegistry);
+        // Build loot category config from discovery config (implicit-driven pipeline)
+        LootCategoryConfig categoryConfig = discoveryConfig.buildCategoryConfig();
+
+        // Loot generator using dynamic registry + category pipeline
+        lootGenerator = new LootGenerator(gearGenerator, dynamicLootRegistry, categoryConfig);
 
         // Loot listener
         lootListener = new LootListener(plugin, lootCalculator, lootGenerator);
@@ -797,6 +806,11 @@ public final class GearManager implements GearService {
     }
 
     @Nullable
+    public io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem getCraftingBenchPreviewSystem() {
+        return craftingBenchPreviewSystem;
+    }
+
+    @Nullable
     private io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator createDistanceCalculator() {
         if (plugin.getConfigManager() == null || plugin.getConfigManager().getMobScalingConfig() == null) {
             return null;
@@ -899,7 +913,8 @@ public final class GearManager implements GearService {
             mapGenerator,
             conversionConfig,
             dropLevelBlender,
-            rarityBonusCalculator
+            rarityBonusCalculator,
+            gearGenerator.getRarityRoller()
         );
 
         LOGGER.at(Level.INFO).log("Container loot replacement system initialized");

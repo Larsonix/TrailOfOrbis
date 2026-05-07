@@ -29,9 +29,14 @@ public class EnergyShieldTracker {
             return new ShieldState(maxShield, 0L);
         }
 
-        /** Returns a new state after absorbing damage. */
+        /** Returns a new state after absorbing damage, resetting regen delay. */
         public ShieldState afterAbsorb(float absorbed) {
             return new ShieldState(currentShield - absorbed, System.currentTimeMillis());
+        }
+
+        /** Returns a new state after absorbing damage WITHOUT resetting regen delay. */
+        public ShieldState afterAbsorbPreserveRegen(float absorbed) {
+            return new ShieldState(currentShield - absorbed, lastHitTimeMs);
         }
 
         /** Returns a new state after regenerating. */
@@ -41,6 +46,14 @@ public class EnergyShieldTracker {
     }
 
     private final ConcurrentHashMap<UUID, ShieldState> shields = new ConcurrentHashMap<>();
+
+    /**
+     * Players whose ES regen is protected while blocking (Glacial Fortress bridge effect).
+     * When a player's UUID is in this set AND they are actively blocking,
+     * damage absorption does NOT reset the regen delay timer.
+     */
+    private final ConcurrentHashMap.KeySetView<UUID, Boolean> blockProtectsESRegen =
+        ConcurrentHashMap.newKeySet();
 
     /** Delay in milliseconds before shield starts regenerating after being hit. */
     private final long regenDelayMs;
@@ -77,13 +90,14 @@ public class EnergyShieldTracker {
         // this is the correct ConcurrentHashMap idiom and future-proofs against
         // any threading model changes.
         float[] remaining = {damage};
+        boolean preserveRegen = blockProtectsESRegen.contains(uuid);
         shields.computeIfPresent(uuid, (key, state) -> {
             if (state.currentShield() <= 0) {
                 return state;
             }
             float absorbed = Math.min(damage, state.currentShield());
             remaining[0] = damage - absorbed;
-            return state.afterAbsorb(absorbed);
+            return preserveRegen ? state.afterAbsorbPreserveRegen(absorbed) : state.afterAbsorb(absorbed);
         });
         return remaining[0];
     }
@@ -107,8 +121,21 @@ public class EnergyShieldTracker {
      * @param uuid The player's UUID
      */
     public void recordHit(@Nonnull UUID uuid) {
+        if (blockProtectsESRegen.contains(uuid)) return; // Glacial Fortress: blocking protects ES regen
         shields.computeIfPresent(uuid, (key, state) ->
             new ShieldState(state.currentShield(), System.currentTimeMillis()));
+    }
+
+    /**
+     * Enables block-protects-ES-regen for a player (Glacial Fortress bridge effect).
+     * While enabled, shield absorption and HP hits during blocking don't reset the regen delay.
+     */
+    public void setBlockProtectsESRegen(@Nonnull UUID uuid, boolean enabled) {
+        if (enabled) {
+            blockProtectsESRegen.add(uuid);
+        } else {
+            blockProtectsESRegen.remove(uuid);
+        }
     }
 
     /**

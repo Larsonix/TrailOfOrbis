@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.DrainPlayerFromWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.event.events.player.RemovedPlayerFromWorldEvent;
+import com.hypixel.hytale.server.core.modules.entity.player.ChunkTracker;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -199,22 +200,23 @@ public class RealmPlayerEnterListener {
     }
 
     /**
-     * Handles player ready in a realm - hides vanilla UI elements.
+     * Handles player ready in a realm — hides vanilla UI, defers combat HUD.
      *
      * <p>CRITICAL: This must be in PlayerReadyEvent, NOT AddPlayerToWorldEvent.
-     * During world transfer, resetManagers() is called AFTER AddPlayerToWorldEvent,
-     * which resets the HUD to defaults (re-adding ObjectivePanel). PlayerReadyEvent
+     * During world transfer, resetManagers() is called before PlayerReadyEvent,
+     * resetting the HUD to defaults (re-adding ObjectivePanel). PlayerReadyEvent
      * fires AFTER all reset/setup operations are complete.
      *
-     * <p>This method handles TWO separate vanilla UI elements:
-     * <ol>
-     *   <li><b>Portal Timer UI</b>: Controlled by {@link UpdatePortal} packets. TrackerSystem
-     *       sends an initial packet when {@code portalWorld.exists() == true}, regardless of
-     *       whether we set {@code timeoutTimer = null}. We must send {@code UpdatePortal(null, null)}
-     *       to hide it.</li>
-     *   <li><b>ObjectivePanel HUD</b>: A separate HUD component hidden via
-     *       {@code hideHudComponents(HudComponent.ObjectivePanel)}.</li>
-     * </ol>
+     * <p>Vanilla UI suppression (ObjectivePanel, portal timer) runs IMMEDIATELY
+     * in the event handler — no {@code world.execute()} deferral. The event
+     * dispatches on the world thread (via {@code world.execute()} in Hytale's
+     * {@code GamePacketHandler.handle(ClientReady)}), so store access and packet
+     * sends are safe. Immediate execution eliminates the 1-frame ObjectivePanel flash.
+     *
+     * <p>Combat HUD creation is still deferred by one tick for MHUD stability —
+     * {@code MultipleHUD.setCustomHud()} double-show() generates Set commands
+     * that reference Append-created elements, which crash if both packets arrive
+     * during JoinWorld processing.
      */
     private void onPlayerReady(@Nonnull PlayerReadyEvent event) {
         Player player = event.getPlayer();
@@ -223,77 +225,82 @@ public class RealmPlayerEnterListener {
             return;
         }
 
-        // Check if this is a realm world
         Optional<RealmInstance> realmOpt = realmsManager.getRealmByWorld(world);
         if (realmOpt.isEmpty()) {
             return;
         }
 
-        world.execute(() -> {
-            // Re-check ref validity on world thread (player may have disconnected)
-            Ref<EntityStore> ref = event.getPlayerRef();
-            if (ref == null || !ref.isValid()) {
-                return;
+        // ─── IMMEDIATE: suppress vanilla UI elements ─────────────────────
+        // No world.execute() deferral — eliminates ObjectivePanel flash.
+
+        Ref<EntityStore> ref = event.getPlayerRef();
+        if (ref == null || !ref.isValid()) {
+            return;
+        }
+
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        UUIDComponent uuidComp = store.getComponent(ref, UUIDComponent.getComponentType());
+        UUID playerId = uuidComp != null ? uuidComp.getUuid() : null;
+        PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+
+        if (playerRef == null) {
+            return;
+        }
+
+        // Hide vanilla portal timer UI
+        PortalWorld portalWorld = store.getResource(PortalWorld.getResourceType());
+        if (portalWorld != null && portalWorld.exists()) {
+            playerRef.getPacketHandler().write(new UpdatePortal(null, null));
+
+            if (playerId != null) {
+                portalWorld.getSeesUi().remove(playerId);
             }
 
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            UUIDComponent uuidComp = store.getComponent(ref, UUIDComponent.getComponentType());
-            UUID playerId = uuidComp != null ? uuidComp.getUuid() : null;
-            PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-
-            if (playerRef == null) {
-                return;
-            }
-
-            // Hide vanilla portal timer UI by sending UpdatePortal(null, null)
-            PortalWorld portalWorld = store.getResource(PortalWorld.getResourceType());
-            if (portalWorld != null && portalWorld.exists()) {
-                playerRef.getPacketHandler().write(new UpdatePortal(null, null));
-
-                if (playerId != null) {
-                    portalWorld.getSeesUi().remove(playerId);
-                }
-
-                LOGGER.atInfo().log("Hid vanilla portal timer for player %s in realm",
-                    playerId != null ? playerId.toString().substring(0, 8) : "unknown");
-            }
-
-            // Hide ObjectivePanel (a separate HUD element, not the portal timer)
-            HudManager hudManager = player.getHudManager();
-            hudManager.hideHudComponents(playerRef, HudComponent.ObjectivePanel);
-            LOGGER.atFine().log("Hid vanilla ObjectivePanel for player %s in realm",
+            LOGGER.atInfo().log("Hid vanilla portal timer for player %s in realm",
                 playerId != null ? playerId.toString().substring(0, 8) : "unknown");
+        }
 
-            // Defer combat HUD to NEXT tick — same reason as XP bar deferral.
-            // MultipleHUD.setCustomHud() double-show() generates Set commands that
-            // reference Append-created elements. If both packets arrive during
-            // JoinWorld processing, the Set crashes. One tick of deferral ensures
-            // the client's UI state is stable.
-            //
-            // DEDUP: Skip if combat HUD already exists. Hytale fires TWO ClientReady
-            // packets per world transition. On remote connections the second arrives
-            // 30+ seconds later. Recreating the HUD (discard+create) on that second
-            // event sends packets during the client's second OnWorldJoined → crash.
-            RealmInstance realm = realmOpt.get();
+        // Hide ObjectivePanel — immediate, no flash
+        HudManager hudManager = player.getHudManager();
+        hudManager.hideHudComponents(playerRef, HudComponent.ObjectivePanel);
+        LOGGER.atFine().log("Hid vanilla ObjectivePanel for player %s in realm",
+            playerId != null ? playerId.toString().substring(0, 8) : "unknown");
 
-            // Grant spawn protection — invincible until first movement.
-            // Protection reads the player's actual position from TransformComponent,
-            // adds the Invulnerable component, and starts a polling timer.
-            if (playerId != null && !realm.getBiome().isUtilityBiome()) {
-                realmsManager.getSpawnProtection().grant(playerId, world);
-            }
-            if (playerId != null && !realm.getBiome().isUtilityBiome()
-                    && !realmsManager.getHudManager().hasCombatHud(playerId)) {
-                final UUID deferredPlayerId = playerId;
-                final PlayerRef deferredRef = playerRef;
-                world.execute(() -> {
-                    if (!deferredRef.isValid()) return;
-                    // Double-check after deferral (another tick might have created it)
-                    if (realmsManager.getHudManager().hasCombatHud(deferredPlayerId)) return;
-                    realmsManager.getHudManager().showCombatHud(deferredPlayerId, deferredRef, realm);
-                });
-            }
-        });
+        // Restore default chunk transfer rate. Was boosted to 128/sec in
+        // RealmTeleportHandler.teleportIntoRealm() to speed up chunk loading for
+        // complex biomes (CellNoise2D Swamp). Now that the player has fully joined
+        // the world, restore the connection-appropriate rate (36/128/256).
+        ChunkTracker chunkTracker = store.getComponent(ref, ChunkTracker.getComponentType());
+        if (chunkTracker != null) {
+            chunkTracker.setDefaultMaxChunksPerSecond(playerRef);
+            LOGGER.atFine().log("Restored default chunk rate for player %s after realm join",
+                playerId != null ? playerId.toString().substring(0, 8) : "unknown");
+        }
+
+        // ─── DEFERRED: combat HUD + spawn protection ─────────────────────
+
+        RealmInstance realm = realmOpt.get();
+
+        // Grant spawn protection — invincible until first movement.
+        // grant() handles its own world.execute() internally.
+        if (playerId != null && !realm.getBiome().isUtilityBiome()) {
+            realmsManager.getSpawnProtection().grant(playerId, world);
+        }
+
+        // Combat HUD — deferred for MHUD stability.
+        // Defensive dedup: hasCombatHud() guard catches edge cases (e.g., rapid
+        // re-entry before previous HUD is cleaned up). Hytale dispatches only ONE
+        // PlayerReadyEvent per transition (AtomicReference.getAndSet(null) gate).
+        if (playerId != null && !realm.getBiome().isUtilityBiome()
+                && !realmsManager.getHudManager().hasCombatHud(playerId)) {
+            final UUID deferredPlayerId = playerId;
+            final PlayerRef deferredRef = playerRef;
+            world.execute(() -> {
+                if (!deferredRef.isValid()) return;
+                if (realmsManager.getHudManager().hasCombatHud(deferredPlayerId)) return;
+                realmsManager.getHudManager().showCombatHud(deferredPlayerId, deferredRef, realm);
+            });
+        }
     }
 
     /**

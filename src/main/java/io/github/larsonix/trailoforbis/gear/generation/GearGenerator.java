@@ -65,8 +65,6 @@ public final class GearGenerator {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    private record ImplicitResult(@Nullable WeaponImplicit weapon, @Nullable ArmorImplicit armor) {}
-
     private final GearBalanceConfig balanceConfig;
     private final ModifierConfig modifierConfig;
     private final EquipmentStatConfig equipmentStatConfig;
@@ -181,13 +179,13 @@ public final class GearGenerator {
     /**
      * Generates gear with a specific rarity and equipment type.
      *
-     * <p>The equipment type determines which stat modifiers can roll:
-     * <ul>
-     *   <li><b>Daggers</b>: Crit, speed, no % physical damage</li>
-     *   <li><b>Staves</b>: Spell damage, no physical damage</li>
-     *   <li><b>Plate armor</b>: Health, armor, stability</li>
-     *   <li><b>Leather armor</b>: Evasion, speed, stamina</li>
-     * </ul>
+     * <p>Resolves the item's identity (equipment type, weapon type, element)
+     * then delegates to {@link #generateFromCategory} — the single generation engine.
+     *
+     * <p>Element rolling uses configurable weights from {@code gear-balance.yml}:
+     * physical weapons have a configurable chance of getting elemental damage
+     * (default 70% physical / 30% elemental, matching loot-discovery.yml defaults).
+     * Magic weapons always get elemental damage.
      *
      * @param baseItem The base item to apply gear data to
      * @param itemLevel The item level
@@ -212,15 +210,19 @@ public final class GearGenerator {
                 "itemLevel must be between " + GearData.MIN_LEVEL + " and " + GearData.MAX_LEVEL);
         }
 
-        // Thrown consumables (bombs, darts, kunai) should not receive RPG stats
+        // Resolve the base item ID for weapon type detection
+        // If the item already has a baseItemId stored (regeneration), use that
+        String baseItemId = GearUtils.getBaseItemId(baseItem);
+        if (baseItemId == null) {
+            baseItemId = baseItem.getItemId();
+        }
+
+        // Thrown consumables (bombs, darts, kunai) should not receive RPG stats.
+        // Shields ARE stat-eligible — they get block_chance via generateFromCategory().
         if ("weapon".equalsIgnoreCase(slot)) {
-            String resolvedId = GearUtils.getBaseItemId(baseItem);
-            if (resolvedId == null) {
-                resolvedId = baseItem.getItemId();
-            }
-            WeaponType resolved = WeaponType.fromItemIdOrUnknown(resolvedId);
-            if (!resolved.isStatEligible()) {
-                LOGGER.atFine().log("Skipping RPG stat generation for thrown weapon: %s", resolvedId);
+            WeaponType resolved = WeaponType.fromItemIdOrUnknown(baseItemId);
+            if (resolved.isThrown()) {
+                LOGGER.atFine().log("Skipping RPG stat generation for thrown weapon: %s", baseItemId);
                 return baseItem;
             }
         }
@@ -235,88 +237,18 @@ public final class GearGenerator {
             }
         }
 
-        // Roll quality
-        int quality = qualityRoller.roll();
+        // Resolve weapon type and roll element using balance config weights
+        WeaponType weaponType = "weapon".equalsIgnoreCase(slot)
+                ? WeaponType.fromItemIdOrUnknown(baseItemId)
+                : null;
+        ElementType element = (weaponType != null)
+                ? implicitCalculator.rollElement(weaponType, random)
+                : null;
 
-        // Calculate modifier distribution to exactly hit max_modifiers
-        RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
-        int[] distribution = calculateModifierDistribution(rarityConfig);
-        int prefixCount = distribution[0];
-        int suffixCount = distribution[1];
-
-        // Determine the original base item ID for weapon type detection
-        // If the item already has a baseItemId stored (regeneration), use that
-        // Otherwise, use the item's current ID
-        String baseItemIdForWeaponType = GearUtils.getBaseItemId(baseItem);
-        if (baseItemIdForWeaponType == null) {
-            baseItemIdForWeaponType = baseItem.getItemId();
-        }
-
-        // For magic weapons: pre-roll the element so modifiers can be biased toward it.
-        // Element is always rolled and stored (Hexcode compat: display adapts at runtime).
-        WeaponType weaponTypeForAffinity = "weapon".equalsIgnoreCase(slot)
-                ? WeaponType.fromItemIdOrUnknown(baseItemIdForWeaponType)
-                : WeaponType.UNKNOWN;
-        ElementType preRolledElement = null;
-        if (weaponTypeForAffinity.isMagic()) {
-            preRolledElement = ElementType.values()[random.nextInt(ElementType.values().length)];
-            AttributeType affinity = AttributeType.fromString(preRolledElement.name());
-            modifierPool.setElementAffinity(affinity);
-        }
-
-        // Roll modifiers with equipment type filtering (+ element affinity if magic weapon)
-        // try/finally ensures affinity is cleared even if rolling throws
-        List<GearModifier> prefixes;
-        List<GearModifier> suffixes;
-        try {
-            prefixes = modifierPool.rollPrefixes(
-                    prefixCount, itemLevel, slot, rarity, effectiveEquipmentType);
-            suffixes = modifierPool.rollSuffixes(
-                    suffixCount, itemLevel, slot, rarity, effectiveEquipmentType);
-        } finally {
-            modifierPool.clearElementAffinity();
-        }
-
-        // Generate unique instance ID
-        GearInstanceId instanceId = GearInstanceIdGenerator.generate();
-
-        // Generate weapon and armor implicits (uses pre-rolled element for magic weapons)
-        ImplicitResult implicits = generateImplicitsWithElement(
-                slot, baseItemIdForWeaponType, effectiveEquipmentType, itemLevel, random, preRolledElement);
-        WeaponImplicit implicit = implicits.weapon();
-        ArmorImplicit armorImplicit = implicits.armor();
-
-        // Build GearData with baseItemId for future regeneration
-        GearData gearData = GearData.builder()
-                .instanceId(instanceId)
-                .level(itemLevel)
-                .rarity(rarity)
-                .quality(quality)
-                .prefixes(prefixes)
-                .suffixes(suffixes)
-                .implicit(implicit)
-                .armorImplicit(armorImplicit)
-                .baseItemId(baseItemIdForWeaponType)
-                .build();
-
-        // CRITICAL: Register custom item BEFORE setting gear data
-        // This ensures the item ID is recognized by Hytale's asset map before
-        // the ItemStack gets the custom itemId. Uses sync registration to guarantee
-        // the item is registered before we continue.
-        registerCustomItem(baseItem, gearData);
-
-        // Inject Hexcode metadata BEFORE setGearData — the 5-arg ItemStack constructor
-        // copies the full BsonDocument, so hex metadata injected here survives
-        ItemStack itemForGear = injectHexMetadataIfApplicable(baseItem, baseItemIdForWeaponType, rarity);
-
-        // Write gear data to ItemStack (this changes the itemId to custom ID)
-        // The registration above ensures Hytale will recognize this custom ID
-        ItemStack result = GearUtils.setGearData(itemForGear, gearData);
-
-        LOGGER.atFine().log("Generated %s %s gear (level %d, quality %d, %d mods)",
-                rarity, slot, itemLevel, quality, prefixes.size() + suffixes.size());
-
-        return result;
+        // Delegate to the unified generation engine
+        return generateFromCategory(
+                baseItem, itemLevel, slot, rarity,
+                effectiveEquipmentType, weaponType, element);
     }
 
     /**
@@ -362,6 +294,139 @@ public final class GearGenerator {
         // Create and register the custom item SYNCHRONOUSLY
         // This ensures the item is fully registered before being returned to callers
         itemRegistry.createAndRegisterSync(baseItemAsset, customItemId);
+    }
+
+    // =========================================================================
+    // IMPLICIT-DRIVEN GENERATION (new pipeline)
+    // =========================================================================
+
+    /**
+     * Generates gear from a pre-resolved category implicit roll.
+     *
+     * <p>This is the entry point for the implicit-driven loot pipeline.
+     * Unlike {@link #generate(ItemStack, int, String, GearRarity)} which
+     * derives weapon/armor type FROM the base item, this method receives
+     * all identity information pre-resolved from the implicit roll.
+     *
+     * <p>Pipeline: implicit roll → equipmentType + element → this method
+     * → quality + modifiers + implicits → apply to skin ItemStack.
+     *
+     * @param skinItem      The base ItemStack to use as visual skin
+     * @param itemLevel     The item level
+     * @param slot          The gear slot string ("weapon", "head", "chest", etc.)
+     * @param rarity        The rolled rarity
+     * @param equipmentType The resolved equipment type (from implicit)
+     * @param weaponType    The weapon type (nullable — for weapons only)
+     * @param element       The damage element (nullable — null = physical)
+     * @return Final ItemStack with gear data applied, or null on failure
+     */
+    @Nullable
+    public ItemStack generateFromCategory(
+            @Nonnull ItemStack skinItem,
+            int itemLevel,
+            @Nonnull String slot,
+            @Nonnull GearRarity rarity,
+            @Nonnull EquipmentType equipmentType,
+            @Nullable WeaponType weaponType,
+            @Nullable ElementType element
+    ) {
+        Objects.requireNonNull(skinItem, "skinItem cannot be null");
+        Objects.requireNonNull(slot, "slot cannot be null");
+        Objects.requireNonNull(rarity, "rarity cannot be null");
+        Objects.requireNonNull(equipmentType, "equipmentType cannot be null");
+
+        if (itemLevel < GearData.MIN_LEVEL || itemLevel > GearData.MAX_LEVEL) {
+            throw new IllegalArgumentException(
+                    "itemLevel must be between " + GearData.MIN_LEVEL + " and " + GearData.MAX_LEVEL);
+        }
+
+        // Roll quality
+        int quality = qualityRoller.roll();
+
+        // Calculate modifier distribution
+        RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
+        int[] distribution = calculateModifierDistribution(rarityConfig);
+        int prefixCount = distribution[0];
+        int suffixCount = distribution[1];
+
+        // Set element affinity for elemental weapons (biases modifier selection toward matching element)
+        if (element != null) {
+            AttributeType affinity = AttributeType.fromString(element.name());
+            modifierPool.setElementAffinity(affinity);
+        }
+
+        // Roll modifiers with equipment type filtering
+        List<GearModifier> prefixes;
+        List<GearModifier> suffixes;
+        try {
+            prefixes = modifierPool.rollPrefixes(
+                    prefixCount, itemLevel, slot, rarity, equipmentType);
+            suffixes = modifierPool.rollSuffixes(
+                    suffixCount, itemLevel, slot, rarity, equipmentType);
+        } finally {
+            modifierPool.clearElementAffinity();
+        }
+
+        // Generate unique instance ID
+        GearInstanceId instanceId = GearInstanceIdGenerator.generate();
+
+        // Generate implicits using the pre-resolved identity.
+        // Unlike generateImplicitsWithElement (which infers from slot string + itemId),
+        // this directly uses the resolved weaponType and equipmentType from the implicit roll.
+        String skinItemId = skinItem.getItemId();
+        WeaponImplicit implicit = null;
+        ArmorImplicit armorImplicit = null;
+
+        if (weaponType != null && weaponType != WeaponType.SHIELD
+                && implicitCalculator.isEnabled()
+                && implicitCalculator.shouldHaveImplicit(weaponType)) {
+            // Weapon with weapon-style implicit (damage, mana_regen, etc.)
+            if (element != null) {
+                implicit = implicitCalculator.calculateWithElement(weaponType, itemLevel, element, random);
+            } else {
+                implicit = implicitCalculator.calculate(weaponType, itemLevel, random);
+            }
+        } else if (equipmentType.isOffhand() && implicitDefenseCalculator.isEnabled()) {
+            // Shield — gets block_chance via defense implicit
+            armorImplicit = implicitDefenseCalculator.calculateShield(itemLevel, random);
+        } else if (equipmentType.isArmor() && implicitDefenseCalculator.isEnabled()
+                && implicitDefenseCalculator.shouldHaveImplicit(equipmentType)) {
+            // Armor with defense implicit (armor, evasion, ES, health)
+            ArmorMaterial material = equipmentType.getArmorMaterial();
+            ArmorSlot armorSlot = equipmentType.getArmorSlot();
+            if (material != null && armorSlot != null) {
+                armorImplicit = implicitDefenseCalculator.calculate(material, armorSlot, itemLevel, random);
+            }
+        }
+
+        // Build GearData with skin's itemId as the base
+        GearData gearData = GearData.builder()
+                .instanceId(instanceId)
+                .level(itemLevel)
+                .rarity(rarity)
+                .quality(quality)
+                .prefixes(prefixes)
+                .suffixes(suffixes)
+                .implicit(implicit)
+                .armorImplicit(armorImplicit)
+                .baseItemId(skinItemId)
+                .build();
+
+        // Register custom item
+        registerCustomItem(skinItem, gearData);
+
+        // Inject Hexcode metadata if applicable
+        ItemStack itemForGear = injectHexMetadataIfApplicable(skinItem, skinItemId, rarity);
+
+        // Write gear data to ItemStack
+        ItemStack result = GearUtils.setGearData(itemForGear, gearData);
+
+        int modCount = prefixes.size() + suffixes.size();
+        LOGGER.atFine().log("Generated %s %s gear from category (level %d, Q%d, %d mods, element=%s)",
+                rarity, slot, itemLevel, quality, modCount,
+                element != null ? element.name() : "none");
+
+        return result;
     }
 
     /**
@@ -417,24 +482,64 @@ public final class GearGenerator {
 
         int quality = qualityRoller.roll();
 
+        // Resolve weapon type and roll element using balance config weights
+        WeaponType weaponType = "weapon".equalsIgnoreCase(slot) && itemId != null
+                ? WeaponType.fromItemIdOrUnknown(itemId)
+                : null;
+        ElementType element = (weaponType != null)
+                ? implicitCalculator.rollElement(weaponType, random)
+                : null;
+
+        // Set element affinity for modifier biasing
+        if (element != null) {
+            AttributeType affinity = AttributeType.fromString(element.name());
+            modifierPool.setElementAffinity(affinity);
+        }
+
         // Calculate modifier distribution to exactly hit max_modifiers
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
         int[] distribution = calculateModifierDistribution(rarityConfig);
         int prefixCount = distribution[0];
         int suffixCount = distribution[1];
 
-        List<GearModifier> prefixes = modifierPool.rollPrefixes(
-                prefixCount, itemLevel, slot, rarity, equipmentType);
-        List<GearModifier> suffixes = modifierPool.rollSuffixes(
-                suffixCount, itemLevel, slot, rarity, equipmentType);
+        List<GearModifier> prefixes;
+        List<GearModifier> suffixes;
+        try {
+            prefixes = modifierPool.rollPrefixes(
+                    prefixCount, itemLevel, slot, rarity, equipmentType);
+            suffixes = modifierPool.rollSuffixes(
+                    suffixCount, itemLevel, slot, rarity, equipmentType);
+        } finally {
+            modifierPool.clearElementAffinity();
+        }
 
         // Generate unique instance ID
         GearInstanceId instanceId = GearInstanceIdGenerator.generate();
 
-        // Generate weapon and armor implicits
-        ImplicitResult implicits = generateImplicits(slot, itemId, equipmentType, itemLevel, random);
-        WeaponImplicit implicit = implicits.weapon();
-        ArmorImplicit armorImplicit = implicits.armor();
+        // Generate weapon and armor implicits (same logic as generateFromCategory)
+        WeaponImplicit implicit = null;
+        ArmorImplicit armorImplicit = null;
+
+        if (weaponType != null && weaponType != WeaponType.SHIELD
+                && implicitCalculator.isEnabled()
+                && implicitCalculator.shouldHaveImplicit(weaponType)) {
+            if (element != null) {
+                implicit = implicitCalculator.calculateWithElement(weaponType, itemLevel, element, random);
+            } else {
+                implicit = implicitCalculator.calculate(weaponType, itemLevel, random);
+            }
+        } else if (equipmentType != null && equipmentType.isOffhand()
+                && implicitDefenseCalculator.isEnabled()) {
+            armorImplicit = implicitDefenseCalculator.calculateShield(itemLevel, random);
+        } else if (equipmentType != null && equipmentType.isArmor()
+                && implicitDefenseCalculator.isEnabled()
+                && implicitDefenseCalculator.shouldHaveImplicit(equipmentType)) {
+            ArmorMaterial material = equipmentType.getArmorMaterial();
+            ArmorSlot armorSlot = equipmentType.getArmorSlot();
+            if (material != null && armorSlot != null) {
+                armorImplicit = implicitDefenseCalculator.calculate(material, armorSlot, itemLevel, random);
+            }
+        }
 
         return GearData.builder()
                 .instanceId(instanceId)
@@ -447,67 +552,6 @@ public final class GearGenerator {
                 .armorImplicit(armorImplicit)
                 .baseItemId(itemId)
                 .build();
-    }
-
-    // =========================================================================
-    // IMPLICIT GENERATION
-    // =========================================================================
-
-    private ImplicitResult generateImplicits(
-            @Nullable String slot,
-            @Nullable String itemId,
-            @Nullable EquipmentType equipmentType,
-            int itemLevel,
-            Random random) {
-        return generateImplicitsWithElement(slot, itemId, equipmentType, itemLevel, random, null);
-    }
-
-    private ImplicitResult generateImplicitsWithElement(
-            @Nullable String slot,
-            @Nullable String itemId,
-            @Nullable EquipmentType equipmentType,
-            int itemLevel,
-            Random random,
-            @Nullable ElementType preRolledElement) {
-
-        // Weapon implicit
-        WeaponImplicit weapon = null;
-        if ("weapon".equalsIgnoreCase(slot) && implicitCalculator.isEnabled() && itemId != null) {
-            WeaponType weaponType = WeaponType.fromItemIdOrUnknown(itemId);
-            LOGGER.atFine().log("[IMPLICIT DEBUG] slot=%s, itemId=%s, weaponType=%s, shouldHaveImplicit=%s",
-                    slot, itemId, weaponType, implicitCalculator.shouldHaveImplicit(weaponType));
-            if (implicitCalculator.shouldHaveImplicit(weaponType)) {
-                if (preRolledElement != null && weaponType.isMagic()) {
-                    // Use pre-rolled element (already consumed random for element selection)
-                    weapon = implicitCalculator.calculateWithElement(weaponType, itemLevel, preRolledElement, random);
-                } else {
-                    weapon = implicitCalculator.calculate(weaponType, itemLevel, random);
-                }
-                LOGGER.atFine().log("[IMPLICIT DEBUG] Generated implicit: %s", weapon);
-            }
-        } else {
-            LOGGER.atFine().log("[IMPLICIT DEBUG] Skipped weapon implicit: slot=%s, enabled=%s",
-                    slot, implicitCalculator.isEnabled());
-        }
-
-        // Armor implicit
-        ArmorImplicit armor = null;
-        if (implicitDefenseCalculator.isEnabled() && equipmentType != null
-                && implicitDefenseCalculator.shouldHaveImplicit(equipmentType)) {
-            if (equipmentType.isOffhand()) {
-                armor = implicitDefenseCalculator.calculateShield(itemLevel, random);
-            } else {
-                ArmorMaterial material = equipmentType.getArmorMaterial();
-                ArmorSlot armorSlot = equipmentType.getArmorSlot();
-                if (material != null && armorSlot != null) {
-                    armor = implicitDefenseCalculator.calculate(material, armorSlot, itemLevel, random);
-                }
-            }
-            LOGGER.atFine().log("[IMPLICIT DEBUG] Generated armor implicit: %s for %s",
-                    armor, equipmentType);
-        }
-
-        return new ImplicitResult(weapon, armor);
     }
 
     // =========================================================================
@@ -858,48 +902,87 @@ public final class GearGenerator {
                 resolvedEquipmentType = generator.equipmentTypeResolver.resolve(itemId, slot);
             }
 
-            // Determine modifiers
+            // Resolve weapon type and roll element using balance config weights
+            WeaponType weaponType = "weapon".equalsIgnoreCase(slot) && itemId != null
+                    ? WeaponType.fromItemIdOrUnknown(itemId)
+                    : null;
+            ElementType element = (weaponType != null)
+                    ? generator.implicitCalculator.rollElement(weaponType, generator.random)
+                    : null;
+
+            // Set element affinity for modifier biasing
+            if (element != null) {
+                AttributeType affinity = AttributeType.fromString(element.name());
+                generator.modifierPool.setElementAffinity(affinity);
+            }
+
+            // Determine modifiers (with element affinity active if applicable)
             RarityConfig rarityConfig = generator.balanceConfig.rarityConfig(finalRarity);
             List<GearModifier> prefixes;
             List<GearModifier> suffixes;
+            try {
+                if (forcedPrefixes != null && forcedSuffixes != null) {
+                    // Both forced - use as-is
+                    prefixes = forcedPrefixes;
+                    suffixes = forcedSuffixes;
+                } else if (forcedPrefixes != null) {
+                    // Prefixes forced, roll remaining suffixes
+                    prefixes = forcedPrefixes;
+                    int suffixCount = rarityConfig.maxModifiers() - prefixes.size();
+                    suffixCount = Math.max(0, Math.min(suffixCount, rarityConfig.maxSuffixes()));
+                    suffixes = generator.modifierPool.rollSuffixes(
+                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                } else if (forcedSuffixes != null) {
+                    // Suffixes forced, roll remaining prefixes
+                    suffixes = forcedSuffixes;
+                    int prefixCount = rarityConfig.maxModifiers() - suffixes.size();
+                    prefixCount = Math.max(0, Math.min(prefixCount, rarityConfig.maxPrefixes()));
+                    prefixes = generator.modifierPool.rollPrefixes(
+                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                } else {
+                    // Neither forced - use distribution to exactly hit max_modifiers
+                    int[] distribution = generator.calculateModifierDistribution(rarityConfig);
+                    int prefixCount = distribution[0];
+                    int suffixCount = distribution[1];
 
-            if (forcedPrefixes != null && forcedSuffixes != null) {
-                // Both forced - use as-is
-                prefixes = forcedPrefixes;
-                suffixes = forcedSuffixes;
-            } else if (forcedPrefixes != null) {
-                // Prefixes forced, roll remaining suffixes
-                prefixes = forcedPrefixes;
-                int suffixCount = rarityConfig.maxModifiers() - prefixes.size();
-                suffixCount = Math.max(0, Math.min(suffixCount, rarityConfig.maxSuffixes()));
-                suffixes = generator.modifierPool.rollSuffixes(
-                        suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
-            } else if (forcedSuffixes != null) {
-                // Suffixes forced, roll remaining prefixes
-                suffixes = forcedSuffixes;
-                int prefixCount = rarityConfig.maxModifiers() - suffixes.size();
-                prefixCount = Math.max(0, Math.min(prefixCount, rarityConfig.maxPrefixes()));
-                prefixes = generator.modifierPool.rollPrefixes(
-                        prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
-            } else {
-                // Neither forced - use distribution to exactly hit max_modifiers
-                int[] distribution = generator.calculateModifierDistribution(rarityConfig);
-                int prefixCount = distribution[0];
-                int suffixCount = distribution[1];
-
-                prefixes = generator.modifierPool.rollPrefixes(
-                        prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
-                suffixes = generator.modifierPool.rollSuffixes(
-                        suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                    prefixes = generator.modifierPool.rollPrefixes(
+                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                    suffixes = generator.modifierPool.rollSuffixes(
+                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                }
+            } finally {
+                generator.modifierPool.clearElementAffinity();
             }
 
             // Generate unique instance ID
             GearInstanceId instanceId = GearInstanceIdGenerator.generate();
 
-            // Generate weapon and armor implicits
-            ImplicitResult implicits = generator.generateImplicits(slot, itemId, resolvedEquipmentType, itemLevel, generator.random);
-            WeaponImplicit implicit = implicits.weapon();
-            ArmorImplicit armorImplicit = implicits.armor();
+            // Generate weapon and armor implicits (same logic as generateFromCategory)
+            WeaponImplicit implicit = null;
+            ArmorImplicit armorImplicit = null;
+
+            if (weaponType != null && weaponType != WeaponType.SHIELD
+                    && generator.implicitCalculator.isEnabled()
+                    && generator.implicitCalculator.shouldHaveImplicit(weaponType)) {
+                if (element != null) {
+                    implicit = generator.implicitCalculator.calculateWithElement(
+                            weaponType, itemLevel, element, generator.random);
+                } else {
+                    implicit = generator.implicitCalculator.calculate(weaponType, itemLevel, generator.random);
+                }
+            } else if (resolvedEquipmentType != null && resolvedEquipmentType.isOffhand()
+                    && generator.implicitDefenseCalculator.isEnabled()) {
+                armorImplicit = generator.implicitDefenseCalculator.calculateShield(itemLevel, generator.random);
+            } else if (resolvedEquipmentType != null && resolvedEquipmentType.isArmor()
+                    && generator.implicitDefenseCalculator.isEnabled()
+                    && generator.implicitDefenseCalculator.shouldHaveImplicit(resolvedEquipmentType)) {
+                ArmorMaterial material = resolvedEquipmentType.getArmorMaterial();
+                EquipmentType.ArmorSlot armorSlot = resolvedEquipmentType.getArmorSlot();
+                if (material != null && armorSlot != null) {
+                    armorImplicit = generator.implicitDefenseCalculator.calculate(
+                            material, armorSlot, itemLevel, generator.random);
+                }
+            }
 
             return GearData.builder()
                     .instanceId(instanceId)

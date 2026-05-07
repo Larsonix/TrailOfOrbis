@@ -253,7 +253,7 @@ public class GatewayUpgradePage {
     private void buildMaxTierMessage(StringBuilder html) {
         html.append("""
                         <div style="layout-mode: Center; anchor-horizontal: 0; anchor-height: 60;">
-                            <p style="font-size: 14; color: #00CCFF;">Maximum tier — all realm levels unlocked</p>
+                            <p style="font-size: 14; color: #00CCFF;">Maximum tier - all realm levels unlocked</p>
                         </div>
             """);
     }

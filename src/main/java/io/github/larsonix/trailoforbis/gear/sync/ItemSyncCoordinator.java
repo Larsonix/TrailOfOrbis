@@ -16,6 +16,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 /**
  * Central coordinator for all item synchronization.
@@ -85,6 +86,14 @@ public class ItemSyncCoordinator {
     /** Players in the Skill Sanctum. Flushes suppressed to prevent node visual corruption. */
     private final Set<UUID> sanctumPlayers = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Callback invoked when a sanctum player's equipment changes (hotbar scroll, etc.).
+     * Hytale's {@code invalidateEquipmentNetwork()} corrupts nearby item entity visuals
+     * (scale, model, light) on the client. This callback triggers an immediate resync
+     * of sanctum node visual components, correcting the corruption in the same tick.
+     */
+    @Nullable private Consumer<UUID> sanctumResyncCallback;
+
     /** Single daemon thread for scheduling delayed flushes. */
     private final ScheduledExecutorService flushScheduler;
 
@@ -126,8 +135,11 @@ public class ItemSyncCoordinator {
          */
         volatile boolean currentlyFlushing = false;
 
+        /** When true, crafting preview translations need re-send (level changed while bench open). */
+        volatile boolean craftingPreviewDirty = false;
+
         boolean hasPendingDirty() {
-            return allGearDirty || !dirtyGearItemIds.isEmpty();
+            return allGearDirty || !dirtyGearItemIds.isEmpty() || craftingPreviewDirty;
         }
     }
 
@@ -196,6 +208,34 @@ public class ItemSyncCoordinator {
      */
     public void markEquipmentDirty(@Nonnull UUID playerId) {
         markStatsDirty(playerId);
+
+        // Reactive sanctum resync: Hytale's invalidateEquipmentNetwork() (from hotbar
+        // scroll) corrupts nearby item entity visuals (scale, model, light). The callback
+        // triggers an immediate resync of sanctum node components in the same tick,
+        // so the entity tracker sends corrected values before the client renders corruption.
+        if (sanctumPlayers.contains(playerId) && sanctumResyncCallback != null) {
+            sanctumResyncCallback.accept(playerId);
+        }
+    }
+
+    /**
+     * Sets the callback invoked when a sanctum player's equipment changes.
+     * Called by {@code SkillSanctumManager} during initialization.
+     */
+    public void setSanctumResyncCallback(@Nullable Consumer<UUID> callback) {
+        this.sanctumResyncCallback = callback;
+    }
+
+    /**
+     * Mark crafting preview as needing a translation re-send.
+     * Used when the player levels up while a crafting bench is open.
+     * The next flush will update translations with the new level.
+     */
+    public void markCraftingPreviewDirty(@Nonnull UUID playerId) {
+        PlayerSyncState state = playerStates.get(playerId);
+        if (state == null) return;
+        state.craftingPreviewDirty = true;
+        scheduleFlush(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -228,7 +268,20 @@ public class ItemSyncCoordinator {
             pending.cancel(false);
         }
 
-        LOGGER.atFine().log("Suppressed sync for player %s (world transition)",
+        // Clear server-side caches. During world transitions the CLIENT's item definition
+        // and translation registries are wiped (JoinWorld reset). Without clearing our
+        // tracking, the post-transition flush thinks items were "already sent" (hash match)
+        // and skips them — leaving RPG items with no definitions on the client.
+        itemSyncService.getPlayerCache().clearPlayerItems(playerId);
+        itemSyncService.getTranslationService().clearPlayerTranslations(playerId);
+
+        // Clear crafting preview bench session — client wipes all definitions on JoinWorld.
+        // No packets sent (client is transitioning, would crash on stale selectors).
+        if (craftingPreviewService != null) {
+            craftingPreviewService.onWorldTransition(playerId);
+        }
+
+        LOGGER.atFine().log("Suppressed sync for player %s (world transition, caches cleared)",
             playerId.toString().substring(0, 8));
     }
 
@@ -337,21 +390,24 @@ public class ItemSyncCoordinator {
                 return;
             }
 
-            // Send crafting preview BEFORE RPG items — vanilla items get preview
-            // text. RPG gear items are unaffected because they don't use
-            // variant=true (their definitions are complete clones with their
-            // own translationProperties).
-            if (craftingPreviewService != null && craftingPreviewService.isInitialized()
-                    && playerRef.isValid()) {
-                int playerLevel = io.github.larsonix.trailoforbis.api.ServiceRegistry
-                        .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
-                        .map(ls -> ls.getLevel(playerId))
-                        .orElse(1);
-                craftingPreviewService.syncToPlayer(playerRef, playerLevel);
+            suppressedPlayers.remove(playerId);
+            pendingFlushes.remove(playerId);
+
+            // Dispatch RPG gear flush to the world thread.
+            // Crafting preview is now window-scoped (sent on bench open via
+            // CraftingBenchPreviewSystem) — no longer sent on join.
+            World w = state.world;
+            if (w != null && w.isAlive()) {
+                w.execute(() -> {
+                    try {
+                        flushOnWorldThread(playerId, state);
+                    } catch (Exception e) {
+                        LOGGER.atWarning().withCause(e).log(
+                            "Post-join sync failed for player %s", playerId.toString().substring(0, 8));
+                    }
+                });
             }
 
-            suppressedPlayers.remove(playerId);
-            executeFlush(playerId);
             LOGGER.atFine().log("Player %s ready — unsuppressed + flushed after join delay",
                 playerId.toString().substring(0, 8));
         }, JOIN_FLUSH_DELAY_MS, TimeUnit.MILLISECONDS);
@@ -369,6 +425,11 @@ public class ItemSyncCoordinator {
         ScheduledFuture<?> pending = pendingFlushes.remove(playerId);
         if (pending != null) {
             pending.cancel(false);
+        }
+
+        // Clean up crafting preview state (no packets — client is gone)
+        if (craftingPreviewService != null) {
+            craftingPreviewService.onPlayerDisconnect(playerId);
         }
 
         LOGGER.atFine().log("Cleaned up coordinator state for player %s",
@@ -530,6 +591,23 @@ public class ItemSyncCoordinator {
                 LOGGER.atFine().log("Flushed %d gear items for player %s [%s]",
                     totalSynced, playerId.toString().substring(0, 8),
                     gearDirty ? "ALL (stats changed)" : dirtyGear.size() + " specific");
+            }
+
+            // ── Crafting preview sync (level-up while bench open) ──
+            if (state.craftingPreviewDirty && craftingPreviewService != null
+                    && craftingPreviewService.isInitialized()
+                    && craftingPreviewService.isActiveBenchSession(playerId)
+                    && !craftingPreviewService.isReskinActive(playerId)) {
+                state.craftingPreviewDirty = false;
+                if (playerRef != null && playerRef.isValid()) {
+                    int level = io.github.larsonix.trailoforbis.api.ServiceRegistry
+                            .get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
+                            .map(ls -> ls.getLevel(playerId))
+                            .orElse(1);
+                    craftingPreviewService.updateTranslationsForActiveSession(playerId, playerRef, level);
+                }
+            } else if (state.craftingPreviewDirty) {
+                state.craftingPreviewDirty = false; // Clear without sending (no bench open or reskin active)
             }
         } finally {
             // ALWAYS clear — even on exception — so the player isn't permanently blocked.

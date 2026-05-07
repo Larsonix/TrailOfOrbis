@@ -123,13 +123,16 @@ class MobStatFactoryTest {
         }
 
         @Test
-        @DisplayName("Caster keyword produces glass cannon")
+        @DisplayName("Caster keyword produces glass cannon — same damage, lower HP")
         void caster_glassCannon() {
             MobStats warrior = factory.generate(50, 0, "generic_warrior", Set.of(), null, 42L);
             MobStats caster = factory.generate(50, 0, "fire_mage", Set.of(), null, 42L);
 
             assertTrue(caster.maxHealth() < warrior.maxHealth(), "Caster HP < Warrior HP");
-            assertTrue(caster.physicalDamage() > warrior.physicalDamage(), "Caster DMG > Warrior DMG");
+            // Caster damage multiplier is 1.0 (same as Warrior) — armor bypass via
+            // 100% elemental conversion is the advantage, not inflated base damage.
+            assertEquals(caster.physicalDamage(), warrior.physicalDamage(), 0.01,
+                    "Caster DMG == Warrior DMG (armor bypass is the differentiator)");
         }
 
         @Test
@@ -224,6 +227,83 @@ class MobStatFactoryTest {
                     "Fire mob should have positive fire resistance");
             assertTrue(stats.elementalStats().getResistance(ElementType.WATER) < 0,
                     "Fire mob should have negative water resistance (weakness)");
+        }
+
+        @Test
+        @DisplayName("Non-CASTER mob with detected element gets resistances but NO elemental damage")
+        void nonCaster_noElementalDamage() {
+            MobScalingConfig.ElementalConfig elemConfig = new MobScalingConfig.ElementalConfig();
+            MobArchetypeConfig archetypeConfig = MobArchetypeConfig.createDefaults();
+
+            MobResistanceConfig resistanceConfig = new MobResistanceConfig();
+            resistanceConfig.setElement_profiles(java.util.Map.of(
+                    "FIRE", java.util.Map.of(
+                            "resistances", java.util.Map.of(
+                                    "fire", 40, "water", -20, "lightning", 0,
+                                    "earth", 10, "wind", -10, "void", 0
+                            ),
+                            "ailment_bonuses", java.util.Map.of("burn_threshold", 50)
+                    )
+            ));
+
+            MobStatFactory elemFactory = new MobStatFactory(
+                    poolConfig,
+                    new ArchetypeResolver(archetypeConfig),
+                    new ResistanceProfileResolver(resistanceConfig),
+                    archetypeConfig,
+                    elemConfig);
+
+            // "fire_warrior" → WARRIOR archetype + FIRE element detected from "fire" keyword
+            MobStats stats = elemFactory.generate(50, 0, "fire_warrior", Set.of(), ElementType.FIRE, 42L);
+
+            assertNotNull(stats.elementalStats(), "Should have elemental stats (resistances)");
+            // Resistances should still be assigned (defensive identity)
+            assertTrue(stats.elementalStats().getResistance(ElementType.FIRE) > 0,
+                    "Fire warrior should still have fire resistance");
+            // But NO offensive elemental damage — warriors stay physical
+            assertEquals(0.0, stats.elementalStats().getFlatDamage(ElementType.FIRE), 0.001,
+                    "Non-CASTER mob should have ZERO fire damage despite detected fire element");
+            assertEquals(0.0, stats.elementalStats().getPenetration(ElementType.FIRE), 0.001,
+                    "Non-CASTER mob should have ZERO fire penetration");
+            // Archetype should be WARRIOR, not CASTER
+            assertEquals(MobArchetype.WARRIOR, stats.archetype(),
+                    "fire_warrior should resolve to WARRIOR archetype");
+        }
+
+        @Test
+        @DisplayName("CASTER mob with detected element gets both resistances AND elemental damage")
+        void caster_getsElementalDamage() {
+            MobScalingConfig.ElementalConfig elemConfig = new MobScalingConfig.ElementalConfig();
+            MobArchetypeConfig archetypeConfig = MobArchetypeConfig.createDefaults();
+
+            MobResistanceConfig resistanceConfig = new MobResistanceConfig();
+            resistanceConfig.setElement_profiles(java.util.Map.of(
+                    "FIRE", java.util.Map.of(
+                            "resistances", java.util.Map.of(
+                                    "fire", 40, "water", -20, "lightning", 0,
+                                    "earth", 10, "wind", -10, "void", 0
+                            ),
+                            "ailment_bonuses", java.util.Map.of("burn_threshold", 50)
+                    )
+            ));
+
+            MobStatFactory elemFactory = new MobStatFactory(
+                    poolConfig,
+                    new ArchetypeResolver(archetypeConfig),
+                    new ResistanceProfileResolver(resistanceConfig),
+                    archetypeConfig,
+                    elemConfig);
+
+            // "fire_mage" → CASTER archetype + FIRE element
+            MobStats stats = elemFactory.generate(50, 0, "fire_mage", Set.of(), ElementType.FIRE, 42L);
+
+            assertNotNull(stats.elementalStats(), "Caster should have elemental stats");
+            assertTrue(stats.elementalStats().getFlatDamage(ElementType.FIRE) > 0,
+                    "CASTER mob should have fire damage");
+            assertTrue(stats.elementalStats().getPenetration(ElementType.FIRE) > 0,
+                    "CASTER mob should have fire penetration");
+            assertEquals(MobArchetype.CASTER, stats.archetype(),
+                    "fire_mage should resolve to CASTER archetype");
         }
 
         @Test

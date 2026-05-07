@@ -323,6 +323,7 @@ public class AttributeManager implements AttributeService {
                 // Get the manager to access the tree config
                 if (skillService instanceof SkillTreeManager manager && manager.getTreeConfig() != null) {
                     SkillTreeStatAggregator aggregator = new SkillTreeStatAggregator(manager.getTreeConfig());
+                    aggregator.setPlayerData(data); // For ATTRIBUTE_SUM_SCALING nexus hubs
                     StatsCombiner combiner = new StatsCombiner();
 
                     AggregatedModifiers modifiers = aggregator.aggregate(treeData);
@@ -441,6 +442,12 @@ public class AttributeManager implements AttributeService {
                 } catch (Exception e) {
                     LOGGER.at(Level.WARNING).withCause(e).log("Failed to refresh tooltips for %s", playerId);
                 }
+            }
+
+            // 10. Refresh combat effect registry (activate/deactivate behavioral effects)
+            var rpg = io.github.larsonix.trailoforbis.TrailOfOrbis.getInstanceOrNull();
+            if (rpg != null && rpg.getCombatEffectRegistry() != null) {
+                rpg.getCombatEffectRegistry().refreshActiveEffects(playerId, finalStats);
             }
         }
 

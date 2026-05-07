@@ -847,6 +847,137 @@ public final class DynamicLootRegistry {
         return skins.get(ThreadLocalRandom.current().nextInt(skins.size())).itemId();
     }
 
+    // =========================================================================
+    // IMPLICIT-DRIVEN SKIN SELECTION (with quality-tier fallback)
+    // =========================================================================
+    //
+    // Used by the new loot pipeline where the implicit determines the material,
+    // and the skin is looked up AFTER generation (not as a gate).
+
+    /**
+     * Selects a skin for an armor item based on material, slot, and rarity.
+     *
+     * <p>Used by the implicit-driven pipeline: the implicit determines the
+     * armor material (e.g., evasion → LEATHER), and this method finds a
+     * matching skin at the appropriate visual quality tier.
+     *
+     * <p>Fallback strategy:
+     * <ol>
+     *   <li>Exact rarity match</li>
+     *   <li>Next lower rarity (e.g., EPIC → RARE → UNCOMMON → COMMON)</li>
+     *   <li>Next higher rarity</li>
+     *   <li>Any skin in the category regardless of rarity</li>
+     * </ol>
+     *
+     * @param slot     The armor slot (HEAD, CHEST, LEGS, HANDS)
+     * @param material The armor material resolved from the implicit
+     * @param rarity   The RPG rarity (for visual quality matching)
+     * @return A random item ID, or null if no skins exist for this material+slot
+     */
+    @Nullable
+    public String selectSkinForMaterial(
+            @Nonnull EquipmentSlot slot,
+            @Nonnull ArmorMaterial material,
+            @Nonnull GearRarity rarity
+    ) {
+        ensureDiscovered();
+        String category = material.name();
+        return selectSkinWithFallback(slot, category, rarity);
+    }
+
+    /**
+     * Selects a skin for a weapon based on weapon type and rarity.
+     *
+     * <p>Used by the implicit-driven pipeline for weapon categories.
+     * The weapon type determines which skins to look up (e.g., SWORD skins).
+     *
+     * @param weaponType The weapon type (SWORD, AXE, STAFF, etc.)
+     * @param rarity     The RPG rarity (for visual quality matching)
+     * @return A random item ID, or null if no skins exist for this weapon type
+     */
+    @Nullable
+    public String selectSkinForWeaponType(
+            @Nonnull WeaponType weaponType,
+            @Nonnull GearRarity rarity
+    ) {
+        ensureDiscovered();
+        String category = weaponType.name();
+        EquipmentSlot slot = weaponType.isOffhand() || weaponType == WeaponType.SHIELD
+                ? EquipmentSlot.OFF_HAND
+                : EquipmentSlot.WEAPON;
+
+        // Spellbooks are in OFF_HAND
+        if (weaponType == WeaponType.SPELLBOOK) {
+            slot = EquipmentSlot.OFF_HAND;
+        }
+
+        return selectSkinWithFallback(slot, category, rarity);
+    }
+
+    /**
+     * Core skin selection with quality-tier fallback.
+     *
+     * <p>Tries the exact rarity first, then walks down the rarity ladder,
+     * then up, then falls back to any skin in the category.
+     */
+    @Nullable
+    private String selectSkinWithFallback(
+            @Nonnull EquipmentSlot slot,
+            @Nonnull String category,
+            @Nonnull GearRarity targetRarity
+    ) {
+        Map<GearRarity, List<DiscoveredItem>> rarityMap = availabilityMatrix
+                .getOrDefault(slot, Map.of())
+                .getOrDefault(category, Map.of());
+
+        if (rarityMap.isEmpty()) {
+            LOGGER.atFine().log("No skins at all for %s/%s", slot, category);
+            return null;
+        }
+
+        // 1. Try exact rarity
+        String result = pickRandom(rarityMap.get(targetRarity));
+        if (result != null) return result;
+
+        // 2. Walk DOWN from target rarity (e.g., EPIC → RARE → UNCOMMON → COMMON)
+        int targetOrdinal = targetRarity.ordinal();
+        for (int i = targetOrdinal - 1; i >= 0; i--) {
+            result = pickRandom(rarityMap.get(GearRarity.values()[i]));
+            if (result != null) {
+                LOGGER.atFine().log("Skin fallback: %s/%s at %s → fell to %s",
+                        slot, category, targetRarity, GearRarity.values()[i]);
+                return result;
+            }
+        }
+
+        // 3. Walk UP from target rarity (e.g., RARE → EPIC → LEGENDARY)
+        for (int i = targetOrdinal + 1; i < GearRarity.values().length; i++) {
+            result = pickRandom(rarityMap.get(GearRarity.values()[i]));
+            if (result != null) {
+                LOGGER.atFine().log("Skin fallback: %s/%s at %s → rose to %s",
+                        slot, category, targetRarity, GearRarity.values()[i]);
+                return result;
+            }
+        }
+
+        // 4. Last resort: any skin in this category (shouldn't reach here given steps 2-3)
+        for (List<DiscoveredItem> skins : rarityMap.values()) {
+            result = pickRandom(skins);
+            if (result != null) return result;
+        }
+
+        return null;
+    }
+
+    /**
+     * Picks a random item ID from a list of discovered items.
+     */
+    @Nullable
+    private static String pickRandom(@Nullable List<DiscoveredItem> skins) {
+        if (skins == null || skins.isEmpty()) return null;
+        return skins.get(ThreadLocalRandom.current().nextInt(skins.size())).itemId();
+    }
+
     /**
      * Checks whether any items exist at the given rarity across all slots.
      *

@@ -151,7 +151,7 @@ public final class RichTooltipFormatter {
 
         // Section 3: Weapon implicit damage (between level and quality)
         if (gearData.hasWeaponImplicit()) {
-            tooltip = tooltip.insert(buildImplicitSection(gearData.implicit()));
+            tooltip = tooltip.insert(buildImplicitSection(gearData.implicit(), gearData.getBaseItemId()));
         }
 
         // Section 3b: Armor implicit defense (between level and quality)
@@ -279,7 +279,7 @@ public final class RichTooltipFormatter {
      * @param implicit The weapon implicit damage
      */
     @Nonnull
-    public Message buildImplicitSection(@Nonnull WeaponImplicit implicit) {
+    public Message buildImplicitSection(@Nonnull WeaponImplicit implicit, @Nullable String baseItemId) {
         // Non-damage implicits (mana_regen, block_chance, etc.) may have small values
         // that need decimal display instead of integer rounding.
         // All damage types (physical, elemental) use integer display.
@@ -297,12 +297,14 @@ public final class RichTooltipFormatter {
         }
 
         // Determine display name and color:
-        // - With Hexcode: element-specific staves show "Spell Damage" (player picks element via spells)
-        // - Without Hexcode: show the actual element ("Fire Damage" in fire-red)
+        // - Magic weapon + Hexcode: show "Spell Damage" (player picks element via hex spells)
+        // - Any elemental weapon without Hexcode, or non-magic elemental: show element name
+        // - Physical weapon: show "Physical Damage" in white
         ElementType element = implicit.getSpellElement();
+        boolean isMagicWeapon = baseItemId != null && WeaponType.fromItemIdOrUnknown(baseItemId).isMagic();
         String damageTypeName;
         String nameColor;
-        if (element != null && HexcodeCompat.isLoaded()) {
+        if (element != null && isMagicWeapon && HexcodeCompat.isLoaded()) {
             damageTypeName = "Spell Damage";
             nameColor = TooltipStyles.VALUE_WHITE;
         } else if (element != null) {

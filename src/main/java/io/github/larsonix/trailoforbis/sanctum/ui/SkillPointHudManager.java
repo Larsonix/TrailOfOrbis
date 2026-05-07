@@ -238,7 +238,7 @@ public class SkillPointHudManager {
     }
 
     /**
-     * Removes a HUD synchronously using the hide + remove pattern.
+     * Removes a HUD synchronously.
      */
     private void removeHudSync(@Nonnull UUID playerId) {
         HyUIHud hud = activeHuds.remove(playerId);
@@ -247,7 +247,6 @@ public class SkillPointHudManager {
         }
 
         try {
-            hud.hide();
             hud.remove();
             LOGGER.atFine().log("Removed skill point HUD for player %s", playerId.toString().substring(0, 8));
         } catch (Exception e) {

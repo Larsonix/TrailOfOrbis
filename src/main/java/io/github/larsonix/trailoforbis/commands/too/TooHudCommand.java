@@ -14,6 +14,7 @@ import io.github.larsonix.trailoforbis.commands.base.OpenPlayerCommand;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.ui.RealmHudManager;
 import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
+import io.github.larsonix.trailoforbis.ui.hud.HudRefreshHelper;
 import io.github.larsonix.trailoforbis.ui.hud.HudToggleService;
 
 import javax.annotation.Nonnull;
@@ -110,10 +111,6 @@ public class TooHudCommand extends OpenPlayerCommand {
 
     private void applyToHud(@Nullable HyUIHud hud, boolean hide) {
         if (hud == null) return;
-        if (hide) {
-            hud.hide();
-        } else {
-            hud.unhide();
-        }
+        HudRefreshHelper.safeSetVisibility(hud, !hide);
     }
 }

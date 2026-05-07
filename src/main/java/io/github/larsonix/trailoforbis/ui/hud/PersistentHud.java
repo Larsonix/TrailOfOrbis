@@ -1,10 +1,12 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
@@ -12,7 +14,7 @@ import java.util.UUID;
  *
  * <p>Persistent HUDs (XP bar, energy shield, future additions) are always visible
  * to players regardless of which world they're in. When a player transitions between
- * worlds, Hytale's {@code resetManagers()} clears all client-side HyUI elements.
+ * worlds, Hytale's {@code JoinWorld(clearWorld=true)} clears all client-side HyUI elements.
  * The {@link HudLifecycleManager} uses this interface to reliably discard stale
  * server state and restore HUDs after every transition.
  *
@@ -44,8 +46,8 @@ public interface PersistentHud {
      * Discards the stale HUD during a world transition WITHOUT sending packets.
      *
      * <p>Called from {@code DrainPlayerFromWorldEvent}. At this point,
-     * {@code Player.resetManagers()} has sent {@code CustomHud(clear=true)} to the
-     * client, destroying all HyUI elements. Implementations must only remove from
+     * {@code JoinWorld(clearWorld=true)} will clear all client-side HyUI elements.
+     * Implementations must only remove from
      * tracking maps and cancel refresh tasks — never call {@code hide()} which
      * would send Set commands to cleared elements (crash).
      */
@@ -72,6 +74,29 @@ public interface PersistentHud {
      */
     void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
                  @Nonnull Store<EntityStore> store);
+
+    /**
+     * Attempts to restore the HUD with a known-valid Player component.
+     *
+     * <p>Called from the primary restore path where the Player is obtained directly
+     * from {@code PlayerReadyEvent.getPlayer()} — guaranteed valid at event time.
+     * This bypasses HyUI's internal {@code playerRef.getReference()} resolution
+     * which can return null during early world transitions, causing silent
+     * registration failures.
+     *
+     * <p>The default implementation delegates to the 3-arg {@code restore()} for
+     * backward compatibility (e.g., CombatFeedbackGhostManager which doesn't
+     * need direct MultiHud registration).
+     *
+     * @param playerId  The player's UUID
+     * @param playerRef Fresh player reference
+     * @param store     The world's entity store
+     * @param player    The Player component from the event, or null for safety-net paths
+     */
+    default void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                         @Nonnull Store<EntityStore> store, @Nullable Player player) {
+        restore(playerId, playerRef, store);
+    }
 
     /**
      * Removes the HUD on player disconnect. May send packets (hide + remove)

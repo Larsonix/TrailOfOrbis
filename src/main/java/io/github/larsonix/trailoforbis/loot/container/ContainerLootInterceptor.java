@@ -22,10 +22,18 @@ import com.hypixel.hytale.server.core.modules.block.components.ItemContainerBloc
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
+import io.github.larsonix.trailoforbis.compat.L4EComponentBridge;
+import io.github.larsonix.trailoforbis.gear.loot.RealmLootContext;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
+import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import io.github.larsonix.trailoforbis.maps.reward.RewardChestManager;
+import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
+import io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -40,15 +48,18 @@ import java.util.UUID;
  * <p>When a player right-clicks a container block, this system:
  * <ol>
  *   <li>Verifies it's an {@link ItemContainerBlock} (not a crafting bench, etc.)</li>
- *   <li>Skips if it's a reward chest (handled by {@link RewardChestManager})</li>
- *   <li>Skips if Loot4Everyone manages the container</li>
- *   <li>Skips if already processed by {@link ContainerTracker}</li>
+ *   <li>Skips if it's a reward chest (handled by L4E bridge or {@link RewardChestManager})</li>
+ *   <li>Recovers from L4E cancellations (stale locks, empty drops)</li>
+ *   <li>Removes L4E auto-registered templates so we own the container</li>
+ *   <li>Skips if already processed (per-player persistent tracking)</li>
  *   <li>Replaces vanilla weapons/armor with RPG gear via {@link ContainerLootReplacer}</li>
  *   <li>Does NOT cancel the event — vanilla opens the container UI normally</li>
  * </ol>
  *
- * <p>This follows the same {@code UseBlockEvent.Pre} pattern used by both
- * Loot4Everyone and our own {@link RewardChestManager}'s interceptor.
+ * <p>Overrides {@code shouldProcessEvent} to always return true, ensuring this
+ * handler runs even when L4E has cancelled the event. This is critical because
+ * L4E auto-claims all containers with droplists and has 6+ cancel paths that
+ * can silently block chest opens.
  *
  * @see ContainerLootSystem
  * @see ContainerLootReplacer
@@ -69,8 +80,12 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
     private final boolean clearAllVanilla;
     private final boolean debugLogging;
 
-    // Lazy-initialized L4E detection
-    private Boolean loot4EveryonePresent;
+    // L4E compatibility bridge (null when L4E is not installed)
+    @Nullable
+    private final L4EComponentBridge l4eBridge;
+
+    // Lazy-initialized distance calculator for overworld source level
+    private DistanceBonusCalculator distanceBonusCalculator;
 
     /**
      * Creates a new container loot interceptor.
@@ -79,12 +94,14 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
      * @param rewardChestManager        The reward chest manager (to skip reward chests), or null if unavailable
      * @param realmsManager             The realms manager (for realm world detection), or null if unavailable
      * @param processedContainerResType The persistent resource type for tracking processed containers
+     * @param l4eBridge                 The L4E component bridge for stale lock cleanup and template removal, or null
      */
     public ContainerLootInterceptor(
             @Nonnull ContainerLootSystem lootSystem,
             @Nullable RewardChestManager rewardChestManager,
             @Nullable RealmsManager realmsManager,
-            @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType) {
+            @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType,
+            @Nullable L4EComponentBridge l4eBridge) {
         super(UseBlockEvent.Pre.class);
         this.lootSystem = lootSystem;
         this.rewardChestManager = rewardChestManager;
@@ -93,6 +110,20 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         this.scope = lootSystem.getConfig().getReplacementScope();
         this.clearAllVanilla = lootSystem.getConfig().isClearAllVanilla();
         this.debugLogging = lootSystem.getConfig().getAdvanced().isDebugLogging();
+        this.l4eBridge = l4eBridge;
+    }
+
+    /**
+     * Always process events, even if another system (L4E) has cancelled them.
+     *
+     * <p>L4E cancels {@code UseBlockEvent.Pre} for multiple reasons (stale lock,
+     * empty drops, etc.). The default {@code shouldProcessEvent} skips cancelled
+     * events, which would make our handler blind to L4E failures. By overriding
+     * to always return true, we can detect and recover from L4E cancellations.
+     */
+    @Override
+    protected boolean shouldProcessEvent(@Nonnull UseBlockEvent.Pre event) {
+        return true;
     }
 
     @Override
@@ -134,7 +165,7 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
             return;
         }
 
-        // Skip reward chests (handled by RewardChestInterceptor)
+        // Skip reward chests — handled by L4E bridge or our RewardChestInterceptor
         if (rewardChestManager != null) {
             UUID worldId = world.getWorldConfig().getUuid();
             if (rewardChestManager.isRewardChest(target.x, target.y, target.z, worldId)) {
@@ -142,21 +173,36 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
             }
         }
 
-        // Skip containers managed by Loot4Everyone
-        if (isLoot4EveryoneManaged(chunkStoreStore, target)) {
-            if (debugLogging) {
-                LOGGER.atFine().log("Container at (%d, %d, %d) managed by L4E, skipping",
-                    target.x, target.y, target.z);
+        // ── L4E cancelled-event recovery ──
+        // If L4E (or another system) cancelled this event, determine if we should
+        // recover or respect the cancellation.
+        if (event.isCancelled()) {
+            // Container genuinely open by another player — respect cancellation
+            if (!containerState.getWindows().isEmpty()) {
+                return;
             }
-            // Guide milestone: Loot4Everyone is active
-            com.hypixel.hytale.server.core.universe.PlayerRef playerRefComp = store.getComponent(playerRef, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
-            if (playerRefComp != null) {
-                io.github.larsonix.trailoforbis.TrailOfOrbis rpg = io.github.larsonix.trailoforbis.TrailOfOrbis.getInstanceOrNull();
-                if (rpg != null && rpg.getGuideManager() != null) {
-                    rpg.getGuideManager().tryShow(playerRefComp.getUuid(), io.github.larsonix.trailoforbis.guide.GuideMilestone.LOOT4EVERYONE);
+
+            // L4E stale OpenedContainerComponent lock — remove it
+            if (l4eBridge != null) {
+                if (l4eBridge.hasOpenedContainer(store, playerRef)) {
+                    l4eBridge.removeOpenedContainerViaCommandBuffer(commandBuffer, playerRef);
+                    LOGGER.atInfo().log("Removed stale L4E OpenedContainerComponent for player at (%d, %d, %d)",
+                        target.x, target.y, target.z);
                 }
             }
-            return;
+
+            // Uncancelled so vanilla opens the container after we process it
+            event.setCancelled(false);
+        }
+
+        // If L4E has an auto-registered template for this container, remove it
+        // so L4E won't interfere on future opens (we own all non-reward containers)
+        if (l4eBridge != null && l4eBridge.hasTemplate(chunkStoreStore, target.x, target.y, target.z)) {
+            l4eBridge.removeTemplate(chunkStoreStore, target.x, target.y, target.z);
+            if (debugLogging) {
+                LOGGER.atFine().log("Removed L4E auto-registered template at (%d, %d, %d)",
+                    target.x, target.y, target.z);
+            }
         }
 
         // Check scope — should we process containers in this world?
@@ -169,52 +215,52 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
             return;
         }
 
+        // Get player UUID via ECS PlayerRef (needed for per-player processing check)
+        PlayerRef playerRefComp = store.getComponent(playerRef, PlayerRef.getComponentType());
+        if (playerRefComp == null) return;
+        UUID playerId = playerRefComp.getUuid();
+
         // Get block type ID for tier classification
         String blockTypeId = event.getBlockType() != null ? event.getBlockType().getId() : null;
 
-        // Check persistent resource — survives server restarts
+        // Check persistent resource — per-player tracking (each player gets their own loot)
         ProcessedContainerResource processedResource =
             chunkStoreStore.getResource(processedContainerResType);
-        if (processedResource.isProcessed(target.x, target.y, target.z)) {
+        if (processedResource.isProcessedByPlayer(target.x, target.y, target.z, playerId)) {
             if (debugLogging) {
-                LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed (persistent)",
-                    target.x, target.y, target.z, world.getName());
+                LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed for player %s",
+                    target.x, target.y, target.z, world.getName(), playerId);
             }
             return;
         }
 
-        // Get player UUID via ECS PlayerRef (Entity.getUuid() deprecated for removal)
-        PlayerRef playerRefComp = store.getComponent(playerRef, PlayerRef.getComponentType());
-        if (playerRefComp == null) return;
-        UUID playerId = playerRefComp.getUuid();
         int playerLevel = getPlayerLevel(playerId);
+
+        // Build zone-aware loot context (mirrors LootListener's realm context extraction)
+        ContainerLootContext lootContext = buildLootContext(world, target, isRealmWorld, playerLevel);
 
         // Classify container tier
         ContainerTier tier = lootSystem.getTierClassifier().classify(blockTypeId);
 
-        // Mark as processed in persistent resource (prevents race conditions + survives restarts)
-        boolean wasFirstOpener = processedResource.markProcessed(
-            target.x, target.y, target.z, playerId);
-        if (!wasFirstOpener) {
-            return;
-        }
+        // Mark as processed for THIS player (prevents double-replacement on rapid re-open)
+        processedResource.markProcessed(target.x, target.y, target.z, playerId);
 
         // Choose replacement strategy based on config
         ContainerLootReplacer.ReplacementResult result;
         if (clearAllVanilla && isRealmWorld) {
             // Total replacement — clear everything, fill with RPG items
             result = lootSystem.getReplacer().replaceTotal(
-                containerState.getItemContainer(), playerLevel, tier, playerId);
+                containerState.getItemContainer(), lootContext, tier, playerId);
         } else {
             // Selective replacement — remove weapons/armor, preserve materials
             result = lootSystem.getReplacer().replace(
-                containerState.getItemContainer(), playerLevel, tier, playerId);
+                containerState.getItemContainer(), lootContext, tier, playerId);
         }
 
         LOGGER.atInfo().log(
-            "Container loot at (%d, %d, %d) in %s: %s (player lv%d, block: %s, realm: %s)",
+            "Container loot at (%d, %d, %d) in %s: %s (srcLv%d, playerLv%d, block: %s, realm: %s)",
             target.x, target.y, target.z, world.getName(),
-            result.summary(), playerLevel,
+            result.summary(), lootContext.sourceLevel(), lootContext.playerLevel(),
             blockTypeId != null ? blockTypeId : "unknown",
             isRealmWorld ? "yes" : "no");
 
@@ -239,71 +285,106 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
     }
 
     /**
-     * Checks if a container is managed by Loot4Everyone.
+     * Builds the loot context for a container based on its world type.
      *
-     * <p>Uses reflection to avoid compile-time dependency on L4E.
-     * When L4E is present, it manages containers that have a
-     * {@code LootChestTemplate} entry — we must skip those to prevent
-     * double-processing.
+     * <p>For realm containers, extracts realm level, DROP_LEVEL_BONUS, IIQ/IIR,
+     * and GEAR_QUALITY_BONUS — mirroring the mob loot pipeline in
+     * {@link io.github.larsonix.trailoforbis.gear.loot.LootListener}.
      *
-     * @param containerState The container state to check
-     * @param pos            The block position
-     * @return true if L4E manages this container
+     * <p>For overworld containers, calculates a distance-based source level
+     * using the chest's position and
+     * {@link DistanceBonusCalculator#estimateLevelFromDistance(double)}.
+     *
+     * @param world        The world containing the container
+     * @param target       The container block position
+     * @param isRealmWorld Whether the world is a realm world
+     * @param playerLevel  The opening player's level
+     * @return Context with zone-appropriate source level and realm bonuses
      */
-    private boolean isLoot4EveryoneManaged(
-            @Nonnull Store<ChunkStore> chunkStoreStore,
-            @Nonnull Vector3i pos) {
+    @Nonnull
+    private ContainerLootContext buildLootContext(
+            @Nonnull World world,
+            @Nonnull Vector3i target,
+            boolean isRealmWorld,
+            int playerLevel) {
 
-        if (!isLoot4EveryonePresent()) {
-            return false;
-        }
+        if (isRealmWorld && realmsManager != null) {
+            Optional<RealmInstance> realmOpt = realmsManager.getRealmByWorld(world);
+            if (realmOpt.isPresent()) {
+                RealmInstance realm = realmOpt.get();
 
-        try {
-            // L4E check: get LootChestTemplate resource from the chunk store
-            // and see if it has a template for this position.
-            // This mirrors L4E's own UseBlockEventPre.java:51 logic.
-            Object l4e = Class.forName("org.mimstar.plugin.Loot4Everyone")
-                .getMethod("get")
-                .invoke(null);
-            Object resourceType = l4e.getClass()
-                .getMethod("getlootChestTemplateResourceType")
-                .invoke(l4e);
+                // Source level = realm level + DROP_LEVEL_BONUS (mirrors LootListener:140)
+                int realmLevel = realm.getLevel();
+                int dropLevelBonus = realm.getMapData().getModifierValue(RealmModifierType.DROP_LEVEL_BONUS);
+                int sourceLevel = realmLevel + dropLevelBonus;
 
-            Store<?> chunkStore = chunkStoreStore;
-            Object template = chunkStore.getClass()
-                .getMethod("getResource", resourceType.getClass().getInterfaces()[0])
-                .invoke(chunkStore, resourceType);
+                // IIQ/IIR from realm modifiers (mirrors LootListener:357-362)
+                double iiqBonus = realm.getMapData().getTotalItemQuantity();
+                double iirBonus = realm.getMapData().getTotalItemRarity();
+                RealmsConfig realmsConfig = realmsManager.getConfig();
+                iiqBonus += realmsConfig.getBaseRealmIiqBonus();
+                RealmLootContext realmCtx = RealmLootContext.of(iiqBonus, iirBonus);
 
-            if (template != null) {
-                Boolean hasTemplate = (Boolean) template.getClass()
-                    .getMethod("hasTemplate", int.class, int.class, int.class)
-                    .invoke(template, pos.x, pos.y, pos.z);
-                return Boolean.TRUE.equals(hasTemplate);
-            }
-        } catch (Exception e) {
-            // L4E integration failed — treat as not managed
-            if (debugLogging) {
-                LOGGER.atFine().withCause(e).log("L4E template check failed for (%d, %d, %d)",
-                    pos.x, pos.y, pos.z);
+                // Quality bonus (mirrors LootListener:396-410)
+                int qualityBonus = realm.getMapData().getModifierValue(RealmModifierType.GEAR_QUALITY_BONUS);
+
+                if (debugLogging) {
+                    LOGGER.atFine().log("Realm container context: realmLv%d + DROP_LEVEL_BONUS=%d → srcLv%d, IIQ=%.1f%%, IIR=%.1f%%, quality+%d",
+                        realmLevel, dropLevelBonus, sourceLevel, iiqBonus, iirBonus, qualityBonus);
+                }
+
+                return ContainerLootContext.realm(sourceLevel, playerLevel, realmCtx, qualityBonus);
             }
         }
 
-        return false;
+        // Overworld: distance-based source level
+        int sourceLevel = estimateSourceLevelFromDistance(target.x, target.z, world);
+
+        if (debugLogging) {
+            LOGGER.atFine().log("Overworld container context: distance-based srcLv%d, playerLv%d",
+                sourceLevel, playerLevel);
+        }
+
+        return ContainerLootContext.overworld(sourceLevel, playerLevel);
     }
 
     /**
-     * Checks if Loot4Everyone is present at runtime.
+     * Estimates a source level from the chest's distance to world spawn.
+     *
+     * <p>Uses the same {@link DistanceBonusCalculator} that mob scaling uses,
+     * ensuring containers and mobs in the same area drop similar-level gear.
+     *
+     * @param x     Block X coordinate
+     * @param z     Block Z coordinate
+     * @param world The world containing the container
+     * @return Estimated level (minimum 1)
      */
-    private boolean isLoot4EveryonePresent() {
-        if (loot4EveryonePresent == null) {
-            try {
-                Class.forName("org.mimstar.plugin.Loot4Everyone");
-                loot4EveryonePresent = true;
-                LOGGER.atInfo().log("Loot4Everyone detected — will skip L4E-managed containers");
-            } catch (ClassNotFoundException e) {
-                loot4EveryonePresent = false;
+    private int estimateSourceLevelFromDistance(int x, int z, @Nonnull World world) {
+        DistanceBonusCalculator calc = getDistanceBonusCalculator();
+        if (calc == null) {
+            return 1; // Fallback: minimum level if mob scaling unavailable
+        }
+        double distance = DistanceBonusCalculator.calculateDistanceFromSpawn(x, z, world);
+        return calc.estimateLevelFromDistance(distance);
+    }
+
+    /**
+     * Lazily resolves the distance bonus calculator from MobScalingManager.
+     *
+     * <p>Returns null if MobScalingManager is not yet initialized (e.g., mob scaling disabled).
+     */
+    @Nullable
+    private DistanceBonusCalculator getDistanceBonusCalculator() {
+        if (distanceBonusCalculator == null) {
+            TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
+            if (rpg != null) {
+                MobScalingManager scalingManager = rpg.getMobScalingManager();
+                if (scalingManager != null) {
+                    distanceBonusCalculator = scalingManager.getDistanceCalculator();
+                }
             }
         }
-        return loot4EveryonePresent;
+        return distanceBonusCalculator;
     }
+
 }

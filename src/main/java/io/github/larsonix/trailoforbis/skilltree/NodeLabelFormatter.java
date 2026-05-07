@@ -264,6 +264,14 @@ public final class NodeLabelFormatter {
             return null;
         }
 
+        // If any modifier uses an internal-only stat (no ComputedStats accessor),
+        // show "Click for details" instead of cryptic abbreviations
+        for (var mod : modifiers) {
+            if (mod.getStat() != null && !mod.getStat().hasAccessor()) {
+                return "Click for details";
+            }
+        }
+
         // If more than MAX_MODIFIERS_ON_NAMEPLATE, show hint instead
         if (modifiers.size() > MAX_MODIFIERS_ON_NAMEPLATE) {
             return "Click for details";

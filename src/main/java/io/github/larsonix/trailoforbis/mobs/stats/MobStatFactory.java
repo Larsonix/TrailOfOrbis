@@ -163,7 +163,9 @@ public class MobStatFactory {
         armorPen = Math.max(armorPen, archetype.getArmorPenetration());
 
         // ===== 6. Elemental stats from resistance profile + element config =====
-        ElementalStats elementalStats = buildElementalStats(level, detectedElement, resistanceProfile);
+        // Only CASTER mobs get offensive elemental damage — warriors, archers, etc. stay physical.
+        // Resistances apply to all archetypes (defensive identity is independent of offense).
+        ElementalStats elementalStats = buildElementalStats(level, detectedElement, resistanceProfile, archetype);
 
         // ===== 7. Build MobStats (new record: no blockChance/parryChance, has ailment fields) =====
         return new MobStats(
@@ -227,24 +229,34 @@ public class MobStatFactory {
      * Builds ElementalStats from resistance profile + elemental damage scaling.
      *
      * <p>Resistances: from profile (deterministic, no noise — defines identity).
-     * <p>Elemental damage/penetration: from detected element + level scaling config.
+     * All archetypes get resistances (defensive identity is independent of offense).
+     *
+     * <p>Elemental damage/penetration: ONLY for {@link MobArchetype#CASTER} mobs.
+     * Warriors, archers, tanks, etc. deal physical damage only — their element
+     * detection is used for resistances but not for offensive elemental stats.
+     * Map modifiers (MONSTERS_EXTRA_FIRE, etc.) can still add elemental damage
+     * to any mob as a realm challenge mechanic — that's handled separately in
+     * {@code RPGDamageSystem.calculateRealmElementalBonusDamage()}.
      */
     @Nullable
     private ElementalStats buildElementalStats(
             int level,
             @Nullable ElementType detectedElement,
-            @Nonnull ResistanceProfile profile) {
+            @Nonnull ResistanceProfile profile,
+            @Nonnull MobArchetype archetype) {
 
         boolean hasResistances = profile.hasResistances();
-        boolean hasElement = detectedElement != null && elementalConfig != null;
+        // Only CASTER mobs get offensive elemental stats
+        boolean isCaster = archetype == MobArchetype.CASTER;
+        boolean hasOffensiveElement = isCaster && detectedElement != null && elementalConfig != null;
 
-        if (!hasResistances && !hasElement) {
+        if (!hasResistances && !hasOffensiveElement) {
             return null;
         }
 
         ElementalStats stats = new ElementalStats();
 
-        // Resistances from profile (all 6 elements)
+        // Resistances from profile (all 6 elements, all archetypes)
         for (ElementType element : ElementType.values()) {
             double resistance = profile.getResistance(element);
             if (resistance != 0.0) {
@@ -252,8 +264,8 @@ public class MobStatFactory {
             }
         }
 
-        // Elemental damage and penetration for the mob's detected element
-        if (hasElement) {
+        // Elemental damage and penetration — CASTER archetype only
+        if (hasOffensiveElement) {
             double flatDamage = level * elementalConfig.getDamagePerLevel();
             double penetration = Math.min(
                     level * elementalConfig.getPenetrationPerLevel(),

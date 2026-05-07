@@ -114,9 +114,6 @@ public class SkillNodeHudManager {
         HyUIHud existing = activeHuds.remove(playerUuid);
         if (existing != null) {
             try {
-                // CRITICAL: hide() before remove() for immediate visual update
-                // Without this, HUD remains visible when player is teleported out of sanctum
-                existing.hide();
                 existing.remove();
                 LOGGER.atFine().log("Removed skill node HUD for player %s",
                     playerUuid.toString().substring(0, 8));

@@ -12,11 +12,12 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Owns the full lifecycle of persistent HUDs across world transitions.
@@ -29,11 +30,9 @@ import java.util.concurrent.TimeUnit;
  * <pre>
  * DrainPlayerFromWorldEvent → discardAll() → each provider.discardStale()
  *                                                ↓
- *                                    [resetManagers clears client]
+ *                                    [JoinWorld(clearWorld=true) clears client DOM]
  *                                                ↓
  * PlayerReadyEvent (LATE)   → restoreAll() → each provider.restore()
- *                                                ↓
- *                           → safety net (1s) → restoreAll() [catches failures]
  * </pre>
  *
  * <h2>Why LATE Priority</h2>
@@ -62,10 +61,10 @@ public class HudLifecycleManager {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    /** Delay before the safety-net restoration fires. */
-    private static final long SAFETY_NET_DELAY_MS = 1000;
-
     private final List<PersistentHud> providers = new ArrayList<>();
+
+    /** Last processed readyId per player — deduplicates rapid PlayerReadyEvent sequences. */
+    private final Map<UUID, Integer> lastReadyIds = new ConcurrentHashMap<>();
 
     // ═══════════════════════════════════════════════════════════════════
     // REGISTRATION
@@ -121,7 +120,7 @@ public class HudLifecycleManager {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // RESTORE (triggered by PlayerReadyEvent + safety net)
+    // RESTORE (triggered by PlayerReadyEvent)
     // ═══════════════════════════════════════════════════════════════════
 
     /**
@@ -134,8 +133,10 @@ public class HudLifecycleManager {
      *
      * @param playerId The player's UUID
      * @param world    The world the player should be in
+     * @param player   The Player component from the event — used for direct MultiHud registration
      */
-    public void restoreAll(@Nonnull UUID playerId, @Nonnull World world) {
+    public void restoreAll(@Nonnull UUID playerId, @Nonnull World world,
+                           @Nullable Player player) {
         if (!world.isAlive()) {
             return;
         }
@@ -160,7 +161,7 @@ public class HudLifecycleManager {
             }
 
             try {
-                hud.restore(playerId, freshRef, worldStore);
+                hud.restore(playerId, freshRef, worldStore, player);
             } catch (Exception e) {
                 LOGGER.atWarning().withCause(e).log(
                     "Failed to restore %s HUD for player %s",
@@ -180,6 +181,7 @@ public class HudLifecycleManager {
      * the client is still connected.
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
+        lastReadyIds.remove(playerId);
         for (PersistentHud hud : providers) {
             try {
                 hud.removeOnDisconnect(playerId);
@@ -224,31 +226,38 @@ public class HudLifecycleManager {
             return;
         }
 
+        // Dedup: PlayerReadyEvent.getReadyId() increments monotonically per player.
+        // Reject stale events from rapid transitions (enter realm → immediately exit).
+        int readyId = event.getReadyId();
+        Integer lastId = lastReadyIds.get(playerId);
+        if (lastId != null && readyId <= lastId) {
+            LOGGER.atFine().log("Skipping stale PlayerReadyEvent for %s (readyId=%d, last=%d)",
+                playerId.toString().substring(0, 8), readyId, lastId);
+            return;
+        }
+        lastReadyIds.put(playerId, readyId);
+
         final UUID pid = playerId;
         final World w = world;
 
-        // Primary restoration — 1 tick deferred for client stability.
-        // Runs AFTER the EARLY handler's world.execute (FIFO ordering on same thread).
+        // Deferred to world.execute() because handleClientReady(true) — the 10-second
+        // timeout fallback — runs on HytaleServer.SCHEDULED_EXECUTOR, not the world thread.
+        // The normal path (ClientReady packet) already dispatches on the world thread,
+        // making this a harmless same-thread re-post in the common case.
         //
-        // Force-discard before restore: Hytale sends TWO ClientReady packets per
-        // world transition (second arrives ~30s later on remote connections). Each
-        // ClientReady triggers resetManagers() which clears ALL client HyUI elements.
-        // Without the discard, the second ClientReady finds isActive()=true from the
-        // first event's HUDs, skips restoration, and the player sees no HUDs forever.
-        // Discarding first ensures the server-side map matches the cleared client state.
+        // The event's Player is passed directly — guaranteed valid at event time. This
+        // bypasses HyUI's safeAdd() which resolves Player via getReference() (transiently
+        // null during transitions). Each provider uses this Player to call
+        // MultiHudWrapper.setCustomHud() directly for synchronous registration.
+        //
+        // Discard before restore: DrainPlayerFromWorldEvent only fires from
+        // World.drainPlayersTo() (realm close/world shutdown). Normal portal teleports
+        // go through TeleportSystems which bypasses the drain event entirely. Without
+        // this discard, activeHuds retains stale entries from the old world, isActive()
+        // returns true, and restoreAll skips all providers → invisible HUDs.
         world.execute(() -> {
             discardAll(pid);
-            restoreAll(pid, w);
+            restoreAll(pid, w, player);
         });
-
-        // Safety net — 1 second delayed.
-        // Catches: transient ref invalidation, exceptions in earlier init,
-        // rapid world transitions that cancelled the primary path.
-        // Does NOT force-discard — avoids flicker if the primary path succeeded.
-        CompletableFuture.delayedExecutor(SAFETY_NET_DELAY_MS, TimeUnit.MILLISECONDS)
-            .execute(() -> {
-                if (!w.isAlive()) return;
-                w.execute(() -> restoreAll(pid, w));
-            });
     }
 }
