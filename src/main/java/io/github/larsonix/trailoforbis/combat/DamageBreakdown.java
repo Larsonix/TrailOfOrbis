@@ -24,9 +24,11 @@ import java.util.EnumMap;
  * @param totalDamage Sum of all damage types
  * @param preDefenseDamage Total damage before defenses (physical + elemental + true, before armor/resist)
  * @param preDefenseElemental Per-element damage before resistance (for accurate combat log display)
- * @param wasCritical Whether this attack was a critical hit
- * @param critMultiplier The critical multiplier applied (1.0 if no crit)
- * @param wasDodged Whether the attack was dodged (evaded)
+ * @param wasCritical Whether this attack was a critical hit (tier >= 1)
+ * @param critMultiplier The effective critical multiplier applied (1.0 if no crit)
+ * @param critTier The crit tier (0 = no crit, 1 = single, 2+ = multicrit)
+ * @param wasDodged Whether the attack was dodged (flat dodge chance)
+ * @param wasEvaded Whether the attack was evaded (evasion vs accuracy formula)
  * @param wasBlocked Whether the attack was blocked
  * @param wasParried Whether the attack was parried
  * @param wasMissed Whether the attack missed (accuracy check failed)
@@ -49,7 +51,9 @@ public record DamageBreakdown(
     // Calculation flags
     boolean wasCritical,
     float critMultiplier,
+    int critTier,
     boolean wasDodged,
+    boolean wasEvaded,
     boolean wasBlocked,
     boolean wasParried,
     boolean wasMissed,
@@ -85,10 +89,12 @@ public record DamageBreakdown(
             new EnumMap<>(ElementType.class), // preDefenseElemental
             false,
             1.0f,
-            false,
-            false,
-            false,
-            false,
+            0, // critTier
+            false, // wasDodged
+            false, // wasEvaded
+            false, // wasBlocked
+            false, // wasParried
+            false, // wasMissed
             0f,
             new EnumMap<>(ElementType.class),
             0f,
@@ -115,7 +121,9 @@ public record DamageBreakdown(
             new EnumMap<>(ElementType.class), // preDefenseElemental
             false,
             1.0f,
+            0, // critTier
             reason == AvoidanceReason.DODGED,
+            reason == AvoidanceReason.EVADED,
             reason == AvoidanceReason.BLOCKED,
             reason == AvoidanceReason.PARRIED,
             reason == AvoidanceReason.MISSED,
@@ -131,7 +139,7 @@ public record DamageBreakdown(
      * @return true if dodged, blocked, parried, or missed
      */
     public boolean wasAvoided() {
-        return wasDodged || wasBlocked || wasParried || wasMissed;
+        return wasDodged || wasEvaded || wasBlocked || wasParried || wasMissed;
     }
 
     /**
@@ -214,8 +222,25 @@ public record DamageBreakdown(
         return new DamageBreakdown(
             0f, new EnumMap<>(ElementType.class), 0f, 0f,
             0f, new EnumMap<>(ElementType.class), // preDefense values
-            this.wasCritical, this.critMultiplier,
-            true, false, false, false,
+            this.wasCritical, this.critMultiplier, this.critTier,
+            true, false, false, false, false,
+            0f, new EnumMap<>(ElementType.class), 0f,
+            this.damageType, this.attackType
+        );
+    }
+
+    /**
+     * Creates a copy with the evaded flag set.
+     *
+     * @return New breakdown with wasEvaded=true and zero damage
+     */
+    @Nonnull
+    public DamageBreakdown withEvaded() {
+        return new DamageBreakdown(
+            0f, new EnumMap<>(ElementType.class), 0f, 0f,
+            0f, new EnumMap<>(ElementType.class), // preDefense values
+            this.wasCritical, this.critMultiplier, this.critTier,
+            false, true, false, false, false,
             0f, new EnumMap<>(ElementType.class), 0f,
             this.damageType, this.attackType
         );
@@ -231,8 +256,8 @@ public record DamageBreakdown(
         return new DamageBreakdown(
             0f, new EnumMap<>(ElementType.class), 0f, 0f,
             0f, new EnumMap<>(ElementType.class), // preDefense values
-            this.wasCritical, this.critMultiplier,
-            false, true, false, false,
+            this.wasCritical, this.critMultiplier, this.critTier,
+            false, false, true, false, false,
             0f, new EnumMap<>(ElementType.class), 0f,
             this.damageType, this.attackType
         );
@@ -258,8 +283,8 @@ public record DamageBreakdown(
         return new DamageBreakdown(
             newPhys, reducedElemental, newTrue, newTotal,
             this.preDefenseDamage, this.preDefenseElemental, // preserve preDefense values
-            this.wasCritical, this.critMultiplier,
-            false, false, true, false,
+            this.wasCritical, this.critMultiplier, this.critTier,
+            false, false, false, true, false,
             this.armorReduction, this.resistanceReductions, this.shieldAbsorbed,
             this.damageType, this.attackType
         );
@@ -275,8 +300,8 @@ public record DamageBreakdown(
         return new DamageBreakdown(
             0f, new EnumMap<>(ElementType.class), 0f, 0f,
             0f, new EnumMap<>(ElementType.class), // preDefense values
-            this.wasCritical, this.critMultiplier,
-            false, false, false, true,
+            this.wasCritical, this.critMultiplier, this.critTier,
+            false, false, false, false, true,
             0f, new EnumMap<>(ElementType.class), 0f,
             this.damageType, this.attackType
         );
@@ -294,8 +319,8 @@ public record DamageBreakdown(
         return new DamageBreakdown(
             this.physicalDamage, this.elementalDamage, this.trueDamage, newTotal,
             this.preDefenseDamage, this.preDefenseElemental, // preserve preDefense values
-            this.wasCritical, this.critMultiplier,
-            this.wasDodged, this.wasBlocked, this.wasParried, this.wasMissed,
+            this.wasCritical, this.critMultiplier, this.critTier,
+            this.wasDodged, this.wasEvaded, this.wasBlocked, this.wasParried, this.wasMissed,
             this.armorReduction, this.resistanceReductions, absorbed,
             this.damageType, this.attackType
         );
@@ -304,7 +329,7 @@ public record DamageBreakdown(
     @Override
     public String toString() {
         if (wasAvoided()) {
-            String avoidType = wasDodged ? "DODGED" : wasBlocked ? "BLOCKED" : wasParried ? "PARRIED" : "MISSED";
+            String avoidType = wasDodged ? "DODGED" : wasEvaded ? "EVADED" : wasBlocked ? "BLOCKED" : wasParried ? "PARRIED" : "MISSED";
             return String.format("DamageBreakdown{%s, attackType=%s}", avoidType, attackType);
         }
 
@@ -326,7 +351,8 @@ public record DamageBreakdown(
         }
 
         if (wasCritical) {
-            sb.append(String.format(", CRIT(x%.2f)", critMultiplier));
+            String tierLabel = critTier > 1 ? " T" + critTier : "";
+            sb.append(String.format(", CRIT%s(x%.2f)", tierLabel, critMultiplier));
         }
 
         if (armorReduction > 0) {
@@ -346,6 +372,7 @@ public record DamageBreakdown(
      */
     public enum AvoidanceReason {
         DODGED,
+        EVADED,
         BLOCKED,
         PARRIED,
         MISSED
@@ -362,7 +389,9 @@ public record DamageBreakdown(
         private final EnumMap<ElementType, Float> preDefenseElemental = new EnumMap<>(ElementType.class);
         private boolean wasCritical;
         private float critMultiplier = 1.0f;
+        private int critTier;
         private boolean wasDodged;
+        private boolean wasEvaded;
         private boolean wasBlocked;
         private boolean wasParried;
         private boolean wasMissed;
@@ -426,8 +455,18 @@ public record DamageBreakdown(
             return this;
         }
 
+        public Builder critTier(int value) {
+            this.critTier = value;
+            return this;
+        }
+
         public Builder wasDodged(boolean value) {
             this.wasDodged = value;
+            return this;
+        }
+
+        public Builder wasEvaded(boolean value) {
+            this.wasEvaded = value;
             return this;
         }
 
@@ -490,7 +529,9 @@ public record DamageBreakdown(
                 new EnumMap<>(preDefenseElemental),
                 wasCritical,
                 critMultiplier,
+                critTier,
                 wasDodged,
+                wasEvaded,
                 wasBlocked,
                 wasParried,
                 wasMissed,

@@ -50,7 +50,7 @@ class LevelingManagerTest {
         config = new LevelingConfig();
         config.setEnabled(true);
 
-        levelingManager = new LevelingManager(repository, formula, config);
+        levelingManager = new LevelingManager(repository, formula, null, config);
     }
 
     @AfterEach
@@ -70,7 +70,7 @@ class LevelingManagerTest {
         @DisplayName("Should create with valid parameters")
         void shouldCreateWithValidParameters() {
             assertDoesNotThrow(() ->
-                new LevelingManager(repository, formula, config));
+                new LevelingManager(repository, formula, null, config));
         }
 
         @Test
@@ -91,15 +91,19 @@ class LevelingManagerTest {
     class PlayerLifecycleTests {
 
         @Test
-        @DisplayName("loadPlayer should delegate to repository")
+        @DisplayName("loadPlayer should delegate to repository and stamp level")
         void loadPlayerShouldDelegate() {
             PlayerLevelData expectedData = PlayerLevelData.createNew(testPlayer);
             when(repository.loadOrCreate(testPlayer)).thenReturn(expectedData);
 
             PlayerLevelData result = levelingManager.loadPlayer(testPlayer);
 
-            assertSame(expectedData, result);
+            // protectLevel() stamps storedLevel on the data, so it's a new instance
+            assertEquals(testPlayer, result.uuid());
+            assertEquals(0, result.xp());
+            assertEquals(1, result.storedLevel()); // Level 1 at 0 XP
             verify(repository).loadOrCreate(testPlayer);
+            verify(repository).save(any(PlayerLevelData.class)); // level stamping save
         }
 
         @Test
@@ -329,7 +333,7 @@ class LevelingManagerTest {
         }
 
         @Test
-        @DisplayName("Should fire level-down event when crossing threshold")
+        @DisplayName("Should fire level-down event when crossing threshold (admin source)")
         void shouldFireLevelDownEvent() {
             AtomicReference<int[]> capturedLevels = new AtomicReference<>();
             levelingManager.registerLevelDownListener((playerId, newLevel, oldLevel, totalXp) -> {
@@ -340,12 +344,31 @@ class LevelingManagerTest {
             PlayerLevelData originalData = PlayerLevelData.createWithXp(testPlayer, 150);
             when(repository.getOrDefault(testPlayer)).thenReturn(originalData);
 
-            // Remove enough to drop below level 2 threshold
-            levelingManager.removeXp(testPlayer, 60, XpSource.DEATH_PENALTY);
+            // Remove enough to drop below level 2 threshold — admin source allows level-down
+            levelingManager.removeXp(testPlayer, 60, XpSource.ADMIN_COMMAND);
 
             assertNotNull(capturedLevels.get());
             assertEquals(1, capturedLevels.get()[0]); // newLevel
             assertEquals(2, capturedLevels.get()[1]); // oldLevel
+        }
+
+        @Test
+        @DisplayName("Death penalty should never cause level-down")
+        void deathPenaltyShouldNotCauseLevelDown() {
+            AtomicReference<int[]> capturedLevels = new AtomicReference<>();
+            levelingManager.registerLevelDownListener((playerId, newLevel, oldLevel, totalXp) -> {
+                capturedLevels.set(new int[]{newLevel, oldLevel});
+            });
+
+            // Start at level 2 (100 XP) with 50 XP progress
+            PlayerLevelData originalData = PlayerLevelData.createWithXp(testPlayer, 150);
+            when(repository.getOrDefault(testPlayer)).thenReturn(originalData);
+
+            // Request 60 XP removal via death penalty — would cross threshold without guard
+            levelingManager.removeXp(testPlayer, 60, XpSource.DEATH_PENALTY);
+
+            // Level-down event must NOT fire — death penalty clamps to level floor
+            assertNull(capturedLevels.get());
         }
 
         @Test
@@ -633,6 +656,277 @@ class LevelingManagerTest {
 
             // Verify save was called (exact count may vary due to race conditions)
             verify(repository, atLeast(threadCount * additionsPerThread / 2)).save(any());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LEVEL PROTECTION TESTS
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Level Protection (protectLevel)")
+    class LevelProtectionTests {
+
+        @Test
+        @DisplayName("Bootstrap: should bump XP when old formula gives higher level")
+        void bootstrapShouldBumpXpOnLevelLoss() {
+            // "Old" formula: steeper curve → same XP = higher level
+            // baseXp=50 means level thresholds are lower → 500 XP = higher level
+            ExponentialFormula oldFormula = new ExponentialFormula(50, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            long testXp = 500;
+            int oldLevel = oldFormula.getLevelForXp(testXp);
+            int newLevel = formula.getLevelForXp(testXp);
+            assertTrue(oldLevel > newLevel, "Precondition: old formula must give higher level for same XP");
+
+            // Pre-migration player: storedLevel is null
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, testXp);
+            assertNull(data.storedLevel());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = mgr.loadPlayer(testPlayer);
+
+            assertEquals(oldLevel, result.storedLevel());
+            assertEquals(formula.getXpForLevel(oldLevel), result.xp());
+            assertTrue(result.xp() >= testXp, "XP should be bumped up, never down");
+            verify(repository).save(argThat(d -> d.storedLevel() == oldLevel));
+        }
+
+        @Test
+        @DisplayName("Bootstrap: should not bump when old formula gives same or lower level")
+        void bootstrapShouldNotBumpWhenNoLoss() {
+            // "Old" formula with higher baseXp → same XP = lower or equal level
+            ExponentialFormula oldFormula = new ExponentialFormula(200, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            long testXp = 500;
+            int oldLevel = oldFormula.getLevelForXp(testXp);
+            int newLevel = formula.getLevelForXp(testXp);
+            assertTrue(oldLevel <= newLevel, "Precondition: old formula should give same or lower level");
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, testXp);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = mgr.loadPlayer(testPlayer);
+
+            // XP should be unchanged, storedLevel stamped to current level
+            assertEquals(testXp, result.xp());
+            assertEquals(newLevel, result.storedLevel());
+        }
+
+        @Test
+        @DisplayName("Bootstrap: should skip when no previousFormula configured")
+        void bootstrapShouldSkipWhenNoPreviousFormula() {
+            // null previousFormula (no migration config)
+            LevelingManager mgr = new LevelingManager(repository, formula, null, config);
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, 500);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = mgr.loadPlayer(testPlayer);
+
+            // No bump — just stamp current level
+            assertEquals(500, result.xp());
+            int expectedLevel = formula.getLevelForXp(500);
+            assertEquals(expectedLevel, result.storedLevel());
+        }
+
+        @Test
+        @DisplayName("Bootstrap: should skip for new players with 0 XP")
+        void bootstrapShouldSkipForZeroXp() {
+            ExponentialFormula oldFormula = new ExponentialFormula(50, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            PlayerLevelData data = PlayerLevelData.createNew(testPlayer);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = mgr.loadPlayer(testPlayer);
+
+            assertEquals(0, result.xp());
+            assertEquals(1, result.storedLevel());
+        }
+
+        @Test
+        @DisplayName("Ongoing: should bump XP when storedLevel > derived level")
+        void ongoingShouldBumpXpWhenStoredLevelHigher() {
+            // Player was level 10, but after curve change their XP maps to level 7
+            int storedLevel = 10;
+            long xpThatMapsToLevel7 = formula.getXpForLevel(7) + 50;
+            assertTrue(formula.getLevelForXp(xpThatMapsToLevel7) < storedLevel,
+                "Precondition: XP should map to a level below storedLevel");
+
+            PlayerLevelData data = new PlayerLevelData(testPlayer, xpThatMapsToLevel7,
+                storedLevel, data().createdAt(), data().lastUpdated());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = levelingManager.loadPlayer(testPlayer);
+
+            assertEquals(formula.getXpForLevel(storedLevel), result.xp());
+            assertEquals(storedLevel, result.storedLevel());
+        }
+
+        @Test
+        @DisplayName("Ongoing: should update storedLevel when current level is higher")
+        void ongoingShouldUpdateWhenLevelIncreased() {
+            // Curve got easier: same XP now maps to level 5 instead of stored 3
+            int storedLevel = 3;
+            long xpForLevel5 = formula.getXpForLevel(5) + 10;
+            int derivedLevel = formula.getLevelForXp(xpForLevel5);
+            assertTrue(derivedLevel > storedLevel,
+                "Precondition: derived level should exceed stored level");
+
+            PlayerLevelData data = new PlayerLevelData(testPlayer, xpForLevel5,
+                storedLevel, data().createdAt(), data().lastUpdated());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = levelingManager.loadPlayer(testPlayer);
+
+            assertEquals(xpForLevel5, result.xp()); // XP unchanged
+            assertEquals(derivedLevel, result.storedLevel()); // Level updated
+        }
+
+        @Test
+        @DisplayName("Ongoing: should not change anything when storedLevel equals current")
+        void ongoingShouldNoOpWhenEqual() {
+            int level = 5;
+            long xp = formula.getXpForLevel(level);
+
+            PlayerLevelData data = new PlayerLevelData(testPlayer, xp,
+                level, data().createdAt(), data().lastUpdated());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = levelingManager.loadPlayer(testPlayer);
+
+            assertEquals(xp, result.xp());
+            assertEquals(level, result.storedLevel());
+        }
+
+        @Test
+        @DisplayName("Bootstrap: should clamp old level to current maxLevel")
+        void bootstrapShouldClampToMaxLevel() {
+            // Old formula with maxLevel=200, current formula maxLevel=100
+            ExponentialFormula oldFormula = new ExponentialFormula(10, 1.5, 200);
+            // Give enough XP that old formula would say level 150
+            long hugeXp = oldFormula.getXpForLevel(150);
+            int oldLevel = oldFormula.getLevelForXp(hugeXp);
+            assertTrue(oldLevel > formula.getMaxLevel(),
+                "Precondition: old level should exceed current maxLevel");
+
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, hugeXp);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = mgr.loadPlayer(testPlayer);
+
+            // Should clamp to maxLevel, not store 150
+            assertTrue(result.storedLevel() <= formula.getMaxLevel(),
+                "Stored level should be clamped to maxLevel");
+        }
+
+        @Test
+        @DisplayName("Ongoing: should clamp storedLevel exceeding maxLevel")
+        void ongoingShouldClampStoredLevelExceedingMax() {
+            // Simulate: storedLevel=120 from a previous era, current maxLevel=100
+            int storedLevel = 120;
+            long xp = formula.getXpForLevel(formula.getMaxLevel());
+
+            PlayerLevelData data = new PlayerLevelData(testPlayer, xp,
+                storedLevel, data().createdAt(), data().lastUpdated());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            PlayerLevelData result = levelingManager.loadPlayer(testPlayer);
+
+            assertTrue(result.storedLevel() <= formula.getMaxLevel(),
+                "Stored level should be clamped to current maxLevel");
+        }
+
+        // Helper to get an arbitrary timestamp pair
+        private PlayerLevelData data() {
+            return PlayerLevelData.createNew(UUID.randomUUID());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // XP ADJUSTED NOTIFICATION TESTS
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("wasXpAdjusted")
+    class WasXpAdjustedTests {
+
+        @Test
+        @DisplayName("Should return true when XP was bumped during bootstrap")
+        void shouldReturnTrueAfterBootstrapBump() {
+            ExponentialFormula oldFormula = new ExponentialFormula(50, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            long testXp = 500;
+            assertTrue(oldFormula.getLevelForXp(testXp) > formula.getLevelForXp(testXp),
+                "Precondition: old formula gives higher level");
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, testXp);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+            mgr.loadPlayer(testPlayer);
+
+            assertTrue(mgr.wasXpAdjusted(testPlayer));
+        }
+
+        @Test
+        @DisplayName("Should return true when XP was bumped during ongoing protection")
+        void shouldReturnTrueAfterOngoingBump() {
+            int storedLevel = 10;
+            long lowXp = formula.getXpForLevel(5);
+            PlayerLevelData data = new PlayerLevelData(testPlayer, lowXp,
+                storedLevel, PlayerLevelData.createNew(UUID.randomUUID()).createdAt(),
+                PlayerLevelData.createNew(UUID.randomUUID()).lastUpdated());
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            levelingManager.loadPlayer(testPlayer);
+
+            assertTrue(levelingManager.wasXpAdjusted(testPlayer));
+        }
+
+        @Test
+        @DisplayName("Should return false when no adjustment was needed")
+        void shouldReturnFalseWhenNoAdjustment() {
+            PlayerLevelData data = PlayerLevelData.createNew(testPlayer);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+
+            levelingManager.loadPlayer(testPlayer);
+
+            assertFalse(levelingManager.wasXpAdjusted(testPlayer));
+        }
+
+        @Test
+        @DisplayName("Should consume flag on first call (one-time notification)")
+        void shouldConsumeOnFirstCall() {
+            ExponentialFormula oldFormula = new ExponentialFormula(50, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, 500);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+            mgr.loadPlayer(testPlayer);
+
+            assertTrue(mgr.wasXpAdjusted(testPlayer), "First call should return true");
+            assertFalse(mgr.wasXpAdjusted(testPlayer), "Second call should return false");
+        }
+
+        @Test
+        @DisplayName("Should be cleared on unloadPlayer")
+        void shouldBeClearedOnUnload() {
+            ExponentialFormula oldFormula = new ExponentialFormula(50, 1.7, 100);
+            LevelingManager mgr = new LevelingManager(repository, formula, oldFormula, config);
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, 500);
+            when(repository.loadOrCreate(testPlayer)).thenReturn(data);
+            mgr.loadPlayer(testPlayer);
+
+            // Unload before checking
+            when(repository.get(testPlayer)).thenReturn(data);
+            mgr.unloadPlayer(testPlayer);
+
+            assertFalse(mgr.wasXpAdjusted(testPlayer), "Flag should be cleared on unload");
         }
     }
 

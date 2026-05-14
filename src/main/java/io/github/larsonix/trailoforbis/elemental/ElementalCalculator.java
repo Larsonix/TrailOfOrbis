@@ -12,13 +12,14 @@ import javax.annotation.Nonnull;
  *
  * <h2>Resistance Formula (with Penetration)</h2>
  * <pre>
- * EffectiveResist = max(0, min(Resistance, 75) - Penetration)
+ * EffectiveResist = max(-200, min(75, Resistance - Penetration))
  * DamageAfterResist = Damage × (1 - EffectiveResist / 100)
  * </pre>
  *
- * <p>Penetration reduces the target's effective resistance. Unlike PoE1 where
- * penetration can push resistance negative, we use PoE2's approach where
- * penetration can only reduce resistance down to 0%.
+ * <p>Penetration subtracts from the target's <b>raw</b> resistance before the 75% cap
+ * is applied. This means overcapping resistance (stacking above 75%) provides a
+ * meaningful buffer against penetration. Penetration can push resistance into
+ * negative territory (up to -200%), causing the target to take up to 3× damage.
  *
  * <h2>Example</h2>
  * <ul>
@@ -31,7 +32,7 @@ import javax.annotation.Nonnull;
  * </ul>
  * <pre>
  * Damage = (50 + 20) × 1.5 × 1.3 = 136.5
- * EffectiveResist = max(0, 60 - 20) = 40%
+ * EffectiveResist = max(-200, min(75, 60 - 20)) = 40%
  * After Resist = 136.5 × (1 - 0.4) = 81.9
  * </pre>
  */
@@ -44,9 +45,9 @@ public final class ElementalCalculator {
     public static final double RESISTANCE_CAP = 75.0;
 
     /**
-     * Minimum resistance (allows up to -100% for 2x damage taken).
+     * Minimum resistance (allows up to -200% for 3x damage taken).
      */
-    public static final double RESISTANCE_FLOOR = -100.0;
+    public static final double RESISTANCE_FLOOR = -200.0;
 
     // Private constructor - utility class
     private ElementalCalculator() {
@@ -97,10 +98,11 @@ public final class ElementalCalculator {
     /**
      * Applies resistance to incoming elemental damage.
      *
-     * <p>Formula: {@code damage × (1 - min(max(resistance, -100), 75) / 100)}
+     * <p>Formula: {@code damage × (1 - effectiveResist / 100)}
+     * where effectiveResist = max(-200, min(75, resistance)).
      *
      * <p>Resistance is capped at 75% to prevent immunity.
-     * Negative resistance (up to -100%) increases damage taken.
+     * Negative resistance (up to -200%) increases damage taken (up to 3×).
      *
      * @param damage     Incoming elemental damage
      * @param resistance Target's resistance to this element (percentage)
@@ -113,17 +115,16 @@ public final class ElementalCalculator {
     /**
      * Applies resistance to incoming elemental damage with penetration.
      *
-     * <p>Penetration reduces the target's effective resistance. Following PoE2's
-     * approach, penetration can only reduce resistance down to 0% (not negative).
+     * <p>Penetration subtracts from the target's raw resistance before the 75% cap
+     * is applied. This means overcapping resistance provides a buffer against
+     * penetration. Penetration can push resistance negative (up to -200%),
+     * causing the target to take up to 3× damage.
      *
      * <p>Formula:
      * <pre>
-     * effectiveResist = max(0, min(resistance, 75) - penetration)
+     * effectiveResist = max(-200, min(75, resistance - penetration))
      * damage × (1 - effectiveResist / 100)
      * </pre>
-     *
-     * <p>Note: If the target has negative resistance (debuffed), penetration
-     * is not applied - the target already takes increased damage.
      *
      * @param damage      Incoming elemental damage
      * @param resistance  Target's resistance to this element (percentage)
@@ -131,21 +132,7 @@ public final class ElementalCalculator {
      * @return Damage after resistance reduction
      */
     public static double applyResistance(double damage, double resistance, double penetration) {
-        // First, cap resistance at 75% (but allow negative from debuffs)
-        double cappedResist = Math.min(resistance, RESISTANCE_CAP);
-
-        // Apply penetration only to positive resistance
-        // Penetration reduces effective resistance but floors at 0 (PoE2 style)
-        double effectiveResist;
-        if (cappedResist > 0 && penetration > 0) {
-            effectiveResist = Math.max(0, cappedResist - penetration);
-        } else {
-            // For negative resistance, don't apply penetration
-            // But still clamp to the floor
-            effectiveResist = Math.max(RESISTANCE_FLOOR, cappedResist);
-        }
-
-        // Apply: damage × (1 - resist/100)
+        double effectiveResist = getEffectiveResistance(resistance, penetration);
         return damage * (1.0 - effectiveResist / 100.0);
     }
 
@@ -215,27 +202,26 @@ public final class ElementalCalculator {
      * Gets the effective resistance after capping.
      *
      * @param resistance Raw resistance value
-     * @return Effective resistance (clamped between -100% and 75%)
+     * @return Effective resistance (clamped between -200% and 75%)
      */
     public static double getEffectiveResistance(double resistance) {
         return getEffectiveResistance(resistance, 0);
     }
 
     /**
-     * Gets the effective resistance after capping and penetration.
+     * Gets the effective resistance after penetration and capping.
+     *
+     * <p>Penetration subtracts from raw resistance BEFORE the 75% cap is applied.
+     * This means overcapping resistance provides a buffer against penetration.
+     * The result is clamped between -200% (3× damage) and 75% (75% reduction).
      *
      * @param resistance  Raw resistance value
      * @param penetration Penetration value (reduces resistance)
-     * @return Effective resistance after penetration (min 0% if penetration applied)
+     * @return Effective resistance after penetration, clamped to [-200, 75]
      */
     public static double getEffectiveResistance(double resistance, double penetration) {
-        double cappedResist = Math.min(resistance, RESISTANCE_CAP);
-
-        if (cappedResist > 0 && penetration > 0) {
-            return Math.max(0, cappedResist - penetration);
-        } else {
-            return Math.max(RESISTANCE_FLOOR, cappedResist);
-        }
+        double afterPen = resistance - penetration;
+        return Math.max(RESISTANCE_FLOOR, Math.min(afterPen, RESISTANCE_CAP));
     }
 
     /**
@@ -244,7 +230,7 @@ public final class ElementalCalculator {
      * <p>Useful for displaying "takes X% more/less damage".
      *
      * @param resistance Resistance percentage
-     * @return Damage multiplier (e.g., 0.4 for 60% resistance, 2.0 for -100% resistance)
+     * @return Damage multiplier (e.g., 0.4 for 60% resistance, 3.0 for -200% resistance)
      */
     public static double getResistanceMultiplier(double resistance) {
         double effective = getEffectiveResistance(resistance);

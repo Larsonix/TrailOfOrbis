@@ -127,6 +127,7 @@ export default defineComponent({
     const view = ref("home"); // "home" | "rules" | "editRule"
     const editingProfileId = ref(null);
     const editingRuleIndex = ref(-1);
+    const editingMapRule = ref(false); // true when editing a map rule vs gear rule
 
     // ── Bridge calls (return updated state JSON) ──
     function callBridge(method, ...args) {
@@ -249,18 +250,43 @@ export default defineComponent({
 
     function onEditRule(ruleIndex) {
       editingRuleIndex.value = ruleIndex;
+      editingMapRule.value = false;
       view.value = "editRule";
     }
 
     function onBackToRules() {
       view.value = "rules";
       editingRuleIndex.value = -1;
+      editingMapRule.value = false;
+    }
+
+    // ── Map rule handlers ──
+    function onAddMapRule() {
+      callBridge("addMapRule", playerId.value, editingProfileId.value, "New Map Rule");
+    }
+
+    function onDeleteMapRule(ruleIndex) {
+      callBridge("deleteMapRule", playerId.value, editingProfileId.value, ruleIndex);
+    }
+
+    function onMoveMapRule(fromIndex, toIndex) {
+      callBridge("moveMapRule", playerId.value, editingProfileId.value, fromIndex, toIndex);
+    }
+
+    function onToggleMapRule(ruleIndex) {
+      callBridge("toggleMapRuleEnabled", playerId.value, editingProfileId.value, ruleIndex);
+    }
+
+    function onEditMapRule(ruleIndex) {
+      editingRuleIndex.value = ruleIndex;
+      editingMapRule.value = true;
+      view.value = "editRule";
     }
 
     // ── Condition handlers ──
     function onSetRuleAction(action) {
       callBridge(
-        "setRuleAction",
+        editingMapRule.value ? "setMapRuleAction" : "setRuleAction",
         playerId.value,
         editingProfileId.value,
         editingRuleIndex.value,
@@ -270,7 +296,7 @@ export default defineComponent({
 
     function onAddCondition(conditionType) {
       callBridge(
-        "addCondition",
+        editingMapRule.value ? "addMapCondition" : "addCondition",
         playerId.value,
         editingProfileId.value,
         editingRuleIndex.value,
@@ -280,7 +306,7 @@ export default defineComponent({
 
     function onRemoveCondition(conditionIndex) {
       callBridge(
-        "removeCondition",
+        editingMapRule.value ? "removeMapCondition" : "removeCondition",
         playerId.value,
         editingProfileId.value,
         editingRuleIndex.value,
@@ -290,7 +316,7 @@ export default defineComponent({
 
     function onUpdateCondition(conditionIndex, conditionData) {
       callBridge(
-        "updateCondition",
+        editingMapRule.value ? "updateMapCondition" : "updateCondition",
         playerId.value,
         editingProfileId.value,
         editingRuleIndex.value,
@@ -328,15 +354,19 @@ export default defineComponent({
         const profile = s.profiles.find(
           (p) => p.id === editingProfileId.value
         );
+        const ruleList = editingMapRule.value
+          ? (profile ? (profile.mapRules || []) : [])
+          : (profile ? profile.rules : []);
         const rule =
           profile && editingRuleIndex.value >= 0
-            ? profile.rules[editingRuleIndex.value]
+            ? ruleList[editingRuleIndex.value]
             : null;
+        const ruleTypeLabel = editingMapRule.value ? " (Map)" : " (Gear)";
         title =
           "Loot Filter  >  " +
           (profile ? profile.name : "Profile") +
           "  >  " +
-          (rule ? rule.name : "New Rule");
+          (rule ? rule.name : "New Rule") + ruleTypeLabel;
         containerHeight = 700;
       }
 
@@ -600,8 +630,9 @@ export default defineComponent({
           ]),
           h("Label", {
             text:
-              profile.rules.length +
-              " rules, default: " +
+              profile.rules.length + " gear / " +
+              (profile.mapRules ? profile.mapRules.length : 0) +
+              " map rules, default: " +
               profile.defaultAction,
             elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED },
           }),
@@ -704,11 +735,11 @@ export default defineComponent({
         )
       );
 
-      // Rules list
+      // Gear rules list
       children.push(spacer(6));
       children.push(
         sectionHeader(
-          "Rules (first match wins)",
+          "Gear Rules (first match wins)",
           profile.rules.length + "/" + s.maxRulesPerProfile
         )
       );
@@ -717,7 +748,7 @@ export default defineComponent({
       if (profile.rules.length === 0) {
         children.push(
           noteText(
-            "No rules. Items will be " +
+            "No gear rules. Gear will be " +
               profile.defaultAction +
               "ED by default."
           )
@@ -725,11 +756,12 @@ export default defineComponent({
       }
 
       for (let i = 0; i < profile.rules.length; i++) {
-        children.push(renderRuleCard(profile.rules[i], i, profile.rules.length));
+        children.push(renderRuleCard(profile.rules[i], i, profile.rules.length,
+          false, onToggleRule, onEditRule, onMoveRule, onDeleteRule));
         children.push(spacer(4));
       }
 
-      // Add rule button
+      // Add gear rule button
       children.push(spacer(4));
       children.push(
         h(
@@ -740,9 +772,55 @@ export default defineComponent({
           },
           [
             h(Common.SmallSecondaryTextButton, {
-              text: "+ Add Rule",
-              anchor: { Width: 175, Height: 36 },
+              text: "+ Add Gear Rule",
+              anchor: { Width: 200, Height: 36 },
               onActivating: onAddRule,
+            }),
+          ]
+        )
+      );
+
+      // ── Map Rules section ──
+      const mapRules = profile.mapRules || [];
+      children.push(spacer(10));
+      children.push(
+        sectionHeader(
+          "Map Rules (first match wins)",
+          mapRules.length + "/" + s.maxRulesPerProfile
+        )
+      );
+      children.push(spacer(4));
+
+      if (mapRules.length === 0) {
+        children.push(
+          noteText(
+            "No map rules. Maps will be " +
+              profile.defaultAction +
+              "ED by default."
+          )
+        );
+      }
+
+      for (let i = 0; i < mapRules.length; i++) {
+        children.push(renderRuleCard(mapRules[i], i, mapRules.length,
+          true, onToggleMapRule, onEditMapRule, onMoveMapRule, onDeleteMapRule));
+        children.push(spacer(4));
+      }
+
+      // Add map rule button
+      children.push(spacer(4));
+      children.push(
+        h(
+          "Group",
+          {
+            layoutMode: "MiddleCenter",
+            anchor: { Horizontal: 0, Height: 40 },
+          },
+          [
+            h(Common.SmallSecondaryTextButton, {
+              text: "+ Add Map Rule",
+              anchor: { Width: 200, Height: 36 },
+              onActivating: onAddMapRule,
             }),
           ]
         )
@@ -755,10 +833,9 @@ export default defineComponent({
       return children;
     }
 
-    function renderRuleCard(rule, index, totalRules) {
+    function renderRuleCard(rule, index, totalRules, isMap, onToggle, onEdit, onMove, onDelete) {
       const actionColor =
         rule.action === "ALLOW" ? COLORS.POSITIVE : COLORS.NEGATIVE;
-      const enabledColor = rule.enabled ? COLORS.POSITIVE : COLORS.TEXT_MUTED;
       const nameColor = rule.enabled
         ? COLORS.TEXT_PRIMARY
         : COLORS.TEXT_MUTED;
@@ -783,7 +860,7 @@ export default defineComponent({
               h(Common.SmallTertiaryTextButton, {
                 text: rule.enabled ? "o" : "-",
                 anchor: { Width: 36, Height: 28 },
-                onActivating: () => onToggleRule(index),
+                onActivating: () => onToggle(index),
               }),
               h("Group", { anchor: { Width: 4 } }),
               h("Group", { flexWeight: 1 }, [
@@ -826,27 +903,27 @@ export default defineComponent({
               h(Common.SmallTertiaryTextButton, {
                 text: "Edit",
                 anchor: { Width: 85, Height: 30 },
-                onActivating: () => onEditRule(index),
+                onActivating: () => onEdit(index),
               }),
               h("Group", { anchor: { Width: 4 } }),
               h(Common.SmallTertiaryTextButton, {
                 text: "^",
                 anchor: { Width: 40, Height: 30 },
                 visible: index > 0,
-                onActivating: () => onMoveRule(index, index - 1),
+                onActivating: () => onMove(index, index - 1),
               }),
               h("Group", { anchor: { Width: 2 }, visible: index > 0 }),
               h(Common.SmallTertiaryTextButton, {
                 text: "v",
                 anchor: { Width: 40, Height: 30 },
                 visible: index < totalRules - 1,
-                onActivating: () => onMoveRule(index, index + 1),
+                onActivating: () => onMove(index, index + 1),
               }),
               h("Group", { anchor: { Width: 2 }, visible: index < totalRules - 1 }),
               h(Common.CancelTextButton, {
                 text: "X",
                 anchor: { Width: 44, Height: 30 },
-                onActivating: () => onDeleteRule(index),
+                onActivating: () => onDelete(index),
               }),
             ]
           ),
@@ -864,9 +941,10 @@ export default defineComponent({
       );
       if (!profile) return [noteText("Profile not found.")];
 
+      const ruleList = editingMapRule.value ? (profile.mapRules || []) : profile.rules;
       const rule =
-        editingRuleIndex.value >= 0 && editingRuleIndex.value < profile.rules.length
-          ? profile.rules[editingRuleIndex.value]
+        editingRuleIndex.value >= 0 && editingRuleIndex.value < ruleList.length
+          ? ruleList[editingRuleIndex.value]
           : null;
       if (!rule) return [noteText("Rule not found."), renderBackButton(onBackToRules)];
 
@@ -976,18 +1054,36 @@ export default defineComponent({
       children.push(sectionHeader("Add Condition"));
       children.push(spacer(4));
 
-      const condTypes = [
-        "MIN_RARITY", "MAX_RARITY", "EQUIPMENT_SLOT", "WEAPON_TYPE",
-        "ARMOR_MATERIAL", "ITEM_LEVEL_RANGE", "QUALITY_RANGE",
-        "MIN_MODIFIER_COUNT", "CORRUPTION_STATE", "IMPLICIT_CONDITION",
-        "REQUIRED_MODIFIERS", "MODIFIER_VALUE_RANGE",
+      // Shared conditions available in both gear and map rules
+      const sharedCondTypes = [
+        "MIN_RARITY", "MAX_RARITY", "ITEM_LEVEL_RANGE", "QUALITY_RANGE",
+        "MIN_MODIFIER_COUNT", "CORRUPTION_STATE",
       ];
-      const condLabels = [
-        "Min Rarity", "Max Rarity", "Equipment Slot", "Weapon Type",
-        "Armor Material", "Item Level", "Quality Range",
-        "Min Modifiers", "Corruption", "Weapon Implicit",
-        "Required Mods", "Mod Value Range",
+      const sharedCondLabels = [
+        "Min Rarity", "Max Rarity", "Item Level", "Quality Range",
+        "Min Modifiers", "Corruption",
       ];
+
+      // Gear-only conditions
+      const gearCondTypes = [
+        "EQUIPMENT_SLOT", "WEAPON_TYPE", "ARMOR_IMPLICIT",
+        "IMPLICIT_CONDITION", "REQUIRED_MODIFIERS", "MODIFIER_VALUE_RANGE",
+      ];
+      const gearCondLabels = [
+        "Equipment Slot", "Weapon Type", "Armor Implicit",
+        "Weapon Implicit", "Required Mods", "Mod Value Range",
+      ];
+
+      // Map-only conditions
+      const mapCondTypes = ["MAP_BIOME", "MAP_SIZE", "MAP_MODIFIER"];
+      const mapCondLabels = ["Biome", "Size", "Map Modifier"];
+
+      const condTypes = editingMapRule.value
+        ? [...sharedCondTypes, ...mapCondTypes]
+        : [...sharedCondTypes, ...gearCondTypes];
+      const condLabels = editingMapRule.value
+        ? [...sharedCondLabels, ...mapCondLabels]
+        : [...sharedCondLabels, ...gearCondLabels];
 
       // Auto-wrapping grid of condition type buttons
       children.push(
@@ -1064,16 +1160,16 @@ export default defineComponent({
             ["SWORD", "DAGGER", "AXE", "MACE", "LONGSWORD", "SPEAR", "CROSSBOW", "STAFF", "WAND"],
             ["Sword", "Dagger", "Axe", "Mace", "Longsword", "Spear", "Crossbow", "Staff", "Wand"],
             "WEAPON_TYPE", "types")];
-        case "ARMOR_MATERIAL":
-          return [renderMultiToggle(idx, cond.materials,
-            ["CLOTH", "LEATHER", "PLATE", "WOOD", "SPECIAL"],
-            ["Cloth", "Leather", "Plate", "Wood", "Special"],
-            "ARMOR_MATERIAL", "materials")];
+        case "ARMOR_IMPLICIT":
+          return [renderMultiToggle(idx, cond.defenseTypes,
+            ["armor", "evasion", "energy_shield", "max_health", "block_chance"],
+            ["Armor", "Evasion", "Energy Shield", "Max Health", "Block Chance"],
+            "ARMOR_IMPLICIT", "defenseTypes")];
         case "ITEM_LEVEL_RANGE":
           return [renderRangeEditor(idx, cond.min, cond.max, 1, 1000000,
             "ITEM_LEVEL_RANGE", [1, 10])];
         case "QUALITY_RANGE":
-          return [renderRangeEditor(idx, cond.min, cond.max, 1, 100,
+          return [renderRangeEditor(idx, cond.min, cond.max, 1, 101,
             "QUALITY_RANGE", [1, 10])];
         case "MIN_MODIFIER_COUNT":
           return [renderSingleNumber(idx, cond.count, 0, 6,
@@ -1091,6 +1187,21 @@ export default defineComponent({
         case "MODIFIER_VALUE_RANGE":
           return [renderReadOnlyCondition(cond.description,
             "Configure via /lf commands or presets")];
+        case "MAP_BIOME":
+          return [renderMultiToggle(idx, cond.biomes,
+            ["FOREST", "DESERT", "VOLCANO", "TUNDRA", "SWAMP", "MOUNTAINS", "BEACH", "JUNGLE",
+             "CAVERNS", "FROZEN_CRYPTS", "SAND_TOMBS", "VOID", "CORRUPTED"],
+            ["Forest", "Desert", "Volcano", "Tundra", "Swamp", "Mountains", "Beach", "Jungle",
+             "Caverns", "Frozen Crypts", "Sand Tombs", "Void", "Corrupted"],
+            "MAP_BIOME", "biomes")];
+        case "MAP_SIZE":
+          return [renderMultiToggle(idx, cond.sizes,
+            ["SMALL", "MEDIUM", "LARGE", "MASSIVE"],
+            ["Small", "Medium", "Large", "Massive"],
+            "MAP_SIZE", "sizes")];
+        case "MAP_MODIFIER":
+          return [renderReadOnlyCondition(cond.description,
+            "Configure via /lf commands")];
         default:
           return [renderReadOnlyCondition(cond.description, "")];
       }

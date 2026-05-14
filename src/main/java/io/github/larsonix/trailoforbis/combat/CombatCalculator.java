@@ -62,18 +62,33 @@ public class CombatCalculator {
     /**
      * Computes armor damage reduction percentage for display purposes.
      *
-     * <p>Uses the canonical level-scaled formula with default constants.
-     * All UI display should call this instead of reimplementing the formula.
+     * <p>Uses the canonical level-scaled formula with configurable constants.
+     *
+     * @param armor The defender's effective armor value
+     * @param attackerLevel The attacker level (use player level for "vs same-level" display)
+     * @param levelScale The level scale from config (e.g. 5.0)
+     * @param baseConstant The base constant from config (e.g. 50.0)
+     * @return Reduction percentage (0.0 to 90.0)
+     */
+    public static float estimateArmorReduction(float armor, int attackerLevel, float levelScale, float baseConstant) {
+        if (armor <= 0) return 0f;
+        int level = Math.max(1, attackerLevel);
+        float reduction = armor / (armor + levelScale * level + baseConstant);
+        return Math.min(reduction, DEFAULT_MAX_ARMOR_REDUCTION) * 100f;
+    }
+
+    /**
+     * Computes armor damage reduction percentage using default constants.
+     *
+     * <p>Prefer the overload with explicit levelScale/baseConstant for runtime display,
+     * as default constants may not match the configured values.
      *
      * @param armor The defender's effective armor value
      * @param attackerLevel The attacker level (use player level for "vs same-level" display)
      * @return Reduction percentage (0.0 to 90.0)
      */
     public static float estimateArmorReduction(float armor, int attackerLevel) {
-        if (armor <= 0) return 0f;
-        int level = Math.max(1, attackerLevel);
-        float reduction = armor / (armor + DEFAULT_ARMOR_LEVEL_SCALE * level + DEFAULT_ARMOR_BASE_CONSTANT);
-        return Math.min(reduction, DEFAULT_MAX_ARMOR_REDUCTION) * 100f;
+        return estimateArmorReduction(armor, attackerLevel, DEFAULT_ARMOR_LEVEL_SCALE, DEFAULT_ARMOR_BASE_CONSTANT);
     }
 
     /**
@@ -355,12 +370,8 @@ public class CombatCalculator {
     @Nonnull
     public ArmorResult calculateDefenderReduction(float damage, @Nonnull ComputedStats defenderStats,
                                                    float armorPenetration, int attackerLevel) {
-        float baseArmor = defenderStats.getArmor();
-
-        // Apply armor percent bonus: armor * (1 + armorPercent / 100)
-        float armorPercent = defenderStats.getArmorPercent();
-        float armor = baseArmor * (1.0f + armorPercent / 100.0f);
-        armor = Math.max(0f, armor); // Can't go negative
+        // Armor already consolidated: Base × (1 + TotalPercent/100) × MultiplierProduct
+        float armor = Math.max(0f, defenderStats.getArmor()); // Can't go negative
 
         if (armor <= 0 || damage <= 0) {
             return new ArmorResult(damage, damage, armor, armor, armorPenetration, 0f);

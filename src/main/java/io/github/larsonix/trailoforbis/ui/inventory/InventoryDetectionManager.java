@@ -24,9 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>This manager uses packet analysis to detect when players open their
  * inventory screen, since Hytale doesn't send an explicit "OpenInventory" packet.
  *
- * <p><b>Note:</b> The stats HUD feature was removed because HyUI HUDs do not
- * support button click events (internal events field is never initialized for
- * HUD contexts, causing NPE in ButtonBuilder). This detection logic is kept
+ * <p><b>Note:</b> The stats HUD feature was removed. Detection logic is kept
  * for potential future use (keybinds, chat hints, etc.).
  *
  * <h2>Detection Signals</h2>
@@ -311,7 +309,7 @@ public class InventoryDetectionManager {
      */
     @SuppressWarnings("unused")
     private void onInventoryDetected(@Nonnull PlayerRef player) {
-        // No-op: HUD feature removed (HyUI HUDs don't support button events)
+        // No-op: HUD feature removed
     }
 
     /**

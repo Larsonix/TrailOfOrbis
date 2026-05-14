@@ -7,6 +7,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.math.vector.Transform;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
@@ -192,6 +195,13 @@ public class SkillSanctumManager {
         });
         tickExecutor.scheduleAtFixedRate(this::tickAllInstances, 50, 50, TimeUnit.MILLISECONDS);
 
+        // Detect non-owner players entering sanctum worlds (e.g., /tp to a friend in sanctum)
+        plugin.getEventRegistry().registerGlobal(
+            EventPriority.NORMAL,
+            PlayerReadyEvent.class,
+            this::onPlayerReadyInSanctum
+        );
+
         this.enabled = true;
 
         // Clean up orphaned sanctum instance worlds from previous server sessions.
@@ -333,6 +343,28 @@ public class SkillSanctumManager {
                 LOGGER.atWarning().log("Auto-closing stale sanctum for %s (player left world)", stalePlayerId);
                 // Skip teleportation - player is already gone (disconnect, death, etc.)
                 closeSanctum(stalePlayerId, false);
+            }
+        }
+
+        // Detect visitors who left the sanctum world (death, teleport, disconnect, etc.)
+        for (SkillSanctumInstance instance : activeInstances.values()) {
+            if (!instance.isActive()) continue;
+            World sanctumWorld = instance.getSanctumWorld();
+            if (sanctumWorld == null || !sanctumWorld.isAlive()) continue;
+            UUID sanctumWorldUuid = sanctumWorld.getWorldConfig().getUuid();
+
+            for (UUID visitorId : instance.getVisitorIds()) {
+                PlayerRef visitorRef = Universe.get().getPlayer(visitorId);
+                if (visitorRef == null || !visitorRef.isValid()) {
+                    // Visitor disconnected — clean up
+                    removeVisitorFromAnySanctum(visitorId);
+                    continue;
+                }
+                UUID visitorWorldUuid = visitorRef.getWorldUuid();
+                if (visitorWorldUuid == null || !visitorWorldUuid.equals(sanctumWorldUuid)) {
+                    // Visitor left the sanctum world — clean up
+                    removeVisitorFromAnySanctum(visitorId);
+                }
             }
         }
 
@@ -737,6 +769,27 @@ public class SkillSanctumManager {
                 }
             }
 
+            // Evict all visitors before closing the world.
+            // Must happen before instance.close() which destroys the realm world.
+            for (UUID visitorId : instance.getVisitorIds()) {
+                // Unsuppress item sync for visitor
+                if (coordinator != null) {
+                    coordinator.unsuppressFromSanctum(visitorId);
+                }
+
+                // Restore visitor flight
+                PlayerRef visitorRef = Universe.get().getPlayer(visitorId);
+                instance.restoreFlightForVisitor(visitorId, visitorRef);
+
+                // Exit visitor from the instance world
+                if (teleportPlayer && visitorRef != null && visitorRef.isValid()) {
+                    instance.exitPlayer(visitorRef);
+                }
+
+                // Remove visitor's skill node detail HUD
+                skillNodeHudManager.removeHud(visitorId);
+            }
+
             instance.close();
             LOGGER.atInfo().log("Closed skill sanctum for %s (teleport=%b)", playerId, teleportPlayer);
             return true;
@@ -833,6 +886,113 @@ public class SkillSanctumManager {
     @Nonnull
     public SkillPointHudManager getSkillPointHudManager() {
         return skillPointHudManager;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // VISITOR MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Finds the sanctum instance that owns the given world.
+     *
+     * <p>This iterates active instances (typically 0-5) comparing world references.
+     *
+     * @param world The world to search for
+     * @return The sanctum instance owning this world, or null
+     */
+    @Nullable
+    SkillSanctumInstance findInstanceByWorld(@Nonnull World world) {
+        for (SkillSanctumInstance instance : activeInstances.values()) {
+            if (!instance.isActive()) continue;
+            World sanctumWorld = instance.getSanctumWorld();
+            if (sanctumWorld != null && sanctumWorld == world) {
+                return instance;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handles non-owner players entering a sanctum world.
+     *
+     * <p>When a player teleports to a friend who is in a sanctum (e.g., via /tp),
+     * this handler detects the sanctum world entry and grants the visitor flight,
+     * F-key interactions, and item sync suppression.
+     *
+     * <p>The owner goes through the normal {@link #openSanctum(PlayerRef)} path and
+     * is skipped here.
+     */
+    private void onPlayerReadyInSanctum(@Nonnull PlayerReadyEvent event) {
+        Player player = event.getPlayer();
+        World world = player.getWorld();
+        if (world == null) return;
+
+        // Find the sanctum instance for this world
+        SkillSanctumInstance instance = findInstanceByWorld(world);
+        if (instance == null || !instance.isActive()) return;
+
+        // Get visitor UUID from the entity
+        Ref<EntityStore> ref = event.getPlayerRef();
+        if (ref == null || !ref.isValid()) return;
+
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        UUIDComponent uuidComp = store.getComponent(ref, UUIDComponent.getComponentType());
+        if (uuidComp == null) return;
+        UUID visitorId = uuidComp.getUuid();
+
+        // Skip the owner (goes through normal openSanctum path)
+        if (visitorId.equals(instance.getPlayerId())) return;
+
+        // Dedup: already tracked as visitor (handles duplicate PlayerReadyEvent)
+        if (instance.isVisitor(visitorId)) return;
+
+        // Get PlayerRef for flight enable and packet sending
+        PlayerRef visitorRef = store.getComponent(ref, PlayerRef.getComponentType());
+        if (visitorRef == null) return;
+
+        LOGGER.atInfo().log("Visitor %s entered sanctum (owner: %s) — enabling flight & interactions",
+            visitorId, instance.getPlayerId());
+
+        // Enable flight, interactions, and item sync suppression on the world thread
+        world.execute(() -> {
+            instance.enableFlightForVisitor(visitorRef);
+            instance.setupVisitorInteractions(visitorRef);
+
+            // Suppress UpdateItems flushes for visitor (same node visual corruption as owner)
+            var coordinator = resolveSyncCoordinator();
+            if (coordinator != null) {
+                coordinator.suppressForSanctum(visitorId);
+            }
+        });
+    }
+
+    /**
+     * Removes a visitor from whichever sanctum they're in.
+     *
+     * <p>Called on visitor disconnect or when a visitor leaves a sanctum world.
+     * Restores flight state and unsuppresses item sync.
+     *
+     * @param visitorId The visitor's UUID
+     */
+    public void removeVisitorFromAnySanctum(@Nonnull UUID visitorId) {
+        for (SkillSanctumInstance instance : activeInstances.values()) {
+            if (!instance.isActive()) continue;
+            if (instance.isVisitor(visitorId)) {
+                // Unsuppress item sync
+                var coordinator = resolveSyncCoordinator();
+                if (coordinator != null) {
+                    coordinator.unsuppressFromSanctum(visitorId);
+                }
+
+                // Restore flight
+                PlayerRef visitorRef = Universe.get().getPlayer(visitorId);
+                instance.restoreFlightForVisitor(visitorId, visitorRef);
+
+                LOGGER.atInfo().log("Removed visitor %s from sanctum (owner: %s)",
+                    visitorId, instance.getPlayerId());
+                return; // A player can only be in one sanctum
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

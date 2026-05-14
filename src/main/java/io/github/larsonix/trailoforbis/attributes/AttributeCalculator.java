@@ -33,6 +33,9 @@ public class AttributeCalculator {
     /** Base critical strike chance (%) */
     public static final float BASE_CRIT_CHANCE = 5.0f;
 
+    /** Base energy shield regen per second (all players, regardless of WATER points) */
+    public static final float BASE_ENERGY_SHIELD_REGEN = 1.0f;
+
     /** Base energy shield regen delay in seconds (time after hit before regen starts) */
     public static final float BASE_ENERGY_SHIELD_REGEN_DELAY = 3.0f;
 
@@ -130,7 +133,7 @@ public class AttributeCalculator {
         float spellDamagePercent = water * waterGrants.getSpellDamagePercent();
         float maxMana = baseStats.getMaxMana() + (water * waterGrants.getMaxMana());
         float energyShieldPercent = water * waterGrants.getEnergyShieldPercent();
-        float energyShieldRegen = water * waterGrants.getEnergyShieldRegen();
+        float energyShieldRegen = BASE_ENERGY_SHIELD_REGEN + (water * waterGrants.getEnergyShieldRegen());
         float manaRegen = water * waterGrants.getManaRegen();
         float freezeChance = water * waterGrants.getFreezeChance();
 

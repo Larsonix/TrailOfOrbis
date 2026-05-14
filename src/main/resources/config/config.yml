@@ -280,12 +280,12 @@ armor:
   # Level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant)
   # Controls how much each attacker level increases armor demand.
   # Higher = armor less effective per level. Lower = armor more effective.
-  # With 9.0, a tank (~950 armor) gets ~50% reduction vs same-level mobs at level 100.
-  levelScale: 9.0
+  # With 5.0, a geared player (~350 armor) gets ~54% reduction vs same-level mobs at level 50.
+  levelScale: 5.0
 
   # Base constant in armor formula — floor for level-0 behavior.
   # Ensures meaningful scaling even at level 1 (denominator never drops below this + levelScale).
-  # With 50.0 and levelScale 9.0, level 1 denominator = 59, so 27 armor → 31% reduction.
+  # With 50.0 and levelScale 5.0, level 1 denominator = 55, so 27 armor → 33% reduction.
   baseConstant: 50.0
 
   # Minimum armor effectiveness after penetration (0.0 to 1.0)
@@ -386,6 +386,19 @@ scaling:
   # Higher values stretch the curve so progression stays meaningful longer.
   # 1.0 = legacy (done by ~500), 5.0 = meaningful through ~2000
   decayDivisor: 5.0
+
+# Movement Speed Diminishing Returns
+# Uses a hyperbolic curve: effective = raw * cap / (raw + cap)
+# The cap is the asymptotic ceiling — effective speed approaches this but never reaches it.
+# Higher cap = gentler curve. 0 = disabled (linear, no diminishing returns).
+#
+# With cap=100 (default):
+#   Raw +10%  -> Effective +9.1%  (91% efficiency)
+#   Raw +30%  -> Effective +23.1% (77% efficiency)
+#   Raw +50%  -> Effective +33.3% (67% efficiency)
+#   Raw +100% -> Effective +50.0% (50% efficiency)
+movement:
+  moveSpeedCap: 100.0
 
 # NOTE: Mob scaling settings are in mob-scaling.yml
 # NOTE: Mob classification (boss/elite detection) is in mob-classification.yml

@@ -19,6 +19,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.attributes.StatMapBridge;
 import io.github.larsonix.trailoforbis.gear.GearManager;
 import io.github.larsonix.trailoforbis.gear.sync.ItemSyncCoordinator;
 
@@ -69,6 +70,10 @@ public final class VanillaEquipmentStatSuppressor extends EntityTickingSystem<En
 
     /** Maximum number of indexed modifiers to check per prefix (weapons/utilities). */
     private static final int MAX_INDEXED_MODIFIERS = 16;
+
+    /** Cached stat indices array (rebuilt only when hex availability changes). */
+    private static volatile int[] cachedStatIndices;
+    private static volatile boolean cachedWithHex;
 
     private final ComponentType<EntityStore, PlayerRef> playerRefType;
     private final ComponentType<EntityStore, EntityStatMap> statMapType;
@@ -181,20 +186,45 @@ public final class VanillaEquipmentStatSuppressor extends EntityTickingSystem<En
     }
 
     /**
-     * Returns vanilla stat indices that equipment can actually modify.
+     * Returns stat indices whose equipment modifiers should be suppressed.
      *
-     * <p>Only includes resource stats that armor/weapon/utility items affect.
-     * SignatureEnergy (built from combat hits) and Ammo (ranged-specific)
-     * are excluded — vanilla equipment never adds modifiers to those stats,
-     * and attempting to remove modifiers from entities that lack those stat
-     * values triggers "No EntityStatValue found for index" warnings.
+     * <p>Includes vanilla resource stats (Health, Oxygen, Stamina, Mana) plus
+     * Hexcode custom stat indices (Volatility, Magic_Power, MagicCharges) when
+     * Hexcode is loaded. Without suppression, Hexcode's native staff stats from
+     * {@code Weapon.StatModifiers} JSON would stack ON TOP of our RPG-computed
+     * stats — the same double-stat bug we fixed for vanilla weapons.
+     *
+     * <p>SignatureEnergy and Ammo are excluded — equipment never modifies those.
      */
     private static int[] getStatIndices() {
-        return new int[] {
-            DefaultEntityStatTypes.getHealth(),
-            DefaultEntityStatTypes.getOxygen(),
-            DefaultEntityStatTypes.getStamina(),
-            DefaultEntityStatTypes.getMana()
-        };
+        boolean hasHex = StatMapBridge.isHexcodeAvailable();
+        int[] cached = cachedStatIndices;
+        if (cached != null && cachedWithHex == hasHex) {
+            return cached;
+        }
+
+        int[] result;
+        if (hasHex) {
+            result = new int[] {
+                DefaultEntityStatTypes.getHealth(),
+                DefaultEntityStatTypes.getOxygen(),
+                DefaultEntityStatTypes.getStamina(),
+                DefaultEntityStatTypes.getMana(),
+                StatMapBridge.getHexVolatilityIndex(),
+                StatMapBridge.getHexMagicPowerIndex(),
+                StatMapBridge.getHexMagicChargesIndex()
+            };
+        } else {
+            result = new int[] {
+                DefaultEntityStatTypes.getHealth(),
+                DefaultEntityStatTypes.getOxygen(),
+                DefaultEntityStatTypes.getStamina(),
+                DefaultEntityStatTypes.getMana()
+            };
+        }
+
+        cachedStatIndices = result;
+        cachedWithHex = hasHex;
+        return result;
     }
 }

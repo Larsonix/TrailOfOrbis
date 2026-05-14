@@ -251,13 +251,7 @@ public final class RealmMapTooltipBuilder {
         RealmModifierType type = mod.type();
         String color = isDifficulty ? DIFFICULTY_COLOR : REWARD_COLOR;
 
-        String displayText;
-        if (type.isBinary()) {
-            displayText = type.getDisplayName();
-        } else {
-            int adjustedValue = (int) Math.round(mod.value() * qualityMult);
-            displayText = "+" + adjustedValue + "% " + type.getDisplayName();
-        }
+        String displayText = type.formatValue(mod.value(), qualityMult);
 
         Message line = Message.raw("\n" + displayText).color(color);
 
@@ -367,10 +361,6 @@ public final class RealmMapTooltipBuilder {
      * Formats a modifier value for plain text, quality-adjusted.
      */
     private String formatModifierPlainText(@Nonnull RealmModifier mod, double qualityMult) {
-        if (mod.type().isBinary()) {
-            return mod.type().getDisplayName();
-        }
-        int adjusted = (int) Math.round(mod.value() * qualityMult);
-        return "+" + adjusted + "% " + mod.type().getDisplayName();
+        return mod.type().formatValue(mod.value(), qualityMult);
     }
 }

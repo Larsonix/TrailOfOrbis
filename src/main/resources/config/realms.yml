@@ -171,7 +171,7 @@ enabled-biomes:
   - DESERT
   - VOLCANO
   - TUNDRA
-  - SWAMP
+  # - SWAMP      # Temporarily disabled — causes crashes/long load times for some players
   # - MOUNTAINS  # Temporarily disabled — WIP for Modjam
   - BEACH
   - JUNGLE
@@ -250,6 +250,7 @@ biome-overrides:
 size-overrides:
   massive:
     reward-multiplier: 4.0
+    timer-multiplier: 1.4    # +40% time — massive arenas need more time to traverse and clear
     min-player-count: 2
     max-player-count: 6
 

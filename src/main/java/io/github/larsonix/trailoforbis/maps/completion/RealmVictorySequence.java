@@ -125,31 +125,31 @@ public class RealmVictorySequence {
             }
         }
 
-        // 3. Spawn victory portal at realm center
+        // 3. Spawn victory portal at realm center, then reward chest beside it
         portalManager.spawnVictoryPortal(realm)
             .thenAccept(success -> {
                 if (success) {
                     LOGGER.atInfo().log("Victory portal spawned for realm %s",
                         realmId.toString().substring(0, 8));
+
+                    // 3b. Spawn reward chest next to the portal
+                    if (rewardChestManager != null) {
+                        rewardChestManager.spawnRewardChest(realm)
+                            .thenAccept(chestSuccess -> {
+                                if (chestSuccess) {
+                                    LOGGER.atInfo().log("Reward chest spawned for realm %s",
+                                        realmId.toString().substring(0, 8));
+                                } else {
+                                    LOGGER.atWarning().log("Failed to spawn reward chest for realm %s",
+                                        realmId.toString().substring(0, 8));
+                                }
+                            });
+                    }
                 } else {
                     LOGGER.atWarning().log("Failed to spawn victory portal for realm %s",
                         realmId.toString().substring(0, 8));
                 }
             });
-
-        // 3b. Spawn reward chest next to portal
-        if (rewardChestManager != null) {
-            rewardChestManager.spawnRewardChest(realm)
-                .thenAccept(success -> {
-                    if (success) {
-                        LOGGER.atInfo().log("Reward chest spawned for realm %s",
-                            realmId.toString().substring(0, 8));
-                    } else {
-                        LOGGER.atWarning().log("Failed to spawn reward chest for realm %s",
-                            realmId.toString().substring(0, 8));
-                    }
-                });
-        }
 
         // 4. Send chat announcement
         broadcastVictoryMessage(realm);
@@ -183,9 +183,7 @@ public class RealmVictorySequence {
      * Broadcasts a victory message to all players in the realm.
      */
     private void broadcastVictoryMessage(@Nonnull RealmInstance realm) {
-        String exitText = rewardChestManager != null
-            ? "Collect your rewards from the chest and use the victory portal to leave when ready."
-            : "A victory portal has appeared ! Leave when you are ready.";
+        String exitText = "Rewards delivered ! Use the victory portal to leave when you are ready.";
 
         Message msg = Message.empty()
             .insert(Message.raw("[").color(MessageColors.GRAY))

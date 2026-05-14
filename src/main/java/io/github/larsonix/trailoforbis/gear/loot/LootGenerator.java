@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.gear.loot;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
@@ -311,7 +312,15 @@ public final class LootGenerator {
      */
     ItemStack createBaseItem(String itemId) {
         try {
-            // Use Hytale's ItemStack constructor
+            // Validate item exists in the asset map before creating ItemStack.
+            // DynamicLootRegistry discovers items at startup, but some may have
+            // broken client rendering (missing models, icons, etc.). Items that
+            // don't resolve to a valid Item would show as "?" on the client.
+            Item item = Item.getAssetMap().getAsset(itemId);
+            if (item == null || item == Item.UNKNOWN) {
+                LOGGER.atWarning().log("Skin item '%s' not in asset map — skipping", itemId);
+                return null;
+            }
             return new ItemStack(itemId, 1);
         } catch (Exception e) {
             LOGGER.atSevere().withCause(e).log("Failed to create item: %s", itemId);

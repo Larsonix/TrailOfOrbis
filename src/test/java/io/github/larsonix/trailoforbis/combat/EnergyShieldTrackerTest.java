@@ -246,4 +246,72 @@ class EnergyShieldTrackerTest {
         tracker.addShield(PLAYER, 50f, 100f);
         assertEquals(100f, tracker.getState(PLAYER).currentShield(), 0.001f);
     }
+
+    // ==================== Zero-Regen Shield Tests ====================
+
+    @Test
+    void tickRegen_zeroRegen_preservesShieldState() {
+        // Initialize shield with regen
+        tracker.tickRegen(PLAYER, 100f, 20f, tracker.getRegenDelayMs(), 0.1f);
+        assertNotNull(tracker.getState(PLAYER));
+        assertEquals(100f, tracker.getState(PLAYER).currentShield(), 0.001f);
+
+        // Now regen drops to 0 (e.g., gear change) — shield state must survive
+        tracker.tickRegen(PLAYER, 100f, 0f, tracker.getRegenDelayMs(), 0.1f);
+        assertNotNull(tracker.getState(PLAYER), "Shield state must not be removed when regen=0 but maxShield>0");
+        assertEquals(100f, tracker.getState(PLAYER).currentShield(), 0.001f);
+    }
+
+    @Test
+    void tickRegen_zeroRegen_doesNotRegenerate() throws Exception {
+        tracker = new EnergyShieldTracker(50L); // short delay
+
+        // Initialize shield with regen, then deplete
+        tracker.tickRegen(PLAYER, 100f, 20f, tracker.getRegenDelayMs(), 0.1f);
+        tracker.absorbDamage(PLAYER, 80f);
+        assertEquals(20f, tracker.getState(PLAYER).currentShield(), 0.001f);
+
+        // Wait past delay
+        Thread.sleep(100);
+
+        // Tick with 0 regen — shield should NOT regenerate
+        tracker.tickRegen(PLAYER, 100f, 0f, tracker.getRegenDelayMs(), 1.0f);
+        assertEquals(20f, tracker.getState(PLAYER).currentShield(), 0.001f);
+    }
+
+    @Test
+    void tickRegen_zeroRegen_initializesNewState() {
+        // Player has maxShield but zero regen — shield state should still be created
+        tracker.tickRegen(PLAYER, 100f, 0f, tracker.getRegenDelayMs(), 0.1f);
+        assertNotNull(tracker.getState(PLAYER), "Shield state must be created even with zero regen");
+        assertEquals(100f, tracker.getState(PLAYER).currentShield(), 0.001f);
+    }
+
+    @Test
+    void tickRegen_zeroRegen_shieldStillAbsorbs() {
+        // Initialize with zero regen
+        tracker.tickRegen(PLAYER, 100f, 0f, tracker.getRegenDelayMs(), 0.1f);
+
+        // Shield should absorb damage normally
+        float remaining = tracker.absorbDamage(PLAYER, 60f);
+        assertEquals(0f, remaining, 0.001f);
+        assertEquals(40f, tracker.getState(PLAYER).currentShield(), 0.001f);
+    }
+
+    // ==================== Safety Initialization Tests ====================
+
+    @Test
+    void addShield_createsStateIfAbsent_thenAbsorbs() {
+        // No tickRegen call — simulate safety init via addShield before first hit
+        assertNull(tracker.getState(PLAYER));
+
+        tracker.addShield(PLAYER, 100f, 100f);
+        assertNotNull(tracker.getState(PLAYER));
+        assertEquals(100f, tracker.getState(PLAYER).currentShield(), 0.001f);
+
+        // Now absorb should work
+        float remaining = tracker.absorbDamage(PLAYER, 40f);
+        assertEquals(0f, remaining, 0.001f);
+        assertEquals(60f, tracker.getState(PLAYER).currentShield(), 0.001f);
+    }
 }

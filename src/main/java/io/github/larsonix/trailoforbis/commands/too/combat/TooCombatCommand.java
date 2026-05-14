@@ -17,5 +17,6 @@ public final class TooCombatCommand extends OpenCommandCollection {
         super("combat", "Combat-related commands");
 
         this.addSubCommand(new TooCombatDetailCommand(plugin));
+        this.addSubCommand(new TooCombatDebugCommand(plugin));
     }
 }

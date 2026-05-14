@@ -91,7 +91,7 @@ public class TooAdminRealmInfoCommand extends AbstractPlayerCommand {
 
         sender.sendMessage(Message.empty()
             .insert(Message.raw("  Timeout : ").color(MessageColors.GRAY))
-            .insert(Message.raw(mapData.getTimeoutSeconds() + "s").color(MessageColors.WHITE)));
+            .insert(Message.raw(realm.getTimeout().toSeconds() + "s").color(MessageColors.WHITE)));
 
         if (!mapData.modifiers().isEmpty()) {
             sender.sendMessage(Message.empty()

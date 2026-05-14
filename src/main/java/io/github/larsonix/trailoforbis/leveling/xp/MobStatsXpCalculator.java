@@ -16,9 +16,6 @@ import javax.annotation.Nonnull;
  */
 public class MobStatsXpCalculator implements XpCalculator {
 
-    /** Global XP multiplier applied to all mob kills (tuning knob for overall XP rate) */
-    private static final double GLOBAL_XP_MULTIPLIER = 1.2;
-
     /** XP multiplier bonus per distance level (0.028 = +2.8% per level) */
     private static final double DISTANCE_XP_PER_LEVEL = 0.028;
 
@@ -55,7 +52,7 @@ public class MobStatsXpCalculator implements XpCalculator {
         double distanceMult = 1.0 + (mobScaling.getDistanceLevel() * DISTANCE_XP_PER_LEVEL);
 
         // Calculate final XP
-        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * GLOBAL_XP_MULTIPLIER * distanceMult);
+        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * config.getGlobalXpMultiplier() * distanceMult);
 
         // Ensure at least 1 XP
         return Math.max(1, xp);
@@ -84,7 +81,7 @@ public class MobStatsXpCalculator implements XpCalculator {
         // Distance XP multiplier
         double distanceMult = 1.0 + (distanceLevel * DISTANCE_XP_PER_LEVEL);
 
-        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * GLOBAL_XP_MULTIPLIER * distanceMult);
+        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * config.getGlobalXpMultiplier() * distanceMult);
         return Math.max(1, xp);
     }
 
@@ -142,7 +139,7 @@ public class MobStatsXpCalculator implements XpCalculator {
         double distanceMult = 1.0 + (distanceLevel * DISTANCE_XP_PER_LEVEL);
 
         // Calculate final XP
-        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * GLOBAL_XP_MULTIPLIER * distanceMult);
+        long xp = (long) Math.ceil((baseXp + poolBonus) * tierMult * config.getGlobalXpMultiplier() * distanceMult);
 
         // Ensure at least 1 XP
         return Math.max(1, xp);

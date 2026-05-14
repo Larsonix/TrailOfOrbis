@@ -41,6 +41,11 @@ public enum XpSource {
     PARTY_SHARE("Party Share"),
 
     /**
+     * XP from nearby player sharing (proximity mode, no party mod).
+     */
+    NEARBY_SHARE("Nearby Share"),
+
+    /**
      * XP from crafting items.
      */
     CRAFTING("Crafting"),

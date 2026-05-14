@@ -12,6 +12,7 @@ import io.github.larsonix.trailoforbis.gear.model.WeaponImplicit;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -69,6 +70,7 @@ public final class GearStatCalculator {
         Map<String, Double> percentBonuses = new HashMap<>();
         double weaponBaseDamage = 0.0;
         String weaponItemId = null;
+        String weaponRawItemId = null;
         boolean isHoldingRpgGear = false;
         ElementType weaponSpellElement = null;
 
@@ -76,7 +78,12 @@ public final class GearStatCalculator {
         processContainer(playerId, inventory.getArmor(), flatBonuses, percentBonuses);
 
         // Process active weapon and extract implicit damage + item ID
-        ItemStack weapon = inventory.getItemInHand();
+        // CRITICAL: Use getActiveHotbarItem(), NOT getItemInHand().
+        // getItemInHand() branches on _usingToolsItem flag — if the player used construction
+        // tools, it returns the tool item instead of the hotbar weapon. This caused ALL weapon
+        // stats to be stale (always reading the first tool used instead of the actual weapon).
+        ItemStack weapon = inventory.getActiveHotbarItem();
+        weaponRawItemId = (weapon != null && weapon.getItem() != null) ? weapon.getItem().getId() : null;
         WeaponResult weaponResult = processWeapon(playerId, weapon, flatBonuses, percentBonuses);
         weaponBaseDamage = weaponResult.baseDamage;
         weaponItemId = weaponResult.vanillaItemId;
@@ -87,16 +94,19 @@ public final class GearStatCalculator {
         // Utility slots work like hotbar: 4 slots, 1 active at a time.
         // Only the actively selected item provides stats, matching Hytale's native behavior.
         //
-        // Skip offhand stats when holding a 2-handed weapon (longswords, battleaxes,
-        // spears, bows, crossbows, staves). Uses our WeaponType classification which
-        // correctly identifies all 200+ vanilla weapons via keyword matching.
-        // Unknown weapons default to 1H (offhand applies) — safe fallback.
-        boolean isTwoHanded = WeaponType.fromItemIdOrUnknown(weaponItemId).isTwoHanded();
-        if (!isTwoHanded) {
+        // Offhand compatibility is two-tiered:
+        //   1) RPG weapons: check Hytale's native Utility.Compatible flag from the weapon's Item asset.
+        //      Compatible=true  → sword, axe, club, claws, wand, crossbow (offhand allowed)
+        //      Compatible=false → daggers (dual-wield), longsword, battleaxe, spear, bow, staff
+        //   2) Everything else (torches, food, blocks, vanilla weapons, empty hand): offhand ALWAYS
+        //      applies. Non-weapon items should never suppress offhand stats — the Utility.Compatible
+        //      flag defaults to false for non-weapons, but that's not a deliberate 2H suppression.
+        boolean offhandCompatible = isHoldingRpgGear ? isWeaponOffhandCompatible(weaponItemId) : true;
+        if (offhandCompatible) {
             ItemStack activeUtility = inventory.getUtilityItem();
             processItem(playerId, activeUtility, flatBonuses, percentBonuses);
         } else {
-            LOGGER.atFine().log("Skipping offhand stats for player %s — weapon %s is two-handed",
+            LOGGER.atFine().log("Skipping offhand stats for player %s — weapon %s does not allow offhand",
                     playerId, weaponItemId);
         }
 
@@ -105,6 +115,7 @@ public final class GearStatCalculator {
                 Collections.unmodifiableMap(percentBonuses),
                 weaponBaseDamage,
                 weaponItemId,
+                weaponRawItemId,
                 isHoldingRpgGear,
                 weaponSpellElement
         );
@@ -374,6 +385,44 @@ public final class GearStatCalculator {
         return durability <= 0;
     }
 
+    /**
+     * Checks if an RPG weapon allows offhand (utility) item pairing.
+     *
+     * <p><b>Only called for RPG weapons</b> ({@code isHoldingRpgGear == true}).
+     * Non-RPG items (torches, food, blocks, vanilla weapons) bypass this check
+     * entirely — their offhand stats always apply.
+     *
+     * <p>Uses Hytale's native {@code Utility.Compatible} flag from the weapon's
+     * {@link Item} asset. This flag is resolved through Hytale's JSON template
+     * inheritance at runtime — individual weapons inherit from their type template.
+     *
+     * <p>Weapons with {@code Compatible=true}: sword, axe, club, claws, wand, crossbow.
+     * Weapons with {@code Compatible=false} (or absent): daggers (dual-wield),
+     * longsword, battleaxe, spear, shortbow, staff.
+     *
+     * <p>Fallback when the Item asset can't be resolved (custom rpg_gear_*
+     * with failed base resolution, unknown mod items): returns {@code true} (allow offhand).
+     * This is the safe default — silently suppressing stats is worse than granting them.
+     *
+     * @param weaponItemId The vanilla item ID of the equipped RPG weapon (may be null)
+     * @return true if offhand stats should be applied
+     */
+    private boolean isWeaponOffhandCompatible(@Nullable String weaponItemId) {
+        if (weaponItemId == null) {
+            return true;  // Bare fists — offhand allowed
+        }
+
+        Item item = Item.getAssetMap().getAsset(weaponItemId);
+        if (item == null) {
+            // Custom or modded item not in asset map — allow offhand as safe fallback.
+            // This covers rpg_gear_* items where resolveVanillaItemId() failed.
+            LOGGER.atFine().log("Weapon %s not in asset map — defaulting to offhand-compatible", weaponItemId);
+            return true;
+        }
+
+        return item.getUtility().isCompatible();
+    }
+
     // =========================================================================
     // RESULT CLASS
     // =========================================================================
@@ -392,13 +441,14 @@ public final class GearStatCalculator {
             Map<String, Double> percentBonuses,
             double weaponBaseDamage,
             @Nullable String weaponItemId,
+            @Nullable String weaponRawItemId,
             boolean isHoldingRpgGear,
             @Nullable ElementType weaponSpellElement
     ) {
         /**
          * Empty bonuses instance.
          */
-        public static final GearBonuses EMPTY = new GearBonuses(Map.of(), Map.of(), 0.0, null, false, null);
+        public static final GearBonuses EMPTY = new GearBonuses(Map.of(), Map.of(), 0.0, null, null, false, null);
 
         /**
          * Checks if there are any bonuses (excluding weapon base damage).

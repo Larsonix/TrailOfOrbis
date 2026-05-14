@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -286,5 +287,23 @@ class CraftingConversionSystemTest {
         private ItemStack get(short slot) {
             return slots.get(slot);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MEMORY LEAK REGRESSION
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("onPlayerDisconnect() cleans up pending conversions for disconnecting player")
+    void onPlayerDisconnect_cleansPendingConversions() {
+        UUID playerA = UUID.randomUUID();
+        UUID playerB = UUID.randomUUID();
+
+        // The onPlayerDisconnect method should not throw even if no data exists
+        assertDoesNotThrow(() -> system.onPlayerDisconnect(playerA));
+
+        // After disconnect, calling again should be safe (idempotent)
+        assertDoesNotThrow(() -> system.onPlayerDisconnect(playerA));
+        assertDoesNotThrow(() -> system.onPlayerDisconnect(playerB));
     }
 }

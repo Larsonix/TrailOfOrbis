@@ -30,7 +30,7 @@ import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
-import io.github.larsonix.trailoforbis.combat.deathrecap.DeathRecapFormatter;
+import io.github.larsonix.trailoforbis.combat.format.CombatFormatConstants;
 import io.github.larsonix.trailoforbis.mobs.infobar.MobInfoFormatter;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
@@ -43,6 +43,10 @@ import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.mobs.model.MobStats;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierApplier;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierManager;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
 import io.github.larsonix.trailoforbis.mobs.spawn.component.RPGSpawnedMarker;
 import io.github.larsonix.trailoforbis.mobs.spawn.manager.RPGSpawnManager;
 import io.github.larsonix.trailoforbis.mobs.speed.MobSpeedEffectManager;
@@ -54,6 +58,7 @@ import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifier;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.util.Optional;
@@ -96,6 +101,9 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
      */
     @Nullable
     private static volatile Field regeneratingValuesField;
+
+    /** Set to true if reflection lookup fails — prevents repeated retry + log spam. */
+    private static volatile boolean regenerationFieldFailed = false;
     
     // Plugin reference for dynamic access to MobScalingManager
     private final TrailOfOrbis plugin;
@@ -335,6 +343,32 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             stats = stats.withMultiplier(statMultiplier);
         }
 
+        // Apply late-game scaling (accelerating HP/damage/armor bonus above threshold level)
+        MobScalingConfig.LateGameScalingConfig lateGame = config.getLateGameScaling();
+        if (lateGame.isEnabled() && mobLevel > lateGame.getThreshold()) {
+            stats = stats.withLateGameScaling(
+                lateGame.calculateHpMultiplier(mobLevel),
+                lateGame.calculateDamageMultiplier(mobLevel),
+                lateGame.calculateArmorMultiplier(mobLevel));
+        }
+
+        // 5.5 ROLL AND APPLY MOB MODIFIERS
+        List<ModifierType> modifiers = List.of();
+        MobModifierManager modManager = plugin.getMobModifierManager();
+        if (modManager != null && modManager.isEnabled()
+                && (classification == RPGMobClass.ELITE || classification == RPGMobClass.BOSS)) {
+            String tier = classification == RPGMobClass.BOSS ? "boss" : "elite";
+            // Boss that rolled elite chance → Elite Boss (3 modifiers)
+            // This is handled by checking if a BOSS also rolled through the elite chance above
+            modifiers = modManager.getRoller().roll(mobLevel, tier, seed);
+
+            if (!modifiers.isEmpty()) {
+                stats = modManager.getApplier().applyStats(stats, modifiers);
+                LOGGER.at(Level.FINE).log("[MobModifier] %s rolled %d modifiers: %s",
+                    roleName, modifiers.size(), modifiers);
+            }
+        }
+
         // DEBUG: Log generated stats for special mobs (FINE level to avoid log spam)
         if (statMultiplier != 1.0) {
             LOGGER.at(Level.FINE).log("[MobScaling] %s stats: HP=%.0f, DMG=%.1f, Armor=%.0f, Crit=%.0f%%/%.0f%%",
@@ -342,7 +376,7 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
                 stats.criticalChance(), stats.criticalMultiplier());
         }
 
-        // 6. ATTACH COMPONENT
+        // 6. ATTACH COMPONENTS
         MobScalingComponent scaling = new MobScalingComponent();
         scaling.setMobLevel(mobLevel);
         scaling.setDistanceLevel(distanceCalculator.estimateLevelFromDistance(distFromSpawn));
@@ -356,10 +390,23 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         // Attach component to entity (scalingType already verified at start of method)
         holder.addComponent(scalingType, scaling);
 
+        // Attach modifier component if modifiers were rolled
+        if (!modifiers.isEmpty()) {
+            MobModifierComponent modComp = new MobModifierComponent();
+            modComp.setModifiers(modifiers);
+            holder.addComponent(MobModifierComponent.getComponentType(), modComp);
+        }
+
         // Add native nameplate with mob level text (skip for PASSIVE — ambient creatures look normal)
         if (classification != RPGMobClass.PASSIVE) {
-            String nameplateText = MobInfoFormatter.formatPlainText(
-                mobLevel, 0, classification, null);
+            String nameplateText;
+            if (!modifiers.isEmpty() && modManager != null) {
+                nameplateText = MobModifierApplier.formatNameplate(
+                    mobLevel, classification, modifiers, modManager.getConfig());
+            } else {
+                nameplateText = MobInfoFormatter.formatPlainText(
+                    mobLevel, 0, classification, null);
+            }
             Nameplate nameplate = holder.ensureAndGetComponent(Nameplate.getComponentType());
             nameplate.setText(nameplateText);
         }
@@ -367,9 +414,18 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         // Set DisplayNameComponent for death screen / kill feed display
         // Without this, entity-killed death messages show "unknown" instead of the mob name
         // Use putComponent — some vanilla NPCs already have a DisplayNameComponent
-        String formattedName = DeathRecapFormatter.formatMobName(roleName);
+        String formattedName = CombatFormatConstants.formatMobName(roleName);
         holder.putComponent(DisplayNameComponent.getComponentType(),
             new DisplayNameComponent(Message.raw(formattedName)));
+
+        // Apply modifier visuals (tint, VFX, scale) BEFORE stat modifiers
+        if (!modifiers.isEmpty() && modManager != null) {
+            String tier = classification == RPGMobClass.BOSS ? "boss" : "elite";
+            Ref<EntityStore> entityRef = npc.getReference();
+            if (entityRef != null && entityRef.isValid()) {
+                modManager.getApplier().applyVisuals(holder, modifiers, tier, entityRef, store);
+            }
+        }
 
         // Apply stat modifiers to EntityStatMap
         applyStatModifiers(holder, scaling, stats, reason, manager);
@@ -511,10 +567,33 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             stats = stats.withMultiplier(combinedStatMultiplier);
         }
 
-        // 4. ATTACH COMPONENT
+        // Apply late-game scaling (accelerating HP/damage/armor bonus above threshold level)
+        MobScalingConfig.LateGameScalingConfig lateGameRealm = manager.getConfig().getLateGameScaling();
+        if (lateGameRealm.isEnabled() && realmLevel > lateGameRealm.getThreshold()) {
+            stats = stats.withLateGameScaling(
+                lateGameRealm.calculateHpMultiplier(realmLevel),
+                lateGameRealm.calculateDamageMultiplier(realmLevel),
+                lateGameRealm.calculateArmorMultiplier(realmLevel));
+        }
+
+        // 3.5 ROLL AND APPLY MOB MODIFIERS (same system for realm and overworld)
+        List<ModifierType> modifiers = List.of();
+        MobModifierManager modManager = plugin.getMobModifierManager();
+        if (modManager != null && modManager.isEnabled()
+                && (classification == RPGMobClass.ELITE || classification == RPGMobClass.BOSS)) {
+            String modTier = classification == RPGMobClass.BOSS ? "boss" : "elite";
+            modifiers = modManager.getRoller().roll(realmLevel, modTier, seed);
+            if (!modifiers.isEmpty()) {
+                stats = modManager.getApplier().applyStats(stats, modifiers);
+                LOGGER.at(Level.FINE).log("[MobModifier] Realm mob %s rolled %d modifiers: %s",
+                    roleName, modifiers.size(), modifiers);
+            }
+        }
+
+        // 4. ATTACH COMPONENTS
         MobScalingComponent scaling = new MobScalingComponent();
         scaling.setMobLevel(realmLevel);
-        scaling.setDistanceLevel(realmLevel); // Same as mob level for realm mobs
+        scaling.setDistanceLevel(0); // Realm mobs get no distance XP bonus
         scaling.setDistanceBonus(bonusPool);
         scaling.setClassification(classification);
         scaling.setRoleName(roleName);
@@ -524,21 +603,43 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
 
         holder.addComponent(scalingType, scaling);
 
+        // Attach modifier component if modifiers were rolled
+        if (!modifiers.isEmpty()) {
+            MobModifierComponent modComp = new MobModifierComponent();
+            modComp.setModifiers(modifiers);
+            holder.addComponent(MobModifierComponent.getComponentType(), modComp);
+        }
+
         // Add native nameplate with realm mob level text (skip for PASSIVE — ambient creatures look normal)
         if (classification != RPGMobClass.PASSIVE) {
-            String nameplateText = MobInfoFormatter.formatPlainText(
-                realmLevel, 0, classification, null);
+            String nameplateText;
+            if (!modifiers.isEmpty() && modManager != null) {
+                nameplateText = MobModifierApplier.formatNameplate(
+                    realmLevel, classification, modifiers, modManager.getConfig());
+            } else {
+                nameplateText = MobInfoFormatter.formatPlainText(
+                    realmLevel, 0, classification, null);
+            }
             Nameplate nameplate = holder.ensureAndGetComponent(Nameplate.getComponentType());
             nameplate.setText(nameplateText);
         }
 
         // Set DisplayNameComponent for death screen / kill feed display
         // Use putComponent — some vanilla NPCs already have a DisplayNameComponent
-        String formattedName = DeathRecapFormatter.formatMobName(roleName);
+        String formattedName = CombatFormatConstants.formatMobName(roleName);
         holder.putComponent(DisplayNameComponent.getComponentType(),
             new DisplayNameComponent(Message.raw(formattedName)));
 
-        // 5. APPLY MODIFIERS
+        // Apply modifier visuals (tint, VFX, scale)
+        if (!modifiers.isEmpty() && modManager != null) {
+            String modTier = classification == RPGMobClass.BOSS ? "boss" : "elite";
+            Ref<EntityStore> entityRef = npc.getReference();
+            if (entityRef != null && entityRef.isValid()) {
+                modManager.getApplier().applyVisuals(holder, modifiers, modTier, entityRef, store);
+            }
+        }
+
+        // 5. APPLY STAT MODIFIERS
         applyStatModifiers(holder, scaling, stats, reason, manager);
         applySpeedEffect(holder, npc, stats, store, manager);
         applyKnockbackResistance(npc, stats);
@@ -596,6 +697,38 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         if (statMultiplier != 1.0) {
             stats = stats.withMultiplier(statMultiplier);
         }
+
+        // Apply late-game scaling (accelerating HP/damage/armor bonus above threshold level)
+        MobScalingConfig.LateGameScalingConfig lateGameLoad = manager.getConfig().getLateGameScaling();
+        if (lateGameLoad.isEnabled() && mobLevel > lateGameLoad.getThreshold()) {
+            stats = stats.withLateGameScaling(
+                lateGameLoad.calculateHpMultiplier(mobLevel),
+                lateGameLoad.calculateDamageMultiplier(mobLevel),
+                lateGameLoad.calculateArmorMultiplier(mobLevel));
+        }
+
+        // Re-apply modifier stat bonuses from persisted MobModifierComponent
+        MobModifierComponent modComp = holder.getComponent(MobModifierComponent.getComponentType());
+        if (modComp != null) {
+            modComp.resolveModifiers();
+            List<ModifierType> modifiers = modComp.getModifiers();
+            if (!modifiers.isEmpty()) {
+                MobModifierManager modManager = plugin.getMobModifierManager();
+                if (modManager != null && modManager.isEnabled()) {
+                    stats = modManager.getApplier().applyStats(stats, modifiers);
+                    // Re-apply visuals (effects don't persist across save/load)
+                    NPCEntity npcForVisuals = holder.getComponent(npcType);
+                    if (npcForVisuals != null) {
+                        Ref<EntityStore> entityRef = npcForVisuals.getReference();
+                        if (entityRef != null && entityRef.isValid()) {
+                            String tier = classification == RPGMobClass.BOSS ? "boss" : "elite";
+                            modManager.getApplier().applyVisuals(holder, modifiers, tier, entityRef, store);
+                        }
+                    }
+                }
+            }
+        }
+
         scaling.setStats(stats);
 
         // Re-apply health modifier with current formula (putModifier is idempotent)
@@ -608,8 +741,9 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             applyKnockbackResistance(npc, stats);
         }
 
-        LOGGER.atFine().log("[MobScaling] Recalculated loaded mob %s: Lv%d, HP=%.0f, class=%s",
-            scaling.getRoleName(), mobLevel, stats.maxHealth(), classification);
+        LOGGER.atFine().log("[MobScaling] Recalculated loaded mob %s: Lv%d, HP=%.0f, class=%s, mods=%s",
+            scaling.getRoleName(), mobLevel, stats.maxHealth(), classification,
+            modComp != null ? modComp.getModifiers() : "none");
     }
 
     /**
@@ -768,6 +902,7 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
      * @param healthStat The mob's Health EntityStatValue
      */
     static void clearVanillaHealthRegen(@Nonnull EntityStatValue healthStat) {
+        if (regenerationFieldFailed) return;
         try {
             Field field = regeneratingValuesField;
             if (field == null) {
@@ -777,8 +912,9 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             }
             field.set(healthStat, null);
         } catch (NoSuchFieldException e) {
+            regenerationFieldFailed = true;
             LOGGER.atWarning().log("[MobScaling] Cannot clear vanilla health regen: " +
-                "EntityStatValue.regeneratingValues field not found (Hytale API changed?)");
+                "EntityStatValue.regeneratingValues field not found (Hytale API changed?). Will not retry.");
         } catch (Exception e) {
             LOGGER.atFine().withCause(e).log("[MobScaling] Failed to clear vanilla health regen");
         }

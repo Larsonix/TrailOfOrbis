@@ -97,9 +97,9 @@ public class ConfigManagerTest {
         RPGConfig.AttributeConfig.EarthGrants earthGrants = attrConfig.getEarthGrants();
         assertNotNull(earthGrants);
         assertEquals(0.5f, earthGrants.getMaxHealthPercent(), 0.001f);
-        assertEquals(5.0f, earthGrants.getArmor(), 0.001f);
-        assertEquals(0.2f, earthGrants.getHealthRegen(), 0.001f);
-        assertEquals(0.2f, earthGrants.getBlockChance(), 0.001f);
+        assertEquals(3.5f, earthGrants.getArmor(), 0.001f);
+        assertEquals(0.02f, earthGrants.getHealthRegen(), 0.001f);
+        assertEquals(0.05f, earthGrants.getBlockChance(), 0.001f);
         assertEquals(0.3f, earthGrants.getKnockbackResistance(), 0.001f);
 
         // Test WIND grants (ghost ranger)
@@ -114,8 +114,8 @@ public class ConfigManagerTest {
         // Test VOID grants (life devourer)
         RPGConfig.AttributeConfig.VoidGrants voidGrants = attrConfig.getVoidGrants();
         assertNotNull(voidGrants);
-        assertEquals(0.1f, voidGrants.getLifeSteal(), 0.001f);
-        assertEquals(0.05f, voidGrants.getPercentHitAsTrueDamage(), 0.001f);
+        assertEquals(0.2f, voidGrants.getLifeSteal(), 0.001f);
+        assertEquals(0.1f, voidGrants.getPercentHitAsTrueDamage(), 0.001f);
         assertEquals(0.3f, voidGrants.getDotDamagePercent(), 0.001f);
         assertEquals(0.5f, voidGrants.getManaOnKill(), 0.001f);
         assertEquals(0.3f, voidGrants.getStatusEffectDuration(), 0.001f);
@@ -172,7 +172,7 @@ public class ConfigManagerTest {
         assertNotNull(attrConfig);
 
         // Test attribute point settings
-        assertEquals(0, attrConfig.getStartingPoints(), "Starting points should be 0");
+        assertEquals(1, attrConfig.getStartingPoints(), "Starting points should be 1");
         assertEquals(1, attrConfig.getPointsPerLevel(), "Points per level should be 1");
     }
 }

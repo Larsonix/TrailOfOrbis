@@ -339,6 +339,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .armorPercent(50f)
                 .build();
+            stats.consolidateResourcePercents(); // Armor percent applied here, not in CombatCalculator
 
             var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
@@ -372,6 +373,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .armorPercent(100f)
                 .build();
+            stats.consolidateResourcePercents();
 
             var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
@@ -387,6 +389,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .armorPercent(-50f)
                 .build();
+            stats.consolidateResourcePercents();
 
             var result = calculator.calculateDefenderReduction(10f, stats, 0f, TEST_LEVEL);
 
@@ -402,6 +405,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .armorPercent(50f)
                 .build();
+            stats.consolidateResourcePercents();
 
             // 50% penetration
             var result = calculator.calculateDefenderReduction(10f, stats, 50f, TEST_LEVEL);
@@ -533,6 +537,7 @@ public class CombatCalculatorTest {
                 .armor(100f)
                 .armorPercent(50f) // +50% = 150 armor
                 .build();
+            stats.consolidateResourcePercents();
 
             var result = calculator.calculateDefenderReduction(10f, stats, 75f, TEST_LEVEL);
 

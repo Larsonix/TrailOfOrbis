@@ -1,0 +1,53 @@
+# =============================================================================
+# Weapon InteractionVars Auto-Patcher
+# =============================================================================
+# Some vanilla and modded weapons ship without InteractionVars (damage
+# definitions). These weapons swing and animate but deal zero damage because
+# the interaction chain has no damage values to resolve.
+#
+# This system detects broken weapons at startup and patches them using a
+# working sibling weapon's InteractionVars (same parent template). The actual
+# damage values don't matter — our RPG system overrides them — but valid
+# InteractionVars are required for the engine to fire damage events at all.
+# =============================================================================
+
+enabled: true
+
+# Weapon families to consider for patching (Tag.Family values).
+# Weapons outside these families are skipped even if broken.
+patched_families:
+  - Sword
+  - Axe
+  - Battleaxe
+  - Mace
+  - Longsword
+  - Daggers
+  - Spear
+  - Club
+  - Claws
+  - Shortbow
+  - Crossbow
+  - Staff
+  - Wand
+  - Spellbook
+  - Shield
+  - Gun
+
+# Item ID prefixes to exclude from patching.
+# Use this for mods whose weapons intentionally lack InteractionVars.
+excluded_prefixes: []
+#  - "ArcanePower_"
+
+# Item ID substrings to exclude from patching.
+# Use this for NPC weapons, test items, cosmetics, etc.
+excluded_patterns:
+  - "_NPC"
+  - "_Npc"
+  - "_Test"
+  - "_Debug"
+  - "_Cosmetic"
+
+# Item IDs to always exclude (exact match).
+excluded_items: []
+#  - "Weapon_Deployable_Healing_Totem"
+#  - "Weapon_Deployable_Turret"

@@ -342,6 +342,142 @@ class StoneActionRegistryGearTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // ALTERVERSE SPLINTER - Reroll Prefixes Only
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Alterverse Splinter - Reroll Prefixes Only")
+    class AlterverseSplinterGearTests {
+
+        @Test
+        @DisplayName("Should reroll prefix types while preserving suffixes")
+        void shouldRerollPrefixesPreserveSuffixes() {
+            GearData gear = createTestGear();
+            String originalSuffixStat = gear.suffixes().get(0).statId();
+            double originalSuffixValue = gear.suffixes().get(0).value();
+
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, gear, random);
+            assertTrue(result.success());
+
+            GearData modified = (GearData) result.modifiedItem();
+            // Suffixes must be completely unchanged
+            assertEquals(gear.suffixes().size(), modified.suffixes().size());
+            assertEquals(originalSuffixStat, modified.suffixes().get(0).statId());
+            assertEquals(originalSuffixValue, modified.suffixes().get(0).value());
+            // Prefix count preserved
+            assertEquals(gear.prefixes().size(), modified.prefixes().size());
+        }
+
+        @Test
+        @DisplayName("Should preserve locked prefixes")
+        void shouldPreserveLockedPrefixes() {
+            GearData gear = createGearWithLockedMod();
+
+            for (int i = 0; i < 10; i++) {
+                Random r = new Random(i * 1000);
+                StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, gear, r);
+                // Locked prefix = all prefixes locked, so stone may fail or succeed with same prefix
+                GearData modified = result.success() ? (GearData) result.modifiedItem() : gear;
+                assertTrue(modified.prefixes().stream()
+                    .anyMatch(m -> m.statId().equals("physical_damage") && m.locked()));
+            }
+        }
+
+        @Test
+        @DisplayName("Should fail on corrupted gear")
+        void shouldFailOnCorrupted() {
+            GearData gear = createCorruptedGear();
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, gear, random);
+            assertFalse(result.success());
+        }
+
+        @Test
+        @DisplayName("Should fail on gear with no prefixes")
+        void shouldFailOnNoPrefixes() {
+            GearData gear = new GearData(
+                null, 50, GearRarity.RARE, 50,
+                List.of(),  // no prefixes
+                List.of(GearModifier.of("of_the_whale", "of the Whale", ModifierType.SUFFIX,
+                    "max_health", GearModifier.STAT_TYPE_PERCENT, 15.0)),
+                false, null, null, null, null, List.of(), 0
+            );
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, gear, random);
+            assertFalse(result.success());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ALTERVERSE FRAGMENT - Reroll Suffixes Only
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Alterverse Fragment - Reroll Suffixes Only")
+    class AlterverseFragmentGearTests {
+
+        @Test
+        @DisplayName("Should reroll suffix types while preserving prefixes")
+        void shouldRerollSuffixesPreservePrefixes() {
+            GearData gear = createTestGear();
+            String originalPrefixStat = gear.prefixes().get(0).statId();
+            double originalPrefixValue = gear.prefixes().get(0).value();
+
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, gear, random);
+            assertTrue(result.success());
+
+            GearData modified = (GearData) result.modifiedItem();
+            // Prefixes must be completely unchanged
+            assertEquals(gear.prefixes().size(), modified.prefixes().size());
+            assertEquals(originalPrefixStat, modified.prefixes().get(0).statId());
+            assertEquals(originalPrefixValue, modified.prefixes().get(0).value());
+            // Suffix count preserved
+            assertEquals(gear.suffixes().size(), modified.suffixes().size());
+        }
+
+        @Test
+        @DisplayName("Should preserve locked suffixes")
+        void shouldPreserveLockedSuffixes() {
+            GearData gear = new GearData(
+                null, 50, GearRarity.RARE, 50,
+                List.of(GearModifier.of("sharp", "Sharp", ModifierType.PREFIX,
+                    "physical_damage", GearModifier.STAT_TYPE_FLAT, 10.0)),
+                List.of(new GearModifier("of_the_whale", "of the Whale", ModifierType.SUFFIX,
+                    "max_health", GearModifier.STAT_TYPE_PERCENT, 15.0, true)),  // locked suffix
+                false, null, null, null, null, List.of(), 0
+            );
+
+            for (int i = 0; i < 10; i++) {
+                Random r = new Random(i * 1000);
+                StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, gear, r);
+                GearData modified = result.success() ? (GearData) result.modifiedItem() : gear;
+                assertTrue(modified.suffixes().stream()
+                    .anyMatch(m -> m.statId().equals("max_health") && m.locked()));
+            }
+        }
+
+        @Test
+        @DisplayName("Should fail on corrupted gear")
+        void shouldFailOnCorrupted() {
+            GearData gear = createCorruptedGear();
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, gear, random);
+            assertFalse(result.success());
+        }
+
+        @Test
+        @DisplayName("Should fail on gear with no suffixes")
+        void shouldFailOnNoSuffixes() {
+            GearData gear = new GearData(
+                null, 50, GearRarity.RARE, 50,
+                List.of(GearModifier.of("sharp", "Sharp", ModifierType.PREFIX,
+                    "physical_damage", GearModifier.STAT_TYPE_FLAT, 10.0)),
+                List.of(),  // no suffixes
+                false, null, null, null, null, List.of(), 0
+            );
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, gear, random);
+            assertFalse(result.success());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // ORBISIAN BLESSING - Reroll Quality
     // ═══════════════════════════════════════════════════════════════════
 

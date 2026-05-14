@@ -102,6 +102,22 @@ public interface AttributeService {
      */
     int resetAllAttributesAdmin(@Nonnull UUID playerId);
 
+    // ==================== Optimization Hints ====================
+
+    /**
+     * Checks whether stats were recalculated (with actual changes) within a recent time window.
+     *
+     * <p>Used by tick-based systems to avoid redundant recalculations when an event handler
+     * already ran the full stat pipeline in the same tick.
+     *
+     * @param playerId The player's UUID
+     * @param windowNanos Maximum age in nanoseconds to consider "recent"
+     * @return true if a stat-changing recalculation happened within the window
+     */
+    default boolean wasRecentlyRecalculated(@Nonnull UUID playerId, long windowNanos) {
+        return false; // Default: always recalculate (safe fallback)
+    }
+
     // ==================== Cleanup Methods ====================
 
     /**

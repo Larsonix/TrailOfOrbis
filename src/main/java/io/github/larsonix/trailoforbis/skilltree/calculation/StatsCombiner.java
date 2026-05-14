@@ -364,12 +364,13 @@ public class StatsCombiner {
         // PHASE 5: Derived keystones (Tier 1: computed from already-combined stats)
         // ═══════════════════════════════════════════════════════════════════
 
-        // HP_SCALING_DAMAGE: bonus physDmg% = (maxHP / 100) × statValue
+        // HP_SCALING_DAMAGE: bonus physDmg% = (maxHP / 50) × statValue
+        // Colossus: +1% Physical Damage per 50 Max HP (no floor)
         if (modifiers.hasModifiers(StatType.HP_SCALING_DAMAGE)) {
             float hpScaling = modifiers.getFlatSum(StatType.HP_SCALING_DAMAGE)
                             + modifiers.getPercentSum(StatType.HP_SCALING_DAMAGE);
             ComputedStats intermediate = builder.build();
-            float bonusPct = (intermediate.getMaxHealth() / 100f) * hpScaling;
+            float bonusPct = (intermediate.getMaxHealth() / 50f) * hpScaling;
             builder.physicalDamagePercent(intermediate.getPhysicalDamagePercent() + bonusPct);
         }
 

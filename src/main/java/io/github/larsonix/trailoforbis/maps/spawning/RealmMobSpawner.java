@@ -1294,16 +1294,21 @@ public class RealmMobSpawner {
      * Cleans up spawning state for a realm.
      *
      * @param realmId The realm ID
+     * @return UUIDs of all mobs that were tracked in this realm (for external cleanup, e.g. ailments)
      */
-    public void cleanupRealm(@Nonnull UUID realmId) {
+    @Nonnull
+    public Set<UUID> cleanupRealm(@Nonnull UUID realmId) {
         SpawnState state = realmSpawnStates.remove(realmId);
+        Set<UUID> mobUuids = Collections.emptySet();
         if (state != null) {
-            LOGGER.atInfo().log("Cleaned up spawn state for realm %s: %d spawned, %d killed",
-                realmId, state.spawnedCount.get(), state.killCount.get());
+            mobUuids = new HashSet<>(state.mobStates.keySet());
+            LOGGER.atInfo().log("Cleaned up spawn state for realm %s: %d spawned, %d killed, %d mob refs freed",
+                realmId, state.spawnedCount.get(), state.killCount.get(), mobUuids.size());
         }
         if (bossStructurePlacer != null) {
             bossStructurePlacer.onRealmClosed(realmId);
         }
+        return mobUuids;
     }
 
     /**

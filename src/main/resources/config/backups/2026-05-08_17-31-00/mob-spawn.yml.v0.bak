@@ -1,0 +1,148 @@
+# =============================================================================
+# Mob Spawn Configuration
+# =============================================================================
+# Controls spawn rates by mob class and player level.
+# This system replaces the old spawn multiplier with a more configurable approach.
+# =============================================================================
+
+# Master switch for the spawn system
+enabled: true
+
+# -----------------------------------------------------------------------------
+# CLASS-BASED SPAWN MULTIPLIERS
+# -----------------------------------------------------------------------------
+# Base spawn weight multipliers per mob classification.
+# Higher values = more spawns of that class.
+#
+# Formula: effective_multiplier = class_multiplier * level_multiplier
+#
+# Values:
+#   1.0 = Normal spawn rate (no change)
+#   1.5 = 50% more spawns
+#   0.5 = 50% fewer spawns
+#   2.0 = Double spawn rate
+
+class_multipliers:
+  # Ambient mobs (birds, butterflies, etc.) - unchanged
+  AMBIENT: 0.5
+
+  # Farm animals - unchanged
+  LIVESTOCK: 0.8
+
+  # Natural dangers (wolves, bears) - slightly more
+  BEAST: 1.2
+
+  # Supernatural enemies (trorks, kweebecs) - moderately more
+  MONSTER: 1.5
+
+  # Mini-bosses - slightly less frequent to keep them special
+  ELITE: 0.3
+
+  # Rare enemies - kept rare
+  LEGENDARY: 0.1
+
+  # Raid bosses - very rare
+  MYTHIC: 0.01
+
+# -----------------------------------------------------------------------------
+# LEVEL-BASED SPAWN SCALING
+# -----------------------------------------------------------------------------
+# Player level affects spawn rates dynamically.
+# Higher level players attract more hostile spawns.
+#
+# Formula:
+#   increments = floor(highest_player_level / level_per_increment)
+#   level_multiplier = 1.0 + (increments * increment_bonus)
+#   final = min(level_multiplier, max_level_multiplier)
+#
+# Example with defaults (level_per_increment=50, increment_bonus=0.2):
+#   Level 1-49:   1.0x (no bonus)
+#   Level 50-99:  1.2x (+20%)
+#   Level 100-149: 1.4x (+40%)
+#   Level 150-199: 1.6x (+60%)
+#   ...capped at 3.0x
+
+level_scaling:
+  # Enable/disable level-based scaling
+  enabled: true
+
+  # Detection radius for finding the highest-level player (blocks)
+  detection_radius: 256.0
+
+  # Scaling formula: "logarithmic" (recommended) or "linear" (legacy)
+  #
+  # LOGARITHMIC (default):
+  #   Uses power-of-log formula that scales gently with level:
+  #   - Level 1: 1.0x
+  #   - Level 100: ~1.2x
+  #   - Level 1,000: ~1.6x
+  #   - Level 10,000: ~2.2x
+  #   - Level 100,000: ~3.3x
+  #   - Level 1,000,000: ~5.0x
+  #
+  # LINEAR (legacy):
+  #   Uses increment-based formula (level_per_increment + increment_bonus).
+  #   WARNING: Can cause server crashes at high levels due to spawn bursts!
+  formula: logarithmic
+
+  # ---- LINEAR FORMULA SETTINGS (only used when formula: linear) ----
+  # Player levels required per spawn rate increment
+  level_per_increment: 50
+
+  # Bonus spawn weight per increment
+  increment_bonus: 0.2
+
+  # Maximum level-based multiplier cap
+  # For logarithmic: ~5.0 is reached at level 1,000,000
+  # For linear: acts as hard cap to prevent runaway scaling
+  max_level_multiplier: 5.0
+
+  # Only apply level scaling to hostile mobs
+  # If false, peaceful mobs also scale (not recommended)
+  hostile_only: true
+
+# -----------------------------------------------------------------------------
+# SPAWN CAPS
+# -----------------------------------------------------------------------------
+# Global limits to prevent server overload from RPG spawning.
+# These work alongside Hytale's native population limits.
+
+spawn_caps:
+  # Maximum hostile mobs per chunk from RPG-triggered additional spawns
+  # This prevents mob overcrowding and entity overload.
+  # 0 = unlimited (use only Hytale's native limits)
+  # 30 = balanced default, allows ~2 mobs per spawn without overcrowding
+  max_hostile_per_chunk: 30
+
+  # Distance from world origin where caps start applying (blocks)
+  # Inside this radius, normal Hytale spawn limits apply
+  cap_start_distance: 100.0
+
+# -----------------------------------------------------------------------------
+# DIFFICULTY PRESETS
+# -----------------------------------------------------------------------------
+# Quick presets for different playstyles.
+# Set to one of: EASY, NORMAL, HARD, NIGHTMARE, CUSTOM
+#
+# CUSTOM = uses the values configured above
+# Other presets override class_multipliers and level_scaling values
+#
+# Preset reference:
+#
+# EASY:
+#   MONSTER=1.0, ELITE=0.5, LEGENDARY=0.3, MYTHIC=0.1
+#   level_per_increment=100, increment_bonus=0.1
+#
+# NORMAL:
+#   MONSTER=1.5, ELITE=0.8, LEGENDARY=0.5, MYTHIC=0.2
+#   level_per_increment=50, increment_bonus=0.2
+#
+# HARD:
+#   MONSTER=2.0, ELITE=1.5, LEGENDARY=1.0, MYTHIC=0.5
+#   level_per_increment=25, increment_bonus=0.3
+#
+# NIGHTMARE:
+#   MONSTER=3.0, ELITE=2.5, LEGENDARY=2.0, MYTHIC=1.5
+#   level_per_increment=10, increment_bonus=0.5
+
+preset: CUSTOM

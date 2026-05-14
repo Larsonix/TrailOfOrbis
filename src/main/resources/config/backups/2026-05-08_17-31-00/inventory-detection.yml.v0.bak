@@ -1,0 +1,75 @@
+# Inventory Detection Settings
+# ═══════════════════════════════════════════════════════════════════════════════
+# Heuristic-based detection of when players open their inventory
+# Shows a floating "Stats" button that opens the RPG stats page
+# ═══════════════════════════════════════════════════════════════════════════════
+
+enabled: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEBUG MODE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Enable detailed logging of detection events
+# Set to true to diagnose detection issues
+debug: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPTIMISTIC SHOW (Mitigation #1: Reduce detection delay)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Show HUD after this many frozen packets (fast trigger for instant feel)
+# Lower = faster detection but more false positives
+# Default: 2, Relaxed for testing: 3
+optimistic_freeze_packets: 3
+
+# Time window (ms) to confirm detection before locking in
+# If player starts looking within this time, HUD is dismissed quickly
+# Default: 150, Relaxed for testing: 300
+optimistic_confirm_ms: 300
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONFIRMED DETECTION (Reliable detection)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Full confirmation requires this many consecutive frozen packets
+# Higher = more reliable but slower detection
+# Default: 5, Relaxed for testing: 8
+confirmed_freeze_packets: 8
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MULTI-SIGNAL CONFIRMATION (Mitigation #2: Reduce false positives)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# If player clicked in world within this time (ms), suppress detection
+# Prevents false positives when looking at static scenery
+world_interaction_stale_ms: 500
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GENERAL SETTINGS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Minimum look change (radians) to consider player is "looking around"
+# Default: 0.001, Relaxed for testing: 0.01 (more tolerant of minor jitter)
+look_delta_epsilon: 0.01
+
+# Player must have been actively looking within this time (ms) before detection triggers
+# Prevents detection when player has been AFK
+min_activity_before_detect_ms: 500
+
+# Cooldown after inventory close to prevent detection flicker (ms)
+# Only applies to quick-dismiss (false positives), not confirmed closes
+cooldown_after_close_ms: 300
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLOSE DETECTION (Prevents false closes from camera jitter)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Immunity period after confirmation (ms) - don't close during this window
+# This prevents immediate closes from camera micro-jitter right after opening
+close_immunity_ms: 500
+
+# Consecutive movement packets required to close inventory
+# Higher = more resistant to jitter, but slower to detect real close
+# A value of 3 means the player must have 3+ consecutive non-frozen packets
+close_movement_packets: 3

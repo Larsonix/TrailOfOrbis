@@ -77,6 +77,16 @@ public class AttributeManager implements AttributeService {
      */
     private final Map<UUID, AtomicLong> statsVersions = new ConcurrentHashMap<>();
 
+    /**
+     * Per-player nanoTime of last stats recalculation that produced a change.
+     *
+     * <p>Used by {@code HotbarSlotTrackingSystem} to skip redundant recalculations
+     * when {@code EquipmentChangeListener} already handled the same equipment change
+     * in the same tick window. This avoids running the full stat pipeline twice
+     * per equipment change (~5ms wasted per duplicate).
+     */
+    private final Map<UUID, Long> lastRecalcNanos = new ConcurrentHashMap<>();
+
     // Gear bonus provider for applying equipment stat bonuses
     private volatile GearBonusProvider gearBonusProvider;
 
@@ -158,6 +168,23 @@ public class AttributeManager implements AttributeService {
     /** Called internally after stats recalculation completes. */
     private void incrementStatsVersion(@Nonnull UUID playerId) {
         statsVersions.computeIfAbsent(playerId, k -> new AtomicLong(0)).incrementAndGet();
+    }
+
+    /**
+     * Checks whether stats were recalculated (with actual changes) within a recent time window.
+     *
+     * <p>Used by {@code HotbarSlotTrackingSystem} to skip redundant recalculations when
+     * {@code EquipmentChangeListener} already handled the same equipment change synchronously.
+     *
+     * @param playerId The player's UUID
+     * @param windowNanos Maximum age in nanoseconds to consider "recent" (e.g., 50_000_000L = 50ms)
+     * @return true if a stat-changing recalculation happened within the window
+     */
+    @Override
+    public boolean wasRecentlyRecalculated(@Nonnull UUID playerId, long windowNanos) {
+        Long lastNano = lastRecalcNanos.get(playerId);
+        if (lastNano == null) return false;
+        return (System.nanoTime() - lastNano) < windowNanos;
     }
 
     /**
@@ -416,6 +443,7 @@ public class AttributeManager implements AttributeService {
         // 8. Increment stats version ONLY when stats actually changed
         if (statsChanged) {
             incrementStatsVersion(playerId);
+            lastRecalcNanos.put(playerId, System.nanoTime());
         }
 
         // Apply to ECS and refresh tooltips ONLY when stats actually changed.
@@ -1025,6 +1053,7 @@ public class AttributeManager implements AttributeService {
         Objects.requireNonNull(playerId, "playerId cannot be null");
         statsLocks.remove(playerId);
         statsVersions.remove(playerId);
+        lastRecalcNanos.remove(playerId);
 
         // Clean up debug stat overrides (prevents memory leak for disconnected players)
         DebugStatOverrideProvider debugProvider = this.debugStatOverrideProvider;

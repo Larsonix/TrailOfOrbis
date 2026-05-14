@@ -240,6 +240,19 @@ public final class ContainerTierClassifier {
     }
 
     /**
+     * Gets the consumable chance multiplier for a tier.
+     *
+     * @return 1.0 = baseline
+     */
+    public double getConsumableChanceMultiplier(@Nonnull ContainerTier tier) {
+        ContainerLootConfig.TierConfig tierConfig = getTierConfig(tier);
+        if (tierConfig != null) {
+            return tierConfig.getConsumableChanceMultiplier();
+        }
+        return 1.0;
+    }
+
+    /**
      * Gets the gear drop range for a tier.
      *
      * @return [min, max] gear drops

@@ -33,7 +33,7 @@ public enum RealmModifierType {
         "Monster Damage",
         Category.PREFIX,
         1,
-        10, 100
+        3, 102
     ),
 
     /**
@@ -44,7 +44,7 @@ public enum RealmModifierType {
         "Monster Life",
         Category.PREFIX,
         1,
-        10, 150
+        5, 160
     ),
 
     /**
@@ -55,7 +55,7 @@ public enum RealmModifierType {
         "Monster Speed",
         Category.PREFIX,
         1,
-        5, 40
+        2, 40
     ),
 
     /**
@@ -66,7 +66,7 @@ public enum RealmModifierType {
         "Monster Attack Speed",
         Category.PREFIX,
         1,
-        10, 50
+        2, 50
     ),
 
     /**
@@ -74,10 +74,10 @@ public enum RealmModifierType {
      * Value: percentage reduction to timeout
      */
     REDUCED_TIME(
-        "Reduced Time",
+        "Time Reduction",
         Category.PREFIX,
         2,
-        10, 40
+        3, 50
     ),
 
     /**
@@ -85,10 +85,10 @@ public enum RealmModifierType {
      * Value: percentage reduction (e.g., 40 = 40% less healing)
      */
     REDUCED_HEALING(
-        "Reduced Healing",
+        "Healing Reduction",
         Category.PREFIX,
         1,
-        20, 60
+        5, 65
     ),
 
     /**
@@ -114,7 +114,7 @@ public enum RealmModifierType {
         "Item Quantity",
         Category.SUFFIX,
         0,
-        5, 50
+        2, 37
     ),
 
     /**
@@ -125,7 +125,7 @@ public enum RealmModifierType {
         "Item Rarity",
         Category.SUFFIX,
         0,
-        5, 40
+        2, 31
     ),
 
     /**
@@ -133,10 +133,10 @@ public enum RealmModifierType {
      * Value: percentage increase (e.g., 25 = +25% XP)
      */
     EXPERIENCE_BONUS(
-        "Experience",
+        "Bonus Experience",
         Category.SUFFIX,
         0,
-        10, 50
+        3, 38
     ),
 
     /**
@@ -144,10 +144,10 @@ public enum RealmModifierType {
      * Value: percentage increase (e.g., 15 = +15% stone drops)
      */
     STONE_DROP_BONUS(
-        "Stone Drops",
+        "Stone Drop Rate",
         Category.SUFFIX,
         0,
-        5, 30
+        2, 20
     ),
 
     /**
@@ -159,7 +159,7 @@ public enum RealmModifierType {
         "Monster Count",
         Category.SUFFIX,
         0,
-        10, 50
+        3, 38
     ),
 
     /**
@@ -171,7 +171,7 @@ public enum RealmModifierType {
         "Elite Chance",
         Category.SUFFIX,
         0,
-        5, 30
+        2, 25
     ),
 
     // ═══════════════════════════════════════════════════════════════════
@@ -186,7 +186,7 @@ public enum RealmModifierType {
         "Extra Fire Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     /**
@@ -197,7 +197,7 @@ public enum RealmModifierType {
         "Extra Water Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     /**
@@ -208,7 +208,7 @@ public enum RealmModifierType {
         "Extra Lightning Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     /**
@@ -219,7 +219,7 @@ public enum RealmModifierType {
         "Extra Earth Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     /**
@@ -230,7 +230,7 @@ public enum RealmModifierType {
         "Extra Wind Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     /**
@@ -241,7 +241,7 @@ public enum RealmModifierType {
         "Extra Void Damage",
         Category.PREFIX,
         1,
-        10, 60
+        5, 65
     ),
 
     // ═══════════════════════════════════════════════════════════════════
@@ -253,10 +253,10 @@ public enum RealmModifierType {
      * Value: percentage increase (e.g., 25 = player takes 25% more damage)
      */
     PLAYER_VULNERABILITY(
-        "Player Vulnerability",
+        "Damage Taken",
         Category.PREFIX,
         2,
-        8, 50
+        3, 50
     ),
 
     /**
@@ -264,10 +264,10 @@ public enum RealmModifierType {
      * Value: percentage reduction to block effectiveness (e.g., 40 = blocks reduce 40% less)
      */
     REDUCED_BLOCK(
-        "Weakened Blocking",
+        "Block Reduction",
         Category.PREFIX,
         1,
-        15, 80
+        5, 65
     ),
 
     /**
@@ -275,10 +275,10 @@ public enum RealmModifierType {
      * Value: percentage bonus to mob armor
      */
     ARMORED_MONSTERS(
-        "Armored Monsters",
+        "Monster Armor",
         Category.PREFIX,
         1,
-        15, 100
+        5, 91
     ),
 
     /**
@@ -286,7 +286,7 @@ public enum RealmModifierType {
      * Value: ignored (binary effect)
      */
     AILMENT_IMMUNE_MONSTERS(
-        "Ailment Immunity",
+        "Ailment-Immune Monsters",
         Category.PREFIX,
         2,
         1, 1
@@ -297,10 +297,10 @@ public enum RealmModifierType {
      * Value: percent of max HP regenerated per second (e.g., 2 = 2% max HP/sec)
      */
     LIFE_REGEN_MONSTERS(
-        "Regenerating Monsters",
+        "Monster Regeneration",
         Category.PREFIX,
         2,
-        1, 5
+        1, 8
     ),
 
     // ═══════════════════════════════════════════════════════════════════
@@ -312,10 +312,11 @@ public enum RealmModifierType {
      * Value: flat bonus added to quality roll (e.g., 15 = +15 quality)
      */
     GEAR_QUALITY_BONUS(
-        "Superior Gear",
+        "Gear Quality",
         Category.SUFFIX,
         0,
-        5, 40
+        2, 35,
+        false
     ),
 
     /**
@@ -323,10 +324,11 @@ public enum RealmModifierType {
      * Value: flat level bonus (e.g., 5 = loot drops at +5 levels)
      */
     DROP_LEVEL_BONUS(
-        "Empowered Loot",
+        "Loot Level",
         Category.SUFFIX,
         0,
-        2, 15
+        1, 15,
+        false
     ),
 
     /**
@@ -334,10 +336,10 @@ public enum RealmModifierType {
      * Value: percentage chance (e.g., 10 = 10% chance for bonus map)
      */
     MAP_DISCOVERY(
-        "Cartographer's Fortune",
+        "Bonus Map Chance",
         Category.SUFFIX,
         0,
-        3, 25
+        2, 20
     ),
 
     /**
@@ -345,7 +347,7 @@ public enum RealmModifierType {
      * Value: ignored (binary effect — always upgrades by 1 tier)
      */
     STONE_RARITY_BONUS(
-        "Enriched Stones",
+        "Stone Rarity Upgrade",
         Category.SUFFIX,
         0,
         1, 1
@@ -356,10 +358,10 @@ public enum RealmModifierType {
      * Value: percentage increase to time limit (e.g., 25 = +25% time)
      */
     BONUS_TIME(
-        "Extended Time",
+        "Bonus Time",
         Category.SUFFIX,
         0,
-        10, 50
+        5, 50
     );
 
     private final String displayName;
@@ -367,6 +369,7 @@ public enum RealmModifierType {
     private final int difficultyWeight;
     private final int minValue;
     private final int maxValue;
+    private final boolean isPercentage;
 
     /**
      * Modifier categories: PREFIX (difficulty) or SUFFIX (reward).
@@ -400,11 +403,22 @@ public enum RealmModifierType {
             int difficultyWeight,
             int minValue,
             int maxValue) {
+        this(displayName, category, difficultyWeight, minValue, maxValue, true);
+    }
+
+    RealmModifierType(
+            @Nonnull String displayName,
+            @Nonnull Category category,
+            int difficultyWeight,
+            int minValue,
+            int maxValue,
+            boolean isPercentage) {
         this.displayName = displayName;
         this.category = category;
         this.difficultyWeight = difficultyWeight;
         this.minValue = minValue;
         this.maxValue = maxValue;
+        this.isPercentage = isPercentage;
     }
 
     /**
@@ -418,19 +432,43 @@ public enum RealmModifierType {
     }
 
     /**
-     * Formats the modifier with its value for gear-style display.
+     * Formats the modifier with its value for display.
      *
      * <p>Binary modifiers (like NO_REGENERATION) display without a value.
+     * Flat modifiers (like GEAR_QUALITY_BONUS) display without "%".
      *
      * @param value The modifier value
-     * @return Formatted string (e.g., "+40% Monster Damage")
+     * @return Formatted string (e.g., "+40% Monster Damage" or "+15 Gear Quality")
      */
     @Nonnull
     public String formatValue(int value) {
         if (isBinary()) {
             return displayName;
         }
-        return "+" + value + "% " + displayName;
+        return isPercentage
+            ? "+" + value + "% " + displayName
+            : "+" + value + " " + displayName;
+    }
+
+    /**
+     * Formats the modifier with quality-adjusted value for tooltip display.
+     *
+     * <p>Applies quality multiplier before formatting. This is the canonical
+     * format method — all UI sites should delegate to this.
+     *
+     * @param baseValue The raw modifier value (before quality scaling)
+     * @param qualityMultiplier Quality multiplier (e.g., 1.0 for quality 50)
+     * @return Formatted string with quality-adjusted value
+     */
+    @Nonnull
+    public String formatValue(int baseValue, double qualityMultiplier) {
+        if (isBinary()) {
+            return displayName;
+        }
+        int adjusted = (int) Math.round(baseValue * qualityMultiplier);
+        return isPercentage
+            ? "+" + adjusted + "% " + displayName
+            : "+" + adjusted + " " + displayName;
     }
 
     /**
@@ -471,6 +509,18 @@ public enum RealmModifierType {
      */
     public int getMaxValue() {
         return maxValue;
+    }
+
+    /**
+     * Checks if this modifier uses percentage values.
+     *
+     * <p>Most modifiers are percentages (e.g., "+40% Monster Damage").
+     * Flat modifiers display without "%" (e.g., "+5 Loot Level").
+     *
+     * @return true if values are percentages, false if flat
+     */
+    public boolean isPercentage() {
+        return isPercentage;
     }
 
     /**

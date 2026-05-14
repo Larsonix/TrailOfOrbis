@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages invisible "ghost" entities used as CombatText anchors for self-feedback.
@@ -61,6 +62,10 @@ public final class CombatFeedbackGhostManager implements PersistentHud {
 
     /** Tracks active ghost entity refs per player (keyed by UUID). */
     private final Map<UUID, GhostEntry> activeGhosts = new ConcurrentHashMap<>();
+
+    /** Per-player cooldown to prevent infinite restore loops when ghost entities despawn. */
+    private final Map<UUID, Long> lastGhostRestore = new ConcurrentHashMap<>();
+    private static final long GHOST_RESTORE_COOLDOWN_NS = TimeUnit.SECONDS.toNanos(60);
 
     /**
      * Tracks one ghost entity per player.
@@ -150,6 +155,7 @@ public final class CombatFeedbackGhostManager implements PersistentHud {
     @Override
     public void discardStale(@Nonnull UUID playerId) {
         GhostEntry removed = activeGhosts.remove(playerId);
+        lastGhostRestore.remove(playerId);
         if (removed != null) {
             LOGGER.atFine().log("Discarded combat feedback ghost for %s (world transition)",
                 playerId.toString().substring(0, 8));
@@ -181,6 +187,15 @@ public final class CombatFeedbackGhostManager implements PersistentHud {
         if (isActive(playerId)) {
             return;
         }
+
+        // Prevent infinite restore loop — ghost entities may despawn (entity lifecycle),
+        // making isActive() return false every health check cycle. Without this cooldown,
+        // the health checker restores every 5 seconds forever (confirmed in logs).
+        Long lastRestore = lastGhostRestore.get(playerId);
+        if (lastRestore != null && (System.nanoTime() - lastRestore) < GHOST_RESTORE_COOLDOWN_NS) {
+            return;
+        }
+        lastGhostRestore.put(playerId, System.nanoTime());
 
         // Get player position for initial ghost placement
         Ref<EntityStore> playerEntityRef = playerRef.getReference();
@@ -224,6 +239,7 @@ public final class CombatFeedbackGhostManager implements PersistentHud {
      */
     @Override
     public void removeOnDisconnect(@Nonnull UUID playerId) {
+        lastGhostRestore.remove(playerId);
         GhostEntry entry = activeGhosts.remove(playerId);
         if (entry == null) {
             return;

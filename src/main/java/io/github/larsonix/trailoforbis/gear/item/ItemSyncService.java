@@ -7,14 +7,15 @@ import com.hypixel.hytale.protocol.packets.assets.UpdateItems;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
+import io.github.larsonix.trailoforbis.attributes.AttributeType;
+import io.github.larsonix.trailoforbis.gear.equipment.RequirementCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
-import java.util.function.LongSupplier;
-import java.util.function.ToLongFunction;
+import java.util.function.Function;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -74,12 +75,22 @@ public final class ItemSyncService {
     private final ItemSyncConfig config;
 
     /**
-     * Provider for player stats version.
-     *
-     * <p>When set, the stats version is included in definition hashes, ensuring
-     * that tooltip updates are triggered when player stats change.
+     * Snapshot of player context needed for requirement evaluation.
+     * Computed once per player per flush, reused across all items.
      */
-    private volatile ToLongFunction<UUID> statsVersionProvider;
+    public record RequirementContext(int playerLevel, Map<AttributeType, Integer> playerAttributes) {}
+
+    /**
+     * Provider for player requirement context (level + attributes).
+     * Called once per flush to get the player's current state for requirement evaluation.
+     */
+    @Nullable private volatile Function<UUID, RequirementContext> requirementContextProvider;
+
+    /**
+     * Calculator for evaluating gear attribute requirements.
+     * Used to determine if a player meets an item's modifier-based attribute requirements.
+     */
+    @Nullable private volatile RequirementCalculator requirementCalculator;
 
     /**
      * Creates an ItemSyncService with the specified configuration.
@@ -194,11 +205,18 @@ public final class ItemSyncService {
         String itemId = gearData.getItemId();
         String instanceId = gearData.instanceId().toCompactString();
 
-        // Get stats version for accurate hash (detects when player stats change)
-        long statsVersion = getStatsVersion(playerId);
+        // Evaluate requirement status for accurate hash (only changes when requirements flip)
+        boolean levelMet = true;
+        boolean attrsMet = true;
+        RequirementContext ctx = getRequirementContext(playerId);
+        if (ctx != null) {
+            levelMet = ctx.playerLevel() >= gearData.level();
+            RequirementCalculator calc = this.requirementCalculator;
+            attrsMet = calc == null || calc.meetsAllRequirements(gearData, ctx.playerAttributes());
+        }
 
-        // Compute hash for change detection (includes stats version)
-        int definitionHash = definitionBuilder.computeDefinitionHash(gearData, playerId, statsVersion);
+        // Compute hash for change detection (includes requirement met/unmet status)
+        int definitionHash = definitionBuilder.computeDefinitionHash(gearData, playerId, levelMet, attrsMet);
 
         // Check if update needed
         if (!playerCache.needsUpdate(playerId, itemId, definitionHash)) {
@@ -284,8 +302,9 @@ public final class ItemSyncService {
         Map<String, ItemBase> definitionsToSend = new LinkedHashMap<>();
         Map<String, TranslationSyncService.TranslationEntry> translationsToRegister = new LinkedHashMap<>();
 
-        // Get stats version once for all items (same player)
-        long statsVersion = getStatsVersion(playerId);
+        // Get requirement context ONCE for all items (player level + attributes are constant per flush)
+        RequirementContext ctx = getRequirementContext(playerId);
+        RequirementCalculator calc = this.requirementCalculator;
 
         for (ItemStack itemStack : items) {
             if (itemStack == null || itemStack.isEmpty()) {
@@ -300,7 +319,11 @@ public final class ItemSyncService {
             GearData gearData = gearDataOpt.get();
             String itemId = gearData.getItemId();
             String instanceId = gearData.instanceId().toCompactString();
-            int definitionHash = definitionBuilder.computeDefinitionHash(gearData, playerId, statsVersion);
+
+            // Evaluate requirement status per-item (but using cached player context)
+            boolean levelMet = ctx == null || ctx.playerLevel() >= gearData.level();
+            boolean attrsMet = ctx == null || calc == null || calc.meetsAllRequirements(gearData, ctx.playerAttributes());
+            int definitionHash = definitionBuilder.computeDefinitionHash(gearData, playerId, levelMet, attrsMet);
 
             if (!playerCache.needsUpdate(playerId, itemId, definitionHash)) {
                 continue;
@@ -337,7 +360,7 @@ public final class ItemSyncService {
         // Step 2: Send item definitions in batches
         sendDefinitionsBatched(playerRef, definitionsToSend);
 
-        LOGGER.atInfo().log("Batch synced %d items to player %s",
+        LOGGER.atFine().log("Batch synced %d items to player %s",
             definitionsToSend.size(), playerId);
 
         return definitionsToSend.size();
@@ -459,34 +482,40 @@ public final class ItemSyncService {
     }
 
     // =========================================================================
-    // STATS VERSION INTEGRATION
+    // REQUIREMENT CONTEXT
     // =========================================================================
 
     /**
-     * Sets the stats version provider.
+     * Sets the requirement context provider and calculator.
      *
-     * <p>When set, the stats version is included in definition hash computations,
-     * ensuring that tooltip updates are triggered when player stats change
-     * (level up, allocate attribute points, skill tree changes, etc.).
+     * <p>When set, requirement-met status (level + attributes) is included in
+     * definition hash computations. This replaces the old statsVersion approach —
+     * only items whose requirement status FLIPPED get re-synced, not all items
+     * on every stat change.
      *
-     * @param provider Function that returns the current stats version for a player
+     * @param contextProvider Provides player level + attributes for requirement evaluation
+     * @param calculator Evaluates gear attribute requirements against player attributes
      */
-    public void setStatsVersionProvider(@Nullable ToLongFunction<UUID> provider) {
-        this.statsVersionProvider = provider;
-        if (provider != null) {
-            LOGGER.atInfo().log("Stats version provider set - tooltips will update on stat changes");
+    public void setRequirementContext(
+            @Nullable Function<UUID, RequirementContext> contextProvider,
+            @Nullable RequirementCalculator calculator) {
+        this.requirementContextProvider = contextProvider;
+        this.requirementCalculator = calculator;
+        if (contextProvider != null) {
+            LOGGER.atInfo().log("Requirement context set - tooltips will update when requirements flip");
         }
     }
 
     /**
-     * Gets the current stats version for a player.
+     * Gets the current requirement context for a player.
      *
      * @param playerId The player's UUID
-     * @return The stats version, or 0 if no provider is set
+     * @return The context, or null if no provider is set
      */
-    private long getStatsVersion(@Nonnull UUID playerId) {
-        ToLongFunction<UUID> provider = this.statsVersionProvider;
-        return provider != null ? provider.applyAsLong(playerId) : 0L;
+    @Nullable
+    private RequirementContext getRequirementContext(@Nonnull UUID playerId) {
+        Function<UUID, RequirementContext> provider = this.requirementContextProvider;
+        return provider != null ? provider.apply(playerId) : null;
     }
 
     // =========================================================================

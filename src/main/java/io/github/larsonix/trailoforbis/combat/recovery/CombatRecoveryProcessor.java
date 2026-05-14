@@ -46,12 +46,54 @@ public class CombatRecoveryProcessor {
     private final CombatEntityResolver entityResolver;
 
     /**
+     * Pre-resolved attacker ref for the current damage event.
+     * Set by RPGDamageSystem before calling recovery methods to avoid
+     * 6 redundant resolveTrueAttacker() calls per damage event during AoE.
+     */
+    @Nullable
+    private Ref<EntityStore> hintedAttackerRef;
+
+    /**
      * Creates a new CombatRecoveryProcessor.
      *
      * @param entityResolver The entity resolver for attacker lookups
      */
     public CombatRecoveryProcessor(@Nonnull CombatEntityResolver entityResolver) {
         this.entityResolver = entityResolver;
+    }
+
+    /**
+     * Sets a pre-resolved attacker ref to skip redundant resolution in recovery methods.
+     * Call before invoking leech/steal/thorns methods. Call {@link #clearHintedAttacker()} after.
+     */
+    public void setHintedAttacker(@Nullable Ref<EntityStore> attackerRef) {
+        this.hintedAttackerRef = attackerRef;
+    }
+
+    /**
+     * Clears the hinted attacker ref after a damage event is fully processed.
+     */
+    public void clearHintedAttacker() {
+        this.hintedAttackerRef = null;
+    }
+
+    /**
+     * Resolves the attacker ref, using the hint if available.
+     */
+    @Nullable
+    private Ref<EntityStore> resolveAttacker(@Nonnull Store<EntityStore> store, @Nonnull Damage damage) {
+        if (hintedAttackerRef != null && hintedAttackerRef.isValid()) {
+            return hintedAttackerRef;
+        }
+        // Fallback to full resolution
+        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
+            return null;
+        }
+        Ref<EntityStore> immediateRef = entitySource.getRef();
+        if (immediateRef == null || !immediateRef.isValid()) {
+            return null;
+        }
+        return entityResolver.resolveTrueAttacker(store, immediateRef);
     }
 
     /**
@@ -73,16 +115,7 @@ public class CombatRecoveryProcessor {
             return;
         }
 
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> attackerRef = resolveAttacker(store, damage);
         if (attackerRef == null) {
             return;
         }
@@ -134,16 +167,7 @@ public class CombatRecoveryProcessor {
             return;
         }
 
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> attackerRef = resolveAttacker(store, damage);
         if (attackerRef == null) {
             return;
         }
@@ -192,16 +216,7 @@ public class CombatRecoveryProcessor {
             return;
         }
 
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> attackerRef = resolveAttacker(store, damage);
         if (attackerRef == null) {
             return;
         }
@@ -253,16 +268,7 @@ public class CombatRecoveryProcessor {
             return;
         }
 
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> attackerRef = resolveAttacker(store, damage);
         if (attackerRef == null) {
             return;
         }
@@ -336,14 +342,19 @@ public class CombatRecoveryProcessor {
             return;
         }
 
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
-        if (attackerRef == null) {
-            return;
+        // Use hinted attacker if available (AoE optimization)
+        Ref<EntityStore> attackerRef;
+        if (hintedAttackerRef != null && hintedAttackerRef.isValid()) {
+            attackerRef = hintedAttackerRef;
+        } else {
+            Ref<EntityStore> immediateRef = entitySource.getRef();
+            if (immediateRef == null || !immediateRef.isValid()) {
+                return;
+            }
+            attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+            if (attackerRef == null) {
+                return;
+            }
         }
 
         // Get attacker's EntityStatMap
@@ -418,23 +429,25 @@ public class CombatRecoveryProcessor {
      *
      * <p>Total return damage = flat thorns + reflected damage
      *
-     * <p><b>Non-lethal:</b> Thorns will not kill the attacker. If the attacker would drop
-     * below 1 HP, they are left at 1 HP instead. This prevents cheap cheese kills and
-     * ensures the attacker has a chance to disengage.
+     * <p><b>Lethal:</b> Thorns can kill the attacker. This is an ARPG — thorns builds
+     * are a legitimate damage source and must be able to finish enemies off.
      *
      * @param store The entity store
      * @param damage The damage event (contains attacker reference)
      * @param defenderStats The defender's computed stats (for thorns values)
      * @param damageTaken The amount of damage the defender took (for reflect calculation)
+     * @return The attacker's entity ref if thorns damage was lethal (health reached 0), null otherwise.
+     *         Caller must add {@code DeathComponent} via CommandBuffer when non-null.
      */
-    public void applyThornsDamage(
+    @Nullable
+    public Ref<EntityStore> applyThornsDamage(
         @Nonnull Store<EntityStore> store,
         @Nonnull Damage damage,
         @Nullable ComputedStats defenderStats,
         float damageTaken
     ) {
         if (defenderStats == null || damageTaken <= 0) {
-            return;
+            return null;
         }
 
         // Calculate flat thorns with percent bonus
@@ -448,47 +461,40 @@ public class CombatRecoveryProcessor {
 
         float totalThornsDamage = flatThorns + reflectedDamage;
         if (totalThornsDamage <= 0) {
-            return;
+            return null;
         }
 
-        // Get attacker from damage source
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> immediateRef = entitySource.getRef();
-        if (immediateRef == null || !immediateRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> attackerRef = resolveAttacker(store, damage);
         if (attackerRef == null) {
-            return;
+            return null;
         }
 
         // Get attacker's EntityStatMap
         EntityStatMap attackerStatMap = store.getComponent(attackerRef, EntityStatMap.getComponentType());
         if (attackerStatMap == null) {
-            return;
+            return null;
         }
 
         // Get current health
         int healthIndex = DefaultEntityStatTypes.getHealth();
         EntityStatValue healthStat = attackerStatMap.get(healthIndex);
         if (healthStat == null) {
-            return;
+            return null;
         }
 
         float currentHealth = healthStat.get();
 
-        // Apply thorns damage, but cap at 1 HP (non-lethal)
-        // Thorns should hurt but not kill — prevents cheap cheese kills
-        float newHealth = Math.max(1f, currentHealth - totalThornsDamage);
+        // Apply thorns damage — lethal (thorns builds must kill)
+        float newHealth = Math.max(0f, currentHealth - totalThornsDamage);
         attackerStatMap.setStatValue(EntityStatMap.Predictable.SELF, healthIndex, newHealth);
 
+        boolean lethal = newHealth <= 0;
         LOGGER.at(Level.FINE).log(
-            "Thorns damage: %.1f (flat=%.1f × %.2f + reflect=%.1f%% of %.1f) to attacker (%.1f -> %.1f HP)",
+            "Thorns damage: %.1f (flat=%.1f × %.2f + reflect=%.1f%% of %.1f) to attacker (%.1f -> %.1f HP)%s",
             totalThornsDamage, thornsDamageFlat, 1f + thornsDamagePercent / 100f,
-            reflectPercent, damageTaken, currentHealth, newHealth);
+            reflectPercent, damageTaken, currentHealth, newHealth,
+            lethal ? " [LETHAL]" : "");
+
+        return lethal ? attackerRef : null;
     }
 }

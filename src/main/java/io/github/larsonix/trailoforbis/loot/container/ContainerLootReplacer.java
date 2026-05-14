@@ -355,7 +355,7 @@ public final class ContainerLootReplacer {
      */
     private boolean shouldPreserveOtherItem(@Nonnull String itemId,
                                             @Nonnull ContainerLootConfig.ItemRemoval config) {
-        // For now, preserve all non-gear items
+        // Preserve all non-gear items (intentional — protects vanilla loot chains)
         // Future enhancement: detect materials/consumables/tools by item ID patterns
         return config.isPreserveMaterials() ||
                config.isPreserveConsumables() ||

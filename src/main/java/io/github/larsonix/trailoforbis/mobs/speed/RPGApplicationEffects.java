@@ -132,6 +132,18 @@ public class RPGApplicationEffects extends ApplicationEffects {
     }
 
     /**
+     * Sets the knockback multiplier received by the entity.
+     *
+     * @param multiplier Knockback multiplier (1.0 = normal, 0.0 = immovable)
+     * @return this for chaining
+     */
+    @Nonnull
+    public RPGApplicationEffects withKnockback(float multiplier) {
+        this.knockbackMultiplier = multiplier;
+        return this;
+    }
+
+    /**
      * Creates a Color from a hex string (e.g., "#cf2302" or "cf2302").
      *
      * <p>Hytale's Color uses byte fields (range -128 to 127 in Java).

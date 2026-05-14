@@ -1,0 +1,16 @@
+// Non-owner view for RealmActivePortalPage: read-only info labels.
+
+Group {
+  LayoutMode: Top;
+
+  Label #EnterInfoLabel {
+    Text: "Portal is active - step through to enter";
+    Style: LabelStyle(FontSize: 13, TextColor: #dee2ef, HorizontalAlignment: Center);
+    Anchor: (Bottom: 6);
+  }
+
+  Label #OwnerOnlyLabel {
+    Text: "Only the portal opener can close it";
+    Style: LabelStyle(FontSize: 11, TextColor: #778292, HorizontalAlignment: Center);
+  }
+}

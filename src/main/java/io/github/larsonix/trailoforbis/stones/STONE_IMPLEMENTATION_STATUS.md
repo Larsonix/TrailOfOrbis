@@ -15,6 +15,8 @@ This document defines the final stone system with Hytale-themed names, replacing
 | `GAIAS_CALIBRATION` | Gaia's Calibration | Rerolls **ALL** modifier values within their ranges | ✅ | ⏳ |
 | `EMBER_OF_TUNING` | Ember of Tuning | Rerolls **ONE** random modifier value | ✅ | ⏳ |
 | `ALTERVERSE_SHARD` | Alterverse Shard | Rerolls **ALL** modifier types completely | ✅ | ⏳ |
+| `ALTERVERSE_SPLINTER` | Alterverse Splinter | Rerolls all unlocked **PREFIX** modifiers only | ✅ | ✅ |
+| `ALTERVERSE_FRAGMENT` | Alterverse Fragment | Rerolls all unlocked **SUFFIX** modifiers only | ✅ | ✅ |
 | `ORBISIAN_BLESSING` | Orbisian Blessing | Rerolls item quality (1-100) | ✅ | ⏳ |
 
 ### Enhancement Stones (5)

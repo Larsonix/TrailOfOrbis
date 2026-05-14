@@ -196,6 +196,34 @@ public class RPGDamageCalculator {
         @Nullable DamageTrace.Builder tb,
         float attackTypeMultiplier
     ) {
+        return calculatePipeline(baseDamage, attackerStats, attackerElemental, defenderStats, defenderElemental,
+            attackType, isDOT, conditionalMultiplier, traceEnabled, spellElement, attackerLevel, projectileSpell,
+            tb, attackTypeMultiplier, null);
+    }
+
+    /**
+     * @param hexBakedElement If non-null, Step 1 skips flat spell and Step 2 skips this
+     *                        element's flat (already baked into hex base). Non-main elements
+     *                        still enter the pipeline.
+     */
+    @Nonnull
+    private DamageBreakdown calculatePipeline(
+        float baseDamage,
+        @Nullable ComputedStats attackerStats,
+        @Nullable ElementalStats attackerElemental,
+        @Nullable ComputedStats defenderStats,
+        @Nullable ElementalStats defenderElemental,
+        @Nonnull AttackType attackType,
+        boolean isDOT,
+        float conditionalMultiplier,
+        boolean traceEnabled,
+        @Nullable ElementType spellElement,
+        int attackerLevel,
+        boolean projectileSpell,
+        @Nullable DamageTrace.Builder tb,
+        float attackTypeMultiplier,
+        @Nullable ElementType hexBakedElement
+    ) {
         boolean isSpell = (attackType == AttackType.SPELL && spellElement != null);
 
         // Initialize damage distribution — elemental weapons place base into the element slot.
@@ -217,14 +245,18 @@ public class RPGDamageCalculator {
 
         boolean wasCritical = false;
         float critMultiplier = 1.0f;
+        int critTier = 0;
 
         if (attackerStats != null) {
             // ==== STEP 1: Add flat damage (skip for DOT) ====
+            // hexBakedElement != null: hex power injection already baked weapon + flat spell into the base
             float beforeFlat = isSpell ? dist.getElemental(spellElement) : dist.getPhysical();
             float flatPhys = 0f, flatMelee = 0f, flatSpell = 0f;
             if (!isDOT) {
                 if (isSpell) {
-                    flatSpell = attackerStats.getSpellDamage();
+                    if (hexBakedElement == null) {
+                        flatSpell = attackerStats.getSpellDamage();
+                    }
                 } else {
                     flatPhys = attackerStats.getPhysicalDamage();
                     flatMelee = (attackType == AttackType.MELEE) ? attackerStats.getMeleeDamage() : 0f;
@@ -250,14 +282,16 @@ public class RPGDamageCalculator {
             // ==== STEP 2: Add flat elemental damage (skip for DOT and mobs) ====
             // Mob damage budget comes entirely from the pool via calculateWeightedMobDamage().
             // Flat elemental on top would add damage outside the pool budget, breaking the curve.
+            // hexBakedElement: that element's flat is already in the hex base — skip only it, not all.
             if (attackerElemental != null && !isDOT && !attackerStats.isMobStats()) {
                 if (tb != null) {
                     for (ElementType type : ElementType.values()) {
+                        if (type == hexBakedElement) continue;
                         float flat = (float) attackerElemental.getFlatDamage(type);
                         if (flat > 0) tb.flatElemental(type, flat);
                     }
                 }
-                addFlatElemental(dist, attackerElemental);
+                addFlatElemental(dist, attackerElemental, hexBakedElement);
                 if (traceEnabled) {
                     float fireFlat = (float) attackerElemental.getFlatDamage(ElementType.FIRE);
                     float waterFlat = (float) attackerElemental.getFlatDamage(ElementType.WATER);
@@ -370,32 +404,34 @@ public class RPGDamageCalculator {
                 applyPercentIncreased(dist, attackerStats, attackType);
                 if (tb != null) tb.physAfterIncreased(dist.getPhysical());
 
-                // Elemental melee/ranged: also scale the element slot with attackType% + dmg%.
+                // Elemental: scale ALL non-zero elemental buckets with attackType% + dmg%.
                 // physicalDamagePercent is NOT included — it only scales physical damage.
-                // meleeDamagePercent scales ALL melee damage (physical and elemental).
-                if (spellElement != null) {
-                    float elemPct = atkTypePct + dmgPct;
-                    if (elemPct != 0f) {
-                        dist.applyElementalPercentIncrease(spellElement, elemPct);
+                // meleeDamagePercent/projectileDamagePercent/damagePercent scale ALL damage.
+                float elemPct = atkTypePct + dmgPct;
+                if (elemPct != 0f) {
+                    for (ElementType type : ElementType.values()) {
+                        if (dist.getElemental(type) > 0) {
+                            dist.applyElementalPercentIncrease(type, elemPct);
+                        }
                     }
                 }
                 if (traceEnabled) {
-                    if (spellElement != null) {
-                        float elemPct = atkTypePct + dmgPct;
-                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased elemental melee (%s): atkType%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f (phys: %.1f)",
-                            spellElement.name(), atkTypePct, dmgPct, elemPct, dist.getElemental(spellElement), dist.getPhysical());
+                    if (elemPct != 0f && dist.hasElementalDamage()) {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased elemental: atkType%%=%.1f + dmg%%=%.1f = +%.1f%% → totalElem=%.1f (phys: %.1f)",
+                            atkTypePct, dmgPct, elemPct, dist.getTotalElemental(), dist.getPhysical());
                     } else {
-                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + melee%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
+                        LOGGER.at(Level.FINE).log("[CALC] Step 4 - %% Increased phys: physDmg%%=%.1f + atkType%%=%.1f + dmg%%=%.1f = +%.1f%% → %.1f",
                             physPct, atkTypePct, dmgPct, totalPct, dist.getPhysical());
                     }
                 }
             }
 
-            // ==== STEP 5: Apply elemental % modifiers ====
+            // ==== STEP 5: Apply elemental % modifiers (per-element + allElementalDamagePercent) ====
             if (attackerElemental != null) {
+                float allElemPct = attackerStats.getAllElementalDamagePercent();
                 if (tb != null) {
                     for (ElementType type : ElementType.values()) {
-                        tb.elemPercentInc(type, (float) attackerElemental.getPercentDamage(type));
+                        tb.elemPercentInc(type, (float) attackerElemental.getPercentDamage(type) + allElemPct);
                         tb.elemPercentMore(type, (float) attackerElemental.getMultiplierDamage(type));
                     }
                 }
@@ -415,7 +451,7 @@ public class RPGDamageCalculator {
                             1f + lightPct/100f + lightMult/100f, 1f + voidPct/100f + voidMult/100f);
                     }
                 }
-                applyElementalModifiers(dist, attackerElemental);
+                applyElementalModifiers(dist, attackerElemental, attackerStats.getAllElementalDamagePercent());
                 if (tb != null) {
                     for (ElementType type : ElementType.values()) {
                         tb.elemAfterMod(type, dist.getElemental(type));
@@ -458,15 +494,33 @@ public class RPGDamageCalculator {
             }
 
             // ==== STEP 8: Roll crit ONCE - applies to ALL damage (skip for DOT) ====
+            // Supports multicrit: crit chance >100% grants additional tiers.
+            // Additive formula: effectiveMult = 1 + tier × (baseMult - 1)
             if (!isDOT) {
                 float critCh = attackerStats.getCriticalChance();
                 float critMultRaw = attackerStats.getCriticalMultiplier();
                 if (tb != null) { tb.critChance(critCh); tb.critMultiplierRaw(critMultRaw); }
                 CritResult crit = rollCrit(attackerStats);
                 wasCritical = crit.wasCritical();
-                if (tb != null) tb.wasCritical(wasCritical);
+                critTier = crit.tier();
+                if (tb != null) { tb.wasCritical(wasCritical); tb.critTier(critTier); }
                 if (wasCritical) {
                     critMultiplier = crit.multiplier();
+
+                    // Apply defender's critical damage reduction (reduces BONUS only, not base)
+                    // Formula: effective = 1 + (rawMult - 1) × (1 - min(reduction, 75) / 100)
+                    float critReduction = 0f;
+                    if (defenderStats != null) {
+                        critReduction = Math.min(defenderStats.getCriticalReduction(), 75f);
+                        if (critReduction > 0) {
+                            if (tb != null) tb.critMultiplierBeforeReduction(critMultiplier);
+                            float bonus = critMultiplier - 1f;
+                            bonus *= (1f - critReduction / 100f);
+                            critMultiplier = 1f + bonus;
+                        }
+                    }
+                    if (tb != null) tb.critReductionPercent(critReduction);
+
                     dist.applyMultiplier(critMultiplier);
                     if (tb != null) tb.critMultiplierApplied(critMultiplier);
                 }
@@ -477,9 +531,19 @@ public class RPGDamageCalculator {
                     }
                 }
                 if (traceEnabled) {
-                    LOGGER.at(Level.FINE).log("[CALC] Step 8 - Crit roll: chance=%.1f%%, result=%s ×%.2f → phys=%.1f, totalElem=%.1f",
-                        critCh, wasCritical ? "CRIT" : "NO CRIT", wasCritical ? critMultiplier : 1f,
-                        dist.getPhysical(), dist.getTotalElemental());
+                    String critLabel = critTier > 1 ? "CRIT T" + critTier : wasCritical ? "CRIT" : "NO CRIT";
+                    float rawMult = wasCritical ? crit.multiplier() : 1f;
+                    float reducedMult = wasCritical ? critMultiplier : 1f;
+                    if (wasCritical && rawMult != reducedMult) {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 8 - Crit roll: chance=%.1f%%, result=%s raw=×%.2f, critReduction=%.1f%% → effective=×%.2f → phys=%.1f, totalElem=%.1f",
+                            critCh, critLabel, rawMult,
+                            defenderStats != null ? Math.min(defenderStats.getCriticalReduction(), 75f) : 0f,
+                            reducedMult, dist.getPhysical(), dist.getTotalElemental());
+                    } else {
+                        LOGGER.at(Level.FINE).log("[CALC] Step 8 - Crit roll: chance=%.1f%%, result=%s ×%.2f → phys=%.1f, totalElem=%.1f",
+                            critCh, critLabel, reducedMult,
+                            dist.getPhysical(), dist.getTotalElemental());
+                    }
                 }
             }
         }
@@ -567,6 +631,7 @@ public class RPGDamageCalculator {
             .preDefenseElemental(preDefenseElemental)
             .wasCritical(wasCritical)
             .critMultiplier(wasCritical ? critMultiplier : 1.0f)
+            .critTier(critTier)
             .armorReduction(armorReduction)
             .resistanceReduction(ElementType.FIRE, resistanceReductions.getOrDefault(ElementType.FIRE, 0f))
             .resistanceReduction(ElementType.WATER, resistanceReductions.getOrDefault(ElementType.WATER, 0f))
@@ -612,6 +677,34 @@ public class RPGDamageCalculator {
         int attackerLevel,
         boolean projectileSpell
     ) {
+        return calculateTraced(baseDamage, attackerStats, attackerElemental, defenderStats, defenderElemental,
+            attackType, conditionalMultiplier, conditionalResult, attackTypeMultiplier,
+            spellElement, attackerLevel, projectileSpell, null);
+    }
+
+    /**
+     * Traced calculation with optional hex baked-element skip.
+     *
+     * @param hexBakedElement If non-null, Step 1 skips flat spell and Step 2 skips this
+     *                        element's flat (already baked into hex base via power injection).
+     *                        Non-main elements still enter the pipeline normally.
+     */
+    @Nonnull
+    public DamageTrace calculateTraced(
+        float baseDamage,
+        @Nullable ComputedStats attackerStats,
+        @Nullable ElementalStats attackerElemental,
+        @Nullable ComputedStats defenderStats,
+        @Nullable ElementalStats defenderElemental,
+        @Nonnull AttackType attackType,
+        float conditionalMultiplier,
+        @Nullable ConditionalResult conditionalResult,
+        float attackTypeMultiplier,
+        @Nullable ElementType spellElement,
+        int attackerLevel,
+        boolean projectileSpell,
+        @Nullable ElementType hexBakedElement
+    ) {
         DamageTrace.Builder tb = DamageTrace.builder();
         tb.weaponBaseDamage(baseDamage);
         tb.attackType(attackType);
@@ -622,7 +715,7 @@ public class RPGDamageCalculator {
         DamageBreakdown breakdown = calculatePipeline(baseDamage, attackerStats, attackerElemental,
             defenderStats, defenderElemental, attackType, false, conditionalMultiplier,
             false, spellElement, attackerLevel, projectileSpell,
-            tb, attackTypeMultiplier);
+            tb, attackTypeMultiplier, hexBakedElement);
 
         tb.breakdown(breakdown);
         return tb.build();
@@ -740,7 +833,7 @@ public class RPGDamageCalculator {
 
         // Step 2: Flat elemental
         if (elemental.hasAnyElementalDamage()) {
-            addFlatElemental(dist, elemental);
+            addFlatElemental(dist, elemental, null);
         }
 
         // Step 3: Conversion (physical → elemental, or spell element → target element)
@@ -760,8 +853,8 @@ public class RPGDamageCalculator {
             }
         } else {
             applyPercentIncreased(dist, stats, attackType);
-            // Elemental melee/ranged: also scale element slot with attackType% + dmg%
-            if (spellElement != null) {
+            // Elemental: scale ALL non-zero elemental buckets with attackType% + dmg%
+            {
                 float atkTypePct = switch (attackType) {
                     case MELEE -> stats.getMeleeDamagePercent();
                     case PROJECTILE -> stats.getProjectileDamagePercent();
@@ -769,13 +862,17 @@ public class RPGDamageCalculator {
                 };
                 float elemPct = atkTypePct + stats.getDamagePercent();
                 if (elemPct != 0f) {
-                    dist.applyElementalPercentIncrease(spellElement, elemPct);
+                    for (ElementType type : ElementType.values()) {
+                        if (dist.getElemental(type) > 0) {
+                            dist.applyElementalPercentIncrease(type, elemPct);
+                        }
+                    }
                 }
             }
         }
 
-        // Step 5: Elemental modifiers (per-element % inc + % more)
-        applyElementalModifiers(dist, elemental);
+        // Step 5: Elemental modifiers (per-element % inc + % more + allElementalDamagePercent)
+        applyElementalModifiers(dist, elemental, stats.getAllElementalDamagePercent());
 
         // Step 6: % More multipliers
         applyMoreMultipliers(dist, stats);
@@ -785,15 +882,17 @@ public class RPGDamageCalculator {
         // Capture pre-crit total (physical + elemental, no true damage yet)
         float preCritTotal = dist.getPhysical() + dist.getTotalElemental();
 
-        // Step 8: Expected crit (replaces RNG roll)
+        // Step 8: Expected crit with multicrit (replaces RNG roll)
+        // Continuous expected tiers: critChance / 100 (e.g., 250% → 2.5 expected tiers)
+        // Expected multiplier: 1 + expectedTiers × (baseMult - 1)
         float critChance = stats.getCriticalChance();
         float critMultRaw = stats.getCriticalMultiplier();
         float expectedCritMult;
-        if (critChance >= 100f) {
-            // Guaranteed crit — use full multiplier
-            expectedCritMult = Math.max(1f, critMultRaw / 100f);
-        } else if (critChance > 0) {
-            expectedCritMult = 1f + (critChance / 100f) * (Math.max(100f, critMultRaw) / 100f - 1f);
+        if (critChance > 0) {
+            float baseMult = Math.max(1f, critMultRaw / 100f);
+            float bonus = baseMult - 1f;
+            float expectedTiers = critChance / 100f;
+            expectedCritMult = 1f + expectedTiers * bonus;
         } else {
             expectedCritMult = 1f;
         }
@@ -1029,10 +1128,17 @@ public class RPGDamageCalculator {
     }
 
     /**
-     * STEP 8: Roll critical strike.
+     * STEP 8: Roll critical strike with multicrit support.
      *
-     * <p>Rolls once for the entire attack. The crit multiplier is applied to ALL
-     * damage types (physical + elemental) equally. Returns the crit result.
+     * <p>When crit chance exceeds 100%, additional tiers are possible:
+     * <ul>
+     *   <li>{@code guaranteedTiers = floor(critChance / 100)}</li>
+     *   <li>Remainder rolls for one additional tier</li>
+     *   <li>{@code effectiveMult = 1 + tier × (baseMult - 1)}</li>
+     * </ul>
+     *
+     * <p>At ≤100% crit chance, this behaves identically to a single binary roll.
+     * The crit multiplier is applied to ALL damage types equally.
      */
     @Nonnull
     private CritResult rollCrit(@Nonnull ComputedStats stats) {
@@ -1041,13 +1147,26 @@ public class RPGDamageCalculator {
             return CritResult.NO_CRIT;
         }
 
-        boolean wasCrit = ThreadLocalRandom.current().nextFloat() * 100f < critChance;
-        if (!wasCrit) {
+        // Determine guaranteed tiers and remainder chance
+        int guaranteedTiers = (int) (critChance / 100f);
+        float remainderChance = critChance - (guaranteedTiers * 100f);
+
+        // Roll for one additional tier using the remainder
+        int tier = guaranteedTiers;
+        if (remainderChance > 0 && ThreadLocalRandom.current().nextFloat() * 100f < remainderChance) {
+            tier++;
+        }
+
+        if (tier <= 0) {
             return CritResult.NO_CRIT;
         }
 
-        float critMult = stats.getCriticalMultiplier() / 100f; // Convert 150 -> 1.5
-        return new CritResult(true, critMult);
+        // Additive multicrit: effectiveMult = 1 + tier × (baseMult - 1)
+        float baseMult = stats.getCriticalMultiplier() / 100f; // Convert 200 -> 2.0
+        float bonus = Math.max(0f, baseMult - 1f); // The bonus portion (e.g., 1.0 for 200%)
+        float effectiveMult = 1f + tier * bonus;
+
+        return new CritResult(true, effectiveMult, tier);
     }
 
     /**
@@ -1190,12 +1309,16 @@ public class RPGDamageCalculator {
      *
      * <p>Adds flat elemental damage from gear/skills. This is added EARLY
      * (before conversion) so it benefits from elemental modifiers AND crit.
+     *
+     * @param skipElement Element to skip (already baked into hex base), or null to add all
      */
     private void addFlatElemental(
         @Nonnull DamageDistribution dist,
-        @Nonnull ElementalStats elemental
+        @Nonnull ElementalStats elemental,
+        @Nullable ElementType skipElement
     ) {
         for (ElementType type : ElementType.values()) {
+            if (type == skipElement) continue;
             double flat = elemental.getFlatDamage(type);
             if (flat > 0) {
                 dist.addElemental(type, (float) flat);
@@ -1207,18 +1330,23 @@ public class RPGDamageCalculator {
      * STEP 5: Apply elemental percent modifiers.
      *
      * <p>Applies element-specific % increased and % more to each element.
+     * {@code allElementalPct} (from {@code allElementalDamagePercent} stat) is summed
+     * additively with per-element % increased, matching PoE's "% increased Elemental Damage".
      * This now includes converted damage, so fire conversion benefits from +fire%.
+     *
+     * @param allElementalPct Global elemental damage % (additive with per-element %)
      */
     private void applyElementalModifiers(
         @Nonnull DamageDistribution dist,
-        @Nonnull ElementalStats elemental
+        @Nonnull ElementalStats elemental,
+        float allElementalPct
     ) {
         for (ElementType type : ElementType.values()) {
             float current = dist.getElemental(type);
             if (current <= 0) continue;
 
-            // % increased (additive)
-            double pctInc = elemental.getPercentDamage(type);
+            // % increased (additive): per-element + allElementalDamagePercent
+            double pctInc = elemental.getPercentDamage(type) + allElementalPct;
             if (pctInc != 0) {
                 dist.applyElementalPercentIncrease(type, (float) pctInc);
             }
@@ -1359,6 +1487,7 @@ public class RPGDamageCalculator {
 
         boolean wasCritical = false;
         float critMultiplier = 1.0f;
+        int critTier = 0;
 
         if (attackerStats != null) {
             // STEP 1: Flat physical damage (test helper — no spell support)
@@ -1366,18 +1495,34 @@ public class RPGDamageCalculator {
 
             // STEP 2: Flat elemental damage (skip for mobs — pool budget only)
             if (attackerElemental != null && !attackerStats.isMobStats()) {
-                addFlatElemental(dist, attackerElemental);
+                addFlatElemental(dist, attackerElemental, null);
             }
 
             // STEP 3: Conversion (early so converted damage benefits from elemental modifiers)
             applyConversion(dist, attackerStats);
 
-            // STEP 4: % increased physical
+            // STEP 4: % increased physical + elemental
             applyPercentIncreased(dist, attackerStats, attackType);
+            // Scale ALL non-zero elemental buckets with attackType% + dmg%
+            {
+                float atkTypePct = switch (attackType) {
+                    case MELEE -> attackerStats.getMeleeDamagePercent();
+                    case PROJECTILE -> attackerStats.getProjectileDamagePercent();
+                    case AREA, SPELL, UNKNOWN -> 0f;
+                };
+                float elemPct = atkTypePct + attackerStats.getDamagePercent();
+                if (elemPct != 0f) {
+                    for (ElementType type : ElementType.values()) {
+                        if (dist.getElemental(type) > 0) {
+                            dist.applyElementalPercentIncrease(type, elemPct);
+                        }
+                    }
+                }
+            }
 
-            // STEP 5: Elemental % modifiers (now includes converted damage)
+            // STEP 5: Elemental % modifiers (now includes converted damage + allElementalDamagePercent)
             if (attackerElemental != null) {
-                applyElementalModifiers(dist, attackerElemental);
+                applyElementalModifiers(dist, attackerElemental, attackerStats.getAllElementalDamagePercent());
             }
 
             // STEP 6: % more multipliers
@@ -1385,10 +1530,24 @@ public class RPGDamageCalculator {
 
             // STEP 7: (No conditional multiplier in this method)
 
-            // STEP 8: Forced crit - applies to ALL damage types
+            // STEP 8: Forced crit - applies to ALL damage types (tier 1 for forced crit)
             if (forceCrit) {
                 wasCritical = true;
-                critMultiplier = attackerStats.getCriticalMultiplier() / 100f;
+                critTier = 1;
+                float baseMult = attackerStats.getCriticalMultiplier() / 100f;
+                float bonus = Math.max(0f, baseMult - 1f);
+                critMultiplier = 1f + critTier * bonus;
+
+                // Apply defender's critical damage reduction (reduces BONUS only, not base)
+                if (defenderStats != null) {
+                    float critReduction = Math.min(defenderStats.getCriticalReduction(), 75f);
+                    if (critReduction > 0) {
+                        float reducedBonus = critMultiplier - 1f;
+                        reducedBonus *= (1f - critReduction / 100f);
+                        critMultiplier = 1f + reducedBonus;
+                    }
+                }
+
                 dist.applyMultiplier(critMultiplier);
             }
         }
@@ -1437,6 +1596,7 @@ public class RPGDamageCalculator {
             .preDefenseElemental(preDefenseElemental)
             .wasCritical(wasCritical)
             .critMultiplier(wasCritical ? critMultiplier : 1.0f)
+            .critTier(critTier)
             .armorReduction(armorReduction)
             .damageType(damageType)
             .attackType(attackType)
@@ -1447,9 +1607,25 @@ public class RPGDamageCalculator {
 
     /**
      * Result of a critical strike roll.
+     *
+     * <p>Supports multicrit: when crit chance exceeds 100%, additional tiers
+     * are granted. Each tier adds an additional application of the crit bonus:
+     * {@code effectiveMultiplier = 1 + tier × (baseMultiplier - 1)}
+     *
+     * <p>Examples with 200% base multiplier (2.0×):
+     * <ul>
+     *   <li>Tier 0 (no crit): 1.0×</li>
+     *   <li>Tier 1 (100% crit): 2.0×</li>
+     *   <li>Tier 2 (200% crit): 3.0×</li>
+     *   <li>Tier 3 (300% crit): 4.0×</li>
+     * </ul>
+     *
+     * @param wasCritical Whether at least one crit tier was achieved
+     * @param multiplier The effective multiplier to apply to damage
+     * @param tier The crit tier (0 = no crit, 1 = single, 2+ = multicrit)
      */
-    public record CritResult(boolean wasCritical, float multiplier) {
+    public record CritResult(boolean wasCritical, float multiplier, int tier) {
         /** No crit result */
-        public static final CritResult NO_CRIT = new CritResult(false, 1.0f);
+        public static final CritResult NO_CRIT = new CritResult(false, 1.0f, 0);
     }
 }

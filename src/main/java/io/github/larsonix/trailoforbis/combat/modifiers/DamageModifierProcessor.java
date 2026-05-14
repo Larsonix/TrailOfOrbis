@@ -315,8 +315,16 @@ public class DamageModifierProcessor {
             return damage;
         }
 
+        UUID uuid = defenderPlayer.getUuid();
+
+        // Safety: ensure shield state exists if player has ES but tracker wasn't initialized yet
+        // (covers timing window between stat computation and first regen tick)
+        if (energyShieldTracker.getState(uuid) == null) {
+            energyShieldTracker.addShield(uuid, maxShield, maxShield);
+        }
+
         float beforeShield = damage;
-        damage = energyShieldTracker.absorbDamage(defenderPlayer.getUuid(), damage);
+        damage = energyShieldTracker.absorbDamage(uuid, damage);
         float absorbed = beforeShield - damage;
 
         if (absorbed > 0) {

@@ -630,6 +630,7 @@ public class RealmsConfig {
         public static final SizeSettings DEFAULT = new SizeSettings();
 
         private double rewardMultiplier = 1.0;
+        private double timerMultiplier = 1.0;
         private int minPlayerCount = 1;
         private int maxPlayerCount = 6;
 
@@ -639,6 +640,14 @@ public class RealmsConfig {
 
         public void setRewardMultiplier(double rewardMultiplier) {
             this.rewardMultiplier = rewardMultiplier;
+        }
+
+        public double getTimerMultiplier() {
+            return timerMultiplier;
+        }
+
+        public void setTimerMultiplier(double timerMultiplier) {
+            this.timerMultiplier = Math.max(0.5, Math.min(3.0, timerMultiplier));
         }
 
         public int getMinPlayerCount() {

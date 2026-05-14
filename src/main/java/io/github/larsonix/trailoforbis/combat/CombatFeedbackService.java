@@ -147,7 +147,7 @@ public final class CombatFeedbackService {
                 case PARRIED -> {
                     playSound(parrySoundIndex, position, store);
                 }
-                case DODGED -> {
+                case DODGED, EVADED -> {
                     playSound(dodgeSoundIndex, position, store);
                 }
                 case MISSED -> {

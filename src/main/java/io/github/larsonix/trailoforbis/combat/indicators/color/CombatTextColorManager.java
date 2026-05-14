@@ -11,8 +11,10 @@ import io.github.larsonix.trailoforbis.config.ConfigManager;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Level;
 
 /**
@@ -38,6 +40,35 @@ public class CombatTextColorManager {
     private CombatTextTemplateRegistry templateRegistry;
     private CombatTextProfileResolver profileResolver;
     private boolean enabled;
+
+    /**
+     * Per-player cache of the last applied profile ID.
+     * Prevents sending redundant template swap packets when the same element
+     * is used for AoE damage (40 identical packets → 1).
+     */
+    private final Map<UUID, String> lastAppliedProfile = new HashMap<>();
+
+    /**
+     * Per-player timestamp of last template swap packet send (nanos).
+     * Used for time-based coalescing: when fighting mixed-element mobs, template
+     * swaps alternate rapidly (fire → lightning → fire). Without coalescing, each
+     * hit sends a packet. With this cooldown, at most one swap per window is sent.
+     */
+    private final Map<UUID, Long> lastSwapTimeNanos = new HashMap<>();
+
+    /**
+     * Minimum interval between template swap packets for the same player (nanos).
+     * 50ms ≈ 1.5 ticks at 30 TPS — imperceptible to the player but prevents
+     * 20-40 template swaps per second during mixed-element combat.
+     */
+    private static final long SWAP_COOLDOWN_NANOS = 50_000_000L;
+
+    /**
+     * Cached built templates by profile ID.
+     * Since the same profile always produces the same EntityUIComponent,
+     * we build once and reuse instead of cloning+overriding per hit.
+     */
+    private final Map<String, com.hypixel.hytale.protocol.EntityUIComponent> templateCache = new HashMap<>();
 
     public CombatTextColorManager(@Nonnull ConfigManager configManager) {
         this.configManager = configManager;
@@ -162,6 +193,9 @@ public class CombatTextColorManager {
 
     public void shutdown() {
         enabled = false;
+        lastAppliedProfile.clear();
+        lastSwapTimeNanos.clear();
+        templateCache.clear();
     }
 
     // ── Built-in profiles ──────────────────────────────────────────────
@@ -189,14 +223,49 @@ public class CombatTextColorManager {
      * Overwrites the vanilla CombatText template at its original index
      * on the attacker's client. Uses the vanilla maxId to avoid client-side
      * array resize races with Hytale's asset pipeline.
+     *
+     * <p>Two-level dedup:
+     * <ol>
+     *   <li><b>Same-profile dedup</b>: skips if the same profile is already active
+     *       (handles AoE with identical element)</li>
+     *   <li><b>Time-based coalescing</b>: during mixed-element combat, template swaps
+     *       alternate rapidly. A 50ms cooldown coalesces multiple swaps into one packet.
+     *       The latest profile is always tracked in {@code lastAppliedProfile} so the
+     *       NEXT hit outside the window sends the correct swap.</li>
+     * </ol>
      */
     private void applyTemplateOverwrite(
         @Nonnull PlayerRef attacker,
         @Nonnull CombatTextProfile profile
     ) {
-        int vanillaIndex = templateRegistry.getVanillaCombatTextIndex();
-        com.hypixel.hytale.protocol.EntityUIComponent packet = templateRegistry.buildTemplate(profile);
+        UUID playerUuid = attacker.getUuid();
 
+        // Level 1: Same-profile dedup — skip if already active
+        String lastProfile = lastAppliedProfile.get(playerUuid);
+        if (profile.id().equals(lastProfile)) {
+            return;
+        }
+
+        // Level 2: Time-based coalescing — suppress rapid alternating swaps.
+        // During mixed-element combat (fire mob → lightning mob → fire mob),
+        // every hit would swap the template. Instead, only send one swap per
+        // cooldown window. The lastAppliedProfile is still updated so the
+        // next hit outside the window knows which profile to send.
+        long now = System.nanoTime();
+        Long lastSwap = lastSwapTimeNanos.get(playerUuid);
+        if (lastSwap != null && (now - lastSwap) < SWAP_COOLDOWN_NANOS) {
+            // Within cooldown — don't send, but track the desired profile.
+            // The combat text will use the previous template (slightly wrong color)
+            // for at most 50ms — imperceptible during rapid combat.
+            lastAppliedProfile.put(playerUuid, profile.id());
+            return;
+        }
+
+        // Send the template swap
+        com.hypixel.hytale.protocol.EntityUIComponent packet = templateCache.computeIfAbsent(
+            profile.id(), id -> templateRegistry.buildTemplate(profile));
+
+        int vanillaIndex = templateRegistry.getVanillaCombatTextIndex();
         attacker.getPacketHandler().writeNoCache(
             new UpdateEntityUIComponents(
                 UpdateType.AddOrUpdate,
@@ -205,6 +274,17 @@ public class CombatTextColorManager {
             )
         );
 
+        lastAppliedProfile.put(playerUuid, profile.id());
+        lastSwapTimeNanos.put(playerUuid, now);
         LOGGER.at(Level.FINE).log("Applied combat text template '%s' via global overwrite", profile.id());
+    }
+
+    /**
+     * Removes cached state for a disconnecting player.
+     * Called from player disconnect lifecycle.
+     */
+    public void removePlayer(@Nonnull UUID playerUuid) {
+        lastAppliedProfile.remove(playerUuid);
+        lastSwapTimeNanos.remove(playerUuid);
     }
 }

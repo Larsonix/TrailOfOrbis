@@ -645,11 +645,18 @@ public final class GearBalanceConfig {
             double spellbookBaseMax,
             double spellbookScaleFactor,
             double physicalWeight,
-            double elementalWeightEach
+            double elementalWeightEach,
+            double spellbookVolatilityBaseMin,
+            double spellbookVolatilityBaseMax,
+            double spellbookVolatilityScaleFactor,
+            double spellbookMagicPowerBaseMin,
+            double spellbookMagicPowerBaseMax,
+            double spellbookMagicPowerScaleFactor
     ) {
         /** Default config with implicit damage disabled. */
         public static final ImplicitDamageConfig DISABLED =
-            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0, 0.1, 0.3, 3.0, 70.0, 5.0);
+            new ImplicitDamageConfig(false, 1.0, 5.0, 55.0, 2.0, 0.1, 0.3, 3.0, 70.0, 5.0,
+                    3.0, 8.0, 4.0, 0.02, 0.06, 3.0);
 
         /**
          * Calculates the scaled damage range for a weapon at a given level.
@@ -678,6 +685,18 @@ public final class GearBalanceConfig {
         public WeaponBaseRange calculateSpellbookRange(int itemLevel) {
             double bonus = LevelScaling.getBonusPercent(itemLevel) / 100.0 * spellbookScaleFactor;
             return new WeaponBaseRange(spellbookBaseMin + bonus, spellbookBaseMax + bonus);
+        }
+
+        /** Calculates the volatility_max range for spellbooks at a given level. */
+        public WeaponBaseRange calculateSpellbookVolatilityRange(int itemLevel) {
+            double bonus = LevelScaling.getBonusPercent(itemLevel) / 100.0 * spellbookVolatilityScaleFactor;
+            return new WeaponBaseRange(spellbookVolatilityBaseMin + bonus, spellbookVolatilityBaseMax + bonus);
+        }
+
+        /** Calculates the magic_power range for spellbooks at a given level. */
+        public WeaponBaseRange calculateSpellbookMagicPowerRange(int itemLevel) {
+            double bonus = LevelScaling.getBonusPercent(itemLevel) / 100.0 * spellbookMagicPowerScaleFactor;
+            return new WeaponBaseRange(spellbookMagicPowerBaseMin + bonus, spellbookMagicPowerBaseMax + bonus);
         }
     }
 

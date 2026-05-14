@@ -18,7 +18,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.gear.GearManager;
 import io.github.larsonix.trailoforbis.gear.GearService;
-import io.github.larsonix.trailoforbis.gear.item.CustomItemData;
 import io.github.larsonix.trailoforbis.gear.item.ItemWorldSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
@@ -72,12 +71,12 @@ public class ItemEntitySpawnSyncSystem extends RefSystem<EntityStore> {
 
     private final Query<EntityStore> query;
 
+    /** Cached reference — resolved once on first use, never changes. */
+    @Nullable
+    private volatile ItemWorldSyncService cachedWorldSyncService;
+
     /**
      * Creates a new ItemEntitySpawnSyncSystem.
-     *
-     * <p>Uses {@link ServiceRegistry} to get the {@link GearService} and
-     * {@link ItemWorldSyncService} when needed, avoiding timing issues
-     * between system registration and service initialization.
      */
     public ItemEntitySpawnSyncSystem() {
         // Query for entities with both ItemComponent and TransformComponent
@@ -111,7 +110,20 @@ public class ItemEntitySpawnSyncSystem extends RefSystem<EntityStore> {
             return;
         }
 
-        // Check if this is a custom item (gear, stone, or map)
+        // Get ItemWorldSyncService (cached — resolved once, never changes)
+        ItemWorldSyncService worldSyncService = getCachedWorldSyncService();
+        if (worldSyncService == null) {
+            return;
+        }
+
+        // Fast check: if this item was recently batch-synced by LootListener,
+        // skip all work (no deserialization, no range check).
+        String itemId = itemStack.getItemId();
+        if (itemId != null && worldSyncService.wasRecentlyBatchSynced(itemId)) {
+            return;
+        }
+
+        // Fast prefix check before expensive GearData deserialization
         if (!isCustomItem(itemStack)) {
             return;
         }
@@ -124,18 +136,10 @@ public class ItemEntitySpawnSyncSystem extends RefSystem<EntityStore> {
 
         Vector3d position = transform.getPosition();
 
-        // Get ItemWorldSyncService from GearManager
-        ItemWorldSyncService worldSyncService = getWorldSyncService();
-        if (worldSyncService == null) {
-            return;
-        }
-
         // Sync to all nearby players
         int synced = worldSyncService.syncItemToNearbyPlayers(store, position, itemStack);
 
         if (synced > 0) {
-            // Per-item sync log - use FINE level
-            String itemId = getCustomItemId(itemStack);
             LOGGER.atFine().log("[ItemSpawnSync] Pre-synced %s to %d player(s) at (%.0f, %.0f, %.0f)",
                 itemId, synced, position.x, position.y, position.z);
         }
@@ -156,72 +160,46 @@ public class ItemEntitySpawnSyncSystem extends RefSystem<EntityStore> {
 
     /**
      * Checks if an item is a custom RPG item (gear, stone, or map).
+     * Uses fast prefix check for gear to avoid unnecessary deserialization.
      */
     private boolean isCustomItem(@Nonnull ItemStack item) {
         String itemId = item.getItemId();
 
-        // Check gear
-        Optional<GearData> gearOpt = GearUtils.readGearData(item);
-        if (gearOpt.isPresent()) {
-            boolean hasId = gearOpt.get().hasInstanceId();
-            LOGGER.atFine().log("[ItemSpawnSync] Gear check for %s: hasData=true, hasInstanceId=%b",
-                itemId, hasId);
-            if (hasId) return true;
+        // Fast prefix check for gear — avoids GearData deserialization for non-gear items
+        if (itemId != null && itemId.startsWith("rpg_gear_")) {
+            Optional<GearData> gearOpt = GearUtils.readGearData(item);
+            if (gearOpt.isPresent() && gearOpt.get().hasInstanceId()) {
+                return true;
+            }
         }
 
-        // Stones are now native Hytale items — no custom sync needed
-
         // Check realm map (using isMapAnyMethod for reconnect safety)
-        boolean isMap = RealmMapUtils.isMapAnyMethod(item);
-        if (isMap) {
+        if (RealmMapUtils.isMapAnyMethod(item)) {
             var mapOpt = RealmMapUtils.readMapDataWithFallback(item);
-            boolean hasData = mapOpt.isPresent();
-            boolean hasId = hasData && mapOpt.get().hasInstanceId();
-            LOGGER.atFine().log("[ItemSpawnSync] Map check for %s: isMap=%b, hasData=%b, hasInstanceId=%b",
-                itemId, isMap, hasData, hasId);
-            if (hasId) return true;
+            if (mapOpt.isPresent() && mapOpt.get().hasInstanceId()) {
+                return true;
+            }
         }
 
         return false;
     }
 
     /**
-     * Gets the custom item ID for logging purposes.
+     * Gets the ItemWorldSyncService, caching the result after first resolution.
      */
     @Nullable
-    private String getCustomItemId(@Nonnull ItemStack item) {
-        // Try gear
-        Optional<GearData> gearOpt = GearUtils.readGearData(item);
-        if (gearOpt.isPresent() && gearOpt.get().hasInstanceId()) {
-            return gearOpt.get().getItemId();
-        }
+    private ItemWorldSyncService getCachedWorldSyncService() {
+        ItemWorldSyncService cached = cachedWorldSyncService;
+        if (cached != null) return cached;
 
-        // Stones are now native Hytale items — use item ID directly
-
-        // Try map
-        var mapOpt = RealmMapUtils.readMapDataWithFallback(item);
-        if (mapOpt.isPresent() && mapOpt.get().hasInstanceId()) {
-            return mapOpt.get().getItemId();
-        }
-
-        return item.getItemId();
-    }
-
-    /**
-     * Gets the ItemWorldSyncService from GearManager.
-     */
-    @Nullable
-    private ItemWorldSyncService getWorldSyncService() {
         Optional<GearService> gearServiceOpt = ServiceRegistry.get(GearService.class);
-        if (gearServiceOpt.isEmpty()) {
-            return null;
-        }
+        if (gearServiceOpt.isEmpty()) return null;
 
         GearService gearService = gearServiceOpt.get();
-        if (!(gearService instanceof GearManager gearManager)) {
-            return null;
-        }
+        if (!(gearService instanceof GearManager gearManager)) return null;
 
-        return gearManager.getItemWorldSyncService();
+        cached = gearManager.getItemWorldSyncService();
+        cachedWorldSyncService = cached;
+        return cached;
     }
 }

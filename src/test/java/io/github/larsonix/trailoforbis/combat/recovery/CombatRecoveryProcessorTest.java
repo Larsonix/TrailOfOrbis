@@ -346,4 +346,86 @@ public class CombatRecoveryProcessorTest {
             verify(entityResolver).resolveTrueAttacker(store, attackerRef);
         }
     }
+
+    // ==================== Hinted Attacker Tests ====================
+    //
+    // Tests verify the hint/fallback resolution pattern WITHOUT reaching
+    // EntityStatMap.getComponentType() (requires Hytale runtime).
+    // Strategy: when resolveTrueAttacker returns null, the method exits before stat access.
+    // This lets us verify whether resolveTrueAttacker was called (fallback) or skipped (hint).
+
+    @Nested
+    @DisplayName("Hinted Attacker (AoE Optimization)")
+    class HintedAttackerTests {
+
+        @Test
+        @DisplayName("When hint is null, falls back to resolveTrueAttacker")
+        void hintNull_fallsBackToResolver() {
+            // No hint set (default) — resolver should be called
+            when(entityResolver.resolveTrueAttacker(any(), any())).thenReturn(null);
+
+            processor.applyLifeLeech(store, damage, 50f);
+
+            verify(entityResolver).resolveTrueAttacker(any(), any());
+        }
+
+        @Test
+        @DisplayName("When hint is invalid, falls back to resolveTrueAttacker")
+        void hintInvalid_fallsBackToResolver() {
+            @SuppressWarnings("unchecked")
+            Ref<EntityStore> invalidRef = mock(Ref.class);
+            when(invalidRef.isValid()).thenReturn(false);
+            processor.setHintedAttacker(invalidRef);
+
+            when(entityResolver.resolveTrueAttacker(any(), any())).thenReturn(null);
+
+            processor.applyLifeLeech(store, damage, 50f);
+
+            // Invalid hint → fallback to resolver
+            verify(entityResolver).resolveTrueAttacker(any(), any());
+            processor.clearHintedAttacker();
+        }
+
+        @Test
+        @DisplayName("clearHintedAttacker resets to full resolution")
+        void clearHint_fallsBackToResolver() {
+            @SuppressWarnings("unchecked")
+            Ref<EntityStore> hintedRef = mock(Ref.class);
+            when(hintedRef.isValid()).thenReturn(true);
+            processor.setHintedAttacker(hintedRef);
+            processor.clearHintedAttacker();
+
+            when(entityResolver.resolveTrueAttacker(any(), any())).thenReturn(null);
+
+            processor.applyLifeLeech(store, damage, 50f);
+
+            // Hint was cleared → should fall back to resolver
+            verify(entityResolver).resolveTrueAttacker(any(), any());
+        }
+
+        @Test
+        @DisplayName("Non-entity source with no hint returns early (no resolver call)")
+        void nonEntitySource_noHint_earlyReturn() {
+            Damage nonEntityDamage = mock(Damage.class);
+            when(nonEntityDamage.getSource()).thenReturn(mock(Damage.Source.class));
+
+            processor.applyLifeLeech(store, nonEntityDamage, 50f);
+
+            // Non-EntitySource + no hint → resolveAttacker returns null without calling resolver
+            verify(entityResolver, never()).resolveTrueAttacker(any(), any());
+        }
+
+        @Test
+        @DisplayName("setHintedAttacker and clearHintedAttacker do not throw")
+        void hintLifecycle_noExceptions() {
+            @SuppressWarnings("unchecked")
+            Ref<EntityStore> hintedRef = mock(Ref.class);
+            when(hintedRef.isValid()).thenReturn(true);
+
+            assertDoesNotThrow(() -> processor.setHintedAttacker(hintedRef));
+            assertDoesNotThrow(() -> processor.clearHintedAttacker());
+            assertDoesNotThrow(() -> processor.setHintedAttacker(null));
+            assertDoesNotThrow(() -> processor.clearHintedAttacker());
+        }
+    }
 }

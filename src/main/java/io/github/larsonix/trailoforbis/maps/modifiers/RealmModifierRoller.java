@@ -449,6 +449,91 @@ public class RealmModifierRoller {
     }
 
     /**
+     * Re-rolls unlocked modifier types with free prefix/suffix redistribution.
+     *
+     * <p>Unlike {@link #rerollTypesSplit}, this method does NOT preserve the
+     * existing prefix/suffix distribution. The total unlocked modifier count
+     * is preserved, but the split between prefixes and suffixes is randomly
+     * redistributed within the rarity's configured bounds.
+     *
+     * <p>Used by ALTERVERSE_SHARD stone. Locked modifiers are preserved.
+     *
+     * @param prefixes Existing prefix modifiers
+     * @param suffixes Existing suffix modifiers
+     * @param random Random source
+     * @param level The map level (for scaling modifier values)
+     * @param rarity The map's rarity (for prefix/suffix cap lookup)
+     * @return RollResult with redistributed and rerolled modifiers
+     */
+    @Nonnull
+    public RollResult rerollTypesRedistributed(
+            @Nonnull List<RealmModifier> prefixes,
+            @Nonnull List<RealmModifier> suffixes,
+            @Nonnull Random random,
+            int level,
+            @Nonnull GearRarity rarity) {
+
+        // Separate locked modifiers (preserved unchanged)
+        List<RealmModifier> lockedPrefixes = prefixes.stream()
+            .filter(RealmModifier::locked)
+            .toList();
+        List<RealmModifier> lockedSuffixes = suffixes.stream()
+            .filter(RealmModifier::locked)
+            .toList();
+
+        int totalUnlocked = (prefixes.size() - lockedPrefixes.size())
+                          + (suffixes.size() - lockedSuffixes.size());
+
+        if (totalUnlocked <= 0) {
+            return new RollResult(prefixes, suffixes);
+        }
+
+        // Get caps from config, accounting for locked modifiers occupying slots
+        int maxPrefixes = config.getPrefixCountRange(rarity).max();
+        int maxSuffixes = config.getSuffixCountRange(rarity).max();
+        int availPrefixSlots = Math.max(0, maxPrefixes - lockedPrefixes.size());
+        int availSuffixSlots = Math.max(0, maxSuffixes - lockedSuffixes.size());
+
+        // Redistribute: roll a new prefix/suffix split within valid bounds
+        int minNewPrefixes = Math.max(0, totalUnlocked - availSuffixSlots);
+        int maxNewPrefixes = Math.min(totalUnlocked, availPrefixSlots);
+        maxNewPrefixes = Math.max(minNewPrefixes, maxNewPrefixes);
+
+        int newPrefixCount = minNewPrefixes
+                + (maxNewPrefixes > minNewPrefixes ? random.nextInt(maxNewPrefixes - minNewPrefixes + 1) : 0);
+        int newSuffixCount = totalUnlocked - newPrefixCount;
+
+        // Build exclusions from all locked modifiers
+        Set<RealmModifierType> exclusions = new HashSet<>();
+        lockedPrefixes.forEach(m -> exclusions.add(m.type()));
+        lockedSuffixes.forEach(m -> exclusions.add(m.type()));
+
+        // Roll new prefixes
+        List<RealmModifier> newPrefixes = new ArrayList<>(lockedPrefixes);
+        for (int i = 0; i < newPrefixCount; i++) {
+            RealmModifierType type = selectPrefixType(random, exclusions);
+            if (type == null) {
+                break;
+            }
+            newPrefixes.add(rollModifier(type, random, level));
+            exclusions.add(type);
+        }
+
+        // Roll new suffixes
+        List<RealmModifier> newSuffixes = new ArrayList<>(lockedSuffixes);
+        for (int i = 0; i < newSuffixCount; i++) {
+            RealmModifierType type = selectSuffixType(random, exclusions);
+            if (type == null) {
+                break;
+            }
+            newSuffixes.add(rollModifier(type, random, level));
+            exclusions.add(type);
+        }
+
+        return new RollResult(newPrefixes, newSuffixes);
+    }
+
+    /**
      * Selects a random prefix type from the prefix pool.
      */
     @javax.annotation.Nullable

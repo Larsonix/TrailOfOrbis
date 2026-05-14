@@ -90,6 +90,38 @@ public enum StoneType {
     ),
 
     /**
+     * Alterverse Splinter - Rerolls all unlocked prefix modifiers.
+     *
+     * <p>Only affects prefixes (offensive modifiers). Suffixes are preserved.
+     * Locked prefixes are also preserved.
+     * Cheaper than Alterverse Shard since it only risks half the modifiers.
+     * Cannot be used on corrupted items.
+     */
+    ALTERVERSE_SPLINTER(
+        "Alterverse Splinter",
+        "Rerolls all unlocked prefixes with new random modifiers",
+        ItemTargetType.BOTH,
+        GearRarity.UNCOMMON,
+        false
+    ),
+
+    /**
+     * Alterverse Fragment - Rerolls all unlocked suffix modifiers.
+     *
+     * <p>Only affects suffixes (defensive/utility modifiers). Prefixes are preserved.
+     * Locked suffixes are also preserved.
+     * Cheaper than Alterverse Shard since it only risks half the modifiers.
+     * Cannot be used on corrupted items.
+     */
+    ALTERVERSE_FRAGMENT(
+        "Alterverse Fragment",
+        "Rerolls all unlocked suffixes with new random modifiers",
+        ItemTargetType.BOTH,
+        GearRarity.UNCOMMON,
+        false
+    ),
+
+    /**
      * Orbisian Blessing - Rerolls the item's quality.
      *
      * <p>Randomly changes quality within 1-100 range.

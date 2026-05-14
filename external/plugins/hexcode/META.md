@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Current Version | `be0e97e` (v0.6.6) |
-| Deployed Version | v0.6.0 |
-| Last Updated | 2026-05-04 |
+| Current Version | `d4cee69` (v0.7.0) |
+| Deployed Version | v0.6.7 (pending v0.7.0) |
+| Last Updated | 2026-05-14 |
 | Cloned From | main |
 
 ## What It Does
@@ -50,9 +50,14 @@ Visual spell-crafting system for Hytale. Players discover glyphs, arrange them i
 
 ## Known Issues
 
-- Armor stat injection conflict — both mods patch ItemArmor via reflection
+- ~~Armor stat injection conflict~~ — RESOLVED in v0.7.0 (reflection patchers deleted, replaced by .patch assets)
 - CRAFTING state persists across world transitions (no DrainPlayerFromWorldEvent listener in Hexcode)
 - Casting state + teleport can leave orphaned constructs in wrong world
+
+## Not Yet Integrated
+
+- **Trigger system** (v0.7.0) — OnPrimary/OnSecondary/OnUse/OnCast/OnDeath reactive spell triggers. Needs design review for RPG integration.
+- **Imbuement system** (v0.7.0) — Items/blocks holding hex slots with trigger dispatch. Needs RPG stat injection design.
 
 ## Collaboration
 

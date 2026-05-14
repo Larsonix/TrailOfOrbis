@@ -99,6 +99,18 @@ public interface PersistentHud {
     }
 
     /**
+     * Returns the active HyUIHud for this player, or null if not a HyUI-based HUD.
+     *
+     * <p>Used by {@link HudHealthChecker} to check whether the HUD is registered
+     * in the client's MCHUD. Providers that don't use HyUI (e.g.,
+     * CombatFeedbackGhostManager) should keep the default null return.
+     */
+    @Nullable
+    default au.ellie.hyui.builders.HyUIHud getActiveHud(@Nonnull UUID playerId) {
+        return null;
+    }
+
+    /**
      * Removes the HUD on player disconnect. May send packets (hide + remove)
      * since the client is still connected at this point.
      */

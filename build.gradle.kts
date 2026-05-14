@@ -88,6 +88,12 @@ dependencies {
     compileOnly("com.mysql:mysql-connector-j:8.2.0")
     compileOnly("org.postgresql:postgresql:42.7.1")
 
+    // Hexcode - Spell-crafting mod by Riprod (compileOnly — optional runtime dependency)
+    // JAR from server deployment; NOT bundled in shadow JAR. At runtime, Hexcode must be
+    // installed separately. All Hexcode-importing code is gated behind HexcodeCompatManager
+    // which checks PluginManager before loading any Hexcode classes.
+    compileOnly(files("libs/hexcode-0.7.0.jar"))
+
     // Vuetale - Vue 3 reactive UI framework for Hytale (Kelpy's compiled JAR)
     implementation(files("libs/vuetale-1.0.12-preview.jar"))
 

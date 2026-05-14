@@ -90,7 +90,7 @@ rarity:
     prefix_range: [3, 3]      # Always 3 prefixes
     suffix_range: [3, 3]      # Always 3 suffixes (6 total guaranteed)
     min_roll_percentile: 0.80 # Rolls in top 20% of range
-    drop_weight: 0.016        # 0.018% — ~1 in 5,461 drops
+    drop_weight: 0            # DISABLED — Unique items are hand-placed, not natural drops
 
 # -----------------------------------------------------------------------------
 # QUALITY SYSTEM
@@ -267,11 +267,23 @@ implicit_damage:
     physical: 70              # Weight for physical damage
     elemental_each: 5         # Weight PER element (fire, water, lightning, earth, wind, void)
 
-  # Spellbook implicit: mana_regen (support identity, not damage)
-  # Tuned so implicit_avg ≈ of_the_arcane max × 1.5 quality at L50
+  # Spellbook implicits — randomly rolls one of: mana_regen (50%), volatility_max (30%), magic_power (20%)
+  # mana_regen: support identity (smaller numbers, regeneration)
   spellbook:
     base_min: 0.1
     base_max: 0.3
+    scale_factor: 3.0
+
+  # volatility_max: hex glyph budget (bigger numbers, flat value)
+  spellbook_volatility:
+    base_min: 3.0
+    base_max: 8.0
+    scale_factor: 4.0
+
+  # magic_power: hex effect magnitude multiplier (small decimal, e.g. 0.05 = +5%)
+  spellbook_magic_power:
+    base_min: 0.02
+    base_max: 0.06
     scale_factor: 3.0
 
 # -----------------------------------------------------------------------------
@@ -299,17 +311,17 @@ implicit_defense:
       stat: armor
       base_min: 5.0
       base_max: 12.0
-      scale_factor: 80.0
+      scale_factor: 130.0
     leather:
       stat: evasion
       base_min: 4.0
       base_max: 10.0
-      scale_factor: 70.0
+      scale_factor: 110.0
     cloth:
       stat: energy_shield
       base_min: 3.0
       base_max: 8.0
-      scale_factor: 60.0
+      scale_factor: 90.0
     wood:
       stat: max_health
       base_min: 5.0
@@ -319,14 +331,14 @@ implicit_defense:
       stat: armor
       base_min: 4.0
       base_max: 10.0
-      scale_factor: 70.0
+      scale_factor: 110.0
 
   # Per-slot multiplier (chest is baseline)
   slot_multipliers:
     chest: 1.0
-    legs: 0.7
-    head: 0.6
-    hands: 0.5
+    legs: 0.8
+    head: 0.7
+    hands: 0.6
 
   # Shield gets block_chance (separate from armor materials)
   shield:

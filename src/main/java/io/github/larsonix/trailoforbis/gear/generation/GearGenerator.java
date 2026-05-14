@@ -291,9 +291,10 @@ public final class GearGenerator {
             return;
         }
 
-        // Create and register the custom item SYNCHRONOUSLY
-        // This ensures the item is fully registered before being returned to callers
-        itemRegistry.createAndRegisterSync(baseItemAsset, customItemId);
+        // Create and register the custom item SYNCHRONOUSLY.
+        // Pass the RPG rarity so the reskin ResourceType matches the correct
+        // workbench recipe group (e.g., MYTHIC → Epic+Legendary skins).
+        itemRegistry.createAndRegisterSync(baseItemAsset, customItemId, gearData.rarity());
     }
 
     // =========================================================================

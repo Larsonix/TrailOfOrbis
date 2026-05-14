@@ -130,13 +130,17 @@ public class RealmCombatHud {
 
         String html = buildHtml(realm);
 
-        return HudBuilder.hudForPlayer(player)
+        HyUIHud hud = HudBuilder.hudForPlayer(player)
             .fromHtml(html)
             // NO withRefreshRate() — HyUI's ScheduledExecutorService runs on its own
             // thread and queues world.execute() tasks that race with world transitions.
             // Refresh is driven by RealmHudManager.tickCombatHud() on the world thread.
-            .onRefresh(hud -> refreshHud(hud, realm))
+            .onRefresh(h -> refreshHud(h, realm))
             .show();
+
+        // Deterministic name — prevents MCHUD accumulation across world transitions
+        hud.name = "too-realm-combat";
+        return hud;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -433,12 +437,7 @@ public class RealmCombatHud {
     }
 
     private static String formatModifierForHud(@Nonnull RealmModifier mod, double qualityMult) {
-        RealmModifierType type = mod.type();
-        if (type.isBinary()) {
-            return type.getDisplayName();
-        }
-        int adjusted = (int) Math.round(mod.value() * qualityMult);
-        return "+" + adjusted + "% " + type.getDisplayName();
+        return mod.type().formatValue(mod.value(), qualityMult);
     }
 
     private static String capitalize(@Nonnull String text) {

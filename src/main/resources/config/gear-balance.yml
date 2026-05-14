@@ -90,7 +90,7 @@ rarity:
     prefix_range: [3, 3]      # Always 3 prefixes
     suffix_range: [3, 3]      # Always 3 suffixes (6 total guaranteed)
     min_roll_percentile: 0.80 # Rolls in top 20% of range
-    drop_weight: 0.016        # 0.018% — ~1 in 5,461 drops
+    drop_weight: 0            # DISABLED — Unique items are hand-placed, not natural drops
 
 # -----------------------------------------------------------------------------
 # QUALITY SYSTEM
@@ -289,17 +289,17 @@ implicit_defense:
       stat: armor
       base_min: 5.0
       base_max: 12.0
-      scale_factor: 80.0
+      scale_factor: 130.0
     leather:
       stat: evasion
       base_min: 4.0
       base_max: 10.0
-      scale_factor: 70.0
+      scale_factor: 110.0
     cloth:
       stat: energy_shield
       base_min: 3.0
       base_max: 8.0
-      scale_factor: 60.0
+      scale_factor: 90.0
     wood:
       stat: max_health
       base_min: 5.0
@@ -309,14 +309,14 @@ implicit_defense:
       stat: armor
       base_min: 4.0
       base_max: 10.0
-      scale_factor: 70.0
+      scale_factor: 110.0
 
   # Per-slot multiplier (chest is baseline)
   slot_multipliers:
     chest: 1.0
-    legs: 0.7
-    head: 0.6
-    hands: 0.5
+    legs: 0.8
+    head: 0.7
+    hands: 0.6
 
   # Shield gets block_chance (separate from armor materials)
   shield:

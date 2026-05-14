@@ -42,7 +42,7 @@ class GearStatsIntegrationTest {
             Map.of("physical_damage", 25.0),
             Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -62,7 +62,7 @@ class GearStatsIntegrationTest {
             Map.of(),
             Map.of("physical_damage", 15.0),  // Adds to percent field
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -85,7 +85,7 @@ class GearStatsIntegrationTest {
             Map.of("max_health", 50.0, "physical_damage", 30.0),
             Map.of("crit_chance", 10.0, "max_health", 20.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -163,7 +163,7 @@ class GearStatsIntegrationTest {
                 "void_resistance", 5.0
             ),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -188,7 +188,7 @@ class GearStatsIntegrationTest {
             Map.of("armor", 100.0, "evasion", 20.0),
             Map.of("block_chance", 10.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -212,7 +212,7 @@ class GearStatsIntegrationTest {
             Map.of("health_regen", 2.0, "mana_regen", 1.5, "stamina_regen", 3.0),
             Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -273,6 +273,7 @@ class GearStatsIntegrationTest {
             ),
             175.0,  // Weapon base damage from implicit
             null,   // No weapon item ID
+            null,   // No weapon raw item ID
             true, null    // Is RPG gear
         );
 

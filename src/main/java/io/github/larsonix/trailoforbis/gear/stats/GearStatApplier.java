@@ -44,13 +44,20 @@ public final class GearStatApplier {
         // Store weapon item ID for attack effectiveness lookup
         stats.setWeaponItemId(bonuses.weaponItemId());
 
+        // Store raw item definition ID for weapon identity comparison
+        // This is unique per generated item (e.g., "rpg_gear_1778246038077_0")
+        stats.setWeaponRawItemId(bonuses.weaponRawItemId());
+
         // Store RPG gear flag - critical for damage path selection
         // When true, damage system uses RPG path even if weaponBaseDamage is 0
         stats.setHoldingRpgGear(bonuses.isHoldingRpgGear());
 
         // Store spell element from weapon implicit (null for physical weapons).
+        // ALWAYS clear first — switching from an elemental weapon to a physical one must
+        // not leave the old element stale. Without this, fire→physical would keep FIRE.
         // With Hexcode: magic weapons (staves/wands) get element from the hex spell, not weapon.
         // Elemental physical weapons always use their own element regardless of Hexcode.
+        stats.setWeaponSpellElement(null);
         ElementType weaponElement = bonuses.weaponSpellElement();
         if (weaponElement != null) {
             boolean isMagic = WeaponType.fromItemIdOrUnknown(bonuses.weaponItemId()).isMagic();

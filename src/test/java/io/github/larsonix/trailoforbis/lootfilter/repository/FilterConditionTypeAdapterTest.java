@@ -2,12 +2,14 @@ package io.github.larsonix.trailoforbis.lootfilter.repository;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import io.github.larsonix.trailoforbis.gear.model.ArmorMaterial;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.lootfilter.model.ConditionType;
 import io.github.larsonix.trailoforbis.lootfilter.model.CorruptionFilter;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterCondition;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
+import io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -76,13 +78,13 @@ class FilterConditionTypeAdapterTest {
     }
 
     @Test
-    @DisplayName("ArmorMaterialCondition round-trips correctly")
-    void armorMaterialRoundTrip() {
-        var original = new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.LEATHER, ArmorMaterial.PLATE));
+    @DisplayName("ArmorImplicitCondition round-trips correctly")
+    void armorImplicitRoundTrip() {
+        var original = new FilterCondition.ArmorImplicitCondition(Set.of("evasion", "armor"));
         var result = roundTrip(original);
-        assertInstanceOf(FilterCondition.ArmorMaterialCondition.class, result);
-        assertEquals(Set.of(ArmorMaterial.LEATHER, ArmorMaterial.PLATE),
-                ((FilterCondition.ArmorMaterialCondition) result).materials());
+        assertInstanceOf(FilterCondition.ArmorImplicitCondition.class, result);
+        assertEquals(Set.of("evasion", "armor"),
+                ((FilterCondition.ArmorImplicitCondition) result).defenseTypes());
     }
 
     @Test
@@ -169,21 +171,24 @@ class FilterConditionTypeAdapterTest {
     }
 
     @Test
-    @DisplayName("All 12 condition types can be serialized")
+    @DisplayName("All 15 condition types can be serialized")
     void allTypesSerializable() {
         List<FilterCondition> conditions = List.of(
                 new FilterCondition.MinRarity(GearRarity.RARE),
                 new FilterCondition.MaxRarity(GearRarity.EPIC),
                 new FilterCondition.EquipmentSlotCondition(Set.of("weapon")),
                 new FilterCondition.WeaponTypeCondition(Set.of(WeaponType.SWORD)),
-                new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.PLATE)),
+                new FilterCondition.ArmorImplicitCondition(Set.of("armor")),
                 new FilterCondition.ItemLevelRange(1, 50),
                 new FilterCondition.QualityRange(50, 100),
                 new FilterCondition.RequiredModifiers(Set.of("sharp"), 1),
                 new FilterCondition.ModifierValueRange("sharp", 0, 10),
                 new FilterCondition.ImplicitCondition(0.5, Set.of("physical_damage")),
                 new FilterCondition.MinModifierCount(3),
-                new FilterCondition.CorruptionStateCondition(CorruptionFilter.EITHER)
+                new FilterCondition.CorruptionStateCondition(CorruptionFilter.EITHER),
+                new FilterCondition.BiomeCondition(Set.of(RealmBiomeType.FOREST)),
+                new FilterCondition.MapSizeCondition(Set.of(RealmLayoutSize.LARGE)),
+                new FilterCondition.MapModifierCondition(Set.of(RealmModifierType.ITEM_QUANTITY), 1)
         );
 
         assertEquals(ConditionType.values().length, conditions.size(),

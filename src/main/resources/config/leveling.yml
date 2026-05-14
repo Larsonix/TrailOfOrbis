@@ -27,11 +27,11 @@ enabled: true
 #   (via xp_gain, mob-stat-pool, or LevelScaling configs), XP requirements
 #   auto-adjust to maintain the intended kills-per-level experience.
 #
-#   EXAMPLE (base_mobs=3, target_mobs=150, target_level=100):
+#   EXAMPLE (base_mobs=3, target_mobs=200, target_level=100):
 #     Level 1:   ~3 mobs to level up
-#     Level 10:  ~21 mobs to level up
-#     Level 50:  ~93 mobs to level up
-#     Level 100: ~150 mobs to level up
+#     Level 10:  ~25 mobs to level up
+#     Level 50:  ~106 mobs to level up
+#     Level 100: ~200 mobs to level up
 #
 # "exponential" (legacy) — Direct XP formula: xp = base_xp * (level-1)^exponent
 
@@ -48,7 +48,7 @@ formula:
   # Want easier early game? Decrease base_mobs.
   effort:
     base_mobs: 3          # mobs per level at level 1
-    target_mobs: 150      # mobs per level at target_level
+    target_mobs: 200      # mobs per level at target_level
     target_level: 100     # reference level for the curve
 
   # Legacy exponential formula (only used when type: exponential)
@@ -80,6 +80,10 @@ xp_gain:
   # Enable/disable XP gain from mob kills
   # Default: true
   enabled: true
+
+  # Global XP multiplier applied to all mob kills (tuning knob for overall XP rate)
+  # Default: 1.2
+  global_xp_multiplier: 1.2
 
   # Base XP per mob level
   # Higher values = more XP from high-level mobs
@@ -286,3 +290,27 @@ celebration:
 #   class_mult = 25.0 (MYTHIC)
 #   boss_mult = 3.0
 #   total = (500 + 200) * 25 * 3 = 52,500 XP
+
+# -----------------------------------------------------------------------------
+# XP CURVE MIGRATION
+# -----------------------------------------------------------------------------
+# Protects existing players from losing levels when the effort curve changes.
+#
+# When enabled, players logging in for the first time after a curve change will
+# have their XP adjusted upward (if needed) to preserve their old level.
+#
+# HOW IT WORKS:
+# 1. The plugin stores each player's derived level in the database.
+# 2. On first login after the update, if no stored level exists yet, the old
+#    formula is used to compute what level the player WAS at.
+# 3. If that's higher than the new formula says, XP is bumped to preserve it.
+#
+# After all players have logged in at least once, set enabled: false.
+# The stored level column provides permanent protection for all future changes.
+
+migration:
+  enabled: true
+  previous_effort:
+    base_mobs: 3
+    target_mobs: 150
+    target_level: 100

@@ -16,9 +16,12 @@ import io.github.larsonix.trailoforbis.gems.model.GemData;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -717,6 +720,111 @@ public final class GearUtils {
         }
 
         return errors;
+    }
+
+    // =========================================================================
+    // FAST IDENTITY CHECKS
+    // =========================================================================
+
+    /** Prefix for all RPG gear item IDs (e.g., "rpg_gear_1a2b3c_001"). */
+    private static final String RPG_GEAR_ID_PREFIX = "rpg_gear_";
+
+    /**
+     * Fast item ID read — returns the RPG gear item ID without any metadata deserialization.
+     *
+     * <p>RPG gear items have their {@code ItemStack.getItemId()} set to {@code rpg_gear_{instance}}.
+     * This method simply reads that field and checks the prefix. Use this instead of
+     * {@link #readGearData(ItemStack)} when you only need the item ID (e.g., dirty-set membership check).
+     *
+     * @param itemStack The item to check (may be null)
+     * @return The item ID if it's RPG gear (starts with "rpg_gear_"), or null otherwise
+     */
+    @Nullable
+    public static String readItemIdFast(@Nullable ItemStack itemStack) {
+        if (itemStack == null || itemStack.isEmpty()) {
+            return null;
+        }
+        String itemId = itemStack.getItemId();
+        if (itemId != null && itemId.startsWith(RPG_GEAR_ID_PREFIX)) {
+            return itemId;
+        }
+        return null;
+    }
+
+    // =========================================================================
+    // INVENTORY HELPERS
+    // =========================================================================
+
+    /**
+     * Collects all items from an inventory (armor, hotbar, storage, backpack, utility).
+     *
+     * @param inventory The inventory to collect items from
+     * @return List of all non-null, non-empty items
+     */
+    @Nonnull
+    public static List<ItemStack> collectAllInventoryItems(@Nonnull Inventory inventory) {
+        Objects.requireNonNull(inventory, "inventory cannot be null");
+
+        List<ItemStack> items = new ArrayList<>();
+        collectFromContainer(inventory.getArmor(), items);
+        collectFromContainer(inventory.getHotbar(), items);
+        collectFromContainer(inventory.getStorage(), items);
+        collectFromContainer(inventory.getBackpack(), items);
+        collectFromContainer(inventory.getUtility(), items);
+        return items;
+    }
+
+    /**
+     * Collects items from equipment containers only (armor, hotbar, utility).
+     *
+     * <p>These are the items whose tooltips the player sees during active gameplay
+     * (equipped armor, held weapons, offhand). Use this for priority syncing
+     * when stats change — equipment tooltips should update immediately.
+     *
+     * @param inventory The inventory to collect from
+     * @return List of equipment items (max ~20)
+     */
+    @Nonnull
+    public static List<ItemStack> collectEquipmentItems(@Nonnull Inventory inventory) {
+        Objects.requireNonNull(inventory, "inventory cannot be null");
+
+        List<ItemStack> items = new ArrayList<>();
+        collectFromContainer(inventory.getArmor(), items);
+        collectFromContainer(inventory.getHotbar(), items);
+        collectFromContainer(inventory.getUtility(), items);
+        return items;
+    }
+
+    /**
+     * Collects items from storage containers only (storage, backpack).
+     *
+     * <p>These items are not actively displayed during gameplay. Their tooltips
+     * only matter when the player opens inventory and hovers over them. Safe
+     * to defer their sync to reduce immediate flush cost.
+     *
+     * @param inventory The inventory to collect from
+     * @return List of storage items
+     */
+    @Nonnull
+    public static List<ItemStack> collectStorageItems(@Nonnull Inventory inventory) {
+        Objects.requireNonNull(inventory, "inventory cannot be null");
+
+        List<ItemStack> items = new ArrayList<>();
+        collectFromContainer(inventory.getStorage(), items);
+        collectFromContainer(inventory.getBackpack(), items);
+        return items;
+    }
+
+    private static void collectFromContainer(@Nullable ItemContainer container, @Nonnull List<ItemStack> items) {
+        if (container == null) {
+            return;
+        }
+        for (short i = 0; i < container.getCapacity(); i++) {
+            ItemStack item = container.getItemStack(i);
+            if (item != null && !item.isEmpty()) {
+                items.add(item);
+            }
+        }
     }
 
     // Prevent instantiation

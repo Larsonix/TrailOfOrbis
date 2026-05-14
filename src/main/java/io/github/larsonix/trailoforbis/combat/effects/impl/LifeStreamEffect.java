@@ -44,6 +44,13 @@ public class LifeStreamEffect extends KeystoneCombatEffect {
                 var hpStat = statMap.get(hpIdx);
                 if (hpStat != null) {
                     float heal = hpStat.getMax() * EVADE_HEAL_FRACTION;
+                    // Apply Health Recovery multiplier
+                    if (ctx.defenderStats() != null) {
+                        float recoveryPct = ctx.defenderStats().getHealthRecoveryPercent();
+                        if (recoveryPct != 0) {
+                            heal *= (1.0f + recoveryPct / 100.0f);
+                        }
+                    }
                     float newHp = Math.min(hpStat.get() + heal, hpStat.getMax());
                     statMap.setStatValue(
                         com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap.Predictable.SELF,

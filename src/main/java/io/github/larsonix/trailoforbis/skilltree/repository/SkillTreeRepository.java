@@ -211,6 +211,19 @@ public class SkillTreeRepository {
     }
 
     /**
+     * Evicts a single player from the in-memory cache.
+     *
+     * <p>Call when a player disconnects to free memory. The data is already
+     * persisted to database on every {@link #save(SkillTreeData)} call, so
+     * no additional save is needed before eviction.
+     *
+     * @param uuid The player's UUID
+     */
+    public void evict(@Nonnull UUID uuid) {
+        cache.remove(uuid);
+    }
+
+    /**
      * Clears the in-memory cache.
      *
      * <p>Use for testing or admin reload commands. Does NOT affect database.

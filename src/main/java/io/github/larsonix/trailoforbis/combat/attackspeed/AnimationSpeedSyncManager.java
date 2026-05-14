@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.io.PacketHandler;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import io.github.larsonix.trailoforbis.listeners.PlayerJoinListener;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
@@ -121,7 +122,7 @@ public class AnimationSpeedSyncManager {
     /**
      * Syncs the animation speed for a player based on their current attack speed stat.
      *
-     * <p>Called from {@code EquipmentChangeListener} and {@code WeaponSlotChangeSystem}
+     * <p>Called from {@code EquipmentChangeListener} and {@code HotbarSlotTrackingSystem}
      * after stats are recalculated.
      *
      * @param uuid The player's UUID
@@ -276,6 +277,10 @@ public class AnimationSpeedSyncManager {
     private void onPlayerDisconnect(PlayerDisconnectEvent event) {
         PlayerRef playerRef = event.getPlayerRef();
         if (playerRef == null) {
+            return;
+        }
+        // Skip stale disconnects (delayed QUIC close from duplicate login kick)
+        if (PlayerJoinListener.isStaleDisconnect(event)) {
             return;
         }
         // Clean up state — no need to send restore packets (player is leaving)
@@ -446,7 +451,7 @@ public class AnimationSpeedSyncManager {
             if (inventory == null) {
                 return null;
             }
-            ItemStack heldItem = inventory.getItemInHand();
+            ItemStack heldItem = inventory.getActiveHotbarItem();
             if (heldItem == null) {
                 return null;
             }

@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.lootfilter.model;
 
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -56,6 +57,25 @@ public record FilterRule(
     public List<String> describeMatch(@Nonnull GearData gearData, @Nonnull EquipmentType equipmentType) {
         return conditions.stream().map(c -> {
             boolean pass = c.matches(gearData, equipmentType);
+            return (pass ? "[x] " : "[!] ") + c.describe();
+        }).toList();
+    }
+
+    /**
+     * Returns true if this rule matches the given realm map.
+     * Disabled rules never match.
+     */
+    public boolean matchesMap(@Nonnull RealmMapData mapData) {
+        if (!enabled) return false;
+        return conditions.stream().allMatch(c -> c.matchesMap(mapData));
+    }
+
+    /**
+     * Per-condition pass/fail breakdown for map /lf test output.
+     */
+    public List<String> describeMatchMap(@Nonnull RealmMapData mapData) {
+        return conditions.stream().map(c -> {
+            boolean pass = c.matchesMap(mapData);
             return (pass ? "[x] " : "[!] ") + c.describe();
         }).toList();
     }

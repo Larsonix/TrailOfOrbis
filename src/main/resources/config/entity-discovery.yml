@@ -53,6 +53,9 @@ detection_patterns:
     - "*Overlord*"
     - "*Wyrm*"
     - "Golem_*"          # All golems are elemental bosses
+    - "*Chieftain*"      # Trork Chieftain + any future chieftains
+    - "*Praetorian*"     # Burnt Skeleton Praetorian + patrol/wander variants
+    - "Goblin_Duke*"     # Goblin Duke + all phase variants
 
   # Patterns that indicate an elite mob
   # NOTE: Elite patterns are now EMPTY - elites are determined by random roll at spawn.
@@ -104,6 +107,8 @@ overrides:
     - "goblin_duke"
     - "scarak_broodmother"
     - "rex_cave"
+    - "skeleton_burnt_praetorian"
+    - "trork_chieftain"
 
   # Force these roles to be classified as ELITE
   # NOTE: Elite overrides are now EMPTY - elites are determined by random roll at spawn.

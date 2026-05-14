@@ -402,33 +402,42 @@ public final class ItemDefinitionBuilder {
      * @return Hash code for the definition
      */
     public int computeDefinitionHash(@Nonnull GearData gearData, @Nullable UUID playerId) {
-        return computeDefinitionHash(gearData, playerId, 0L);
+        return computeDefinitionHash(gearData, playerId, true, true);
     }
 
     /**
-     * Computes a hash code for the item definition based on gear data and player stats version.
+     * Computes a hash code for the item definition based on gear data and requirement status.
      *
      * <p>Used by {@link PlayerItemCache} to detect when definitions need updating.
-     * The stats version ensures that when a player's stats change (level up, allocate
-     * attribute points, skill tree changes, gear changes), the hash changes and
-     * tooltip updates are triggered.
+     * Instead of the global statsVersion counter (which invalidated ALL items on any
+     * stat change), this uses the actual requirement-met status — so only items where
+     * the player's level or attributes crossed a threshold get re-synced.
      *
      * @param gearData The gear data
      * @param playerId The player (affects requirement display)
-     * @param statsVersion The player's current stats version (from AttributeManager)
+     * @param levelMet Whether the player meets this item's level requirement
+     * @param attrsMet Whether the player meets this item's attribute requirements
      * @return Hash code for the definition
      */
     // Increment this when the definition format changes to force re-sync of all cached items.
     // This ensures old definitions (missing playerAnimationsId, etc.) get rebuilt.
-    private static final int DEFINITION_FORMAT_VERSION = 4;
+    private static final int DEFINITION_FORMAT_VERSION = 6;
 
-    public int computeDefinitionHash(@Nonnull GearData gearData, @Nullable UUID playerId, long statsVersion) {
+    public int computeDefinitionHash(
+            @Nonnull GearData gearData,
+            @Nullable UUID playerId,
+            boolean levelMet,
+            boolean attrsMet) {
         Objects.requireNonNull(gearData, "gearData cannot be null");
 
-        // Include all factors that affect the visual display
+        // Include all factors that affect the visual display.
+        // gearData.hashCode() covers: level, rarity, quality, modifiers, implicit, gems, etc.
+        // playerId differentiates per-player caches.
+        // levelMet + attrsMet capture the only player-dependent tooltip content (requirement colors).
         int result = gearData.hashCode();
         result = 31 * result + (playerId != null ? playerId.hashCode() : 0);
-        result = 31 * result + Long.hashCode(statsVersion);
+        result = 31 * result + (levelMet ? 1 : 0);
+        result = 31 * result + (attrsMet ? 1 : 0);
         result = 31 * result + DEFINITION_FORMAT_VERSION;
         return result;
     }
@@ -453,21 +462,19 @@ public final class ItemDefinitionBuilder {
     /**
      * Sanitizes vanilla fields from the CLIENT item definition (packet).
      *
-     * <p>Strips ALL stat modifiers from weapon/utility/armor so the client does not
-     * apply them locally for prediction. Weapon-mechanic stats (SignatureEnergy, Ammo,
-     * SignatureCharges) are managed entirely by the server via the server-side Item's
-     * preserved statModifiers — see {@code ItemRegistryService.neutralizeWeaponStats()}.
+     * <p><b>Weapon statModifiers are PRESERVED</b> on the client definition. These contain
+     * weapon-mechanic stats (SignatureEnergy, Ammo, SignatureCharges) that the client needs
+     * to initialize the Abilities HUD (Signature Energy gauge, ability icons, button legend).
+     * Without them, the client sees max SE = 0 and hides the entire Abilities HUD area.
      *
-     * <p><b>Why client-side statModifiers must be null:</b> Our {@code ItemSyncCoordinator}
-     * periodically sends UpdateItems packets. If the client-side weapon definition includes
-     * statModifiers, the client re-applies them on each update, resetting SignatureEnergy
-     * to max. This breaks the signature attack lifecycle — after consuming SE, the client
-     * restores it to full, causing the client to route all attacks to the (now on-cooldown)
-     * signature attack, locking the player.
+     * <p><b>Softlock prevention:</b> The client re-applies weapon.statModifiers on every
+     * UpdateItems re-sync, resetting SE to max. To prevent this from causing a signature
+     * attack softlock, {@code ItemSyncCoordinator.flushOnWorldThread()} calls
+     * {@link StatMapBridge#correctWeaponMechanicStats} after every equipment sync, which
+     * force-sends the server's actual current stat values via {@code Predictable.SELF}.
      *
-     * <p>{@code displayEntityStatsHUD} is preserved (inherited from the server-side Item
-     * via toPacket) to tell the client which stat HUD bars to render. The bar values come
-     * from server EntityStatValue updates, not from client-side stat prediction.
+     * <p>Armor and utility statModifiers ARE nulled — they contain combat stats (Health,
+     * Stamina, Mana bonuses) handled by our RPG stat system and don't affect HUD display.
      *
      * <p>Durability is zeroed because RPG gear is permanent — the native durability bar
      * should never appear.
@@ -475,9 +482,11 @@ public final class ItemDefinitionBuilder {
      * @param definition The item definition to sanitize for client display
      */
     private void clearVanillaModifiers(@Nonnull ItemBase definition) {
-        if (definition.weapon != null) {
-            definition.weapon.statModifiers = null;
-        }
+        // NOTE: weapon.statModifiers is intentionally PRESERVED (not nulled).
+        // It contains weapon-mechanic stats (SignatureEnergy, Ammo, SignatureCharges)
+        // needed by the client to show the Abilities HUD. The softlock from client
+        // re-applying these on UpdateItems re-sync is handled by stat correction
+        // in ItemSyncCoordinator — see StatMapBridge.correctWeaponMechanicStats().
 
         if (definition.armor != null) {
             definition.armor.statModifiers = null;

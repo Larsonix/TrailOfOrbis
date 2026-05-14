@@ -271,6 +271,19 @@ public final class PlayerItemCache {
         return Set.copyOf(playerCache.keySet());
     }
 
+    /**
+     * Returns all item IDs currently tracked across ALL online players.
+     * Used by the demotion sweep to protect items held by active players.
+     */
+    @Nonnull
+    public Set<String> getAllTrackedItemIds() {
+        Set<String> allIds = new java.util.HashSet<>();
+        for (Map<String, Integer> cache : playerCaches.values()) {
+            allIds.addAll(cache.keySet());
+        }
+        return allIds;
+    }
+
     // =========================================================================
     // STATISTICS
     // =========================================================================

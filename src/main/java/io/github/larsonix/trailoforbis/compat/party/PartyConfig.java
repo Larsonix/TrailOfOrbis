@@ -18,6 +18,7 @@ public class PartyConfig {
     private AntiBoostingConfig antiBoosting = new AntiBoostingConfig();
     private PvpProtectionConfig pvpProtection = new PvpProtectionConfig();
     private RealmCoopConfig realmCoop = new RealmCoopConfig();
+    private ProximityConfig proximity = new ProximityConfig();
     private HudConfig hud = new HudConfig();
     private LocationConfig location = new LocationConfig();
 
@@ -48,6 +49,9 @@ public class PartyConfig {
     public RealmCoopConfig getRealmCoop() { return realmCoop; }
     public void setRealmCoop(RealmCoopConfig v) { this.realmCoop = v; }
     public void setRealm_coop(RealmCoopConfig v) { this.realmCoop = v; }
+
+    public ProximityConfig getProximity() { return proximity; }
+    public void setProximity(ProximityConfig v) { this.proximity = v; }
 
     public HudConfig getHud() { return hud; }
     public void setHud(HudConfig v) { this.hud = v; }
@@ -113,8 +117,19 @@ public class PartyConfig {
         }
     }
 
-    public static class AntiBoostingConfig {
+    public static class ProximityConfig {
         private boolean enabled = true;
+        private double radius = 64.0;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean v) { this.enabled = v; }
+
+        public double getRadius() { return radius; }
+        public void setRadius(double v) { this.radius = v; }
+    }
+
+    public static class AntiBoostingConfig {
+        private boolean enabled = false;
         private boolean usePartyMaxLevel = true;
 
         public boolean isEnabled() { return enabled; }

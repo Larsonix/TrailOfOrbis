@@ -1,43 +1,65 @@
 package io.github.larsonix.trailoforbis.lootfilter.model;
 
-import io.github.larsonix.trailoforbis.gear.model.ArmorMaterial;
+import io.github.larsonix.trailoforbis.gear.model.ArmorImplicit;
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.WeaponImplicit;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
+import io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifier;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A single filter condition that evaluates whether an item matches.
  *
- * <p>Sealed interface with 12 record implementations — one per {@link ConditionType}.
+ * <p>Sealed interface with record implementations — one per {@link ConditionType}.
  * Within a rule, multiple conditions are AND'd together (all must match).
+ *
+ * <p>Conditions may apply to gear, maps, or both. Gear rules use {@link #matches},
+ * map rules use {@link #matchesMap}. The default {@code matchesMap} returns true
+ * (gear-only conditions auto-pass when used in map evaluation).
  */
 public sealed interface FilterCondition permits
         FilterCondition.MinRarity,
         FilterCondition.MaxRarity,
         FilterCondition.EquipmentSlotCondition,
         FilterCondition.WeaponTypeCondition,
-        FilterCondition.ArmorMaterialCondition,
+        FilterCondition.ArmorImplicitCondition,
         FilterCondition.ItemLevelRange,
         FilterCondition.QualityRange,
         FilterCondition.RequiredModifiers,
         FilterCondition.ModifierValueRange,
         FilterCondition.ImplicitCondition,
         FilterCondition.MinModifierCount,
-        FilterCondition.CorruptionStateCondition {
+        FilterCondition.CorruptionStateCondition,
+        FilterCondition.BiomeCondition,
+        FilterCondition.MapSizeCondition,
+        FilterCondition.MapModifierCondition {
 
     /** The discriminator type for serialization. */
     ConditionType type();
 
-    /** Returns true if the item matches this condition. */
+    /** Returns true if gear matches this condition. */
     boolean matches(@Nonnull GearData gearData, @Nonnull EquipmentType equipmentType);
+
+    /** Returns true if a realm map matches this condition. Default: pass-through. */
+    default boolean matchesMap(@Nonnull RealmMapData mapData) { return true; }
+
+    /** Whether this condition is only meaningful for maps (not available in gear rules). */
+    default boolean isMapOnly() { return false; }
+
+    /** Whether this condition is only meaningful for gear (not available in map rules). */
+    default boolean isGearOnly() { return false; }
 
     /** Human-readable summary for UI and commands. */
     String describe();
@@ -46,7 +68,7 @@ public sealed interface FilterCondition permits
     // IMPLEMENTATIONS
     // ═══════════════════════════════════════════════════════════════════
 
-    /** rarity >= threshold */
+    /** rarity >= threshold (shared: works for gear and maps) */
     record MinRarity(@Nonnull GearRarity threshold) implements FilterCondition {
         @Override
         public ConditionType type() { return ConditionType.MIN_RARITY; }
@@ -57,10 +79,15 @@ public sealed interface FilterCondition permits
         }
 
         @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return m.rarity().ordinal() >= threshold.ordinal();
+        }
+
+        @Override
         public String describe() { return threshold.name() + " or better"; }
     }
 
-    /** rarity <= threshold */
+    /** rarity <= threshold (shared: works for gear and maps) */
     record MaxRarity(@Nonnull GearRarity threshold) implements FilterCondition {
         @Override
         public ConditionType type() { return ConditionType.MAX_RARITY; }
@@ -71,17 +98,22 @@ public sealed interface FilterCondition permits
         }
 
         @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return m.rarity().ordinal() <= threshold.ordinal();
+        }
+
+        @Override
         public String describe() { return threshold.name() + " or worse"; }
     }
 
-    /** Equipment slot membership (uses EquipmentType.getSlot()) */
+    /** Equipment slot membership (gear-only) */
     record EquipmentSlotCondition(@Nonnull Set<String> slots) implements FilterCondition {
         public EquipmentSlotCondition {
             slots = Set.copyOf(slots);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.EQUIPMENT_SLOT; }
+        @Override public ConditionType type() { return ConditionType.EQUIPMENT_SLOT; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -97,14 +129,14 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** Weapon type membership */
+    /** Weapon type membership (gear-only) */
     record WeaponTypeCondition(@Nonnull Set<WeaponType> types) implements FilterCondition {
         public WeaponTypeCondition {
             types = Set.copyOf(types);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.WEAPON_TYPE; }
+        @Override public ConditionType type() { return ConditionType.WEAPON_TYPE; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -121,31 +153,32 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** Armor material membership */
-    record ArmorMaterialCondition(@Nonnull Set<ArmorMaterial> materials) implements FilterCondition {
-        public ArmorMaterialCondition {
-            materials = Set.copyOf(materials);
+    /** Armor implicit defense type filter (gear-only) */
+    record ArmorImplicitCondition(@Nonnull Set<String> defenseTypes) implements FilterCondition {
+        public ArmorImplicitCondition {
+            defenseTypes = Set.copyOf(defenseTypes);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.ARMOR_MATERIAL; }
+        @Override public ConditionType type() { return ConditionType.ARMOR_IMPLICIT; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
-            if (e.getCategory() != EquipmentType.Category.ARMOR) return false;
-            return e.getArmorMaterial() != null && materials.contains(e.getArmorMaterial());
+            ArmorImplicit impl = g.armorImplicit();
+            if (impl == null) return false;
+            return defenseTypes.contains(impl.defenseType());
         }
 
         @Override
         public String describe() {
-            return materials.stream()
-                    .map(m -> capitalize(m.name()))
+            return defenseTypes.stream()
+                    .map(FilterCondition::formatDamageType)
                     .sorted()
                     .collect(Collectors.joining(", "));
         }
     }
 
-    /** min <= level <= max */
+    /** min <= level <= max (shared: works for gear and maps) */
     record ItemLevelRange(int min, int max) implements FilterCondition {
         public ItemLevelRange {
             if (min > max) {
@@ -157,12 +190,16 @@ public sealed interface FilterCondition permits
             max = Math.min(1_000_000, max);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.ITEM_LEVEL_RANGE; }
+        @Override public ConditionType type() { return ConditionType.ITEM_LEVEL_RANGE; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
             return g.level() >= min && g.level() <= max;
+        }
+
+        @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return m.level() >= min && m.level() <= max;
         }
 
         @Override
@@ -172,7 +209,7 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** min <= quality <= max */
+    /** min <= quality <= max (shared: works for gear and maps) */
     record QualityRange(int min, int max) implements FilterCondition {
         public QualityRange {
             if (min > max) {
@@ -184,12 +221,16 @@ public sealed interface FilterCondition permits
             max = Math.min(101, max);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.QUALITY_RANGE; }
+        @Override public ConditionType type() { return ConditionType.QUALITY_RANGE; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
             return g.quality() >= min && g.quality() <= max;
+        }
+
+        @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return m.quality() >= min && m.quality() <= max;
         }
 
         @Override
@@ -200,15 +241,15 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** At least N of the listed modifiers present on the item */
+    /** At least N of the listed gear modifiers present (gear-only) */
     record RequiredModifiers(@Nonnull Set<String> modifierIds, int minCount) implements FilterCondition {
         public RequiredModifiers {
             modifierIds = Set.copyOf(modifierIds);
             minCount = Math.max(1, minCount);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.REQUIRED_MODIFIERS; }
+        @Override public ConditionType type() { return ConditionType.REQUIRED_MODIFIERS; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -228,7 +269,7 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** Specific modifier with roll value in range */
+    /** Specific gear modifier with roll value in range (gear-only) */
     record ModifierValueRange(@Nonnull String modifierId, double minValue, double maxValue)
             implements FilterCondition {
         public ModifierValueRange {
@@ -239,8 +280,8 @@ public sealed interface FilterCondition permits
             }
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.MODIFIER_VALUE_RANGE; }
+        @Override public ConditionType type() { return ConditionType.MODIFIER_VALUE_RANGE; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -261,7 +302,7 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** Weapon implicit roll quality and damage type */
+    /** Weapon implicit roll quality and damage type (gear-only) */
     record ImplicitCondition(double minPercentile, @Nonnull Set<String> damageTypes)
             implements FilterCondition {
         public ImplicitCondition {
@@ -269,8 +310,8 @@ public sealed interface FilterCondition permits
             damageTypes = Set.copyOf(damageTypes);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.IMPLICIT_CONDITION; }
+        @Override public ConditionType type() { return ConditionType.IMPLICIT_CONDITION; }
+        @Override public boolean isGearOnly() { return true; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -299,14 +340,13 @@ public sealed interface FilterCondition permits
         }
     }
 
-    /** Total modifiers >= threshold */
+    /** Total modifiers >= threshold (shared: works for gear and maps) */
     record MinModifierCount(int count) implements FilterCondition {
         public MinModifierCount {
             count = Math.clamp(count, 0, 6);
         }
 
-        @Override
-        public ConditionType type() { return ConditionType.MIN_MODIFIER_COUNT; }
+        @Override public ConditionType type() { return ConditionType.MIN_MODIFIER_COUNT; }
 
         @Override
         public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) {
@@ -314,10 +354,15 @@ public sealed interface FilterCondition permits
         }
 
         @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return m.modifierCount() >= count;
+        }
+
+        @Override
         public String describe() { return count + "+ modifiers"; }
     }
 
-    /** Corruption state filter */
+    /** Corruption state filter (shared: works for gear and maps) */
     record CorruptionStateCondition(@Nonnull CorruptionFilter filter) implements FilterCondition {
         @Override
         public ConditionType type() { return ConditionType.CORRUPTION_STATE; }
@@ -332,12 +377,102 @@ public sealed interface FilterCondition permits
         }
 
         @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return switch (filter) {
+                case CORRUPTED_ONLY -> m.corrupted();
+                case NOT_CORRUPTED -> !m.corrupted();
+                case EITHER -> true;
+            };
+        }
+
+        @Override
         public String describe() {
             return switch (filter) {
                 case CORRUPTED_ONLY -> "Corrupted only";
                 case NOT_CORRUPTED -> "Not corrupted";
                 case EITHER -> "Any corruption";
             };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MAP-ONLY CONDITIONS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** Realm biome membership (map-only) */
+    record BiomeCondition(@Nonnull Set<RealmBiomeType> biomes) implements FilterCondition {
+        public BiomeCondition { biomes = Set.copyOf(biomes); }
+
+        @Override public ConditionType type() { return ConditionType.MAP_BIOME; }
+        @Override public boolean isMapOnly() { return true; }
+        @Override public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) { return true; }
+
+        @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return biomes.contains(m.biome());
+        }
+
+        @Override
+        public String describe() {
+            return biomes.stream()
+                    .map(RealmBiomeType::getDisplayName)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+        }
+    }
+
+    /** Realm map size membership (map-only) */
+    record MapSizeCondition(@Nonnull Set<RealmLayoutSize> sizes) implements FilterCondition {
+        public MapSizeCondition { sizes = Set.copyOf(sizes); }
+
+        @Override public ConditionType type() { return ConditionType.MAP_SIZE; }
+        @Override public boolean isMapOnly() { return true; }
+        @Override public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) { return true; }
+
+        @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            return sizes.contains(m.size());
+        }
+
+        @Override
+        public String describe() {
+            return sizes.stream()
+                    .map(s -> capitalize(s.name()))
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+        }
+    }
+
+    /** Realm map modifier presence (map-only) */
+    record MapModifierCondition(@Nonnull Set<RealmModifierType> modifierTypes, int minCount)
+            implements FilterCondition {
+        public MapModifierCondition {
+            modifierTypes = Set.copyOf(modifierTypes);
+            minCount = Math.max(1, minCount);
+        }
+
+        @Override public ConditionType type() { return ConditionType.MAP_MODIFIER; }
+        @Override public boolean isMapOnly() { return true; }
+        @Override public boolean matches(@Nonnull GearData g, @Nonnull EquipmentType e) { return true; }
+
+        @Override
+        public boolean matchesMap(@Nonnull RealmMapData m) {
+            long count = Stream.concat(m.prefixes().stream(), m.suffixes().stream())
+                    .map(RealmModifier::type)
+                    .filter(modifierTypes::contains)
+                    .count();
+            return count >= minCount;
+        }
+
+        @Override
+        public String describe() {
+            String mods = modifierTypes.stream()
+                    .map(RealmModifierType::getDisplayName)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            if (minCount == 1 && modifierTypes.size() == 1) return "Has: " + mods;
+            if (minCount >= modifierTypes.size()) return "Has all: " + mods;
+            return "Has " + minCount + "+ of: " + mods;
         }
     }
 

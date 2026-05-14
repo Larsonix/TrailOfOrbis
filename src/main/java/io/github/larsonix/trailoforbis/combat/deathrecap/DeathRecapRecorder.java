@@ -15,6 +15,7 @@ import io.github.larsonix.trailoforbis.combat.resolution.CombatEntityResolver;
 import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
+import io.github.larsonix.trailoforbis.combat.format.CombatFormatConstants;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 
 import javax.annotation.Nonnull;
@@ -40,7 +41,7 @@ public class DeathRecapRecorder {
 
     private final CombatEntityResolver entityResolver;
     private final DamageTypeClassifier classifier;
-    private final DeathRecapTracker tracker;
+    private final java.util.function.Supplier<DeathRecapTracker> trackerSupplier;
     private final ComponentType<EntityStore, MobScalingComponent> mobScalingComponentType;
     private final LevelingProvider levelingProvider;
 
@@ -55,22 +56,27 @@ public class DeathRecapRecorder {
     /**
      * Creates a new DeathRecapRecorder.
      *
+     * <p>The tracker is resolved lazily via supplier because the recorder is
+     * constructed during RPGDamageSystem.initialize() (Phase 3) but the
+     * DeathRecapTracker is created later (Phase 7.6). Eager resolution would
+     * always receive null.
+     *
      * @param entityResolver The entity resolver for attacker lookups
      * @param classifier The damage type classifier
-     * @param tracker The death recap tracker (may be null)
+     * @param trackerSupplier Lazy supplier for the death recap tracker
      * @param mobScalingComponentType The mob scaling component type
      * @param levelingProvider Provider for getting player levels
      */
     public DeathRecapRecorder(
         @Nonnull CombatEntityResolver entityResolver,
         @Nonnull DamageTypeClassifier classifier,
-        @Nullable DeathRecapTracker tracker,
+        @Nonnull java.util.function.Supplier<DeathRecapTracker> trackerSupplier,
         @Nullable ComponentType<EntityStore, MobScalingComponent> mobScalingComponentType,
         @Nullable LevelingProvider levelingProvider
     ) {
         this.entityResolver = entityResolver;
         this.classifier = classifier;
-        this.tracker = tracker;
+        this.trackerSupplier = trackerSupplier;
         this.mobScalingComponentType = mobScalingComponentType;
         this.levelingProvider = levelingProvider;
     }
@@ -116,6 +122,7 @@ public class DeathRecapRecorder {
         float defenderMaxHealth,
         float defenderHealthBefore
     ) {
+        DeathRecapTracker tracker = trackerSupplier.get();
         if (tracker == null || !tracker.getConfig().isEnabled()) {
             return;
         }
@@ -190,6 +197,7 @@ public class DeathRecapRecorder {
         float defenderMaxHealth,
         float defenderHealthBefore
     ) {
+        DeathRecapTracker tracker = trackerSupplier.get();
         if (tracker == null || !tracker.getConfig().isEnabled()) {
             return;
         }
@@ -271,7 +279,7 @@ public class DeathRecapRecorder {
             if (mobScalingComponentType != null) {
                 MobScalingComponent scaling = store.getComponent(attackerRef, mobScalingComponentType);
                 if (scaling != null) {
-                    String mobName = DeathRecapFormatter.formatMobName(
+                    String mobName = CombatFormatConstants.formatMobName(
                         scaling.getRoleName() != null ? scaling.getRoleName() : "Unknown Mob"
                     );
                     return new AttackerInfo(
@@ -294,6 +302,7 @@ public class DeathRecapRecorder {
      * @return true if tracker is initialized and enabled
      */
     public boolean isAvailable() {
+        DeathRecapTracker tracker = trackerSupplier.get();
         return tracker != null && tracker.getConfig().isEnabled();
     }
 
@@ -333,7 +342,7 @@ public class DeathRecapRecorder {
             if (mobScalingComponentType != null) {
                 MobScalingComponent scaling = store.getComponent(targetRef, mobScalingComponentType);
                 if (scaling != null) {
-                    String mobName = DeathRecapFormatter.formatMobName(
+                    String mobName = CombatFormatConstants.formatMobName(
                         scaling.getRoleName() != null ? scaling.getRoleName() : "Unknown Mob"
                     );
                     return new AttackerInfo(

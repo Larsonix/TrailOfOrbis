@@ -12,14 +12,22 @@ import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemContext;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.server.OpenCustomUIInteraction;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.api.services.SkillTreeService;
+import io.github.larsonix.trailoforbis.gear.GearManager;
+import io.github.larsonix.trailoforbis.gear.item.ItemDisplayNameService;
+import io.github.larsonix.trailoforbis.stones.ModifiableItem;
+import io.github.larsonix.trailoforbis.stones.ModifiableItemIO;
+import io.github.larsonix.trailoforbis.stones.StoneActionRegistry;
+import io.github.larsonix.trailoforbis.stones.StoneActionResult;
 import io.github.larsonix.trailoforbis.stones.StoneType;
 import io.github.larsonix.trailoforbis.stones.StoneUtils;
 
@@ -29,10 +37,15 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Page supplier for the Stone Picker UI.
@@ -67,10 +80,15 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
      * The two calls arrive within the same millisecond, so 500ms is generous. The key includes
      * stone type so that rapidly switching between different refund stones is not blocked.
      */
-    private static final long REFUND_DEBOUNCE_MS = 500;
+    private static final long BULK_ACTION_DEBOUNCE_MS = 500;
 
-    /** Tracks last refund stone consumption time per player+stoneType for deduplication. */
-    private final ConcurrentHashMap<String, Long> lastRefundTime = new ConcurrentHashMap<>();
+    /** Tracks last bulk action time per player+stoneType for deduplication. */
+    private final ConcurrentHashMap<String, Long> lastBulkActionTime = new ConcurrentHashMap<>();
+
+    /** Priority order for bulk identify: hotbar first, then storage, armor, utility. */
+    private static final List<ContainerType> IDENTIFY_PRIORITY = List.of(
+        ContainerType.HOTBAR, ContainerType.STORAGE, ContainerType.ARMOR, ContainerType.UTILITY
+    );
 
     private final TrailOfOrbis plugin;
 
@@ -107,19 +125,24 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
         byte activeSlot = inventory.getActiveHotbarSlot();
         if (activeSlot == Inventory.INACTIVE_SLOT_INDEX) return;
 
+        // Re-verify the slot still contains the expected stone type.
+        // This method runs deferred via world.execute() — the player could have
+        // switched hotbar slots between tryCreate() and this callback.
+        ItemStack heldItem = inventory.getHotbar().getItemStack(activeSlot);
+        if (heldItem == null || heldItem.isEmpty() || !StoneUtils.isStone(heldItem)) return;
+        Optional<StoneType> currentType = StoneUtils.readStoneType(heldItem);
+        if (currentType.isEmpty() || currentType.get() != stoneType) return;
+
         // Determine how many to consume: full stack if crouching, 1 otherwise
         int consumeCount = 1;
         if (isCrouching) {
-            ItemStack heldItem = inventory.getHotbar().getItemStack(activeSlot);
-            if (heldItem != null && !heldItem.isEmpty()) {
-                consumeCount = heldItem.getQuantity();
-            }
+            consumeCount = heldItem.getQuantity();
         }
 
         // Consume stones from the active slot
         inventory.getHotbar().removeItemStackFromSlot(activeSlot, consumeCount);
 
-        java.util.UUID playerId = playerRef.getUuid();
+        UUID playerId = playerRef.getUuid();
         final int consumed = consumeCount;
 
         if (stoneType == StoneType.ORB_OF_UNLEARNING) {
@@ -159,6 +182,144 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
 
         LOGGER.atInfo().log("Player %s consumed %dx %s (crouching: %b)",
             playerRef.getUsername(), consumed, stoneType.getDisplayName(), isCrouching);
+    }
+
+    /**
+     * Handles bulk identification: identifies as many unidentified items as possible,
+     * consuming one scroll per item identified.
+     *
+     * <p>Scans the player's inventory for unidentified items, processes them in
+     * priority order (hotbar first, then storage, armor, utility), and identifies
+     * up to {@code min(scrollsInHand, unidentifiedItemCount)} items in one action.
+     *
+     * @param player The player component
+     * @param playerRef The player reference
+     * @param stoneType The stone type (LOREKEEPERS_SCROLL)
+     */
+    private void handleBulkIdentify(
+            @Nonnull Player player,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull StoneType stoneType) {
+
+        Inventory inventory = player.getInventory();
+        if (inventory == null) return;
+
+        byte activeSlot = inventory.getActiveHotbarSlot();
+        if (activeSlot == Inventory.INACTIVE_SLOT_INDEX) return;
+
+        // Re-verify the slot still contains the expected stone type.
+        // This method runs deferred via world.execute() — the player could have
+        // switched hotbar slots between tryCreate() and this callback.
+        ItemStack heldItem = inventory.getHotbar().getItemStack(activeSlot);
+        if (heldItem == null || heldItem.isEmpty() || !StoneUtils.isStone(heldItem)) return;
+        Optional<StoneType> currentType = StoneUtils.readStoneType(heldItem);
+        if (currentType.isEmpty() || currentType.get() != stoneType) return;
+
+        int scrollsAvailable = heldItem.getQuantity();
+
+        // Get action registry for scanning and execution
+        StoneApplicationService applicationService = plugin.getStoneApplicationService();
+        if (applicationService == null) return;
+        StoneActionRegistry actionRegistry = applicationService.getActionRegistry();
+
+        GearManager gearManager = plugin.getGearManager();
+        if (gearManager == null || !gearManager.isInitialized()) return;
+
+        // Scan for unidentified items (canApply filters to !isIdentified())
+        ItemDisplayNameService displayNameService = gearManager.getItemDisplayNameService();
+        CompatibleItemScanner scanner = new CompatibleItemScanner(displayNameService);
+        List<CompatibleItemScanner.ScannedItem> scannedItems =
+            scanner.scan(inventory, stoneType, actionRegistry);
+
+        // Sort by priority: Hotbar → Storage → Armor → Utility
+        scannedItems.sort(Comparator.comparingInt(
+            item -> IDENTIFY_PRIORITY.indexOf(item.container())));
+
+        int toIdentify = Math.min(scrollsAvailable, scannedItems.size());
+
+        if (toIdentify == 0) {
+            NotificationUtil.sendNotification(
+                playerRef.getPacketHandler(),
+                Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+                Message.raw("No unidentified items found").color("#FF5555"),
+                NotificationStyle.Warning);
+            return;
+        }
+
+        // Identify items one by one
+        Random random = ThreadLocalRandom.current();
+        int successCount = 0;
+        List<ItemStack> updatedStacks = new ArrayList<>();
+        List<ModifiableItem> originalDatas = new ArrayList<>();
+
+        for (int i = 0; i < toIdentify; i++) {
+            CompatibleItemScanner.ScannedItem item = scannedItems.get(i);
+
+            // Get fresh item from container
+            ItemContainer container = item.container().getContainer(inventory);
+            if (container == null) continue;
+
+            ItemStack currentItem = container.getItemStack(item.slot());
+            if (currentItem == null || currentItem.isEmpty()) continue;
+
+            // Execute identify action
+            StoneActionResult result = actionRegistry.execute(stoneType, item.data(), random);
+            if (!result.success() || result.modifiedItem() == null) {
+                LOGGER.atFine().log("Bulk identify: action failed for item in %s slot %d: %s",
+                    item.container(), item.slot(), result.message());
+                continue;
+            }
+
+            // Write back modified data
+            ItemStack updatedStack = ModifiableItemIO.writeBack(currentItem, result.modifiedItem());
+            if (updatedStack == null) {
+                LOGGER.atWarning().log("Bulk identify: writeBack failed for item in %s slot %d",
+                    item.container(), item.slot());
+                continue;
+            }
+
+            container.setItemStackForSlot(item.slot(), updatedStack);
+            updatedStacks.add(updatedStack);
+            originalDatas.add(item.data());
+            successCount++;
+        }
+
+        if (successCount == 0) {
+            NotificationUtil.sendNotification(
+                playerRef.getPacketHandler(),
+                Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+                Message.raw("Failed to identify any items").color("#FF5555"),
+                NotificationStyle.Warning);
+            return;
+        }
+
+        // Consume scrolls equal to successful identifications
+        inventory.getHotbar().removeItemStackFromSlot(activeSlot, successCount);
+
+        // Notification
+        String detail = successCount + " item" + (successCount > 1 ? "s" : "") + " identified"
+            + " (" + successCount + " scroll" + (successCount > 1 ? "s" : "") + " used)";
+        NotificationUtil.sendNotification(
+            playerRef.getPacketHandler(),
+            Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+            Message.raw(detail).color("#55FF55"),
+            NotificationStyle.Success);
+
+        // Batch resync all modified items (next tick to avoid tooltip flash)
+        World world = player.getWorld();
+        if (world != null) {
+            final List<ItemStack> resyncStacks = List.copyOf(updatedStacks);
+            final List<ModifiableItem> resyncDatas = List.copyOf(originalDatas);
+            world.execute(() -> {
+                for (int i = 0; i < resyncStacks.size(); i++) {
+                    ModifiableItemIO.resync(playerRef, resyncStacks.get(i),
+                        resyncDatas.get(i), gearManager);
+                }
+            });
+        }
+
+        LOGGER.atInfo().log("Player %s bulk-identified %d items (%d scrolls consumed)",
+            playerRef.getUsername(), successCount, successCount);
     }
 
     /**
@@ -222,17 +383,10 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
 
         StoneType stoneType = stoneTypeOpt.get();
 
-        // Refund stones: consume and grant points immediately, no picker UI
-        // Debounce: Hytale calls tryCreate() twice per interaction — skip duplicate
-        if (stoneType.isRefundStone()) {
-            long now = System.currentTimeMillis();
-            String debounceKey = playerRef.getUuid().toString() + ":" + stoneType.name();
-            Long lastTime = lastRefundTime.put(debounceKey, now);
-            if (lastTime != null && (now - lastTime) < REFUND_DEBOUNCE_MS) {
-                LOGGER.atFine().log("Debounced duplicate refund stone use for %s", playerRef.getUsername());
-                return null;
-            }
-            boolean isCrouching = false;
+        // Detect crouching for bulk-action stones (refund stones + Lorekeeper's Scroll).
+        // Read once, shared by both branches below.
+        boolean isCrouching = false;
+        if (stoneType.isRefundStone() || stoneType == StoneType.LOREKEEPERS_SCROLL) {
             try {
                 MovementStatesComponent movementComp = componentAccessor.getComponent(
                     ref, MovementStatesComponent.getComponentType());
@@ -243,9 +397,44 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
                     }
                 }
             } catch (Exception e) {
-                LOGGER.atWarning().withCause(e).log("Failed to read crouching state, defaulting to single consume");
+                LOGGER.atWarning().withCause(e).log("Failed to read crouching state, defaulting to single action");
             }
-            handleRefundStone(playerComponent, playerRef, stoneType, isCrouching);
+        }
+
+        // Refund stones: consume and grant points immediately, no picker UI
+        // Debounce: Hytale calls tryCreate() twice per interaction — skip duplicate
+        if (stoneType.isRefundStone()) {
+            long now = System.currentTimeMillis();
+            String debounceKey = playerRef.getUuid().toString() + ":" + stoneType.name();
+            Long lastTime = lastBulkActionTime.put(debounceKey, now);
+            if (lastTime != null && (now - lastTime) < BULK_ACTION_DEBOUNCE_MS) {
+                LOGGER.atFine().log("Debounced duplicate refund stone use for %s", playerRef.getUsername());
+                return null;
+            }
+            // Defer inventory mutation to world.execute() — removeItemStackFromSlot()
+            // is an EntityStore mutation that causes "Simulation and server tick are
+            // not in sync" when called inside the interaction chain's serverTick().
+            World world = ref.getStore().getExternalData().getWorld();
+            final boolean capturedCrouching = isCrouching;
+            world.execute(() -> {
+                handleRefundStone(playerComponent, playerRef, stoneType, capturedCrouching);
+            });
+            return null;
+        }
+
+        // Lorekeeper's Scroll: bulk identify when crouching, picker UI when not
+        if (stoneType == StoneType.LOREKEEPERS_SCROLL && isCrouching) {
+            long now = System.currentTimeMillis();
+            String debounceKey = playerRef.getUuid().toString() + ":" + stoneType.name();
+            Long lastTime = lastBulkActionTime.put(debounceKey, now);
+            if (lastTime != null && (now - lastTime) < BULK_ACTION_DEBOUNCE_MS) {
+                LOGGER.atFine().log("Debounced duplicate bulk identify for %s", playerRef.getUsername());
+                return null;
+            }
+            World world = ref.getStore().getExternalData().getWorld();
+            world.execute(() -> {
+                handleBulkIdentify(playerComponent, playerRef, stoneType);
+            });
             return null;
         }
 
@@ -272,13 +461,19 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
         LOGGER.atInfo().log("Opening HyUI StonePickerPage for %s stone at slot %d",
             stoneType.name(), activeSlot);
 
-        // Open the HyUI page directly — get store from the entity ref
-        Store<EntityStore> store = ref.getStore();
-        StonePickerPage page = new StonePickerPage(
-            plugin, playerRef, stoneType, itemInHand, activeSlot,
-            ContainerType.HOTBAR, applicationService
-        );
-        page.open(store);
+        // Defer page.open() to world.execute() — opening a HyUI page inside tryCreate()
+        // causes "Simulation and server tick are not in sync" because tryCreate() runs
+        // inside the interaction chain tick. page.open() modifies the ECS store which
+        // advances the server operation counter without advancing the simulation counter.
+        World world = ref.getStore().getExternalData().getWorld();
+        world.execute(() -> {
+            Store<EntityStore> deferredStore = world.getEntityStore().getStore();
+            StonePickerPage page = new StonePickerPage(
+                plugin, playerRef, stoneType, itemInHand, activeSlot,
+                ContainerType.HOTBAR, applicationService
+            );
+            page.open(deferredStore);
+        });
 
         // Return null — HyUI handles the page, not the engine's native page system
         return null;

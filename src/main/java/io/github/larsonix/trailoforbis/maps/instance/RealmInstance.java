@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.maps.instance;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.World;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.core.*;
 import io.github.larsonix.trailoforbis.maps.spawning.RealmLabyrinthPlacer;
 import io.github.larsonix.trailoforbis.maps.templates.RealmTemplate;
@@ -139,19 +140,21 @@ public class RealmInstance {
      * @param mapData The realm map data
      * @param template The template to instantiate
      * @param ownerId The player who opened this realm
+     * @param config Realms configuration (for size timer multiplier)
      */
     public RealmInstance(
             @Nonnull UUID realmId,
             @Nonnull RealmMapData mapData,
             @Nonnull RealmTemplate template,
-            @Nonnull UUID ownerId) {
+            @Nonnull UUID ownerId,
+            @Nonnull RealmsConfig config) {
         this.realmId = Objects.requireNonNull(realmId, "Realm ID cannot be null");
         this.mapData = Objects.requireNonNull(mapData, "Map data cannot be null");
         this.template = Objects.requireNonNull(template, "Template cannot be null");
         this.ownerId = Objects.requireNonNull(ownerId, "Owner ID cannot be null");
 
         this.createdAt = Instant.now();
-        this.timeout = Duration.ofSeconds(mapData.computeTimeoutSeconds());
+        this.timeout = Duration.ofSeconds(mapData.computeTimeoutSeconds(config));
 
         // Initialize completion tracker
         int estimatedMonsters = mapData.calculateMonsterCount();

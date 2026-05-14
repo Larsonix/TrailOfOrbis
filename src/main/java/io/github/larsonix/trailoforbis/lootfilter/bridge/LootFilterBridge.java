@@ -436,6 +436,12 @@ public class LootFilterBridge {
         }
         map.put("rules", rules);
 
+        List<Map<String, Object>> mapRules = new ArrayList<>();
+        for (FilterRule rule : profile.getMapRules()) {
+            mapRules.add(serializeRule(rule));
+        }
+        map.put("mapRules", mapRules);
+
         return map;
     }
 
@@ -472,8 +478,8 @@ public class LootFilterBridge {
                     map.put("slots", List.copyOf(c.slots()));
             case FilterCondition.WeaponTypeCondition c ->
                     map.put("types", c.types().stream().map(Enum::name).toList());
-            case FilterCondition.ArmorMaterialCondition c ->
-                    map.put("materials", c.materials().stream().map(Enum::name).toList());
+            case FilterCondition.ArmorImplicitCondition c ->
+                    map.put("defenseTypes", List.copyOf(c.defenseTypes()));
             case FilterCondition.ItemLevelRange c -> {
                 map.put("min", c.min());
                 map.put("max", c.max());
@@ -499,6 +505,14 @@ public class LootFilterBridge {
                     map.put("count", c.count());
             case FilterCondition.CorruptionStateCondition c ->
                     map.put("filter", c.filter().name());
+            case FilterCondition.BiomeCondition c ->
+                    map.put("biomes", c.biomes().stream().map(Enum::name).toList());
+            case FilterCondition.MapSizeCondition c ->
+                    map.put("sizes", c.sizes().stream().map(Enum::name).toList());
+            case FilterCondition.MapModifierCondition c -> {
+                map.put("modifierTypes", c.modifierTypes().stream().map(Enum::name).toList());
+                map.put("minCount", c.minCount());
+            }
         }
 
         return map;
@@ -525,10 +539,8 @@ public class LootFilterBridge {
                     Set.copyOf(((List<String>) map.get("types")).stream()
                             .map(io.github.larsonix.trailoforbis.gear.model.WeaponType::valueOf)
                             .toList()));
-            case ARMOR_MATERIAL -> new FilterCondition.ArmorMaterialCondition(
-                    Set.copyOf(((List<String>) map.get("materials")).stream()
-                            .map(io.github.larsonix.trailoforbis.gear.model.ArmorMaterial::valueOf)
-                            .toList()));
+            case ARMOR_IMPLICIT -> new FilterCondition.ArmorImplicitCondition(
+                    Set.copyOf((List<String>) map.get("defenseTypes")));
             case ITEM_LEVEL_RANGE -> new FilterCondition.ItemLevelRange(
                     ((Number) map.get("min")).intValue(),
                     ((Number) map.get("max")).intValue());
@@ -550,6 +562,19 @@ public class LootFilterBridge {
             case CORRUPTION_STATE -> new FilterCondition.CorruptionStateCondition(
                     io.github.larsonix.trailoforbis.lootfilter.model.CorruptionFilter.valueOf(
                             (String) map.get("filter")));
+            case MAP_BIOME -> new FilterCondition.BiomeCondition(
+                    Set.copyOf(((List<String>) map.get("biomes")).stream()
+                            .map(io.github.larsonix.trailoforbis.maps.core.RealmBiomeType::valueOf)
+                            .toList()));
+            case MAP_SIZE -> new FilterCondition.MapSizeCondition(
+                    Set.copyOf(((List<String>) map.get("sizes")).stream()
+                            .map(io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize::valueOf)
+                            .toList()));
+            case MAP_MODIFIER -> new FilterCondition.MapModifierCondition(
+                    Set.copyOf(((List<String>) map.get("modifierTypes")).stream()
+                            .map(io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType::valueOf)
+                            .toList()),
+                    ((Number) map.get("minCount")).intValue());
         };
     }
 
@@ -571,16 +596,144 @@ public class LootFilterBridge {
             case EQUIPMENT_SLOT -> new FilterCondition.EquipmentSlotCondition(Set.of("weapon"));
             case WEAPON_TYPE -> new FilterCondition.WeaponTypeCondition(
                     Set.of(io.github.larsonix.trailoforbis.gear.model.WeaponType.SWORD));
-            case ARMOR_MATERIAL -> new FilterCondition.ArmorMaterialCondition(
-                    Set.of(io.github.larsonix.trailoforbis.gear.model.ArmorMaterial.LEATHER));
+            case ARMOR_IMPLICIT -> new FilterCondition.ArmorImplicitCondition(
+                    Set.of("evasion"));
             case ITEM_LEVEL_RANGE -> new FilterCondition.ItemLevelRange(1, 100);
-            case QUALITY_RANGE -> new FilterCondition.QualityRange(50, 100);
+            case QUALITY_RANGE -> new FilterCondition.QualityRange(50, 101);
             case REQUIRED_MODIFIERS -> new FilterCondition.RequiredModifiers(Set.of(), 1);
             case MODIFIER_VALUE_RANGE -> new FilterCondition.ModifierValueRange("crit_chance", 0, 100);
             case IMPLICIT_CONDITION -> new FilterCondition.ImplicitCondition(0.0, Set.of());
             case MIN_MODIFIER_COUNT -> new FilterCondition.MinModifierCount(3);
             case CORRUPTION_STATE -> new FilterCondition.CorruptionStateCondition(
                     io.github.larsonix.trailoforbis.lootfilter.model.CorruptionFilter.EITHER);
+            case MAP_BIOME -> new FilterCondition.BiomeCondition(
+                    Set.of(io.github.larsonix.trailoforbis.maps.core.RealmBiomeType.FOREST));
+            case MAP_SIZE -> new FilterCondition.MapSizeCondition(
+                    Set.of(io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize.MEDIUM));
+            case MAP_MODIFIER -> new FilterCondition.MapModifierCondition(
+                    Set.of(io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType.ITEM_QUANTITY), 1);
         };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MAP RULE BRIDGE METHODS
+    // ═══════════════════════════════════════════════════════════════════
+
+    public String addMapRule(String playerId, String profileId, String ruleName) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule newRule = new FilterRule(
+                    ruleName != null && !ruleName.isEmpty() ? ruleName : "New Map Rule",
+                    true, FilterAction.ALLOW, List.of());
+            filterManager.saveProfile(uuid, profile.withAddedMapRule(newRule));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: addMapRule failed");
+            return "null";
+        }
+    }
+
+    public String deleteMapRule(String playerId, String profileId, int ruleIndex) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            filterManager.saveProfile(uuid, profile.withRemovedMapRule(ruleIndex));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: deleteMapRule failed");
+            return "null";
+        }
+    }
+
+    public String moveMapRule(String playerId, String profileId, int fromIndex, int toIndex) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            filterManager.saveProfile(uuid, profile.withMovedMapRule(fromIndex, toIndex));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: moveMapRule failed");
+            return "null";
+        }
+    }
+
+    public String toggleMapRuleEnabled(String playerId, String profileId, int ruleIndex) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule rule = profile.getMapRules().get(ruleIndex);
+            filterManager.saveProfile(uuid, profile.withUpdatedMapRule(ruleIndex, rule.withEnabled(!rule.enabled())));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: toggleMapRuleEnabled failed");
+            return "null";
+        }
+    }
+
+    public String setMapRuleAction(String playerId, String profileId, int ruleIndex, String action) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule rule = profile.getMapRules().get(ruleIndex);
+            FilterRule updated = new FilterRule(rule.name(), rule.enabled(),
+                    FilterAction.valueOf(action.toUpperCase()), rule.conditions());
+            filterManager.saveProfile(uuid, profile.withUpdatedMapRule(ruleIndex, updated));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: setMapRuleAction failed");
+            return "null";
+        }
+    }
+
+    public String addMapCondition(String playerId, String profileId, int ruleIndex, String conditionType) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule rule = profile.getMapRules().get(ruleIndex);
+            FilterCondition newCond = createDefaultCondition(ConditionType.valueOf(conditionType.toUpperCase()));
+            List<FilterCondition> updatedConds = new ArrayList<>(rule.conditions());
+            updatedConds.add(newCond);
+            FilterRule updatedRule = new FilterRule(rule.name(), rule.enabled(), rule.action(), updatedConds);
+            filterManager.saveProfile(uuid, profile.withUpdatedMapRule(ruleIndex, updatedRule));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: addMapCondition failed");
+            return "null";
+        }
+    }
+
+    public String removeMapCondition(String playerId, String profileId, int ruleIndex, int conditionIndex) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule rule = profile.getMapRules().get(ruleIndex);
+            List<FilterCondition> updatedConds = new ArrayList<>(rule.conditions());
+            updatedConds.remove(conditionIndex);
+            FilterRule updatedRule = new FilterRule(rule.name(), rule.enabled(), rule.action(), updatedConds);
+            filterManager.saveProfile(uuid, profile.withUpdatedMapRule(ruleIndex, updatedRule));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: removeMapCondition failed");
+            return "null";
+        }
+    }
+
+    public String updateMapCondition(String playerId, String profileId, int ruleIndex,
+                                     int conditionIndex, String conditionJson) {
+        try {
+            UUID uuid = UUID.fromString(playerId);
+            FilterProfile profile = getProfileOrThrow(uuid, profileId);
+            FilterRule rule = profile.getMapRules().get(ruleIndex);
+            FilterCondition newCond = deserializeCondition(conditionJson);
+            List<FilterCondition> updatedConds = new ArrayList<>(rule.conditions());
+            updatedConds.set(conditionIndex, newCond);
+            FilterRule updatedRule = new FilterRule(rule.name(), rule.enabled(), rule.action(), updatedConds);
+            filterManager.saveProfile(uuid, profile.withUpdatedMapRule(ruleIndex, updatedRule));
+            return serializeStateJson(uuid);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Bridge: updateMapCondition failed");
+            return "null";
+        }
     }
 }

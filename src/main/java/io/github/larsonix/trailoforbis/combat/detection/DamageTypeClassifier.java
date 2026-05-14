@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.combat.AttackType;
-import io.github.larsonix.trailoforbis.combat.deathrecap.DeathRecapFormatter;
+import io.github.larsonix.trailoforbis.combat.format.CombatFormatConstants;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 
 import javax.annotation.Nonnull;
@@ -361,7 +361,7 @@ public class DamageTypeClassifier {
             case "wither" -> "Wither";
             case "explosion" -> "Explosion";
             case "thorns" -> "Thorns";
-            default -> DeathRecapFormatter.formatMobName(id); // Format as title case
+            default -> CombatFormatConstants.formatMobName(id); // Format as title case
         };
     }
 }

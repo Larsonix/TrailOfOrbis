@@ -1,0 +1,198 @@
+# =============================================================================
+# ENTITY DISCOVERY CONFIGURATION
+# =============================================================================
+# Dynamic entity/NPC discovery for automatic mod compatibility.
+#
+# Instead of maintaining static lists of bosses and elites, the plugin
+# automatically discovers and classifies all registered NPC roles at startup
+# using Hytale's NPC/Role API.
+#
+# This makes TrailOfOrbis compatible with ANY mod that adds NPCs using Hytale's
+# standard role system - no configuration changes needed!
+#
+# Detection Priority (highest to lowest):
+#   1. Config Overrides - Explicit boss/elite/passive lists below
+#   2. Group Patterns - NPCGroup names matching boss/elite patterns
+#   3. Name Patterns - Role names matching boss/elite patterns
+#   4. LivingWorld Groups - Standard Hytale categorization
+#   5. Attitude Fallback - DefaultPlayerAttitude for unclassified roles
+# =============================================================================
+
+# Discovery master settings
+discovery:
+  # Master toggle - if false, falls back to mob-classification.yml lists only
+  enabled: true
+
+  # Enable name-based pattern matching (role names like "*_Boss", "*_Captain")
+  detect_by_name: true
+
+  # Enable group-based pattern matching (NPCGroup names like "*/Bosses")
+  detect_by_group: true
+
+# =============================================================================
+# NAME PATTERNS
+# =============================================================================
+# Role name patterns for automatic boss/elite detection.
+# Supports wildcards: * (any characters), ? (single character)
+# Patterns are case-insensitive.
+# =============================================================================
+
+detection_patterns:
+  # Patterns that indicate a boss mob
+  boss:
+    - "*_Boss"
+    - "*_boss"
+    - "Boss_*"
+    - "*Dragon*"
+    - "*Lord*"
+    - "*King*"
+    - "*Queen*"
+    - "*Titan*"
+    - "*Ancient*"
+    - "*Broodmother*"
+    - "*Overlord*"
+    - "*Wyrm*"
+    - "Golem_*"          # All golems are elemental bosses
+
+  # Patterns that indicate an elite mob
+  # NOTE: Elite patterns are now EMPTY - elites are determined by random roll at spawn.
+  # See mob-scaling.yml elite_chance section for the new random elite system.
+  elite: []
+
+  # Patterns that indicate a minor mob (reduced XP)
+  # Leave empty - minor mobs are best identified by explicit overrides
+  # (patterns like "*_larva" would be too broad and error-prone)
+  minor: []
+
+# =============================================================================
+# GROUP PATTERNS
+# =============================================================================
+# NPCGroup name patterns for automatic boss/elite detection.
+# Mods can create custom groups like "MyMod/Bosses" that will be detected.
+# =============================================================================
+
+group_patterns:
+  # Groups that indicate boss mobs
+  boss:
+    - "*/Bosses"
+    - "*/Boss"
+    - "Bosses/*"
+    - "*/WorldBosses"
+    - "*/RaidBosses"
+
+  # Groups that indicate elite mobs
+  # NOTE: Elite patterns are now EMPTY - elites are determined by random roll at spawn.
+  # See mob-scaling.yml elite_chance section for the new random elite system.
+  elite: []
+
+# =============================================================================
+# EXPLICIT OVERRIDES
+# =============================================================================
+# Manual classification for specific roles.
+# These take highest priority over all automatic detection.
+# Migrated from mob-classification.yml for backwards compatibility.
+# =============================================================================
+
+overrides:
+  # Force these roles to be classified as BOSS
+  bosses:
+    # Dragons
+    - "dragon_fire"
+    - "dragon_frost"
+    # Zone bosses
+    - "yeti"
+    - "goblin_duke"
+    - "scarak_broodmother"
+    - "rex_cave"
+
+  # Force these roles to be classified as ELITE
+  # NOTE: Elite overrides are now EMPTY - elites are determined by random roll at spawn.
+  # See mob-scaling.yml elite_chance section for the new random elite system.
+  # Roles like trork_chieftain, goblin_ogre, etc. are now HOSTILE with a chance to roll elite.
+  elites: []
+
+  # Force these roles to be classified as HOSTILE (1.0x XP)
+  # Use for mobs that fall through group detection but are real combat enemies
+  hostiles:
+    # Wraiths - dangerous undead with no group membership (uses Template_Intelligent)
+    - "Wraith"
+    - "Wraith_Lantern"
+
+  # Force these roles to be classified as MINOR (50% XP, normal stats)
+  # Use for small/weak hostile creatures that are easy to farm
+  minors:
+    # Void larvae - small void creatures
+    - "larva_void"
+    - "larva_silk"
+    # Small predators
+    - "fox"
+    # Add more minor mobs here:
+    # - "rat"
+    # - "spider_small"
+
+  # Force these roles to be classified as PASSIVE (0.1x XP, no scaling)
+  # Use for mobs that are in hostile groups but shouldn't give full XP
+  passive:
+    # Skeleton horses - undead mounts in Skeleton group, easy to farm
+    - "Horse_Skeleton"
+    - "Horse_Skeleton_Armored"
+
+# =============================================================================
+# BLACKLIST
+# =============================================================================
+# Exclude specific roles or entire mods from the discovery process.
+# Blacklisted roles won't receive RPG scaling or give XP.
+# =============================================================================
+
+blacklist:
+  # Role name patterns to exclude
+  roles:
+    - "*_Template_*"     # Template/abstract roles
+    - "*_Debug_*"        # Debug roles
+    - "*_Test_*"         # Test roles
+    - "*_Abstract_*"     # Abstract base roles
+    # Uncomment to exclude specific roles:
+    # - "npc_villager"
+
+  # Mods to completely exclude (by pack ID)
+  mods: []
+    # Example:
+    # - "BuilderTools"    # Exclude all roles from BuilderTools mod
+    # - "AdminNPCs"       # Exclude all roles from AdminNPCs mod
+
+# =============================================================================
+# CLASSIFICATION GROUPS
+# =============================================================================
+# Direct NPCGroup names for hostile/passive classification.
+#
+# These are the actual group names that mobs belong to (e.g., "Trork", "Goblin").
+# This is more reliable than using LivingWorld/* meta-groups.
+#
+# Leave empty to use the built-in defaults shown in comments.
+# Only add entries here if you need to override for custom mod groups.
+# =============================================================================
+
+classification_groups:
+  # NPCGroup names that indicate hostile mobs (enemies that should give XP)
+  # Default if empty: Trork, Goblin, Skeleton, Zombie, Void, Vermin,
+  #                   Predators, PredatorsBig, Scarak, Outlander, Undead
+  hostile:
+    # Golems are handled by "Golem_*" name pattern in detection_patterns.boss
+    # Example - add custom mod groups:
+    # - "MyMod_Demons"
+    # - "MyMod_Bandits"
+
+  # NPCGroup names that indicate minor mobs (reduced XP hostiles)
+  # Empty by default - minor mobs are best identified by explicit overrides
+  # since "small creature" isn't a standard Hytale group classification
+  minor: []
+    # Example - add custom mod groups for small creatures:
+    # - "MyMod_SmallVermin"
+    # - "MyMod_Critters"
+
+  # NPCGroup names that indicate passive mobs (no combat, no XP)
+  # Default if empty: Prey, PreyBig, Critters, Birds, Aquatic
+  passive: []
+    # Example - add custom mod groups:
+    # - "MyMod_Villagers"
+    # - "MyMod_Merchants"

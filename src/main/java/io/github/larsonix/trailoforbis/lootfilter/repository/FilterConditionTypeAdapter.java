@@ -3,12 +3,14 @@ package io.github.larsonix.trailoforbis.lootfilter.repository;
 import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import io.github.larsonix.trailoforbis.gear.model.ArmorMaterial;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.lootfilter.model.ConditionType;
 import io.github.larsonix.trailoforbis.lootfilter.model.CorruptionFilter;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterCondition;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
+import io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -42,11 +44,9 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
                 for (WeaponType t : c.types()) out.value(t.name());
                 out.endArray();
             }
-            case FilterCondition.ArmorMaterialCondition c -> {
-                out.name("materials");
-                out.beginArray();
-                for (ArmorMaterial m : c.materials()) out.value(m.name());
-                out.endArray();
+            case FilterCondition.ArmorImplicitCondition c -> {
+                out.name("defenseTypes");
+                writeStringSet(out, c.defenseTypes());
             }
             case FilterCondition.ItemLevelRange c -> {
                 out.name("min").value(c.min());
@@ -73,6 +73,25 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
             }
             case FilterCondition.MinModifierCount c -> out.name("count").value(c.count());
             case FilterCondition.CorruptionStateCondition c -> out.name("filter").value(c.filter().name());
+            case FilterCondition.BiomeCondition c -> {
+                out.name("biomes");
+                out.beginArray();
+                for (RealmBiomeType b : c.biomes()) out.value(b.name());
+                out.endArray();
+            }
+            case FilterCondition.MapSizeCondition c -> {
+                out.name("sizes");
+                out.beginArray();
+                for (RealmLayoutSize s : c.sizes()) out.value(s.name());
+                out.endArray();
+            }
+            case FilterCondition.MapModifierCondition c -> {
+                out.name("modifierTypes");
+                out.beginArray();
+                for (RealmModifierType t : c.modifierTypes()) out.value(t.name());
+                out.endArray();
+                out.name("minCount").value(c.minCount());
+            }
         }
 
         out.endObject();
@@ -91,6 +110,10 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
 
         String typeStr = (String) fields.get("type");
         if (typeStr == null) throw new IOException("Missing 'type' field in FilterCondition");
+
+        // Backward compat: old ARMOR_MATERIAL → new ARMOR_IMPLICIT
+        if ("ARMOR_MATERIAL".equals(typeStr)) typeStr = "ARMOR_IMPLICIT";
+
         ConditionType type = ConditionType.valueOf(typeStr);
 
         return switch (type) {
@@ -107,12 +130,21 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
                 }
                 yield new FilterCondition.WeaponTypeCondition(types);
             }
-            case ARMOR_MATERIAL -> {
-                Set<ArmorMaterial> materials = new HashSet<>();
-                for (String s : toStringSet(fields.get("materials"))) {
-                    materials.add(ArmorMaterial.valueOf(s));
+            case ARMOR_IMPLICIT -> {
+                // Try new field name first, fall back to old "materials" for DB migration
+                Set<String> defenseTypes;
+                Object rawTypes = fields.get("defenseTypes");
+                if (rawTypes != null) {
+                    defenseTypes = toStringSet(rawTypes);
+                } else {
+                    // Migrate old ArmorMaterial enum values → defense type strings
+                    Set<String> migrated = new HashSet<>();
+                    for (String mat : toStringSet(fields.get("materials"))) {
+                        migrated.add(materialToDefenseType(mat));
+                    }
+                    defenseTypes = migrated;
                 }
-                yield new FilterCondition.ArmorMaterialCondition(materials);
+                yield new FilterCondition.ArmorImplicitCondition(defenseTypes);
             }
             case ITEM_LEVEL_RANGE -> new FilterCondition.ItemLevelRange(
                     toInt(fields.get("min")), toInt(fields.get("max")));
@@ -132,6 +164,27 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
                     toInt(fields.get("count")));
             case CORRUPTION_STATE -> new FilterCondition.CorruptionStateCondition(
                     CorruptionFilter.valueOf((String) fields.get("filter")));
+            case MAP_BIOME -> {
+                Set<RealmBiomeType> biomes = new HashSet<>();
+                for (String s : toStringSet(fields.get("biomes"))) {
+                    biomes.add(RealmBiomeType.valueOf(s));
+                }
+                yield new FilterCondition.BiomeCondition(biomes);
+            }
+            case MAP_SIZE -> {
+                Set<RealmLayoutSize> sizes = new HashSet<>();
+                for (String s : toStringSet(fields.get("sizes"))) {
+                    sizes.add(RealmLayoutSize.valueOf(s));
+                }
+                yield new FilterCondition.MapSizeCondition(sizes);
+            }
+            case MAP_MODIFIER -> {
+                Set<RealmModifierType> types = new HashSet<>();
+                for (String s : toStringSet(fields.get("modifierTypes"))) {
+                    types.add(RealmModifierType.valueOf(s));
+                }
+                yield new FilterCondition.MapModifierCondition(types, toInt(fields.get("minCount")));
+            }
         };
     }
 
@@ -178,5 +231,19 @@ public final class FilterConditionTypeAdapter extends TypeAdapter<FilterConditio
     private double toDouble(Object obj) {
         if (obj instanceof Number n) return n.doubleValue();
         return 0.0;
+    }
+
+    /**
+     * Migrates old ArmorMaterial enum names to defense type strings.
+     * Used for backward-compatible deserialization of pre-rename filter data.
+     */
+    private static String materialToDefenseType(String material) {
+        return switch (material.toUpperCase()) {
+            case "PLATE", "SPECIAL" -> "armor";
+            case "LEATHER" -> "evasion";
+            case "CLOTH" -> "energy_shield";
+            case "WOOD" -> "max_health";
+            default -> "armor";
+        };
     }
 }

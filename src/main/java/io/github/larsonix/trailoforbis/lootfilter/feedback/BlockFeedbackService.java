@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -63,6 +64,29 @@ public final class BlockFeedbackService {
         }
 
         // Schedule a flush only on the first block in a new window
+        if (wasEmpty) {
+            try {
+                scheduler.schedule(() -> flush(playerId), COALESCE_DELAY_MS, TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                // Scheduler shut down during plugin disable
+            }
+        }
+    }
+
+    /**
+     * Called when a map pickup is blocked by the filter.
+     * Shares the same coalescing window as gear blocks.
+     */
+    public void onMapBlocked(@Nonnull UUID playerId, @Nonnull RealmMapData mapData,
+                             @javax.annotation.Nullable PlayerRef playerRef) {
+        PendingBlocks pending = pendingBlocks.computeIfAbsent(playerId, k -> new PendingBlocks());
+
+        boolean wasEmpty = pending.count == 0;
+        pending.count++;
+        if (pending.highestRarity == null || mapData.rarity().ordinal() > pending.highestRarity.ordinal()) {
+            pending.highestRarity = mapData.rarity();
+        }
+
         if (wasEmpty) {
             try {
                 scheduler.schedule(() -> flush(playerId), COALESCE_DELAY_MS, TimeUnit.MILLISECONDS);

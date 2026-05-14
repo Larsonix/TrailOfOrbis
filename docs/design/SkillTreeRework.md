@@ -1,8 +1,77 @@
 # Skill Tree Rework — Master Design Document
 
-> **Status**: Review pass complete — all phases designed
+> **Status**: Phase 10 complete — Full tree redesign + balance pass (May 10, 2026)
 > **Scope**: Full rework of all 485 skill tree node values, stat assignments, keystone mechanics, nexus effects, and descriptions.
 > **What does NOT change**: The tree structure (485 nodes, 15 regions, 3D layout, connections, allocation code, sanctum). Only what the nodes DO.
+
+---
+
+## Phase 7-10 — Complete Skill Tree Redesign (May 10, 2026)
+
+### Phase 7: Universal Main Branches
+
+Player feedback: the 6 main elemental branches forced players through niche stats. Players felt weaker (-12.7% total power) and uninterested by keystones.
+
+**All 192 main branch nodes** redesigned with universal stats only. No element-specific damage%, no penetration, no ailment chance on any basic or notable.
+
+#### Stat Ownership (Strict — No Cross-Contamination)
+
+| Branch | Fantasy | Exclusive Stats |
+|--------|---------|----------------|
+| **FIRE** | Power | Physical Damage%, **Crit Multiplier**, Charged Atk%, All Damage%, Atk Speed% |
+| **WATER** | Mind | Spell Damage%, Max Mana, Mana Regen, Energy Shield%, ES Regen |
+| **LIGHTNING** | Speed | Attack Speed%, **Crit Chance**, Move Speed%, Stamina Regen, Dodge Chance |
+| **EARTH** | Fortitude | Max HP%, Armor, HP Regen, Block Chance, **Health Recovery%** |
+| **VOID** | Sustain | Life Steal, All Damage%, Life Leech, **Melee Damage%**, Mana on Kill, **Damage Reduction%** |
+| **WIND** | Finesse | Evasion, Accuracy, Dodge Chance, Move Speed%, **Projectile Damage%** |
+
+Rules: Crit Mult = Fire only. Crit Chance = Lightning only. Health Recovery = Earth only. Melee Dmg = Void only. Proj Dmg = Wind only.
+
+#### Main Branch Keystones (12)
+
+| Branch | KS1 | KS2 |
+|--------|-----|-----|
+| Fire | Unleashed (+20% All Dmg, +15 Crit Mult) | Berserker's Rage (missing HP scaling) |
+| Water | Arcane Reservoir (+15% Spell, +25% Mana) | Mind Over Matter (15% MANA_AS_DAMAGE_BUFFER) |
+| Lightning | Velocity (+15% Atk Speed, +10% Crit) | Chain Momentum (ON_CRIT → stacking speed) |
+| Earth | Ironclad (+25% HP, +20 Armor, +5% Block) | Fortified (WHEN_HIT → stacking armor+DR) |
+| Void | Predator (+2% LS, +12% All Dmg, +3% DR) | Feast or Famine (ON_KILL → heal 8% HP + dmg) |
+| Wind | Ghost (ON_EVADE → +15% All Dmg) | Keen Eye (WHILE_MOVING → +12% All Dmg) |
+
+### Phase 8: Octant Branch Coherence
+
+All 8 octant branches redesigned with coherent cluster themes. Each cluster uses exactly 2 stats that serve ONE theme. All 3 parent elements represented in every octant.
+
+- Lane 1: Parent universal combinations (great travel nodes)
+- Lane 2: Specialist depth (element damage, penetration, ailments, or niche mechanics)
+
+### Phase 9: Bridge Redesign
+
+All 12 bridge chains (36 nodes) redesigned with universal parent stats only. Specialist payoff effects removed (10 CombatEffects deregistered). Payoff nodes ("super bridge nodes") moved to middle position. Vertical bridge positions centered (z/x wobble removed).
+
+### Phase 10: Value Balance Pass
+
+**Synergies** — All 56 synergies brought above perception threshold (per-trigger value ≥ 1.0 for percent stats). Key changes per player feedback:
+- Fire Keen Edge: ×3, Lightning Endurance: ×5, Earth Regeneration: ×3
+- Earth Tempered Steel (redundant with Iron Fortitude) → Vital Endurance (HP Regen)
+- Void/Wind/Striker weak synergies: ×2 to ×2.5
+- All keystone drawbacks reduced to 15-25 range
+
+**Octant Keystones** — Tuned for clarity and balance:
+- Soul Siphon: simplified to 2 mechanics on Spell Crit Kill (mana restore + 8% heal). Overkill charge removed. Java rewritten.
+- Colossus: HP floor removed, formula changed `/100` → `/50`. Java updated.
+- Storm Runner: invisible conversion → WHILE_MOVING conditional (+15% Spell Dmg)
+- Momentum: description clarified to "All Damage"
+
+**Bridge values** — Void-adjacent bridge nodes padded with secondary stats to match non-Void bridge totals (payoffs 14.5-18.0, travels 7.0-11.0).
+
+### CombatEffect Changes (cumulative)
+
+- **Deregistered (main keystones)**: GlacialMasteryEffect, ThundergodEffect, LivingFortressEffect, SkyPiercerEffect
+- **Deregistered (bridges)**: LifeStreamEffect, InfernalCorruptionEffect, SoulGardenEffect, BoilingCurrentsEffect, ArcticArcanaEffect, ThunderingBlowsEffect, VoidChillEffect, StormShatterEffect, VoidStormEffect, GlacialFortressEffect
+- **Added**: FeastOrFamineEffect (Void KS2 ON_KILL heal)
+- **Rewritten**: SoulSiphonEffect (Spell Crit Kill trigger, mana+heal)
+- **Kept**: BerserkersRageEffect, BladeDanceEffect, RampageEffect, ChainDetonationEffect, BloodFortressEffect, SpellEchoEffect, and all remaining octant effects
 
 ---
 

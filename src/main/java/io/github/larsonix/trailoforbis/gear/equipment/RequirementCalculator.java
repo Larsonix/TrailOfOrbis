@@ -9,6 +9,7 @@ import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 
+import javax.annotation.Nonnull;
 import java.util.*;
 
 /**
@@ -178,6 +179,51 @@ public final class RequirementCalculator {
 
         // Check if any modifier has a required attribute
         return !collectRequiredAttributes(gearData).isEmpty();
+    }
+
+    /**
+     * Fast check: does a player meet ALL attribute requirements for this gear?
+     *
+     * <p>Uses the same logic as {@link #calculateRequirements(GearData)} but returns
+     * a single boolean instead of allocating a map. Designed for hash computation
+     * in the item sync pipeline where it's called per-item per-flush.
+     *
+     * @param gearData The gear data to check
+     * @param playerAttributes The player's current attribute totals (type → value)
+     * @return true if all requirements are met, or if the item has no requirements
+     */
+    public boolean meetsAllRequirements(
+            @Nonnull GearData gearData,
+            @Nonnull Map<AttributeType, Integer> playerAttributes) {
+
+        if (gearData == null) return true;
+
+        // Quick exit: level below minimum means no requirements → always met
+        AttributeRequirementsConfig config = balanceConfig.attributeRequirements();
+        if (gearData.level() < config.minItemLevelForRequirements()) {
+            return true;
+        }
+
+        // Collect required attributes from modifiers
+        Set<AttributeType> requiredAttributes = collectRequiredAttributes(gearData);
+        if (requiredAttributes.isEmpty()) {
+            return true;
+        }
+
+        // Calculate the requirement threshold
+        int requirementAmount = calculateRequirementAmount(gearData.level(), gearData.rarity());
+        if (requirementAmount <= 0) {
+            return true;
+        }
+
+        // Check each required attribute against player totals
+        for (AttributeType attr : requiredAttributes) {
+            int playerValue = playerAttributes.getOrDefault(attr, 0);
+            if (playerValue < requirementAmount) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

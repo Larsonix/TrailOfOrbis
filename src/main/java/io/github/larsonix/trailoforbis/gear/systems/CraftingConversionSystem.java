@@ -539,12 +539,13 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
     }
 
     /**
-     * Computes crafted gear level: material ceiling clamped to player level.
+     * Computes crafted gear level: clamped to material's level range.
      *
-     * <p>The material determines the maximum level (based on where it spawns
-     * in the overworld), and the player's RPG level sets the upper bound.
-     * This ensures a level 1 player never gets an unequippable level 5 item
-     * from crafting starter materials.
+     * <p>The material determines both the minimum and maximum level (based on
+     * where it spawns in the overworld). The player's RPG level is clamped
+     * within this range. High-tier materials always produce high-level gear,
+     * even if the player is below the material's floor (they won't be able
+     * to equip it until they reach that level).
      */
     private int computeCraftedGearLevel(@Nonnull String outputItemId, int playerLevel) {
         if (distanceCalculator == null) {
@@ -554,16 +555,17 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
         MaterialTierMapper materialMapper = converter.getMaterialMapper();
         VanillaConversionConfig.DistanceRange distRange = materialMapper.getDistanceRange(outputItemId);
 
-        int materialCeiling = Math.max(1, distanceCalculator.estimateLevelFromDistance(distRange.getMax()));
+        int materialFloor = Math.max(1, distanceCalculator.estimateLevelFromDistance(distRange.getMin()));
+        int materialCeiling = Math.max(materialFloor, distanceCalculator.estimateLevelFromDistance(distRange.getMax()));
 
-        // Deterministic: exactly min(playerLevel, materialCeiling).
-        // Crafting is a deliberate action — the level must match the tooltip promise.
-        int gearLevel = Math.max(1, Math.min(playerLevel, materialCeiling));
+        // Clamp to material range: floor ensures high-tier materials always produce
+        // high-level gear (unequippable until player reaches that level).
+        int gearLevel = Math.max(materialFloor, Math.min(playerLevel, materialCeiling));
 
-        gearLevel = Math.max(1, (int)(gearLevel * craftingLevelMultiplier));
+        gearLevel = Math.max(materialFloor, (int)(gearLevel * craftingLevelMultiplier));
 
-        LOGGER.atFine().log("Crafted level for %s: playerLv=%d, materialCeiling=%d, result=%d",
-                outputItemId, playerLevel, materialCeiling, gearLevel);
+        LOGGER.atFine().log("Crafted level for %s: playerLv=%d, floor=%d, ceiling=%d, result=%d",
+                outputItemId, playerLevel, materialFloor, materialCeiling, gearLevel);
 
         return gearLevel;
     }
@@ -691,6 +693,23 @@ public final class CraftingConversionSystem extends EntityEventSystem<EntityStor
 
         private boolean isExpired(long ttlMs) {
             return System.currentTimeMillis() - createdAtMs > ttlMs;
+        }
+    }
+
+    /**
+     * Cleans up per-player state on disconnect.
+     *
+     * <p>Removes pending craft conversions and scheduled processing flags
+     * to prevent memory leaks from abandoned crafting operations.
+     *
+     * @param playerId The disconnecting player's UUID
+     */
+    public void onPlayerDisconnect(@Nonnull UUID playerId) {
+        Deque<PendingCraftConversion> removed = pendingByPlayer.remove(playerId);
+        scheduledPlayers.remove(playerId);
+        if (removed != null && !removed.isEmpty()) {
+            LOGGER.atFine().log("Cleaned up %d pending craft conversions for player %s",
+                removed.size(), playerId);
         }
     }
 

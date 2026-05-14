@@ -256,6 +256,30 @@ class RealmMapGeneratorTest {
         }
 
         @Test
+        @DisplayName("rollRarity never returns UNIQUE even with maximum bonus")
+        void rollRarityNeverReturnsUnique() {
+            RealmMapGenerator generator = new RealmMapGenerator(realmsConfig, modifierConfig, new Random(12345));
+
+            for (int i = 0; i < 10_000; i++) {
+                GearRarity rarity = generator.rollRarity(10.0); // Maximum bonus
+                assertNotEquals(GearRarity.UNIQUE, rarity,
+                    "UNIQUE maps must never drop naturally (iteration " + i + ")");
+            }
+        }
+
+        @Test
+        @DisplayName("rollRarity never returns UNIQUE with zero bonus")
+        void rollRarityNeverReturnsUniqueZeroBonus() {
+            RealmMapGenerator generator = new RealmMapGenerator(realmsConfig, modifierConfig, new Random(99999));
+
+            for (int i = 0; i < 10_000; i++) {
+                GearRarity rarity = generator.rollRarity(0.0);
+                assertNotEquals(GearRarity.UNIQUE, rarity,
+                    "UNIQUE maps must never drop naturally (iteration " + i + ")");
+            }
+        }
+
+        @Test
         @DisplayName("rollRarity clamps negative bonus to 0")
         void rollRarityClampsNegativeBonus() {
             RealmMapGenerator generator = new RealmMapGenerator(realmsConfig, modifierConfig, new Random(42));

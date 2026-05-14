@@ -1,6 +1,5 @@
 package io.github.larsonix.trailoforbis.compat.party;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -12,7 +11,7 @@ import java.util.UUID;
 public interface PartyChangeListener {
     default void onMemberJoined(UUID partyId, UUID playerId) {}
     default void onMemberLeft(UUID partyId, UUID playerId) {}
-    default void onPartyDisbanded(UUID partyId, List<UUID> formerMembers) {}
+    default void onPartyDisbanded(UUID partyId) {}
     default void onLeaderChanged(UUID partyId, UUID oldLeader, UUID newLeader) {}
     default void onPvpSettingChanged(UUID partyId, boolean pvpEnabled) {}
 }

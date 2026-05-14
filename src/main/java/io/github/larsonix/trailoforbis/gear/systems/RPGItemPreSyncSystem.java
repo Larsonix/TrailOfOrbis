@@ -175,7 +175,7 @@ public class RPGItemPreSyncSystem extends RefSystem<EntityStore> {
                 return;
             }
 
-            List<ItemStack> allItems = GearManager.collectAllInventoryItems(player.getInventory());
+            List<ItemStack> allItems = GearUtils.collectAllInventoryItems(player.getInventory());
             if (allItems.isEmpty()) {
                 LOGGER.atFine().log("[PreSync] No items for %s", uuid);
                 return;

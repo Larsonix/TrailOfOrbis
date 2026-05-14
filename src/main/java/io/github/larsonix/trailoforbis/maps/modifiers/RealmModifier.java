@@ -92,6 +92,12 @@ public record RealmModifier(
 
     @Override
     @Nonnull
+    public String typeLabel() {
+        return type.getCategory().name();
+    }
+
+    @Override
+    @Nonnull
     public String formatForTooltip() {
         String base = type.formatValue(value);
         if (locked) {

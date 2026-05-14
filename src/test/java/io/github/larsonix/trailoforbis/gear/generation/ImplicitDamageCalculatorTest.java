@@ -50,7 +50,9 @@ class ImplicitDamageCalculatorTest {
         ImplicitDamageConfig implicitConfig = new ImplicitDamageConfig(
                 true, BASE_MIN, BASE_MAX, SCALE_FACTOR, TWO_HANDED_MULTIPLIER,
                 0.1, 0.3, 3.0,  // spellbook: mana_regen
-                70.0, 5.0        // element weights: physical=70, elemental_each=5
+                70.0, 5.0,       // element weights: physical=70, elemental_each=5
+                3.0, 8.0, 4.0,  // spellbook_volatility
+                0.02, 0.06, 3.0 // spellbook_magic_power
         );
 
         // ExponentialScaling is no longer used by ImplicitDamageCalculator,

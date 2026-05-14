@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.combat.deathrecap;
 
+import io.github.larsonix.trailoforbis.combat.AttackType;
 import io.github.larsonix.trailoforbis.combat.DamageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,13 +42,16 @@ class DeathRecapTrackerTest {
             "mob",
             10,
             null,
-            damage, 0, 0, false, 1.0f, damage,
+            damage,
+            false, 1.0f, 0, damage,
             0, 0, 0, 0, damage,
             null, null, 0,
-            null, null,  // defenderRawResistances, attackerPenetration
+            null, null,
             damage,
             DamageType.PHYSICAL,
-            false,
+            AttackType.MELEE,
+            false, false, false, false,
+            0f, 0f,
             100, healthBefore, healthAfter, 0
         );
     }
@@ -412,13 +416,16 @@ class DeathRecapTrackerTest {
             CombatSnapshot snapshot = new CombatSnapshot(
                 System.currentTimeMillis(),
                 "Assassin", "mob", 20, null,
-                50, 10, 20, true, 2.0f, 120,  // wasCritical = true
+                50,
+                true, 2.0f, 1, 120,  // wasCritical = true, critTier = 1
                 30, 20, 10, 25, 90,
                 null, null, 0,
-                null, null,  // defenderRawResistances, attackerPenetration
+                null, null,
                 90,
                 DamageType.PHYSICAL,
-                false,
+                AttackType.MELEE,
+                false, false, false, false,
+                0f, 0f,
                 100, 100, 10, 5  // maxHealth, healthBefore, healthAfter, evasion
             );
 

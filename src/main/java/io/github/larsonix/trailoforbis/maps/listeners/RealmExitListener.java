@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
+import io.github.larsonix.trailoforbis.listeners.PlayerJoinListener;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 import io.github.larsonix.trailoforbis.util.MessageColors;
@@ -77,6 +78,13 @@ public class RealmExitListener {
     private void onPlayerDisconnect(@Nonnull PlayerDisconnectEvent event) {
         PlayerRef playerRef = event.getPlayerRef();
         if (playerRef == null) {
+            return;
+        }
+
+        // Skip stale disconnects (delayed QUIC close from duplicate login kick).
+        // Without this, a stale disconnect 25s later would clear realm tracking
+        // for the active session.
+        if (PlayerJoinListener.isStaleDisconnect(event)) {
             return;
         }
 

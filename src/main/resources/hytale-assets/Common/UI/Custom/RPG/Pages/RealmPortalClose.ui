@@ -1,0 +1,24 @@
+// Owner view for RealmActivePortalPage: info label + Close Portal button.
+// No $Variable cross-refs — self-contained to avoid asset graph corruption.
+// Texture paths are RELATIVE to this .ui file's directory (RPG/Pages/).
+// Values from Common.ui: @ButtonBorder=12, @DefaultButtonHeight=44, @DefaultButtonPadding=24.
+
+Group {
+  LayoutMode: Top;
+
+  Label #CloseInfoLabel {
+    Text: "Close this portal and shut down the realm";
+    Style: LabelStyle(FontSize: 12, TextColor: #778292, RenderItalics: true, HorizontalAlignment: Center);
+  }
+
+  TextButton #ClosePortalBtn {
+    Style: TextButtonStyle(
+      Default: (Background: PatchStyle(TexturePath: "Buttons/Destructive.png", Border: 12), LabelStyle: LabelStyle(FontSize: 17, TextColor: #bfcdd5, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+      Hovered: (Background: PatchStyle(TexturePath: "Buttons/Destructive_Hovered.png", Border: 12), LabelStyle: LabelStyle(FontSize: 17, TextColor: #bfcdd5, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+      Pressed: (Background: PatchStyle(TexturePath: "Buttons/Destructive_Pressed.png", Border: 12), LabelStyle: LabelStyle(FontSize: 17, TextColor: #bfcdd5, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center))
+    );
+    Anchor: (Top: 8, MinWidth: 250, Height: 44);
+    Padding: (Horizontal: 24);
+    Text: "Close Portal";
+  }
+}

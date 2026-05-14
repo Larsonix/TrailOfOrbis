@@ -236,18 +236,7 @@ public class RealmMobDeathListener extends DeathSystems.OnDeathSystem {
      * @param store The entity store
      */
     private void updatePlayerStats(@Nonnull UUID playerId, @Nonnull Store<EntityStore> store) {
-        // Find the player entity and update their RealmPlayerComponent
-        // This is done by iterating players with RealmPlayerComponent that match the UUID
-        // For now, we rely on RealmInstance.recordMobKill() to track kills
-        // The player's RealmPlayerComponent will be updated when they receive rewards
-
-        // In a more complete implementation, we would:
-        // 1. Find the player's entity reference
-        // 2. Get their RealmPlayerComponent
-        // 3. Call incrementKillCount()
-        // 4. Optionally update damage dealt
-
-        // For now, the RealmInstance handles kill tracking centrally
+        // Kill tracking is centralized in RealmInstance.recordMobKill()
         LOGGER.atFine().log("Player %s scored a realm mob kill", playerId.toString().substring(0, 8));
     }
 }

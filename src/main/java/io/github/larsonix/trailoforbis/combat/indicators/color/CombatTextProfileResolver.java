@@ -59,6 +59,7 @@ public class CombatTextProfileResolver {
     ) {
         // 1. Avoidance has highest priority
         if (params.isMissed()) return profiles.get("missed");
+        if (params.isEvaded()) return profiles.get("evaded");
         if (params.isDodged()) return profiles.get("dodged");
         if (params.isBlocked()) return profiles.get("blocked");
         if (params.isParried()) return profiles.get("parried");

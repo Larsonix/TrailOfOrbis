@@ -79,11 +79,32 @@ public class PlayerJoinListener {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     /**
-     * Tracks UUIDs currently being processed in onPlayerDisconnect to prevent
-     * duplicate save operations. When a player exists in multiple worlds (e.g.,
-     * realm instance), PlayerDisconnectEvent fires once per world.
+     * Tracks the active session for each player by storing the PlayerRef from
+     * their most recent PlayerConnectEvent.
+     *
+     * <p>During duplicate logins, Hytale fires multiple PlayerDisconnectEvents
+     * for the old connection (kick + delayed QUIC stream close up to 25+ seconds
+     * later). By comparing the event's PlayerRef with the stored one using object
+     * identity, we detect stale disconnects and skip destructive cleanup that
+     * would corrupt the active session's data.
      */
-    private static final Set<UUID> processingDisconnects = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, PlayerRef> activeSessions = new ConcurrentHashMap<>();
+
+    /**
+     * Prevents double-processing of disconnect events from the same session.
+     *
+     * <p>During duplicate login kicks, Hytale fires PlayerDisconnectEvent TWICE
+     * for the old session (kick + "Player removed from world") BEFORE the new
+     * session's PlayerConnectEvent stores its ref in activeSessions. The existing
+     * stale check (activeRef != eventPlayerRef) can't catch these because both
+     * events use the same PlayerRef from the old session, and activeSessions is
+     * empty after the first disconnect removes it.
+     *
+     * <p>This set tracks UUIDs that have already had their disconnect processed.
+     * The first disconnect adds the UUID; the second is rejected. Cleared when
+     * the player reconnects (onPlayerConnect).
+     */
+    private static final Set<UUID> processedDisconnects = ConcurrentHashMap.newKeySet();
 
     /**
      * Tracks players who just connected (PlayerConnectEvent). Consumed by the first
@@ -135,6 +156,42 @@ public class PlayerJoinListener {
     }
 
     /**
+     * Checks if a PlayerDisconnectEvent belongs to a stale session.
+     *
+     * <p>During duplicate logins, Hytale fires PlayerDisconnectEvent multiple times
+     * for the old connection: once on kick, and again when the QUIC stream closes
+     * (25+ seconds later). The delayed event would destroy the new session's cached
+     * data (level, attributes, gear sync) if not detected.
+     *
+     * <p>This method compares the event's PlayerRef with the most recent
+     * PlayerConnectEvent's PlayerRef using object identity. Different objects
+     * mean different sessions — the event belongs to a stale session.
+     *
+     * <p>Other disconnect handlers (RealmExitListener, AnimationSpeedSyncManager)
+     * should call this at the top of their handlers to skip stale cleanups.
+     *
+     * @param event The disconnect event to check
+     * @return true if the event belongs to a stale session and should be ignored
+     */
+    public static boolean isStaleDisconnect(@Nonnull PlayerDisconnectEvent event) {
+        PlayerRef eventRef = event.getPlayerRef();
+        if (eventRef == null) return false;
+        UUID uuid = eventRef.getUuid();
+
+        // Check 1: Different session (delayed QUIC close from old connection)
+        PlayerRef activeRef = activeSessions.get(uuid);
+        if (activeRef != null && activeRef != eventRef) return true;
+
+        // Check 2: Same session but already processed (double disconnect from same kick).
+        // During duplicate login kicks, Hytale fires two disconnects for the old session
+        // before the new session's PlayerConnectEvent runs. The first disconnect clears
+        // activeSessions, so the activeRef check above misses the second disconnect.
+        if (processedDisconnects.contains(uuid)) return true;
+
+        return false;
+    }
+
+    /**
      * Clears the per-world initialization dedup tracker for a player.
      * Called from DrainPlayerFromWorldEvent (so the next world gets full init)
      * and from onPlayerDisconnect.
@@ -164,10 +221,12 @@ public class PlayerJoinListener {
         UUID uuid = playerRef.getUuid();
         Holder<EntityStore> holder = event.getHolder();
 
-        // Clear any stale disconnect-processing guard from previous session.
-        // The guard stays active for the entire disconnect flow (sync cleanup + async save)
-        // and only needs clearing when the player reconnects.
-        processingDisconnects.remove(uuid);
+        // Register this as the active session. Any future disconnect event with a
+        // different PlayerRef will be detected as stale and skipped.
+        activeSessions.put(uuid, playerRef);
+
+        // Allow this session's future disconnect to be processed (clear old session's flag)
+        processedDisconnects.remove(uuid);
 
         // Clear any stale joining guard (shouldn't happen, but safety)
         joiningPlayers.remove(uuid);
@@ -207,6 +266,7 @@ public class PlayerJoinListener {
         }
 
         AttributeService attributeService = attributeServiceOpt.get();
+
         Player player = event.getPlayer();
         World world = player.getWorld();
         if (world == null) {
@@ -338,6 +398,21 @@ public class PlayerJoinListener {
                             .insert(Message.raw(" allocated node(s) were reset and all points refunded.").color(MessageColors.WHITE)));
                 }
             }
+
+            // XP curve migration notification
+            ServiceRegistry.get(LevelingService.class)
+                .filter(svc -> svc instanceof LevelingManager)
+                .map(svc -> (LevelingManager) svc)
+                .ifPresent(mgr -> {
+                    if (mgr.wasXpAdjusted(uuid)) {
+                        int level = mgr.getLevel(uuid);
+                        playerRef.sendMessage(Message.empty()
+                            .insert(Message.raw("[Trail of Orbis] ").color(MessageColors.GRAY))
+                            .insert(Message.raw("Your level has been preserved through a balance update (Level ").color(MessageColors.WHITE))
+                            .insert(Message.raw(String.valueOf(level)).color(MessageColors.WARNING))
+                            .insert(Message.raw(").").color(MessageColors.WHITE)));
+                    }
+                });
         }
 
         // Cache vanilla stats and apply ECS operations
@@ -446,6 +521,14 @@ public class PlayerJoinListener {
                 rpgInstance.getStoneTooltipSyncService().syncToPlayer(playerRef);
             }
 
+            // Set PartyPro HUD level display (slot 1, replaces distance)
+            ServiceRegistry.get(io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager.class)
+                .ifPresent(party -> {
+                    ServiceRegistry.get(LevelingService.class).ifPresent(leveling -> {
+                        party.updateHudLevel(uuid, leveling.getLevel(uuid));
+                    });
+                });
+
             // Crafting preview tooltips are sent by ItemSyncCoordinator during the
             // join flush — right before RPG items, so RPG tooltips always win.
 
@@ -475,7 +558,11 @@ public class PlayerJoinListener {
             if (io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()) {
                 LOGGER.atInfo().log("[HexAssetDiag] Running post-join hex asset verification for %s", username);
                 io.github.larsonix.trailoforbis.compat.HexcodeCompat.diagCheckHexAsset("Hexstaff_Basic_Crude");
-                ItemStack mainHand = InventoryComponent.getItemInHand(store, entityRef);
+                // Bypass InventoryComponent.getItemInHand() — it delegates to Inventory.getItemInHand()
+                // which returns tool items when _usingToolsItem is set.
+                Player joinPlayer = store.getComponent(entityRef, Player.getComponentType());
+                ItemStack mainHand = (joinPlayer != null && joinPlayer.getInventory() != null)
+                    ? joinPlayer.getInventory().getActiveHotbarItem() : null;
                 if (mainHand != null && !mainHand.isEmpty() && mainHand.getItem() != null) {
                     String mainHandId = mainHand.getItem().getId();
                     LOGGER.atInfo().log("[HexAssetDiag] Main hand item: '%s'", mainHandId);
@@ -485,6 +572,13 @@ public class PlayerJoinListener {
                 }
 
                 // Particle test removed — confirmed client has particle systems loaded
+            }
+
+            // DIAGNOSTIC: Log item counts on join to detect inventory loss across transitions
+            if (player.getInventory() != null) {
+                int itemCount = io.github.larsonix.trailoforbis.gear.util.GearUtils
+                    .collectAllInventoryItems(player.getInventory()).size();
+                LOGGER.atInfo().log("[INVENTORY-DIAG] Player %s joined with %d total items", username, itemCount);
             }
         } else {
             LOGGER.at(Level.INFO).log("Warning: Entity not available for %s, caching will be deferred", username);
@@ -702,19 +796,61 @@ public class PlayerJoinListener {
         Optional<UIService> uiServiceOpt = ServiceRegistry.get(UIService.class);
 
         // PlayerDisconnectEvent extends PlayerRefEvent, so we get PlayerRef from it
-        UUID uuid = event.getPlayerRef().getUuid();
+        PlayerRef eventPlayerRef = event.getPlayerRef();
+        UUID uuid = eventPlayerRef.getUuid();
 
-        // Clear joining guard in case disconnect fires during join (e.g., timeout)
+        // Guard 1: Prevent double-processing from the same session.
+        // During duplicate login kicks, Hytale fires PlayerDisconnectEvent TWICE for the
+        // old session (kick + "Player removed from world") BEFORE the new session's
+        // PlayerConnectEvent stores its ref in activeSessions. The stale check below can't
+        // catch these because both events use the same PlayerRef, and activeSessions is
+        // empty after the first disconnect removes it.
+        if (!processedDisconnects.add(uuid)) {
+            LOGGER.atInfo().log("Skipping duplicate disconnect for %s (already processed this session)", uuid);
+            return;
+        }
+
+        // Guard 2: Skip ALL cleanup if this disconnect belongs to a stale session
+        // (e.g., delayed QUIC close from a duplicate login kick 25s ago).
+        // During duplicate logins, onPlayerConnect stores the NEW session's PlayerRef in
+        // activeSessions. If this event's PlayerRef is a different object, it belongs to
+        // the old connection and must not destroy the active session's cached state.
+        PlayerRef activeRef = activeSessions.get(uuid);
+        if (activeRef != null && activeRef != eventPlayerRef) {
+            LOGGER.atInfo().log("Skipping stale disconnect for %s (old session cleanup, active session exists)", uuid);
+            return;
+        }
+
+        // Atomic removal: only remove if WE are the active session.
+        // ConcurrentHashMap.remove(key, value) checks value identity before removing.
+        // If a new onPlayerConnect raced between our get() and this remove(), the stored
+        // PlayerRef has changed and this returns false — we skip cleanup.
+        if (activeRef != null && !activeSessions.remove(uuid, eventPlayerRef)) {
+            LOGGER.atInfo().log("Skipping stale disconnect for %s (session replaced during cleanup)", uuid);
+            return;
+        }
+
+        // From here: this IS the active session disconnecting. Run full cleanup.
+
+        // DIAGNOSTIC: Log item counts on disconnect to detect inventory loss
+        try {
+            Ref<EntityStore> diagRef = eventPlayerRef.getReference();
+            if (diagRef != null && diagRef.isValid()) {
+                Store<EntityStore> diagStore = diagRef.getStore();
+                Player diagPlayer = diagStore.getComponent(diagRef, Player.getComponentType());
+                if (diagPlayer != null && diagPlayer.getInventory() != null) {
+                    int itemCount = io.github.larsonix.trailoforbis.gear.util.GearUtils
+                        .collectAllInventoryItems(diagPlayer.getInventory()).size();
+                    LOGGER.atInfo().log("[INVENTORY-DIAG] Player %s disconnecting with %d total items", uuid, itemCount);
+                }
+            }
+        } catch (Exception diagEx) {
+            LOGGER.atFine().log("[INVENTORY-DIAG] Could not count items for %s on disconnect: %s", uuid, diagEx.getMessage());
+        }
+
         joiningPlayers.remove(uuid);
         lastInitializedWorld.remove(uuid);
         migratedThisSession.remove(uuid);
-
-        // Guard against duplicate disconnect events (fires once per world when
-        // player exists in multiple worlds, e.g., realm instance + overworld)
-        if (!processingDisconnects.add(uuid)) {
-            LOGGER.atFine().log("Skipping duplicate disconnect for %s", uuid);
-            return;
-        }
 
         // Clean up UI state
         uiServiceOpt.ifPresent(ui -> ui.onPlayerDisconnect(uuid));
@@ -749,6 +885,24 @@ public class PlayerJoinListener {
                     }
                     // Crafting preview has no per-player state to clean up
                     // (definitions are sent globally, not tracked per-player)
+
+                    // Clean up pending craft conversions to prevent memory leak
+                    var craftConversion = mgr.getCraftingConversionSystem();
+                    if (craftConversion != null) {
+                        craftConversion.onPlayerDisconnect(uuid);
+                    }
+
+                    // Clean up world drop sync cache to prevent memory leak
+                    var worldSyncService = mgr.getItemWorldSyncService();
+                    if (worldSyncService != null) {
+                        worldSyncService.onPlayerDisconnect(uuid);
+                    }
+
+                    // Clean up custom item sync tracking to prevent memory leak
+                    var customItemSync = mgr.getCustomItemSyncService();
+                    if (customItemSync != null) {
+                        customItemSync.onPlayerDisconnect(uuid);
+                    }
                 }
             });
 
@@ -826,9 +980,33 @@ public class PlayerJoinListener {
             rpg.getAilmentImmunityTracker().cleanup(uuid);
         }
 
+        // Clean up combat requirement notification cooldowns
+        if (rpg != null && rpg.getCombatRequirementNotifier() != null) {
+            rpg.getCombatRequirementNotifier().cleanupPlayer(uuid);
+        }
+
+        // Clean up conditional trigger system per-player state (effect trackers + node cache)
+        if (rpg != null && rpg.getConditionalTriggerSystem() != null) {
+            rpg.getConditionalTriggerSystem().removePlayer(uuid);
+        }
+
+        // Clean up container sync tracking to prevent memory leak
+        if (rpg != null && rpg.getContainerSyncTickSystem() != null) {
+            rpg.getContainerSyncTickSystem().cleanupPlayer(uuid);
+        }
+
         // Clean up stone tooltip sync tracking
         if (rpg != null && rpg.getStoneTooltipSyncService() != null) {
             rpg.getStoneTooltipSyncService().onPlayerDisconnect(uuid);
+        }
+
+        // Clear PartyPro HUD custom text
+        ServiceRegistry.get(io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager.class)
+            .ifPresent(party -> party.clearHud(uuid));
+
+        // Clean up combat text color dedup cache
+        if (rpg != null && rpg.getCombatTextColorManager() != null) {
+            rpg.getCombatTextColorManager().removePlayer(uuid);
         }
 
         // Clean up reskin cache to prevent memory leak
@@ -845,6 +1023,8 @@ public class PlayerJoinListener {
         // Use teleport=false since player is disconnecting (entity ref is already invalid)
         if (rpg != null && rpg.getSkillSanctumManager() != null) {
             rpg.getSkillSanctumManager().closeSanctum(uuid, false);
+            // Also clean up if this player was a visitor in someone else's sanctum
+            rpg.getSkillSanctumManager().removeVisitorFromAnySanctum(uuid);
         }
 
         // Save and evict loot filter state
@@ -856,6 +1036,23 @@ public class PlayerJoinListener {
         if (rpg != null && rpg.getInventoryDetectionManager() != null) {
             rpg.getInventoryDetectionManager().removeTracker(uuid);
         }
+
+        // Clean up realm HUDs (combat, victory, defeat) to prevent memory leak
+        if (rpg != null && rpg.getRealmsManager() != null) {
+            rpg.getRealmsManager().getHudManager().discardAllHudsForPlayer(uuid);
+        }
+
+        // Clean up Hexcode compat state (cast records, echo cooldowns, casting aura)
+        // Guard: Hex classes import Hexcode — loading without Hexcode causes NoClassDefFoundError.
+        if (io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()) {
+            io.github.larsonix.trailoforbis.compat.HexCastStateStore.onPlayerDisconnect(uuid);
+            io.github.larsonix.trailoforbis.compat.HexSpellEchoService.onPlayerDisconnect(uuid);
+            io.github.larsonix.trailoforbis.compat.CastingAuraInjector.onPlayerDisconnect(uuid);
+        }
+
+        // Clean up admin clipboard to prevent memory leak
+        io.github.larsonix.trailoforbis.commands.tooadmin.clipboard.CopyPasteClipboard
+            .getInstance().clearAll(uuid);
 
         // Note: XP bar + energy shield HUD removal handled above via hudLifecycleManager
 
@@ -910,10 +1107,9 @@ public class PlayerJoinListener {
                   return null;
               })
               .whenComplete((v, ex) -> {
-                  // Note: We intentionally do NOT remove from processingDisconnects here.
-                  // The guard stays active until the player reconnects (cleared in onPlayerConnect).
-                  // This prevents duplicate saves during server shutdown where disconnect events
-                  // fire sequentially (the second arrives after the first save completes).
+                  // No cleanup needed here. The activeSessions entry was already removed
+                  // at the top of onPlayerDisconnect. The saveVersion entry persists until
+                  // the player reconnects (incrementSaveVersion in onPlayerReady).
               });
         });
     }

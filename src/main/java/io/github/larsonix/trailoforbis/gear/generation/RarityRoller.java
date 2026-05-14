@@ -28,7 +28,7 @@ public final class RarityRoller {
     private final double totalBaseWeight;
 
     // Rarity order (lowest to highest)
-    // Note: UNIQUE has very low drop weight (0.05 by default) and is meant for special/quest items
+    // Note: UNIQUE has drop_weight=0 (disabled) — reserved for future hand-placed unique items
     private static final GearRarity[] RARITY_ORDER = {
         GearRarity.COMMON,
         GearRarity.UNCOMMON,
@@ -119,8 +119,8 @@ public final class RarityRoller {
             }
         }
 
-        // Should never reach here, but return highest rarity as fallback
-        return GearRarity.UNIQUE;
+        // Floating-point overshoot fallback — return highest natural-drop rarity
+        return GearRarity.MYTHIC;
     }
 
     /**

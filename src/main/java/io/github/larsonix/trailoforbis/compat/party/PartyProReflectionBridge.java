@@ -8,6 +8,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -341,9 +342,9 @@ public final class PartyProReflectionBridge implements PartyBridge {
     @Nonnull
     @SuppressWarnings("unchecked")
     private List<UUID> castUuidList(@Nullable Object result, @Nonnull UUID fallback) {
-        if (result instanceof List<?> list) {
-            List<UUID> uuids = new ArrayList<>(list.size());
-            for (Object item : list) {
+        if (result instanceof Collection<?> collection) {
+            List<UUID> uuids = new ArrayList<>(collection.size());
+            for (Object item : collection) {
                 if (item instanceof UUID uuid) {
                     uuids.add(uuid);
                 }
@@ -407,33 +408,19 @@ public final class PartyProReflectionBridge implements PartyBridge {
             }
         }
 
-        @SuppressWarnings("unchecked")
         private void dispatchPartyDisband(Object event) throws Exception {
             UUID partyId = getEventUuid(event, "getPartyId");
-            List<UUID> members = List.of();
-            try {
-                Method getMembers = event.getClass().getMethod("getFormerMembers");
-                Object result = getMembers.invoke(event);
-                if (result instanceof List<?> list) {
-                    List<UUID> uuids = new ArrayList<>();
-                    for (Object item : list) {
-                        if (item instanceof UUID uuid) uuids.add(uuid);
-                    }
-                    members = Collections.unmodifiableList(uuids);
-                }
-            } catch (Exception ignored) {}
-
             if (partyId != null) {
                 for (PartyChangeListener l : listeners) {
-                    l.onPartyDisbanded(partyId, members);
+                    l.onPartyDisbanded(partyId);
                 }
             }
         }
 
         private void dispatchLeaderChange(Object event) throws Exception {
             UUID partyId = getEventUuid(event, "getPartyId");
-            UUID oldLeader = getEventUuid(event, "getOldLeader");
-            UUID newLeader = getEventUuid(event, "getNewLeader");
+            UUID oldLeader = getEventUuid(event, "getPreviousLeaderId");
+            UUID newLeader = getEventUuid(event, "getNewLeaderId");
             if (partyId != null && oldLeader != null && newLeader != null) {
                 for (PartyChangeListener l : listeners) {
                     l.onLeaderChanged(partyId, oldLeader, newLeader);

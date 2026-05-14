@@ -537,13 +537,19 @@ public final class StatMapping {
         registerFlat("volatility_max",
             (s, v) -> s.setVolatilityMax(s.getVolatilityMax() + v));
 
+        registerPercent("volatility_max_percent",
+            (s, v) -> s.setVolatilityMax(s.getVolatilityMax() + (float)(s.getVolatilityMax() * v / 100.0)));
+
         registerPercent("magic_power",
             (s, v) -> s.setMagicPower(s.getMagicPower() + v));
 
         registerFlat("magic_charges",
             (s, v) -> s.setMagicCharges(s.getMagicCharges() + (int) Math.round(v)));
 
-        registerPercent("draw_accuracy",
+        registerFlat("draw_accuracy",
+            (s, v) -> s.setDrawAccuracy(s.getDrawAccuracy() + v));
+
+        registerPercent("draw_accuracy_percent",
             (s, v) -> s.setDrawAccuracy(s.getDrawAccuracy() + v));
 
         registerPercent("cast_speed",

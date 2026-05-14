@@ -9,6 +9,8 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 
+import com.hypixel.hytale.math.vector.Vector3d;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Set;
@@ -370,5 +372,171 @@ public final class TerrainUtils {
 
         // >30% of sampled positions have non-terrain obstructions
         return totalChecked > 0 && (solidCount * 100 / (totalChecked * 2)) > 30;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SAFE SPAWN POSITION (player spawn point selection)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Spiral offsets for each ring radius. At radius r, test the 8 positions:
+     * (r,0), (-r,0), (0,r), (0,-r), (r,r), (r,-r), (-r,r), (-r,-r).
+     * Combined with the center check, this covers the cardinal and diagonal
+     * directions at increasing distances.
+     */
+    private static final int[][] SPIRAL_OFFSETS = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+    };
+
+    /**
+     * Finds a safe spawn position for a player near the given center, using a
+     * biome-specific terrain material whitelist for ground detection.
+     *
+     * <p>Unlike {@link #findGroundLevel}, this validates the FULL player volume
+     * (2×2×2 blocks via {@link #isSpawnPositionClear}) and spirals outward if the
+     * center is obstructed. This prevents spawning inside blocks that clip the
+     * player's wider-than-1-block hitbox.
+     *
+     * <p>Search order:
+     * <ol>
+     *   <li>Center position (centerX, centerZ)</li>
+     *   <li>Spiral outward: 8 positions per radius ring, incrementing by 1 block</li>
+     *   <li>Force-clear: if all positions within searchRadius are obstructed,
+     *       clears a 3×3×2 volume at center as a last resort</li>
+     * </ol>
+     *
+     * @param world            The world (chunks must be loaded)
+     * @param centerX          Center X to search from (typically 0)
+     * @param centerZ          Center Z to search from (typically 0)
+     * @param maxY             Maximum Y for ground scanning
+     * @param terrainMaterials Biome terrain materials for ground detection
+     * @param searchRadius     Maximum spiral search radius (blocks)
+     * @return Safe spawn position with +0.5 X/Z centering and +0.5 Y offset
+     */
+    @Nonnull
+    public static Vector3d findSafeSpawnPosition(
+            @Nonnull World world, int centerX, int centerZ, int maxY,
+            @Nonnull Set<String> terrainMaterials, int searchRadius) {
+
+        // Try center first — most common case
+        int groundY = findGroundLevel(world, centerX, centerZ, maxY, terrainMaterials);
+        if (groundY != FALLBACK_GROUND_Y && isSpawnPositionClear(world, centerX, groundY, centerZ)) {
+            return new Vector3d(centerX + 0.5, groundY + 0.5, centerZ + 0.5);
+        }
+
+        // Spiral outward — check 8 positions at each increasing radius
+        for (int r = 1; r <= searchRadius; r++) {
+            for (int[] offset : SPIRAL_OFFSETS) {
+                int x = centerX + offset[0] * r;
+                int z = centerZ + offset[1] * r;
+
+                int y = findGroundLevel(world, x, z, maxY, terrainMaterials);
+                if (y != FALLBACK_GROUND_Y && isSpawnPositionClear(world, x, y, z)) {
+                    LOGGER.atInfo().log("Safe spawn found at offset (%d, %d) from center — "
+                        + "center was obstructed", offset[0] * r, offset[1] * r);
+                    return new Vector3d(x + 0.5, y + 0.5, z + 0.5);
+                }
+            }
+        }
+
+        // Nuclear option: force-clear blocks at center to guarantee survival.
+        // This should be extremely rare — means the entire R=8 area is obstructed.
+        int fallbackY = (groundY != FALLBACK_GROUND_Y) ? groundY : FALLBACK_GROUND_Y;
+        LOGGER.atSevere().log("No safe spawn found within R=%d of (%d,%d) — force-clearing "
+            + "3×3×2 volume at Y=%d", searchRadius, centerX, centerZ, fallbackY);
+        forceClearSpawnVolume(world, centerX, fallbackY, centerZ);
+        return new Vector3d(centerX + 0.5, fallbackY + 0.5, centerZ + 0.5);
+    }
+
+    /**
+     * Finds a safe spawn position using generic terrain detection (no biome whitelist).
+     *
+     * <p>Used for ceiling biomes (Caverns, Frozen Crypts, Sand Tombs) where the
+     * biome whitelist is too restrictive — cave floors can have blocks not in the
+     * biome material set (mossy variants, crystals, etc.).
+     *
+     * @param world       The world (chunks must be loaded)
+     * @param centerX     Center X to search from (typically 0)
+     * @param centerZ     Center Z to search from (typically 0)
+     * @param maxY        Maximum Y for ground scanning (typically baseY + 1 for ceiling biomes)
+     * @param searchRadius Maximum spiral search radius (blocks)
+     * @return Safe spawn position with +0.5 X/Z centering and +0.5 Y offset
+     */
+    @Nonnull
+    public static Vector3d findSafeSpawnPosition(
+            @Nonnull World world, int centerX, int centerZ, int maxY, int searchRadius) {
+
+        // Try center first
+        int groundY = findGroundLevel(world, centerX, centerZ, maxY);
+        if (groundY != FALLBACK_GROUND_Y && isSpawnPositionClear(world, centerX, groundY, centerZ)) {
+            return new Vector3d(centerX + 0.5, groundY + 0.5, centerZ + 0.5);
+        }
+
+        // Spiral outward
+        for (int r = 1; r <= searchRadius; r++) {
+            for (int[] offset : SPIRAL_OFFSETS) {
+                int x = centerX + offset[0] * r;
+                int z = centerZ + offset[1] * r;
+
+                int y = findGroundLevel(world, x, z, maxY);
+                if (y != FALLBACK_GROUND_Y && isSpawnPositionClear(world, x, y, z)) {
+                    LOGGER.atInfo().log("Safe spawn found at offset (%d, %d) from center — "
+                        + "center was obstructed (ceiling biome)", offset[0] * r, offset[1] * r);
+                    return new Vector3d(x + 0.5, y + 0.5, z + 0.5);
+                }
+            }
+        }
+
+        // Nuclear option
+        int fallbackY = (groundY != FALLBACK_GROUND_Y) ? groundY : FALLBACK_GROUND_Y;
+        LOGGER.atSevere().log("No safe spawn found within R=%d of (%d,%d) — force-clearing "
+            + "3×3×2 volume at Y=%d (ceiling biome)", searchRadius, centerX, centerZ, fallbackY);
+        forceClearSpawnVolume(world, centerX, fallbackY, centerZ);
+        return new Vector3d(centerX + 0.5, fallbackY + 0.5, centerZ + 0.5);
+    }
+
+    /**
+     * Force-clears a 3×3×2 volume at the given position to guarantee player clearance.
+     *
+     * <p>Last-resort measure when no safe position exists within the spiral search
+     * radius. Destroys any blocks (including terrain) at the player's feet and head
+     * level across a 3×3 footprint. This ensures a player can stand without
+     * suffocating, at the cost of a small visual hole in the terrain.
+     *
+     * @param world   The world to modify
+     * @param x       Center X of the volume
+     * @param groundY Y level of the player's feet (blocks at groundY and groundY+1 are cleared)
+     * @param z       Center Z of the volume
+     */
+    private static void forceClearSpawnVolume(@Nonnull World world, int x, int groundY, int z) {
+        BlockType emptyBlock = BlockType.getAssetMap().getAsset("Empty");
+        if (emptyBlock == null) {
+            LOGGER.atSevere().log("Cannot force-clear spawn volume — Empty block type not resolved");
+            return;
+        }
+        String emptyId = emptyBlock.getId();
+        int cleared = 0;
+
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                int bx = x + dx;
+                int bz = z + dz;
+                WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(bx, bz));
+                if (chunk == null) continue;
+
+                for (int dy = 0; dy <= 1; dy++) {
+                    BlockType block = world.getBlockType(bx, groundY + dy, bz);
+                    if (block != null && block.getMaterial() == BlockMaterial.Solid) {
+                        chunk.setBlock(bx, groundY + dy, bz, emptyId);
+                        cleared++;
+                    }
+                }
+            }
+        }
+
+        if (cleared > 0) {
+            LOGGER.atWarning().log("Force-cleared %d blocks in 3×3×2 volume at (%d, %d, %d) "
+                + "to prevent player suffocation", cleared, x, groundY, z);
+        }
     }
 }

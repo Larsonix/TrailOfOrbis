@@ -158,7 +158,7 @@ physDamage = physDamage × (1 - min(physicalResistance, 75) / 100)
 
 **Elemental Damage (per element) :**
 ```
-effectiveResist = max(0, min(resistance, 75) - penetration)    // pen floors at 0%
+effectiveResist = max(-200, min(75, resistance - penetration))  // pen before cap, floor -200%
 elemDamage = elemDamage × (1 - effectiveResist / 100)
 ```
 

@@ -4,6 +4,7 @@ import au.ellie.hyui.builders.HyUIHud;
 import au.ellie.hyui.builders.UIElementBuilder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 import javax.annotation.Nonnull;
@@ -322,7 +323,7 @@ public final class HudRefreshHelper {
      *
      * @return {@code true} if the reset succeeded
      */
-    private static boolean resetHasBuilt(@Nonnull HyUIHud hud) {
+    public static boolean resetHasBuilt(@Nonnull HyUIHud hud) {
         if (!REFLECTION_AVAILABLE) {
             return false;
         }
@@ -360,6 +361,35 @@ public final class HudRefreshHelper {
      *
      * @return {@code true} if visibility was set successfully
      */
+    /**
+     * Checks whether a specific HyUIHud is registered in the player's MultipleCustomUIHud.
+     *
+     * <p>Uses the same reflection approach as {@code MultiHudWrapper.getHuds()} to access
+     * the MCHUD's internal {@code customHuds} map. Returns {@code false} if there's no
+     * custom HUD set, if reflection fails, or if the HUD is not found in the map.
+     *
+     * @param hud    The HyUIHud to check for
+     * @param player The Player component
+     * @return {@code true} if the HUD is registered in the MCHUD
+     */
+    @SuppressWarnings("unchecked")
+    public static boolean isRegisteredInMchud(@Nonnull HyUIHud hud, @Nonnull Player player) {
+        try {
+            var hudManager = player.getHudManager();
+            var customHud = hudManager.getCustomHud();
+            if (customHud == null) return false;
+
+            // Access the MCHUD's customHuds map via reflection
+            java.lang.reflect.Field customHudsField = customHud.getClass().getDeclaredField("customHuds");
+            customHudsField.setAccessible(true);
+            java.util.Map<String, ?> registeredHuds = (java.util.Map<String, ?>) customHudsField.get(customHud);
+            return registeredHuds.containsValue(hud);
+        } catch (Exception e) {
+            // Reflection failed — assume not registered (safe: worst case we re-register)
+            return false;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static boolean setFirstElementVisibility(@Nonnull HyUIHud hud, boolean visible) {
         if (!VISIBILITY_AVAILABLE) {

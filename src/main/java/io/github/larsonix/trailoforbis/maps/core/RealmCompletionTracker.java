@@ -49,17 +49,17 @@ public class RealmCompletionTracker {
     /** Total number of monsters spawned in the realm. */
     private final AtomicInteger totalMonsters;
 
-    /** Number of kills required for completion (95% of total — allows some stuck/lost mobs). */
+    /** Number of kills required for completion (90% of total — allows some stuck/lost mobs). */
     private final AtomicInteger requiredKills;
 
-    /** Fraction of total mobs that must be killed for completion (0.95 = 95%). */
-    private static final double COMPLETION_THRESHOLD = 0.95;
+    /** Fraction of total mobs that must be killed for completion (0.90 = 90%). */
+    private static final double COMPLETION_THRESHOLD = 0.90;
 
     /**
      * Flat buffer subtracted from total before applying the threshold.
      * Prevents low mob counts from rounding up to 100% required kills.
-     * At 15 mobs: required = ceil((15-3)*0.95) = 12 instead of 15.
-     * At 100 mobs: required = ceil((100-3)*0.95) = 93 instead of 95 — negligible.
+     * At 15 mobs: required = ceil((15-3)*0.90) = 11 instead of 15.
+     * At 100 mobs: required = ceil((100-3)*0.90) = 88 instead of 90 — negligible.
      */
     private static final int LOW_COUNT_BUFFER = 3;
 

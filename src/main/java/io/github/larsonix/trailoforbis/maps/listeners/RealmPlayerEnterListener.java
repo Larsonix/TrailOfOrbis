@@ -17,16 +17,24 @@ import com.hypixel.hytale.server.core.event.events.player.DrainPlayerFromWorldEv
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.event.events.player.RemovedPlayerFromWorldEvent;
 import com.hypixel.hytale.server.core.modules.entity.player.ChunkTracker;
+import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.BlockMaterial;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
+import io.github.larsonix.trailoforbis.maps.templates.RealmTemplateRegistry;
+import io.github.larsonix.trailoforbis.util.TerrainUtils;
 
 import javax.annotation.Nonnull;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -277,9 +285,18 @@ public class RealmPlayerEnterListener {
                 playerId != null ? playerId.toString().substring(0, 8) : "unknown");
         }
 
-        // ─── DEFERRED: combat HUD + spawn protection ─────────────────────
+        // ─── SUFFOCATION RESCUE: post-teleport safety check ─────────────
+        // Adapts the proven mob rescue pattern (RealmMobSpawner:898-911).
+        // If Layer 1 (findSafeSpawnPosition) somehow placed the player inside
+        // blocks, this detects and corrects it before they take damage.
 
         RealmInstance realm = realmOpt.get();
+
+        if (playerId != null && !realm.getBiome().isUtilityBiome()) {
+            rescueIfSuffocating(world, store, ref, playerId, realm.getBiome());
+        }
+
+        // ─── DEFERRED: combat HUD + spawn protection ─────────────────────
 
         // Grant spawn protection — invincible until first movement.
         // grant() handles its own world.execute() internally.
@@ -294,13 +311,94 @@ public class RealmPlayerEnterListener {
         if (playerId != null && !realm.getBiome().isUtilityBiome()
                 && !realmsManager.getHudManager().hasCombatHud(playerId)) {
             final UUID deferredPlayerId = playerId;
-            final PlayerRef deferredRef = playerRef;
             world.execute(() -> {
-                if (!deferredRef.isValid()) return;
+                // Fresh ref at execution time — immune to stale captures if the player
+                // transitions again before this task runs.
+                PlayerRef freshRef = com.hypixel.hytale.server.core.universe.Universe.get()
+                    .getPlayer(deferredPlayerId);
+                if (freshRef == null || !freshRef.isValid()) return;
                 if (realmsManager.getHudManager().hasCombatHud(deferredPlayerId)) return;
-                realmsManager.getHudManager().showCombatHud(deferredPlayerId, deferredRef, realm);
+                realmsManager.getHudManager().showCombatHud(deferredPlayerId, freshRef, realm);
             });
         }
+    }
+
+    /**
+     * Checks if the player is suffocating (body inside solid blocks) and teleports
+     * them to the nearest safe position if so.
+     *
+     * <p>This is a recovery mechanism for when spawn point selection (Layer 1 in
+     * {@link TerrainUtils#findSafeSpawnPosition}) fails due to edge cases like
+     * terrain noise peaks, late structure placement, or heightmap inaccuracies.
+     *
+     * <p>Adapts the proven mob suffocation rescue from {@code RealmMobSpawner}
+     * (lines 898-911), which checks feet+head blocks and teleports to safe ground.
+     *
+     * @param world     The realm world
+     * @param store     The entity store
+     * @param entityRef The player's entity reference
+     * @param playerId  The player's UUID (for logging)
+     * @param biome     The realm biome type
+     * @return true if rescue was needed and performed
+     */
+    private boolean rescueIfSuffocating(
+            @Nonnull World world, @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> entityRef, @Nonnull UUID playerId,
+            @Nonnull RealmBiomeType biome) {
+
+        TransformComponent transform = store.getComponent(entityRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return false;
+        }
+
+        Vector3d pos = transform.getPosition();
+        int bx = (int) Math.floor(pos.x);
+        int by = (int) Math.floor(pos.y);
+        int bz = (int) Math.floor(pos.z);
+
+        // Check feet and head positions — same pattern as RealmMobSpawner:898-905
+        BlockType blockFeet = world.getBlockType(bx, by, bz);
+        BlockType blockHead = world.getBlockType(bx, by + 1, bz);
+
+        // Match the mob suffocation pattern: both feet AND head must be inside
+        // non-empty blocks. A player with just feet clipping a decorative block
+        // (flower, grass) but head clear can move normally — no rescue needed.
+        // Using BlockMaterial.Empty check (not Solid) so vegetation also triggers,
+        // matching RealmMobSpawner:904-905.
+        boolean feetBlocked = blockFeet != null && blockFeet.getMaterial() != BlockMaterial.Empty;
+        boolean headBlocked = blockHead != null && blockHead.getMaterial() != BlockMaterial.Empty;
+
+        if (!feetBlocked || !headBlocked) {
+            // At least one of feet/head is in air — player can breathe, no rescue needed
+            return false;
+        }
+
+        // Player is inside blocks — find a safe position nearby
+        LOGGER.atWarning().log("Player %s is suffocating at (%d, %d, %d) in realm (biome=%s, "
+            + "feet=%s, head=%s) — attempting rescue",
+            playerId.toString().substring(0, 8), bx, by, bz, biome.name(),
+            blockFeet != null ? blockFeet.getId() : "null",
+            blockHead != null ? blockHead.getId() : "null");
+
+        int baseY = (int) RealmTemplateRegistry.getBaseYForBiome(biome);
+        int maxScanY = baseY + (biome.isCeilingBiome() ? 1 : 30);
+
+        Vector3d safePos;
+        if (biome.isCeilingBiome()) {
+            safePos = TerrainUtils.findSafeSpawnPosition(world, bx, bz, maxScanY, 8);
+        } else {
+            Set<String> terrainMaterials = biome.getTerrainMaterials();
+            safePos = TerrainUtils.findSafeSpawnPosition(world, bx, bz, maxScanY, terrainMaterials, 8);
+        }
+
+        transform.teleportPosition(safePos);
+
+        LOGGER.atWarning().log("Rescued player %s from suffocation — teleported from "
+            + "(%d, %d, %d) to (%.1f, %.1f, %.1f)",
+            playerId.toString().substring(0, 8), bx, by, bz,
+            safePos.x, safePos.y, safePos.z);
+
+        return true;
     }
 
     /**

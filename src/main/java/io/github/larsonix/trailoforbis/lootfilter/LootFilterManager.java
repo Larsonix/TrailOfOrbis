@@ -5,6 +5,7 @@ import io.github.larsonix.trailoforbis.database.DataManager;
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.lootfilter.config.LootFilterConfig;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterAction;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterProfile;
@@ -102,6 +103,22 @@ public final class LootFilterManager {
             return state.evaluate(gearData, equipmentType);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Filter evaluation error for %s — allowing pickup",
+                    playerId.toString().substring(0, 8));
+            return FilterAction.ALLOW;
+        }
+    }
+
+    /**
+     * Evaluates a realm map against the player's map filter rules.
+     * Fail-open: returns ALLOW on any error.
+     */
+    @Nonnull
+    public FilterAction evaluateMap(@Nonnull UUID playerId, @Nonnull RealmMapData mapData) {
+        try {
+            PlayerFilterState state = repository.getOrCreate(playerId);
+            return state.evaluateMap(mapData);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Map filter evaluation error for %s — allowing pickup",
                     playerId.toString().substring(0, 8));
             return FilterAction.ALLOW;
         }

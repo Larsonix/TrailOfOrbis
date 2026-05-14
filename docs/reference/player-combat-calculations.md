@@ -98,25 +98,26 @@ Spell Damage: +25%
 
 ---
 
-## 4. Armor Formula (PoE-Style)
+## 4. Armor Formula (Level-Scaled)
 
 ### Formula
 ```java
-// Physical damage reduction
-reduction = armor / (armor + 10 × damage)
+// Physical damage reduction (consistent % regardless of hit size)
+reduction = armor / (armor + levelScale × attackerLevel + baseConstant)
 reduction = min(reduction, 0.90)  // Cap at 90%
+// Default: levelScale = 5.0, baseConstant = 50.0 (configurable in config.yml)
 ```
 
-### Armor Effectiveness Table
+### Armor Effectiveness Table (vs same-level mobs)
 
-| Armor | vs 10 dmg | vs 50 dmg | vs 100 dmg | vs 200 dmg |
-|-------|-----------|-----------|------------|------------|
-| 100 | 50% | 17% | 9% | 5% |
-| 500 | 83% | 50% | 33% | 20% |
-| 1000 | 91% | 67% | 50% | 33% |
-| 2000 | 95% | 80% | 67% | 50% |
+| Armor | vs Lv1 | vs Lv20 | vs Lv50 | vs Lv100 |
+|-------|--------|---------|---------|----------|
+| 50    | 47.6%  | 33.3%   | 16.7%   | 9.1%     |
+| 150   | 73.2%  | 53.6%   | 33.3%   | 21.4%    |
+| 300   | 84.5%  | 67.4%   | 50.0%   | 35.3%    |
+| 500   | 90.0%  | 78.1%   | 62.5%   | 47.6%    |
 
-**Key Insight**: Armor is more effective vs small hits. Big hits go through.
+**Key Insight**: Higher-level attackers reduce armor effectiveness naturally. Armor gives consistent reduction regardless of hit size.
 
 ### Armor Penetration
 ```java
@@ -132,19 +133,21 @@ Even 100% penetration only halves armor, never bypasses completely.
 
 ### Formula
 ```java
-// Per-element damage reduction
-reduction = resistance / 100.0;
-finalDamage = baseDamage × (1.0 - reduction);
+// Pen subtracts from raw resistance, then cap and floor applied
+effectiveResist = max(-200, min(75, resistance - penetration));
+finalDamage = baseDamage × (1.0 - effectiveResist / 100.0);
 ```
 
-### Resistance Cap
-- Hard cap: 90% (never immune)
-- Penetration reduces resistance before cap check
+### Boundaries
+- Hard cap: 75% (never immune)
+- Floor: -200% (3× damage maximum)
+- Overcapping resistance (above 75%) buffers against penetration
 
 ### Penetration
 ```java
-// Penetration subtracts from resistance
-effectiveResistance = max(resistance - penetration, 0);
+// Penetration subtracts from raw resistance before cap
+// Can push resistance negative for bonus damage (up to -200% / 3×)
+effectiveResistance = max(-200, min(75, resistance - penetration));
 ```
 
 ---
@@ -358,20 +361,20 @@ Damage: ~14 (weighted formula)
 Armor: ~5
 ```
 
-**Player → Mob:**
+**Player → Mob (attacker level 50):**
 ```
 Damage: ~125 average
-Mob armor reduction: 5/(5+1250) = 0.4%
-Damage dealt: ~124
-Hits to kill: 167/124 = ~1.3 hits (slight overkill)
+Mob armor reduction: 5/(5+5×50+50) = 1.6%
+Damage dealt: ~123
+Hits to kill: 167/123 = ~1.4 hits (slight overkill)
 ```
 
-**Mob → Player:**
+**Mob → Player (attacker level 50):**
 ```
 Damage: ~14
-Player armor reduction: 400/(400+140) = 74%
-Damage taken: 14 × 0.26 = ~4
-Hits to kill: 150/4 = ~38 hits
+Player armor reduction: 400/(400+5×50+50) = 57%
+Damage taken: 14 × 0.43 = ~6
+Hits to kill: 150/6 = ~25 hits
 ```
 
 **Note**: These numbers show the EARTH tank is very survivable. Glass cannon builds (FIRE/VOID) trade HP for damage.
@@ -385,7 +388,7 @@ Hits to kill: 150/4 = ~38 hits
 | Base stats | `BaseStats.java` | Starting values |
 | Attribute grants | `AttributeGrants.java` | Per-point bonuses |
 | Damage calculator | `RPGDamageCalculator.java` | Full damage pipeline |
-| Armor formula | `ArmorCalculator.java` | Physical reduction |
+| Armor formula | `CombatCalculator.java` | Physical reduction |
 | Crit handling | `CriticalHitCalculator.java` | Crit rolls |
 | Evasion | `EvasionCalculator.java` | Hit/evade rolls |
 | Computed stats | `ComputedStats.java` | Final player stats |
@@ -395,11 +398,11 @@ Hits to kill: 150/4 = ~38 hits
 ## 16. Formula Quick Reference
 
 ```
-# Armor Reduction
-reduction = armor / (armor + 10 × damage)
+# Armor Reduction (levelScale=5.0, baseConstant=50.0)
+reduction = armor / (armor + 5 × attackerLevel + 50)
 
-# Elemental Reduction
-reduction = resistance / 100
+# Elemental Resistance (pen before cap, floor -200%)
+effectiveResist = max(-200, min(75, resistance - penetration))
 
 # Hit Chance (vs Evasion)
 hitChance = accuracy / (accuracy + evasion/4)

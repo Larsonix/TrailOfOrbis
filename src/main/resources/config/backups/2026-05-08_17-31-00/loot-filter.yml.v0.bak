@@ -1,0 +1,58 @@
+# Master switch for entire loot filter system
+enabled: true
+
+# Per-player limits
+max_profiles_per_player: 10
+max_rules_per_profile: 50
+max_conditions_per_rule: 50
+
+# Defaults for new player states
+defaults:
+  # What happens when no rule matches in a new profile
+  default_action: ALLOW
+  # New players start with filtering off
+  filtering_enabled: false
+
+# Feedback when items are blocked
+feedback:
+  # none / chat / action-bar
+  mode: chat
+  # every = log each blocked item / summary = periodic count
+  detail: summary
+  # Seconds between summary messages (only used when detail: summary)
+  summary_interval: 5
+
+# Starter presets — players can copy these as starting profiles
+presets:
+  - name: "Block Common"
+    default_action: ALLOW
+    rules:
+      - name: "Hide Common junk"
+        action: BLOCK
+        conditions:
+          - type: MAX_RARITY
+            threshold: COMMON
+
+  - name: "Rare+ Only"
+    default_action: BLOCK
+    rules:
+      - name: "Keep Rare and above"
+        action: ALLOW
+        conditions:
+          - type: MIN_RARITY
+            threshold: RARE
+
+  - name: "Epic+ Endgame"
+    default_action: BLOCK
+    rules:
+      - name: "Keep Epic and above"
+        action: ALLOW
+        conditions:
+          - type: MIN_RARITY
+            threshold: EPIC
+
+# Override auto-derived modifier categories for specific modifiers
+category_overrides:
+  of_stability: RESOURCES
+  of_fortitude: RESOURCES
+  of_the_cat: MOVEMENT

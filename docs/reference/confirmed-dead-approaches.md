@@ -296,3 +296,39 @@ Sending `UpdateItems` or `UpdateTranslations` packets between `DrainPlayerFromWo
 **Working approach**: Native code analysis tools produce pseudo-C source for the majority of client functions. Use topic indexes and gameplay function references for searching.
 
 **Also working**: Binary string extraction recovers embedded property names, namespace paths, and GLSL shaders. XAML/UI parsing extracts full UI component definitions.
+
+---
+
+## Weapon Change Detection (2026-05-09)
+
+### Dead: Event-based weapon stat recalculation via SwitchActiveSlotEvent
+
+**What**: `WeaponSlotChangeSystem` listened to `SwitchActiveSlotEvent` for hotbar section, called `recalculateStats()` immediately.
+
+**Why dead**: Hytale fires `SwitchActiveSlotEvent` BEFORE updating the inventory's active slot field (confirmed via decompiled `InventoryPacketHandler`: event dispatch at line 379, field update at line 392). Reading `inventory.getActiveHotbarItem()` during the event handler returns the OLD weapon.
+
+**Working approach**: Tick-based polling via `HotbarSlotTrackingSystem`. Reads inventory state AFTER Hytale's packet handler has updated the active slot. Tracks both slot index AND weapon item definition ID to catch in-slot replacements.
+
+### Dead: Caching weapon identity in ComputedStats without AoE cache version check
+
+**What**: Store `weaponBaseDamage`, `weaponItemId`, `weaponSpellElement` in `ComputedStats`. Recalculate on weapon change. Combat reads from cache.
+
+**Why dead**: The AoE attacker cache in `RPGDamageSystem` (`cachedAttackerCtx`) stores a `ComputedStats` reference from the first hit and reuses it for all subsequent hits from the same player UUID. It was designed for per-tick AoE optimization but persisted across ticks — weapon switches triggered correct stat recalculation and updated the PlayerData cache, but the AoE cache short-circuited the lookup and returned stale stats.
+
+**Working approach**: Add `statsVersion` to the AoE cache hit condition. The version increments on every `recalculateStats()` call. Same attacker + same version = cache hit (AoE works). Same attacker + different version = cache miss (fresh stats loaded).
+
+### Dead: Using `getItemInHand()` for weapon reads
+
+**What**: Call `inventory.getItemInHand()` to read the player's weapon.
+
+**Why partially dead**: `getItemInHand()` branches on `_usingToolsItem` flag — when the player has used construction tools (pickaxe/hammer), this flag stays true and `getItemInHand()` returns the tool item instead of the hotbar weapon. Not the primary bug cause, but an incorrect API for weapon reads.
+
+**Working approach**: Use `inventory.getActiveHotbarItem()` which always returns the hotbar weapon regardless of the tools flag. All 17 call sites across 16 files updated.
+
+### Dead: Incomplete `OffensiveStats.equals()` for weapon identity
+
+**What**: `OffensiveStats.equals()` compared only combat stat VALUES (physDmg, critChance, etc.) but excluded weapon identity fields (weaponBaseDamage, weaponItemId, weaponRawItemId, weaponSpellElement).
+
+**Why dead**: When switching between two swords with similar modifier stats, `equals()` returned true → `statsChanged=false` → cache not updated → combat used the first sword's data. The recalculation produced correct stats but the `equals()` optimization blocked them from propagating.
+
+**Working approach**: Include all weapon identity fields in `equals()` and `hashCode()`. Now any weapon change is detected as a stat change.

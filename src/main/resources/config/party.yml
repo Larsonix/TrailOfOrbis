@@ -50,8 +50,23 @@ xp_sharing:
 # level instead of just the killer's level.
 
 anti_boosting:
-  enabled: true
+  enabled: false
   use_party_max_level: true
+
+# -----------------------------------------------------------------------------
+# PROXIMITY XP SHARING (when no party mod is installed)
+# -----------------------------------------------------------------------------
+# When PartyPro is not available, nearby players within the radius of a mob
+# death automatically share XP. Uses the same pool multipliers and split mode
+# as party sharing.
+#
+# This is the fallback — when PartyPro IS available, party membership
+# determines sharing (not proximity).
+
+proximity:
+  enabled: true
+  # Radius in blocks from mob death position. Players within this range share XP.
+  radius: 64.0
 
 # -----------------------------------------------------------------------------
 # PVP PROTECTION

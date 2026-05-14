@@ -43,6 +43,8 @@ __pycache__/
 _recovery*/
 _backup*/
 _corrupted_backup/
+src/main/resources/config/backups/
+src/main/resources/config/.versions.yml
 LadyPaladraStonesDesignCommission/
 Wiki/hytale-docs-main/
 Wiki/voile-extracted/
@@ -163,3 +165,4 @@ docs/research/NEXT_RESEARCH_PROMPT.md
 !scripts/generate-octant-assets.py
 !scripts/generate-octant-positions.py
 !scripts/create-elemental-assets.java
+changelogs/TrailOfOrbis

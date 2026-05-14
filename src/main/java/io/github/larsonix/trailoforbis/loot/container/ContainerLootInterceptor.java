@@ -17,14 +17,19 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.ecs.UseBlockEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.compat.L4EComponentBridge;
+import io.github.larsonix.trailoforbis.gear.item.ItemWorldSyncService;
 import io.github.larsonix.trailoforbis.gear.loot.RealmLootContext;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -84,6 +89,10 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
     @Nullable
     private final L4EComponentBridge l4eBridge;
 
+    // Item sync service for sending custom item definitions to clients (null when GearManager unavailable)
+    @Nullable
+    private final ItemWorldSyncService itemWorldSyncService;
+
     // Lazy-initialized distance calculator for overworld source level
     private DistanceBonusCalculator distanceBonusCalculator;
 
@@ -95,13 +104,15 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
      * @param realmsManager             The realms manager (for realm world detection), or null if unavailable
      * @param processedContainerResType The persistent resource type for tracking processed containers
      * @param l4eBridge                 The L4E component bridge for stale lock cleanup and template removal, or null
+     * @param itemWorldSyncService     The item sync service for sending custom definitions to clients, or null
      */
     public ContainerLootInterceptor(
             @Nonnull ContainerLootSystem lootSystem,
             @Nullable RewardChestManager rewardChestManager,
             @Nullable RealmsManager realmsManager,
             @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType,
-            @Nullable L4EComponentBridge l4eBridge) {
+            @Nullable L4EComponentBridge l4eBridge,
+            @Nullable ItemWorldSyncService itemWorldSyncService) {
         super(UseBlockEvent.Pre.class);
         this.lootSystem = lootSystem;
         this.rewardChestManager = rewardChestManager;
@@ -111,6 +122,7 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         this.clearAllVanilla = lootSystem.getConfig().isClearAllVanilla();
         this.debugLogging = lootSystem.getConfig().getAdvanced().isDebugLogging();
         this.l4eBridge = l4eBridge;
+        this.itemWorldSyncService = itemWorldSyncService;
     }
 
     /**
@@ -176,6 +188,7 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         // ── L4E cancelled-event recovery ──
         // If L4E (or another system) cancelled this event, determine if we should
         // recover or respect the cancellation.
+        boolean removedL4eComponent = false;
         if (event.isCancelled()) {
             // Container genuinely open by another player — respect cancellation
             if (!containerState.getWindows().isEmpty()) {
@@ -183,21 +196,26 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
             }
 
             // L4E stale OpenedContainerComponent lock — remove it
-            if (l4eBridge != null) {
-                if (l4eBridge.hasOpenedContainer(store, playerRef)) {
-                    l4eBridge.removeOpenedContainerViaCommandBuffer(commandBuffer, playerRef);
-                    LOGGER.atInfo().log("Removed stale L4E OpenedContainerComponent for player at (%d, %d, %d)",
-                        target.x, target.y, target.z);
-                }
+            if (l4eBridge != null && l4eBridge.hasOpenedContainer(store, playerRef)) {
+                l4eBridge.removeOpenedContainerViaCommandBuffer(commandBuffer, playerRef);
+                removedL4eComponent = true;
+                LOGGER.atInfo().log("Removed stale L4E OpenedContainerComponent for player at (%d, %d, %d)",
+                    target.x, target.y, target.z);
             }
 
             // Uncancelled so vanilla opens the container after we process it
             event.setCancelled(false);
         }
 
-        // If L4E has an auto-registered template for this container, remove it
-        // so L4E won't interfere on future opens (we own all non-reward containers)
-        if (l4eBridge != null && l4eBridge.hasTemplate(chunkStoreStore, target.x, target.y, target.z)) {
+        // Check if L4E managed this container BEFORE removing the template.
+        // L4E only adds OpenedContainerComponent when hasTemplate() is true, and
+        // CommandBuffer.removeComponent() is deferred — our try-catch can't catch
+        // the IllegalArgumentException thrown during Store.tick() if the component
+        // was never added.
+        boolean l4eHadTemplate = l4eBridge != null
+            && l4eBridge.hasTemplate(chunkStoreStore, target.x, target.y, target.z);
+
+        if (l4eHadTemplate) {
             l4eBridge.removeTemplate(chunkStoreStore, target.x, target.y, target.z);
             if (debugLogging) {
                 LOGGER.atFine().log("Removed L4E auto-registered template at (%d, %d, %d)",
@@ -227,11 +245,20 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         ProcessedContainerResource processedResource =
             chunkStoreStore.getResource(processedContainerResType);
         if (processedResource.isProcessedByPlayer(target.x, target.y, target.z, playerId)) {
-            if (debugLogging) {
-                LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed for player %s",
-                    target.x, target.y, target.z, world.getName(), playerId);
+            // Defensive recovery: if the container was externally cleared (e.g., L4E's
+            // ContainerMonitoringSystem clears on window close), re-process rather than
+            // showing the player an empty chest.
+            if (!isContainerEmpty(containerState.getItemContainer())) {
+                if (debugLogging) {
+                    LOGGER.atFine().log("Container at (%d, %d, %d) in %s already processed for player %s",
+                        target.x, target.y, target.z, world.getName(), playerId);
+                }
+                return;
             }
-            return;
+            // Container was cleared externally — remove processed flag and re-process
+            processedResource.removeForPlayer(target.x, target.y, target.z, playerId);
+            LOGGER.atInfo().log("Container at (%d, %d, %d) in %s was externally cleared for player %s, re-processing",
+                target.x, target.y, target.z, world.getName(), playerId);
         }
 
         int playerLevel = getPlayerLevel(playerId);
@@ -257,6 +284,25 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
                 containerState.getItemContainer(), lootContext, tier, playerId);
         }
 
+        // Sync custom item definitions (rpg_gear_xxx, rpg_map_xxx) to the opening player
+        // BEFORE Hytale sends container contents to the client. Without this, the client
+        // has no definition for custom item IDs and renders them as "?".
+        syncContainerItemsToPlayer(containerState.getItemContainer(), playerRefComp);
+
+        // Remove any items the client can't render (missing from asset map).
+        // This catches broken items from any source: stale DynamicLootRegistry skins,
+        // consumables that slipped past validation, or any other invalid item ID.
+        removeInvalidItems(containerState.getItemContainer());
+
+        // Prevent L4E from clearing our items on window close.
+        // L4E's UseBlockEventPre adds OpenedContainerComponent only when hasTemplate()
+        // is true. We must not queue a deferred removal for containers L4E never managed
+        // (crashes during CommandBuffer.consume — try-catch can't catch deferred ops).
+        // Also skip if we already removed it in stale lock recovery (prevents double-remove).
+        if (l4eHadTemplate && !removedL4eComponent) {
+            l4eBridge.removeOpenedContainerViaCommandBuffer(commandBuffer, playerRef);
+        }
+
         LOGGER.atInfo().log(
             "Container loot at (%d, %d, %d) in %s: %s (srcLv%d, playerLv%d, block: %s, realm: %s)",
             target.x, target.y, target.z, world.getName(),
@@ -271,6 +317,95 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
     @Override
     public Query<EntityStore> getQuery() {
         return Archetype.empty();
+    }
+
+    /**
+     * Checks if a container has no items in any slot.
+     *
+     * @param container The item container to check
+     * @return true if every slot is null or empty
+     */
+    private boolean isContainerEmpty(@Nonnull ItemContainer container) {
+        short capacity = container.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack item = container.getItemStack(slot);
+            if (item != null && !ItemStack.isEmpty(item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Syncs all custom item definitions in a container to the opening player.
+     *
+     * <p>Iterates every slot and calls {@link ItemWorldSyncService#syncItemToPlayer}
+     * for each item with custom data (gear or realm map). Sends UpdateTranslations +
+     * UpdateItems packets so the client can render rpg_gear_xxx and rpg_map_xxx items.
+     *
+     * <p>Must be called AFTER all container modifications and BEFORE the handler
+     * returns, so the client has definitions before the container UI renders.
+     */
+    private void syncContainerItemsToPlayer(
+            @Nonnull ItemContainer container,
+            @Nonnull PlayerRef playerRef) {
+        if (itemWorldSyncService == null) {
+            return;
+        }
+
+        short capacity = container.getCapacity();
+        int synced = 0;
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack item = container.getItemStack(slot);
+            if (item == null || ItemStack.isEmpty(item)) {
+                continue;
+            }
+            if (itemWorldSyncService.syncItemToPlayer(playerRef, item)) {
+                synced++;
+            }
+        }
+
+        if (synced > 0 && debugLogging) {
+            LOGGER.atFine().log("Synced %d custom item definition(s) to player for container open", synced);
+        }
+    }
+
+    /**
+     * Removes items from a container whose item ID doesn't resolve to a valid
+     * Item in the asset map. These would render as "?" on the client and can
+     * crash the client if interacted with (e.g., via the Stone picker item-grid).
+     *
+     * @param container The container to validate
+     */
+    private void removeInvalidItems(@Nonnull ItemContainer container) {
+        short capacity = container.getCapacity();
+        int removed = 0;
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack item = container.getItemStack(slot);
+            if (item == null || ItemStack.isEmpty(item)) {
+                continue;
+            }
+            String itemId = item.getItemId();
+            if (itemId == null || itemId.isEmpty()) {
+                container.removeItemStackFromSlot(slot, item.getQuantity());
+                removed++;
+                continue;
+            }
+            // Custom RPG items (rpg_gear_*, rpg_map_*) are registered dynamically
+            // and won't be in the vanilla asset map — they're validated by sync above.
+            if (itemId.startsWith("rpg_")) {
+                continue;
+            }
+            Item assetItem = Item.getAssetMap().getAsset(itemId);
+            if (assetItem == null || assetItem == Item.UNKNOWN) {
+                LOGGER.atWarning().log("Removed invalid item '%s' from container slot %d (not in asset map)", itemId, slot);
+                container.removeItemStackFromSlot(slot, item.getQuantity());
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            LOGGER.atWarning().log("Removed %d invalid item(s) from container before player open", removed);
+        }
     }
 
     /**

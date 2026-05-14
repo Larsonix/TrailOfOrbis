@@ -25,6 +25,7 @@ import com.hypixel.hytale.protocol.InteractableUpdate;
 import com.hypixel.hytale.protocol.ItemUpdate;
 import com.hypixel.hytale.protocol.ItemWithAllMetadata;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -161,6 +162,13 @@ public class SkillSanctumInstance {
      * Used to restore on exit.
      */
     private boolean originalCanFly = false;
+
+    /**
+     * Per-visitor original canFly state for restoration on exit.
+     * Key = visitor UUID, Value = their originalCanFly before entering sanctum.
+     * The owner is NOT in this map (uses the existing {@code originalCanFly} field).
+     */
+    private final Map<UUID, Boolean> visitorOriginalCanFly = new ConcurrentHashMap<>();
 
     /**
      * Whether flight has been enabled for the player.
@@ -407,8 +415,18 @@ public class SkillSanctumInstance {
             connectionRenderer = null;
         }
 
-        // TODO: Phase 4 - Destroy all orb entities
-        // For now, entities will be cleaned up when the realm closes
+        // Restore flight for all visitors before closing the world.
+        // Must happen before realm closure since restoreFlightForVisitor accesses the world.
+        // Use snapshot copy to avoid concurrent modification (restoreFlightForVisitor removes from map).
+        if (!visitorOriginalCanFly.isEmpty()) {
+            LOGGER.atInfo().log("Restoring flight for %d visitor(s) in sanctum %s",
+                visitorOriginalCanFly.size(), playerId);
+            for (UUID visitorId : Set.copyOf(visitorOriginalCanFly.keySet())) {
+                PlayerRef visitorRef = Universe.get().getPlayer(visitorId);
+                restoreFlightForVisitor(visitorId, visitorRef);
+            }
+            visitorOriginalCanFly.clear(); // safety net
+        }
 
         // Close the underlying realm and remove the instance world.
         // forceClose() only transitions the state to CLOSING — it does NOT delete the
@@ -416,6 +434,14 @@ public class SkillSanctumInstance {
         // and reloads it on every server restart, causing orphaned instances to accumulate.
         if (realmInstance != null) {
             World world = realmInstance.getWorld();
+
+            // Explicitly destroy all orb entities before realm closure.
+            // This ensures entities are removed from the ECS immediately rather than
+            // relying solely on implicit cleanup from world deletion.
+            if (world != null && world.isAlive()) {
+                destroyTrackedEntities(world.getEntityStore().getStore());
+            }
+
             try {
                 realmInstance.forceClose(RealmInstance.CompletionReason.ABANDONED);
             } catch (Exception e) {
@@ -438,6 +464,36 @@ public class SkillSanctumInstance {
 
         manager.onInstanceClosed(playerId);
         LOGGER.atInfo().log("Sanctum instance closed for %s", playerId);
+    }
+
+    /**
+     * Removes all tracked node and subtitle entities from the entity store.
+     */
+    private void destroyTrackedEntities(@Nonnull Store<EntityStore> store) {
+        int removed = 0;
+        for (Ref<EntityStore> ref : nodeEntities.values()) {
+            if (ref != null && ref.isValid()) {
+                try {
+                    store.removeEntity(ref, RemoveReason.REMOVE);
+                    removed++;
+                } catch (Exception e) {
+                    // Entity may already be removed — safe to ignore
+                }
+            }
+        }
+        for (Ref<EntityStore> ref : subtitleEntities.values()) {
+            if (ref != null && ref.isValid()) {
+                try {
+                    store.removeEntity(ref, RemoveReason.REMOVE);
+                    removed++;
+                } catch (Exception e) {
+                    // Entity may already be removed — safe to ignore
+                }
+            }
+        }
+        if (removed > 0) {
+            LOGGER.atInfo().log("Destroyed %d sanctum entities for %s", removed, playerId);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -552,6 +608,134 @@ public class SkillSanctumInstance {
         LOGGER.atInfo().log("Enabled forced flight for player %s in sanctum (was canFly: %b)",
             playerRef.getUuid(), originalCanFly);
         return true;
+    }
+
+    /**
+     * Enables flight for a visitor (non-owner) in the sanctum.
+     *
+     * <p>Captures their original canFly state for restoration on exit.
+     * The owner uses the normal {@link #enableFlightForPlayer(PlayerRef)} path.
+     *
+     * @param visitorRef The visitor player reference
+     * @return true if flight was enabled successfully
+     * @implNote Must be called on the sanctum world thread.
+     */
+    public boolean enableFlightForVisitor(@Nonnull PlayerRef visitorRef) {
+        UUID visitorId = visitorRef.getUuid();
+        if (visitorId.equals(playerId)) return false; // owner uses normal path
+        if (visitorOriginalCanFly.containsKey(visitorId)) return false; // already enabled
+
+        World world = getSanctumWorld();
+        if (world == null || !world.isAlive()) return false;
+
+        Ref<EntityStore> entityRef = visitorRef.getReference();
+        if (entityRef == null || !entityRef.isValid()) return false;
+
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        MovementManager movementManager = store.getComponent(entityRef, MovementManager.getComponentType());
+        if (movementManager == null) {
+            LOGGER.atWarning().log("enableFlightForVisitor: MovementManager not found for %s", visitorId);
+            return false;
+        }
+
+        // Save per-visitor original state
+        visitorOriginalCanFly.put(visitorId, movementManager.getSettings().canFly);
+
+        // Enable flight permission
+        movementManager.getSettings().canFly = true;
+        movementManager.update(visitorRef.getPacketHandler());
+
+        // Force flying state
+        MovementStatesComponent comp = store.getComponent(entityRef, MovementStatesComponent.getComponentType());
+        if (comp != null) {
+            MovementStates states = comp.getMovementStates();
+            states.flying = true;
+            states.onGround = false;
+            states.falling = false;
+        }
+
+        // Send packet to force client into flight
+        SavedMovementStates savedStates = new SavedMovementStates(true);
+        visitorRef.getPacketHandler().write(new SetMovementStates(savedStates));
+
+        LOGGER.atInfo().log("Enabled flight for visitor %s in sanctum (owner: %s)", visitorId, playerId);
+        return true;
+    }
+
+    /**
+     * Sets up F-key interactions for a visitor in the sanctum.
+     *
+     * <p>Visitors get the same Interactions component as the owner, allowing them
+     * to press F on skill nodes. However, the {@link SkillNodeInteraction} handler
+     * checks ownership and blocks non-owners from allocating/deallocating.
+     *
+     * @param visitorRef The visitor player reference
+     * @implNote Must be called on the sanctum world thread.
+     */
+    public void setupVisitorInteractions(@Nonnull PlayerRef visitorRef) {
+        World world = getSanctumWorld();
+        if (world == null || !world.isAlive()) return;
+
+        Ref<EntityStore> entityRef = visitorRef.getReference();
+        if (entityRef == null || !entityRef.isValid()) return;
+
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Interactions interactions = new Interactions();
+        interactions.setInteractionId(InteractionType.Use, SkillNodeInteraction.DEFAULT_ID);
+        interactions.setInteractionHint("Press F to inspect | Click to see details");
+        store.putComponent(entityRef, Interactions.getComponentType(), interactions);
+
+        LOGGER.atInfo().log("Added Interactions component to visitor %s in sanctum (owner: %s)",
+            visitorRef.getUuid(), playerId);
+    }
+
+    /**
+     * Restores a visitor's original flight state when they leave the sanctum.
+     *
+     * @param visitorId  The visitor's UUID
+     * @param visitorRef The visitor's player reference (may be null if disconnected)
+     */
+    public void restoreFlightForVisitor(@Nonnull UUID visitorId, @Nullable PlayerRef visitorRef) {
+        Boolean originalCanFlyValue = visitorOriginalCanFly.remove(visitorId);
+        if (originalCanFlyValue == null) return; // wasn't tracked
+
+        if (visitorRef == null || !visitorRef.isValid()) return;
+
+        World world = getSanctumWorld();
+        if (world == null || !world.isAlive()) return;
+
+        world.execute(() -> {
+            Ref<EntityStore> entityRef = visitorRef.getReference();
+            if (entityRef == null || !entityRef.isValid()) return;
+
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            MovementManager mm = store.getComponent(entityRef, MovementManager.getComponentType());
+            if (mm != null) {
+                mm.getSettings().canFly = originalCanFlyValue;
+                mm.update(visitorRef.getPacketHandler());
+                LOGGER.atInfo().log("Restored flight for visitor %s (canFly=%b)", visitorId, originalCanFlyValue);
+            }
+        });
+    }
+
+    /**
+     * Gets the set of visitor UUIDs currently tracked in this sanctum.
+     *
+     * @return Snapshot copy of visitor UUIDs (safe for iteration during concurrent modification)
+     */
+    @Nonnull
+    public Set<UUID> getVisitorIds() {
+        return Set.copyOf(visitorOriginalCanFly.keySet());
+    }
+
+    /**
+     * Checks if a player is a tracked visitor in this sanctum.
+     *
+     * @param uuid The player UUID to check
+     * @return true if the player is a tracked visitor
+     */
+    public boolean isVisitor(@Nonnull UUID uuid) {
+        return visitorOriginalCanFly.containsKey(uuid);
     }
 
     /**
@@ -682,40 +866,36 @@ public class SkillSanctumInstance {
             return;
         }
 
-        PlayerRef playerRef = Universe.get().getPlayer(playerId);
-        if (playerRef == null || !playerRef.isValid()) {
-            return;
-        }
-
-        // Check player's current world
-        UUID playerWorldUuid = playerRef.getWorldUuid();
-        UUID sanctumWorldUuid = world.getWorldConfig().getUuid();
-        if (playerWorldUuid == null || !playerWorldUuid.equals(sanctumWorldUuid)) {
-            return;
-        }
-
-        Ref<EntityStore> entityRef = playerRef.getReference();
-        if (entityRef == null || !entityRef.isValid()) {
-            return;
-        }
-
         Store<EntityStore> store = world.getEntityStore().getStore();
-        MovementStatesComponent comp = store.getComponent(entityRef,
-            MovementStatesComponent.getComponentType());
 
-        if (comp != null) {
-            MovementStates states = comp.getMovementStates();
-            // Re-force flying if player somehow toggled it off
-            if (!states.flying || states.onGround) {
-                states.flying = true;
-                states.onGround = false;
-                states.falling = false;
+        // Force flight for ALL players in the sanctum world (owner + visitors)
+        for (Player player : world.getPlayers()) {
+            if (player == null) continue;
 
-                // Re-send packet to sync client
-                SavedMovementStates savedStates = new SavedMovementStates(true);
-                playerRef.getPacketHandler().write(new SetMovementStates(savedStates));
+            UUID playerUuid = player.getUuid();
+            PlayerRef ref = Universe.get().getPlayer(playerUuid);
+            if (ref == null || !ref.isValid()) continue;
 
-                LOGGER.atFine().log("Re-forced flying state for player %s in sanctum", playerId);
+            Ref<EntityStore> entityRef = ref.getReference();
+            if (entityRef == null || !entityRef.isValid()) continue;
+
+            MovementStatesComponent comp = store.getComponent(entityRef,
+                MovementStatesComponent.getComponentType());
+
+            if (comp != null) {
+                MovementStates states = comp.getMovementStates();
+                // Re-force flying if player somehow toggled it off
+                if (!states.flying || states.onGround) {
+                    states.flying = true;
+                    states.onGround = false;
+                    states.falling = false;
+
+                    // Re-send packet to sync client
+                    SavedMovementStates savedStates = new SavedMovementStates(true);
+                    ref.getPacketHandler().write(new SetMovementStates(savedStates));
+
+                    LOGGER.atFine().log("Re-forced flying state for %s in sanctum %s", playerUuid, playerId);
+                }
             }
         }
     }

@@ -121,7 +121,7 @@ public final class CombatRequirementNotifier {
     @Nullable
     private ItemStack findFirstUnmetItem(@Nonnull UUID playerId, @Nonnull Inventory inventory) {
         // Check active weapon first (most impactful during combat)
-        ItemStack weapon = inventory.getItemInHand();
+        ItemStack weapon = inventory.getActiveHotbarItem();
         if (!ItemStack.isEmpty(weapon) && !validator.canEquip(playerId, weapon)) {
             return weapon;
         }

@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.combat.modifiers;
 
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -10,9 +11,13 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentType;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierManager;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
 import io.github.larsonix.trailoforbis.combat.resolution.CombatEntityResolver;
 import io.github.larsonix.trailoforbis.combat.tracking.ConsecutiveHitTracker;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
@@ -228,7 +233,39 @@ public class ConditionalMultiplierCalculator {
             }
         }
 
-        float combined = realmMult * executeMult * vsFrozenMult * vsShockedMult * lowLifeMult * consecutiveMult;
+        // Enraged mob modifier: bonus damage when enrage threshold triggered
+        float enragedMult = 1.0f;
+        TrailOfOrbis pluginInstance = TrailOfOrbis.getInstanceOrNull();
+        if (pluginInstance != null && damage.getSource() instanceof Damage.EntitySource entitySource) {
+            Ref<EntityStore> attackerRef = entityResolver.resolveTrueAttacker(store, entitySource.getRef());
+            if (attackerRef != null && attackerRef.isValid()) {
+                ComponentType<EntityStore, MobModifierComponent> modType = pluginInstance.getMobModifierComponentType();
+                if (modType != null) {
+                    MobModifierComponent mobMods = store.getComponent(attackerRef, modType);
+                    if (mobMods != null && mobMods.hasModifier(ModifierType.ENRAGED) && mobMods.isEnrageTriggered()) {
+                        double bonus = 0.30;
+                        if (pluginInstance.getMobModifierManager() != null) {
+                            bonus = pluginInstance.getMobModifierManager().getConfig()
+                                .getModifierSettings(ModifierType.ENRAGED).getDamage_bonus();
+                        }
+                        enragedMult = 1.0f + (float) bonus;
+                        LOGGER.at(Level.FINE).log("Conditional: enraged +%.0f%%", bonus * 100);
+                    }
+                }
+
+                // Pack Leader / Rallying damage buff (tracked in MobModifierManager)
+                MobModifierManager modManager = pluginInstance.getMobModifierManager();
+                if (modManager != null) {
+                    float packLeaderBonus = modManager.getPackLeaderDamageBonus(attackerRef.hashCode());
+                    if (packLeaderBonus > 0) {
+                        enragedMult *= (1.0f + packLeaderBonus);
+                        LOGGER.at(Level.FINE).log("Conditional: pack leader/rallying +%.0f%%", packLeaderBonus * 100);
+                    }
+                }
+            }
+        }
+
+        float combined = realmMult * executeMult * vsFrozenMult * vsShockedMult * lowLifeMult * consecutiveMult * enragedMult;
 
         return new ConditionalResult(combined, realmMult, executeMult, vsFrozenMult, vsShockedMult, lowLifeMult, consecutiveMult);
     }

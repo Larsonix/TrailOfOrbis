@@ -282,7 +282,7 @@ public class RegenerationTickSystem extends EntityTickingSystem<EntityStore> {
         float maxShield = stats.getEnergyShield();
         float shieldRegenPerSec = stats.getEnergyShieldRegen();
         TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-        if (maxShield > 0 && shieldRegenPerSec > 0 && rpg != null) {
+        if (maxShield > 0 && rpg != null) {
             EnergyShieldTracker shieldTracker = rpg.getEnergyShieldTracker();
             if (shieldTracker != null) {
                 float delaySeconds = Math.max(MIN_SHIELD_REGEN_DELAY_SECONDS, stats.getEnergyShieldRegenDelay());

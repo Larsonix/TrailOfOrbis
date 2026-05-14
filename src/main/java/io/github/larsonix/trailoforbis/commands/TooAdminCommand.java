@@ -75,6 +75,7 @@ public final class TooAdminCommand extends AbstractCommandCollection {
         this.addSubCommand(new TooAdminStatsCommand(plugin));
         this.addSubCommand(new TooAdminTestColorCommand());
         this.addSubCommand(new TooAdminTestAtkSpdCommand(plugin));
+        this.addSubCommand(new TooAdminHexcodeCommand());
 
         this.requirePermission("too.admin");
     }

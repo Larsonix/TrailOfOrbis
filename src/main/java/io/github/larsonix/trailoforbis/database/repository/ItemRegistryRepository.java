@@ -167,6 +167,42 @@ public class ItemRegistryRepository {
         return result;
     }
 
+    /**
+     * Loads only items seen within the last N days. Reduces startup memory pressure
+     * by skipping ancient orphaned items.
+     */
+    public Map<String, ItemRegistryEntry> loadRecent(int days) {
+        if (days <= 0) return loadAll();
+
+        String sql = SELECT_ALL + " WHERE last_seen >= ?";
+        Map<String, ItemRegistryEntry> result = new HashMap<>();
+
+        long cutoffMillis = System.currentTimeMillis() - (days * 24L * 60L * 60L * 1000L);
+        Timestamp cutoff = new Timestamp(cutoffMillis);
+
+        try (Connection conn = dataManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setTimestamp(1, cutoff);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String customId = rs.getString("custom_id");
+                    String baseItemId = rs.getString("base_item_id");
+                    String secondaryInteractionId = rs.getString("secondary_interaction_id");
+                    result.put(customId, new ItemRegistryEntry(baseItemId, secondaryInteractionId));
+                }
+            }
+
+            LOGGER.atInfo().log("Loaded %d item registrations from database (last %d days)", result.size(), days);
+
+        } catch (SQLException e) {
+            LOGGER.atWarning().withCause(e).log("Failed to load recent items, falling back to loadAll()");
+            return loadAll();
+        }
+
+        return result;
+    }
+
     /** @return empty if not found */
     @Nonnull
     public Optional<String> getBaseItemId(@Nonnull String customId) {
@@ -406,6 +442,33 @@ public class ItemRegistryRepository {
         } catch (SQLException e) {
             LOGGER.atWarning().withCause(e).log("Failed to remove item %s from registry", customId);
             return false;
+        }
+    }
+
+    /**
+     * Batch-deletes items by their custom IDs.
+     *
+     * @return number of items actually deleted
+     */
+    public int deleteByIds(@Nonnull Collection<String> customIds) {
+        if (customIds.isEmpty()) return 0;
+
+        try (Connection conn = dataManager.getConnection()) {
+            int deleted = 0;
+            try (PreparedStatement stmt = conn.prepareStatement(DELETE_BY_ID)) {
+                for (String id : customIds) {
+                    stmt.setString(1, id);
+                    stmt.addBatch();
+                }
+                int[] results = stmt.executeBatch();
+                for (int r : results) {
+                    if (r > 0) deleted += r;
+                }
+            }
+            return deleted;
+        } catch (SQLException e) {
+            LOGGER.atWarning().withCause(e).log("Failed to batch-delete %d items from registry", customIds.size());
+            return 0;
         }
     }
 

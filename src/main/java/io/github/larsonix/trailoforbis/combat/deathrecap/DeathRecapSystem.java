@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.combat.format.DeathRecapFormatter;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

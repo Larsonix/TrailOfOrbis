@@ -221,6 +221,100 @@ class StoneActionRegistryTest {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ALTERVERSE SPLINTER - Reroll Prefixes Only
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Alterverse Splinter - Reroll Prefixes Only (Maps)")
+    class AlterverseSplinterTests {
+
+        @Test
+        @DisplayName("Should reroll prefix types while preserving suffixes")
+        void shouldRerollPrefixesPreserveSuffixes() {
+            RealmMapData map = createTestMap();
+            RealmModifier originalSuffix = map.suffixes().get(0);
+
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, map, random);
+            assertTrue(result.success());
+
+            RealmMapData modified = (RealmMapData) result.modifiedItem();
+            // Suffixes must be unchanged
+            assertEquals(1, modified.suffixes().size());
+            assertEquals(originalSuffix.type(), modified.suffixes().get(0).type());
+            assertEquals(originalSuffix.value(), modified.suffixes().get(0).value());
+        }
+
+        @Test
+        @DisplayName("Should fail on corrupted map")
+        void shouldFailOnCorrupted() {
+            RealmMapData map = createCorruptedMap();
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, map, random);
+            assertFalse(result.success());
+        }
+
+        @Test
+        @DisplayName("Should fail on map with no prefixes")
+        void shouldFailOnNoPrefixes() {
+            RealmMapData map = new RealmMapData(
+                50, GearRarity.RARE, 50, RealmBiomeType.FOREST,
+                RealmLayoutSize.MEDIUM, RealmLayoutShape.CIRCULAR,
+                List.of(),  // no prefixes
+                List.of(RealmModifier.of(RealmModifierType.ITEM_QUANTITY, 20)),
+                false, true, null
+            );
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_SPLINTER, map, random);
+            assertFalse(result.success());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ALTERVERSE FRAGMENT - Reroll Suffixes Only
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Alterverse Fragment - Reroll Suffixes Only (Maps)")
+    class AlterverseFragmentTests {
+
+        @Test
+        @DisplayName("Should reroll suffix types while preserving prefixes")
+        void shouldRerollSuffixesPreservePrefixes() {
+            RealmMapData map = createTestMap();
+            RealmModifier originalPrefix = map.prefixes().get(0);
+
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, map, random);
+            assertTrue(result.success());
+
+            RealmMapData modified = (RealmMapData) result.modifiedItem();
+            // Prefixes must be unchanged
+            assertEquals(1, modified.prefixes().size());
+            assertEquals(originalPrefix.type(), modified.prefixes().get(0).type());
+            assertEquals(originalPrefix.value(), modified.prefixes().get(0).value());
+        }
+
+        @Test
+        @DisplayName("Should fail on corrupted map")
+        void shouldFailOnCorrupted() {
+            RealmMapData map = createCorruptedMap();
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, map, random);
+            assertFalse(result.success());
+        }
+
+        @Test
+        @DisplayName("Should fail on map with no suffixes")
+        void shouldFailOnNoSuffixes() {
+            RealmMapData map = new RealmMapData(
+                50, GearRarity.RARE, 50, RealmBiomeType.FOREST,
+                RealmLayoutSize.MEDIUM, RealmLayoutShape.CIRCULAR,
+                List.of(RealmModifier.of(RealmModifierType.MONSTER_DAMAGE, 30)),
+                List.of(),  // no suffixes
+                false, true, null
+            );
+            StoneActionResult result = registry.execute(StoneType.ALTERVERSE_FRAGMENT, map, random);
+            assertFalse(result.success());
+        }
+    }
+
     @Nested
     @DisplayName("Gaia's Gift - Add Modifier")
     class GaiasGiftTests {

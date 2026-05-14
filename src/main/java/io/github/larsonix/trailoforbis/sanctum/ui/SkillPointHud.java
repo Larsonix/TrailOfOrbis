@@ -103,9 +103,9 @@ public class SkillPointHud {
 
         String html = buildHtml(unallocated, allocated, total, refunds);
 
-        return HudBuilder.hudForPlayer(player)
+        HyUIHud hud = HudBuilder.hudForPlayer(player)
             .fromHtml(html)
-            .onRefresh(hud -> {
+            .onRefresh(h -> {
                 SkillTreeData current = skillTreeManager.getSkillTreeData(playerId);
                 int curUnallocated = current.getSkillPoints();
                 int curAllocated = skillTreeManager.calculateFullRespecCost(playerId);
@@ -123,25 +123,25 @@ public class SkillPointHud {
 
                 if (unallocatedChanged) {
                     displayUnallocated[0] = curUnallocated;
-                    hud.getById(ID_UNALLOCATED, LabelBuilder.class).ifPresent(label ->
+                    h.getById(ID_UNALLOCATED, LabelBuilder.class).ifPresent(label ->
                         label.withText("Unallocated : " + curUnallocated));
                 }
 
                 if (allocatedChanged) {
                     displayAllocated[0] = curAllocated;
-                    hud.getById(ID_ALLOCATED, LabelBuilder.class).ifPresent(label ->
+                    h.getById(ID_ALLOCATED, LabelBuilder.class).ifPresent(label ->
                         label.withText("Allocated : " + curAllocated));
                 }
 
                 if (totalChanged) {
                     displayTotal[0] = curTotal;
-                    hud.getById(ID_TOTAL, LabelBuilder.class).ifPresent(label ->
+                    h.getById(ID_TOTAL, LabelBuilder.class).ifPresent(label ->
                         label.withText("Total : " + curTotal));
                 }
 
                 if (refundsChanged) {
                     displayRefunds[0] = curRefunds;
-                    hud.getById(ID_REFUNDS, LabelBuilder.class).ifPresent(label -> {
+                    h.getById(ID_REFUNDS, LabelBuilder.class).ifPresent(label -> {
                         label.withText("Refunds : " + curRefunds);
                         // Dynamic color: yellow when available, red when depleted.
                         // Must include fontSize — withStyle() replaces the entire style object,
@@ -155,6 +155,10 @@ public class SkillPointHud {
                 }
             })
             .show();
+
+        // Deterministic name — prevents MCHUD accumulation across world transitions
+        hud.name = "too-skill-points";
+        return hud;
     }
 
     // ═══════════════════════════════════════════════════════════════════

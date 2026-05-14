@@ -36,6 +36,7 @@ public class RealmsConfigLoader {
     private RealmsConfig realmsConfig;
     private RealmModifierConfig modifierConfig;
     private MobPoolConfig mobPoolConfig;
+    private RealmTemplateConfig templateConfig;
 
     /**
      * Creates a new config loader.
@@ -62,6 +63,7 @@ public class RealmsConfigLoader {
         realmsConfig = loadRealmsConfig();
         modifierConfig = loadModifierConfig();
         mobPoolConfig = loadMobPoolConfig();
+        templateConfig = RealmTemplateConfig.load(configDirectory);
 
         LOGGER.at(Level.INFO).log("Realm configurations loaded successfully");
     }
@@ -76,7 +78,7 @@ public class RealmsConfigLoader {
 
         Map<String, Object> data = loadYaml(path);
         if (data == null) {
-            LOGGER.at(Level.INFO).log("Using default realms.yml config");
+            LOGGER.at(Level.WARNING).log("No realms.yml found on disk or classpath — using Java defaults");
             return config;
         }
 
@@ -205,6 +207,26 @@ public class RealmsConfigLoader {
                     config.setBiomeOverride(biome, biomeSettings);
                 } catch (Exception e) {
                     LOGGER.at(Level.WARNING).log("Invalid biome override: %s", entry.getKey());
+                }
+            }
+        }
+
+        // Size overrides (per-size settings like timer-multiplier, player counts)
+        Map<String, Object> sizeOverrides = getMap(data, "size-overrides");
+        if (sizeOverrides != null) {
+            for (Map.Entry<String, Object> entry : sizeOverrides.entrySet()) {
+                try {
+                    RealmLayoutSize size = RealmLayoutSize.fromString(entry.getKey());
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> settings = (Map<String, Object>) entry.getValue();
+                    RealmsConfig.SizeSettings sizeSettings = new RealmsConfig.SizeSettings();
+                    sizeSettings.setRewardMultiplier(getDouble(settings, "reward-multiplier", 1.0));
+                    sizeSettings.setTimerMultiplier(getDouble(settings, "timer-multiplier", 1.0));
+                    sizeSettings.setMinPlayerCount(getInt(settings, "min-player-count", 1));
+                    sizeSettings.setMaxPlayerCount(getInt(settings, "max-player-count", 6));
+                    config.setSizeOverride(size, sizeSettings);
+                } catch (Exception e) {
+                    LOGGER.at(Level.WARNING).log("Invalid size override: %s", entry.getKey());
                 }
             }
         }
@@ -356,7 +378,7 @@ public class RealmsConfigLoader {
 
         Map<String, Object> data = loadYaml(path);
         if (data == null) {
-            LOGGER.at(Level.INFO).log("Using default realm-modifiers.yml config");
+            LOGGER.at(Level.WARNING).log("No realm-modifiers.yml found on disk or classpath — using Java defaults");
             return config;
         }
 
@@ -414,6 +436,7 @@ public class RealmsConfigLoader {
                         ms.setBaseMin(getInt(settings, "base_min", type.getMinValue()));
                         ms.setBaseMax(getInt(settings, "base_max", type.getMaxValue()));
                         ms.setScalePerLevel(getDouble(settings, "scale_per_level", 0.0));
+                        ms.setMaxCap(getInt(settings, "max_cap", -1));
                     } else {
                         // Legacy flat min/max format (binary modifiers and backward compat)
                         ms.setBaseMin(getInt(settings, "min", type.getMinValue()));
@@ -452,7 +475,7 @@ public class RealmsConfigLoader {
 
         Map<String, Object> data = loadYaml(path);
         if (data == null) {
-            LOGGER.at(Level.INFO).log("Using default realm-mobs.yml config");
+            LOGGER.at(Level.WARNING).log("No realm-mobs.yml found on disk or classpath — using Java defaults");
             return config;
         }
 
@@ -540,27 +563,56 @@ public class RealmsConfigLoader {
         return mobPoolConfig;
     }
 
+    @Nonnull
+    public RealmTemplateConfig getTemplateConfig() {
+        if (templateConfig == null) {
+            templateConfig = new RealmTemplateConfig();
+        }
+        return templateConfig;
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // YAML UTILITIES
     // ═══════════════════════════════════════════════════════════════════
 
     private Map<String, Object> loadYaml(Path path) {
-        if (!Files.exists(path)) {
-            return null;
+        if (Files.exists(path)) {
+            try (InputStream is = Files.newInputStream(path)) {
+                Map<String, Object> result = parseYamlStream(is);
+                if (result != null) {
+                    LOGGER.at(Level.FINE).log("Loaded config from disk: %s", path);
+                    return result;
+                }
+            } catch (IOException e) {
+                LOGGER.at(Level.WARNING).withCause(e).log("Failed to load config from disk: %s", path);
+            }
         }
 
-        try (InputStream is = Files.newInputStream(path)) {
-            Object loaded = yaml.load(is);
-            if (loaded instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> result = (Map<String, Object>) loaded;
-                return result;
+        // Fall back to classpath (JAR-bundled default)
+        String classpathResource = "/config/" + path.getFileName().toString();
+        try (InputStream is = getClass().getResourceAsStream(classpathResource)) {
+            if (is != null) {
+                Map<String, Object> result = parseYamlStream(is);
+                if (result != null) {
+                    LOGGER.at(Level.INFO).log("Loaded config from classpath: %s", classpathResource);
+                    return result;
+                }
             }
-            return null;
         } catch (IOException e) {
-            LOGGER.at(Level.WARNING).withCause(e).log("Failed to load config: %s", path);
-            return null;
+            LOGGER.at(Level.WARNING).withCause(e).log("Failed to load config from classpath: %s", classpathResource);
         }
+
+        return null;
+    }
+
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseYamlStream(InputStream is) {
+        Object loaded = yaml.load(is);
+        if (loaded instanceof Map) {
+            return (Map<String, Object>) loaded;
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

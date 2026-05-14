@@ -307,8 +307,10 @@ class RealmMapDataTest {
         @Test
         @DisplayName("getTimeoutSeconds should reduce with modifier")
         void timeoutReducedByModifier() {
+            // Timeout uses a degressive formula: base + (mobs * perMob) / (1 + mobs/softCap),
+            // then size multiplier, then modifiers. Test the relationship, not absolute values.
             RealmMapData noMod = RealmMapData.builder()
-                .size(RealmLayoutSize.MEDIUM) // 600 seconds base
+                .size(RealmLayoutSize.MEDIUM)
                 .build();
 
             RealmMapData withMod = RealmMapData.builder()
@@ -316,8 +318,16 @@ class RealmMapDataTest {
                 .addModifier(RealmModifier.of(RealmModifierType.REDUCED_TIME, 20)) // -20%
                 .build();
 
-            assertEquals(600, noMod.getTimeoutSeconds());
-            assertEquals(480, withMod.getTimeoutSeconds()); // 600 - 120 = 480
+            int baseTimeout = noMod.getTimeoutSeconds();
+            int reducedTimeout = withMod.getTimeoutSeconds();
+
+            assertTrue(baseTimeout > 60, "Base timeout should exceed minimum (60s)");
+            assertTrue(reducedTimeout < baseTimeout, "REDUCED_TIME should lower timeout");
+            // REDUCED_TIME(20) applies a 20% reduction to the pre-rounded timeout.
+            // Allow ±1 tolerance for rounding: reduction happens before final Math.round.
+            double expectedReduced = baseTimeout * 0.8;
+            assertTrue(Math.abs(reducedTimeout - expectedReduced) <= 1,
+                "Expected ~" + expectedReduced + " but got " + reducedTimeout);
         }
     }
 

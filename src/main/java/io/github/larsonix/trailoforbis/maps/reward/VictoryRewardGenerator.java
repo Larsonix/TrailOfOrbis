@@ -170,10 +170,10 @@ public final class VictoryRewardGenerator {
     }
 
     /**
-     * Item type for random reward selection.
+     * Item type for random reward selection (stones are separate, level-based).
      */
     private enum RewardItemType {
-        MAP, STONE, GEAR
+        MAP, GEAR
     }
 
     /**
@@ -226,29 +226,31 @@ public final class VictoryRewardGenerator {
         // Look up player level for drop level blending
         int playerLevel = getPlayerLevel(playerId);
 
-        // Calculate total item count (base + IIQ bonus rolls)
+        // Stones: deterministic count based on realm level (1 base + 1 per 10 levels)
+        int stoneCount = 1 + completedLevel / 10;
+
+        // Calculate total item count (base + IIQ bonus rolls) for maps and gear only
         int totalCount = calculateItemCount(sizeRewards.getTotalItems(), totalIiqBonus);
 
-        // Randomly assign each item to a type (equal weight: map, stone, gear)
+        // Randomly assign each item to map or gear (equal weight)
         RewardItemType[] types = RewardItemType.values();
         int mapCount = 0;
-        int stoneCount = 0;
         int gearCount = 0;
         for (int i = 0; i < totalCount; i++) {
             switch (types[random.nextInt(types.length)]) {
                 case MAP -> mapCount++;
-                case STONE -> stoneCount++;
                 case GEAR -> gearCount++;
             }
         }
 
-        // Generate items
-        List<ItemStack> maps = generateMaps(completedLevel, playerLevel, mapCount, totalIirBonus);
+        // Generate items (victory maps drop identified)
+        List<ItemStack> maps = generateMaps(completedLevel, playerLevel, mapCount, totalIirBonus, true);
         List<ItemStack> stones = generateStones(stoneCount, totalIirBonus);
         List<ItemStack> gear = generateGear(completedLevel, playerLevel, gearCount, totalIirBonus);
 
-        LOGGER.atInfo().log("Generated victory rewards for player %s: %d maps, %d stones, %d gear (total=%d)",
-            playerId.toString().substring(0, 8), maps.size(), stones.size(), gear.size(), totalCount);
+        LOGGER.atInfo().log("Generated victory rewards for player %s: %d maps, %d stones, %d gear (total=%d, stonesByLevel=%d/%d)",
+            playerId.toString().substring(0, 8), maps.size(), stones.size(), gear.size(),
+            totalCount + stoneCount, stoneCount, completedLevel);
 
         return new VictoryRewards(maps, gear, stones);
     }
@@ -296,10 +298,11 @@ public final class VictoryRewardGenerator {
      * @param playerLevel The player's level (for drop level blending)
      * @param count Number of maps to generate
      * @param rarityBonus IIR bonus as decimal
+     * @param identified Whether maps should drop identified (true for victory rewards)
      * @return List of generated map ItemStacks
      */
     @Nonnull
-    private List<ItemStack> generateMaps(int completedLevel, int playerLevel, int count, double rarityBonus) {
+    private List<ItemStack> generateMaps(int completedLevel, int playerLevel, int count, double rarityBonus, boolean identified) {
         if (count <= 0) {
             return List.of();
         }
@@ -312,6 +315,11 @@ public final class VictoryRewardGenerator {
                     ? dropLevelBlender.calculate(completedLevel, playerLevel, random)
                     : config.calculateMapLevel(completedLevel, random);
                 RealmMapData mapData = mapGenerator.generate(level, rarityBonus);
+
+                // Identify the map if requested (victory reward maps drop identified)
+                if (identified) {
+                    mapData = mapData.identify();
+                }
 
                 // Generate unique instance ID for custom item registration
                 CustomItemInstanceId instanceId = CustomItemInstanceId.Generator.generateMap();
@@ -330,8 +338,8 @@ public final class VictoryRewardGenerator {
 
                 if (mapItem != null && !mapItem.isEmpty()) {
                     maps.add(mapItem);
-                    LOGGER.atFine().log("Generated victory map: level=%d, rarity=%s, biome=%s, customId=%s",
-                        level, mapData.rarity(), mapData.biome(), customItemId);
+                    LOGGER.atFine().log("Generated victory map: level=%d, rarity=%s, biome=%s, identified=%b, customId=%s",
+                        level, mapData.rarity(), mapData.biome(), identified, customItemId);
                 }
             } catch (Exception e) {
                 LOGGER.atWarning().withCause(e).log("Failed to generate victory map");

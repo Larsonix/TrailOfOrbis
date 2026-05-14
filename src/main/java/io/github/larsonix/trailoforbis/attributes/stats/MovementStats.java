@@ -239,9 +239,9 @@ public final class MovementStats {
     @Override
     public String toString() {
         return String.format(
-            "MovementStats{move=+%.0f%%, jump=+%.1f, sprint=+%.0f%%, walk=+%.0f%%, run=+%.0f%%}",
-            movementSpeedPercent * 100, jumpForceBonus,
-            sprintSpeedBonus * 100, walkSpeedPercent * 100, runSpeedPercent * 100
+            "MovementStats{move=+%.1f%%, jump=+%.1f, sprint=+%.1f%%, walk=+%.1f%%, run=+%.1f%%}",
+            movementSpeedPercent, jumpForceBonus,
+            sprintSpeedBonus, walkSpeedPercent, runSpeedPercent
         );
     }
 }

@@ -161,11 +161,27 @@ class ElementalCalculatorTest {
         }
 
         @Test
-        @DisplayName("Negative resistance floors at -100% (2× damage)")
-        void negativeResistance_floorsAtMinusHundred() {
-            // -200% resistance should be floored to -100% = 2× damage
+        @DisplayName("Negative resistance floors at -200% (3× damage)")
+        void negativeResistance_floorsAtMinus200() {
+            // -200% resistance = 3× damage (at the floor)
             double result = ElementalCalculator.applyResistance(100, -200);
-            assertEquals(200.0, result, 0.001);
+            assertEquals(300.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("-150% resistance is NOT clamped (within floor)")
+        void negativeResistance_minus150_notClamped() {
+            // -150% resistance = 2.5× damage (within -200 floor)
+            double result = ElementalCalculator.applyResistance(100, -150);
+            assertEquals(250.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("-300% resistance is clamped to -200% floor")
+        void negativeResistance_minus300_clampedToFloor() {
+            // -300% resistance should be floored to -200% = 3× damage
+            double result = ElementalCalculator.applyResistance(100, -300);
+            assertEquals(300.0, result, 0.001);
         }
     }
 
@@ -186,19 +202,59 @@ class ElementalCalculatorTest {
         }
 
         @Test
-        @DisplayName("Penetration cannot push resistance below zero")
-        void penetration_cannotPushBelowZero() {
-            // 30% resist - 50% pen = 0% effective (not -20%)
+        @DisplayName("Penetration pushes resistance negative (vulnerability)")
+        void penetration_pushesNegative() {
+            // 30% resist - 50% pen = -20% effective → 1.2× damage
             double result = ElementalCalculator.applyResistance(100, 30, 50);
-            assertEquals(100.0, result, 0.001); // Full damage
+            assertEquals(120.0, result, 0.001);
         }
 
         @Test
-        @DisplayName("Penetration does not apply to already negative resistance")
-        void penetration_doesNotApplyToNegativeResistance() {
-            // -50% resist should stay -50%, not become more negative
+        @DisplayName("Penetration applies to negative resistance too")
+        void penetration_appliesEvenToNegativeResistance() {
+            // -50% resist - 20% pen = -70% effective → 1.7× damage
             double result = ElementalCalculator.applyResistance(100, -50, 20);
-            assertEquals(150.0, result, 0.001); // 100 × 1.5
+            assertEquals(170.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("Penetration on zero resistance creates vulnerability")
+        void penetration_onZero_createsVulnerability() {
+            // 0% resist - 50% pen = -50% effective → 1.5× damage
+            double result = ElementalCalculator.applyResistance(100, 0, 50);
+            assertEquals(150.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("Penetration floors at -200% (3× damage max)")
+        void penetration_floorsAtMinus200() {
+            // 50% resist - 300% pen = -250%, floored to -200% → 3× damage
+            double result = ElementalCalculator.applyResistance(100, 50, 300);
+            assertEquals(300.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("Overcapped resistance absorbs penetration (pen before cap)")
+        void overcapped_absorbsPenetration() {
+            // 120% resist - 30% pen = 90%, capped to 75% → 0.25× damage
+            double result = ElementalCalculator.applyResistance(100, 120, 30);
+            assertEquals(25.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("Overcapped resistance partially absorbs penetration")
+        void overcapped_partiallyAbsorbsPenetration() {
+            // 120% resist - 50% pen = 70%, under cap → 0.30× damage
+            double result = ElementalCalculator.applyResistance(100, 120, 50);
+            assertEquals(30.0, result, 0.001);
+        }
+
+        @Test
+        @DisplayName("At-cap resistance with penetration (no overcap buffer)")
+        void atCap_withPenetration_noBuffer() {
+            // 75% resist - 39.4% pen = 35.6% effective → 0.644× damage
+            double result = ElementalCalculator.applyResistance(100, 75, 39.4);
+            assertEquals(64.4, result, 0.1);
         }
 
         @Test
@@ -212,7 +268,7 @@ class ElementalCalculatorTest {
             targetStats.setResistance(ElementType.FIRE, 60);
 
             // Damage = (50 + 20) × 1.5 × 1.3 = 136.5
-            // EffectiveResist = max(0, 60 - 20) = 40%
+            // EffectiveResist = max(-200, min(75, 60 - 20)) = 40%
             // After Resist = 136.5 × (1 - 0.4) = 81.9
             double result = ElementalCalculator.calculateFinalDamage(50, attackerStats, targetStats, ElementType.FIRE);
             assertEquals(81.9, result, 0.1);
@@ -297,10 +353,12 @@ class ElementalCalculatorTest {
         }
 
         @Test
-        @DisplayName("getEffectiveResistance floors at -100%")
-        void getEffectiveResistance_floorsAtMinus100() {
-            double effective = ElementalCalculator.getEffectiveResistance(-150);
-            assertEquals(-100.0, effective, 0.001);
+        @DisplayName("getEffectiveResistance floors at -200%")
+        void getEffectiveResistance_floorsAtMinus200() {
+            // -150% is within floor, not clamped
+            assertEquals(-150.0, ElementalCalculator.getEffectiveResistance(-150), 0.001);
+            // -250% is below floor, clamped to -200%
+            assertEquals(-200.0, ElementalCalculator.getEffectiveResistance(-250), 0.001);
         }
 
         @Test
@@ -311,10 +369,30 @@ class ElementalCalculatorTest {
         }
 
         @Test
-        @DisplayName("getEffectiveResistance with penetration floors at 0%")
-        void getEffectiveResistance_withPenetration_floorsAtZero() {
-            double effective = ElementalCalculator.getEffectiveResistance(30, 50);
-            assertEquals(0.0, effective, 0.001);
+        @DisplayName("getEffectiveResistance with penetration pushes negative")
+        void getEffectiveResistance_withPenetration_pushesNegative() {
+            // 30% resist - 50% pen = -20% (vulnerability)
+            assertEquals(-20.0, ElementalCalculator.getEffectiveResistance(30, 50), 0.001);
+            // 0% resist - 50% pen = -50%
+            assertEquals(-50.0, ElementalCalculator.getEffectiveResistance(0, 50), 0.001);
+            // -50% resist - 30% pen = -80%
+            assertEquals(-80.0, ElementalCalculator.getEffectiveResistance(-50, 30), 0.001);
+        }
+
+        @Test
+        @DisplayName("getEffectiveResistance with penetration floors at -200%")
+        void getEffectiveResistance_withPenetration_floorsAtMinus200() {
+            // 50% resist - 300% pen = -250%, clamped to -200%
+            assertEquals(-200.0, ElementalCalculator.getEffectiveResistance(50, 300), 0.001);
+        }
+
+        @Test
+        @DisplayName("getEffectiveResistance overcap absorbs penetration (pen before cap)")
+        void getEffectiveResistance_overcap_absorbsPen() {
+            // 120% resist - 30% pen = 90%, capped to 75%
+            assertEquals(75.0, ElementalCalculator.getEffectiveResistance(120, 30), 0.001);
+            // 120% resist - 50% pen = 70%, under cap
+            assertEquals(70.0, ElementalCalculator.getEffectiveResistance(120, 50), 0.001);
         }
 
         @Test

@@ -53,6 +53,20 @@ public interface ItemTypeHandler<T extends ModifiableItem> {
     StoneActionResult rerollTypes(@Nonnull T item, @Nonnull Random random);
 
     /**
+     * Rerolls all unlocked prefix modifier types and values.
+     * Suffixes are preserved unchanged.
+     */
+    @Nonnull
+    StoneActionResult rerollPrefixTypes(@Nonnull T item, @Nonnull Random random);
+
+    /**
+     * Rerolls all unlocked suffix modifier types and values.
+     * Prefixes are preserved unchanged.
+     */
+    @Nonnull
+    StoneActionResult rerollSuffixTypes(@Nonnull T item, @Nonnull Random random);
+
+    /**
      * Adds one random modifier to an empty slot.
      */
     @Nonnull

@@ -8,16 +8,20 @@ import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.ModifierType;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -48,11 +52,26 @@ class GearStatCalculatorTest {
     private GearStatCalculator calculator;
     private UUID playerId;
 
+    @SuppressWarnings("unchecked")
+    private DefaultAssetMap<String, Item> assetMap = mock(DefaultAssetMap.class);
+    private MockedStatic<Item> mockedItemStatic;
+
     @BeforeEach
     void setUp() {
         // Pass null for ItemRegistryService in tests - it's optional
         calculator = new GearStatCalculator(balanceConfig, validator, null);
         playerId = UUID.randomUUID();
+
+        // Mock Item.getAssetMap() for Utility.Compatible checks
+        mockedItemStatic = mockStatic(Item.class);
+        mockedItemStatic.when(Item::getAssetMap).thenReturn(assetMap);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (mockedItemStatic != null) {
+            mockedItemStatic.close();
+        }
     }
 
     // =========================================================================
@@ -65,7 +84,7 @@ class GearStatCalculatorTest {
         when(inventory.getArmor()).thenReturn(armorContainer);
         when(armorContainer.getCapacity()).thenReturn((short) 4);
         when(armorContainer.getItemStack(anyShort())).thenReturn(null);
-        when(inventory.getItemInHand()).thenReturn(null);
+        when(inventory.getActiveHotbarItem()).thenReturn(null);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         GearBonuses bonuses = calculator.calculateBonuses(playerId, inventory);
@@ -77,7 +96,7 @@ class GearStatCalculatorTest {
     @DisplayName("calculateBonuses - null armor container handled")
     void calculateBonuses_NullArmorContainer_Handled() {
         when(inventory.getArmor()).thenReturn(null);
-        when(inventory.getItemInHand()).thenReturn(null);
+        when(inventory.getActiveHotbarItem()).thenReturn(null);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         GearBonuses bonuses = calculator.calculateBonuses(playerId, inventory);
@@ -114,7 +133,7 @@ class GearStatCalculatorTest {
             java.util.Map.of("physical_damage", 10.0),
             java.util.Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
         assertEquals(10.0, bonuses.getFlat("PHYSICAL_DAMAGE"));
@@ -127,7 +146,7 @@ class GearStatCalculatorTest {
             java.util.Map.of(),
             java.util.Map.of("crit_chance", 5.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
         assertEquals(5.0, bonuses.getPercent("CRIT_CHANCE"));
@@ -140,7 +159,7 @@ class GearStatCalculatorTest {
             java.util.Map.of("physical_damage", 10.0),
             java.util.Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
         assertFalse(bonuses.isEmpty());
@@ -153,7 +172,7 @@ class GearStatCalculatorTest {
             java.util.Map.of(),
             java.util.Map.of("crit_chance", 5.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
         assertFalse(bonuses.isEmpty());
@@ -166,7 +185,7 @@ class GearStatCalculatorTest {
             java.util.Map.of(),
             java.util.Map.of(),
             150.0,
-            null,
+            null, null,
             true, null
         );
         assertTrue(bonuses.hasWeaponDamage());
@@ -179,7 +198,7 @@ class GearStatCalculatorTest {
             java.util.Map.of(),
             java.util.Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
         assertFalse(bonuses.hasWeaponDamage());
@@ -400,24 +419,55 @@ class GearStatCalculatorTest {
     }
 
     /**
-     * Creates a mock non-RPG weapon ItemStack with the given item ID.
+     * Creates a mock non-RPG ItemStack with the given item ID.
      * GearUtils.readGearData() returns empty (no rarity metadata) so
-     * processWeapon falls through to resolveVanillaItemId priority 3.
+     * processWeapon returns isRpgGear=false.
+     *
+     * @param compatible Whether the item's Utility.Compatible flag is true
      */
-    private ItemStack createWeaponMock(String itemId) {
+    private ItemStack createWeaponMock(String itemId, boolean compatible) {
         ItemStack weapon = mock(ItemStack.class, withSettings().lenient());
         Item weaponItem = mock(Item.class, withSettings().lenient());
         when(weapon.getItem()).thenReturn(weaponItem);
         when(weaponItem.getId()).thenReturn(itemId);
+
+        // Set up asset map to return an Item with the given Utility.Compatible value
+        Item assetItem = mock(Item.class, withSettings().lenient());
+        ItemUtility utility = mock(ItemUtility.class, withSettings().lenient());
+        when(utility.isCompatible()).thenReturn(compatible);
+        when(assetItem.getUtility()).thenReturn(utility);
+        when(assetMap.getAsset(itemId)).thenReturn(assetItem);
+
         return weapon;
     }
 
+    /**
+     * Creates a mock RPG weapon ItemStack with gear metadata.
+     * GearUtils.readGearData() returns valid data (has rarity) so
+     * processWeapon returns isRpgGear=true.
+     *
+     * @param itemId The vanilla weapon item ID
+     * @param compatible Whether the weapon's Utility.Compatible flag is true
+     *                   (true = allows offhand pairing, false = suppresses offhand)
+     */
+    private ItemStack createRpgWeaponMock(String itemId, boolean compatible) {
+        ItemStack weapon = createWeaponMock(itemId, compatible);
+
+        // Add RPG gear metadata so GearUtils.readGearData() returns valid GearData.
+        // Minimum: rarity key must be non-null. Level and quality use defaults when null.
+        when(weapon.getFromMetadataOrNull(eq("RPG:Rarity"), any())).thenReturn("COMMON");
+
+        return weapon;
+    }
+
+    // --- RPG weapon Compatible=false: offhand suppressed ---
+
     @Test
-    @DisplayName("calculateBonuses - 2H weapon (longsword) skips offhand stats")
-    void calculateBonuses_TwoHandedLongsword_SkipsUtility() {
-        ItemStack weapon = createWeaponMock("Weapon_Longsword_Iron");
+    @DisplayName("RPG Longsword (Compatible=false) skips offhand stats")
+    void calculateBonuses_RpgLongsword_SkipsUtility() {
+        ItemStack weapon = createRpgWeaponMock("Weapon_Longsword_Iron", false);
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
 
         calculator.calculateBonuses(playerId, inventory);
 
@@ -425,11 +475,11 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - 2H weapon (shortbow) skips offhand stats")
-    void calculateBonuses_TwoHandedBow_SkipsUtility() {
-        ItemStack weapon = createWeaponMock("Weapon_Shortbow_Iron");
+    @DisplayName("RPG Shortbow (Compatible=false) skips offhand stats")
+    void calculateBonuses_RpgShortbow_SkipsUtility() {
+        ItemStack weapon = createRpgWeaponMock("Weapon_Shortbow_Iron", false);
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
 
         calculator.calculateBonuses(playerId, inventory);
 
@@ -437,11 +487,11 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - 2H weapon (staff) skips offhand stats")
-    void calculateBonuses_TwoHandedStaff_SkipsUtility() {
-        ItemStack weapon = createWeaponMock("Weapon_Staff_Iron");
+    @DisplayName("RPG Staff (Compatible=false) skips offhand stats")
+    void calculateBonuses_RpgStaff_SkipsUtility() {
+        ItemStack weapon = createRpgWeaponMock("Weapon_Staff_Iron", false);
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
 
         calculator.calculateBonuses(playerId, inventory);
 
@@ -449,11 +499,37 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - 1H weapon (sword) processes offhand stats")
-    void calculateBonuses_OneHandedSword_ProcessesUtility() {
-        ItemStack weapon = createWeaponMock("Weapon_Sword_Iron");
+    @DisplayName("RPG Daggers (Compatible=false, dual-wield) skips offhand stats")
+    void calculateBonuses_RpgDaggers_SkipsUtility() {
+        ItemStack weapon = createRpgWeaponMock("Weapon_Daggers_Iron", false);
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory, never()).getUtilityItem();
+    }
+
+    @Test
+    @DisplayName("RPG Mace (Compatible=false) skips offhand stats")
+    void calculateBonuses_RpgMace_SkipsUtility() {
+        ItemStack weapon = createRpgWeaponMock("Weapon_Mace_Iron", false);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory, never()).getUtilityItem();
+    }
+
+    // --- Non-RPG items: offhand ALWAYS applies regardless of Compatible flag ---
+
+    @Test
+    @DisplayName("Torch (non-RPG, Compatible=false) still processes offhand stats")
+    void calculateBonuses_NonRpgTorch_AlwaysAllowsOffhand() {
+        ItemStack weapon = createWeaponMock("Utility_Torch", false);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         calculator.calculateBonuses(playerId, inventory);
@@ -462,11 +538,26 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - 1H weapon (dagger) processes offhand stats")
-    void calculateBonuses_OneHandedDagger_ProcessesUtility() {
-        ItemStack weapon = createWeaponMock("Weapon_Daggers_Iron");
+    @DisplayName("Food (non-RPG, Compatible=false) still processes offhand stats")
+    void calculateBonuses_NonRpgFood_AlwaysAllowsOffhand() {
+        ItemStack weapon = createWeaponMock("Food_Apple", false);
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+        when(inventory.getUtilityItem()).thenReturn(null);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory).getUtilityItem();
+    }
+
+    // --- Compatible=true: offhand allowed ---
+
+    @Test
+    @DisplayName("Sword (Compatible=true) processes offhand stats")
+    void calculateBonuses_Sword_ProcessesUtility() {
+        ItemStack weapon = createWeaponMock("Weapon_Sword_Iron", true);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         calculator.calculateBonuses(playerId, inventory);
@@ -475,10 +566,51 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - no weapon (bare fists) processes offhand stats")
+    @DisplayName("Axe (Compatible=true) processes offhand stats")
+    void calculateBonuses_Axe_ProcessesUtility() {
+        ItemStack weapon = createWeaponMock("Weapon_Axe_Iron", true);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+        when(inventory.getUtilityItem()).thenReturn(null);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory).getUtilityItem();
+    }
+
+    @Test
+    @DisplayName("Crossbow (Compatible=true) processes offhand stats")
+    void calculateBonuses_Crossbow_ProcessesUtility() {
+        ItemStack weapon = createWeaponMock("Weapon_Crossbow_Iron", true);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+        when(inventory.getUtilityItem()).thenReturn(null);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory).getUtilityItem();
+    }
+
+    @Test
+    @DisplayName("Wand (Compatible=true) processes offhand stats")
+    void calculateBonuses_Wand_ProcessesUtility() {
+        ItemStack weapon = createWeaponMock("Weapon_Wand_Root", true);
+        stubEmptyArmor();
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
+        when(inventory.getUtilityItem()).thenReturn(null);
+
+        calculator.calculateBonuses(playerId, inventory);
+
+        verify(inventory).getUtilityItem();
+    }
+
+    // --- Fallback cases ---
+
+    @Test
+    @DisplayName("Bare fists (null weapon) processes offhand stats")
     void calculateBonuses_NoWeapon_ProcessesUtility() {
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(null);
+        when(inventory.getActiveHotbarItem()).thenReturn(null);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         calculator.calculateBonuses(playerId, inventory);
@@ -487,11 +619,17 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("calculateBonuses - unknown weapon defaults to 1H (processes offhand)")
-    void calculateBonuses_UnknownWeapon_DefaultsToOneHanded() {
-        ItemStack weapon = createWeaponMock("SomeMod_UnknownItem");
+    @DisplayName("Unknown mod weapon (not in asset map) defaults to offhand allowed")
+    void calculateBonuses_UnknownWeapon_DefaultsToOffhandAllowed() {
+        ItemStack weapon = mock(ItemStack.class, withSettings().lenient());
+        Item weaponItem = mock(Item.class, withSettings().lenient());
+        when(weapon.getItem()).thenReturn(weaponItem);
+        when(weaponItem.getId()).thenReturn("SomeMod_UnknownItem");
+        // Asset map returns null for unknown items — fallback to allow offhand
+        when(assetMap.getAsset("SomeMod_UnknownItem")).thenReturn(null);
+
         stubEmptyArmor();
-        when(inventory.getItemInHand()).thenReturn(weapon);
+        when(inventory.getActiveHotbarItem()).thenReturn(weapon);
         when(inventory.getUtilityItem()).thenReturn(null);
 
         calculator.calculateBonuses(playerId, inventory);

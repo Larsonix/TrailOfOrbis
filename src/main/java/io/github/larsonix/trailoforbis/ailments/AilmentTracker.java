@@ -70,6 +70,16 @@ public class AilmentTracker {
         entities.remove(entityUuid);
     }
 
+    /** Bulk-cleans ailment state for all entities in a closed realm. */
+    public int cleanupEntities(@Nonnull Set<UUID> entityUuids) {
+        if (entityUuids.isEmpty()) return 0;
+        int removed = 0;
+        for (UUID uuid : entityUuids) {
+            if (entities.remove(uuid) != null) removed++;
+        }
+        return removed;
+    }
+
     /**
      * @return true if applied successfully
      */

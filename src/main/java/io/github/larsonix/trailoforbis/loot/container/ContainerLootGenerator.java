@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.loot.container;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 import io.github.larsonix.trailoforbis.gear.generation.RarityRoller;
@@ -9,6 +10,7 @@ import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
 import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.loot.consumable.ConsumableLootRegistry;
 import io.github.larsonix.trailoforbis.maps.items.RealmMapGenerator;
 import io.github.larsonix.trailoforbis.stones.StoneType;
 import io.github.larsonix.trailoforbis.stones.StoneUtils;
@@ -59,6 +61,8 @@ public final class ContainerLootGenerator {
     private final LootGenerator lootGenerator;
     @Nullable
     private final RealmMapGenerator mapGenerator;
+    @Nullable
+    private final ConsumableLootRegistry consumableRegistry;
     private final ContainerTierClassifier tierClassifier;
     private final DropLevelBlender dropLevelBlender;
     @Nullable
@@ -72,6 +76,7 @@ public final class ContainerLootGenerator {
      * @param config                  The container loot configuration
      * @param lootGenerator           The gear loot generator
      * @param mapGenerator            The realm map generator (nullable - map drops disabled if null)
+     * @param consumableRegistry      The consumable loot registry (nullable - consumable drops disabled if null)
      * @param tierClassifier          The container tier classifier
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
@@ -81,11 +86,12 @@ public final class ContainerLootGenerator {
             @Nonnull ContainerLootConfig config,
             @Nonnull LootGenerator lootGenerator,
             @Nullable RealmMapGenerator mapGenerator,
+            @Nullable ConsumableLootRegistry consumableRegistry,
             @Nonnull ContainerTierClassifier tierClassifier,
             @Nonnull DropLevelBlender dropLevelBlender,
             @Nullable RarityBonusCalculator rarityBonusCalculator,
             @Nonnull RarityRoller rarityRoller) {
-        this(config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller, ThreadLocalRandom.current());
+        this(config, lootGenerator, mapGenerator, consumableRegistry, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller, ThreadLocalRandom.current());
     }
 
     /**
@@ -94,6 +100,7 @@ public final class ContainerLootGenerator {
      * @param config                  The container loot configuration
      * @param lootGenerator           The gear loot generator
      * @param mapGenerator            The realm map generator (nullable - map drops disabled if null)
+     * @param consumableRegistry      The consumable loot registry (nullable - consumable drops disabled if null)
      * @param tierClassifier          The container tier classifier
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
@@ -104,6 +111,7 @@ public final class ContainerLootGenerator {
             @Nonnull ContainerLootConfig config,
             @Nonnull LootGenerator lootGenerator,
             @Nullable RealmMapGenerator mapGenerator,
+            @Nullable ConsumableLootRegistry consumableRegistry,
             @Nonnull ContainerTierClassifier tierClassifier,
             @Nonnull DropLevelBlender dropLevelBlender,
             @Nullable RarityBonusCalculator rarityBonusCalculator,
@@ -112,6 +120,7 @@ public final class ContainerLootGenerator {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.lootGenerator = Objects.requireNonNull(lootGenerator, "lootGenerator cannot be null");
         this.mapGenerator = mapGenerator;  // Nullable - map drops disabled if RealmsManager not available
+        this.consumableRegistry = consumableRegistry;  // Nullable - consumable drops disabled if null
         this.tierClassifier = Objects.requireNonNull(tierClassifier, "tierClassifier cannot be null");
         this.dropLevelBlender = Objects.requireNonNull(dropLevelBlender, "dropLevelBlender cannot be null");
         this.rarityBonusCalculator = rarityBonusCalculator;  // Nullable for tests
@@ -151,10 +160,14 @@ public final class ContainerLootGenerator {
         List<ItemStack> maps = generateMaps(lootContext, tier, playerRarityBonus);
         loot.addAll(maps);
 
+        // Generate consumables (food/potions)
+        List<ItemStack> consumables = generateConsumables(lootContext.playerLevel(), tier, playerRarityBonus);
+        loot.addAll(consumables);
+
         if (config.getAdvanced().isDebugLogging()) {
-            LOGGER.atInfo().log("Generated loot for tier %s (srcLv%d, playerLv%d, playerBonus=%.1f%%): %d gear, %d stones, %d maps",
+            LOGGER.atInfo().log("Generated loot for tier %s (srcLv%d, playerLv%d, playerBonus=%.1f%%): %d gear, %d stones, %d maps, %d consumables",
                 tier, lootContext.sourceLevel(), lootContext.playerLevel(), playerRarityBonus,
-                gear.size(), stones.size(), maps.size());
+                gear.size(), stones.size(), maps.size(), consumables.size());
         }
 
         return loot;
@@ -197,7 +210,15 @@ public final class ContainerLootGenerator {
         List<ItemStack> loot = new ArrayList<>(targetSlots);
         int slotsRemaining = targetSlots;
 
-        // Phase 1: Roll stones (claim slots from budget)
+        // Phase 1: Roll consumables (claim slots from budget)
+        List<ItemStack> consumables = generateConsumables(lootContext.playerLevel(), tier, playerRarityBonus);
+        for (ItemStack consumable : consumables) {
+            if (slotsRemaining <= 1) break; // Reserve at least 1 slot for gear
+            loot.add(consumable);
+            slotsRemaining--;
+        }
+
+        // Phase 2: Roll stones (claim slots from budget)
         List<ItemStack> stones = generateStones(lootContext.playerLevel(), tier, playerRarityBonus);
         for (ItemStack stone : stones) {
             if (slotsRemaining <= 1) break; // Reserve at least 1 slot for gear
@@ -205,7 +226,7 @@ public final class ContainerLootGenerator {
             slotsRemaining--;
         }
 
-        // Phase 2: Roll maps (claim slots from budget)
+        // Phase 3: Roll maps (claim slots from budget)
         List<ItemStack> maps = generateMaps(lootContext, tier, playerRarityBonus);
         for (ItemStack map : maps) {
             if (slotsRemaining <= 1) break; // Reserve at least 1 slot for gear
@@ -213,7 +234,7 @@ public final class ContainerLootGenerator {
             slotsRemaining--;
         }
 
-        // Phase 3: Fill ALL remaining slots with gear
+        // Phase 4: Fill ALL remaining slots with gear
         // Convert player bonus from percentage to decimal, tier bonus already decimal
         double rarityBonus = tierClassifier.getRarityBonus(tier) + (playerRarityBonus / 100.0);
         // Apply realm IIR bonus (percentage → decimal)
@@ -240,10 +261,12 @@ public final class ContainerLootGenerator {
         }
 
         if (config.getAdvanced().isDebugLogging()) {
-            int gearCount = loot.size() - stones.size() - maps.size();
-            LOGGER.atInfo().log("Generated %d items for %d target slots (tier %s): %d gear, %d stones, %d maps",
-                loot.size(), targetSlots, tier, gearCount,
-                Math.min(stones.size(), targetSlots), Math.min(maps.size(), targetSlots));
+            int consumableCount = Math.min(consumables.size(), targetSlots);
+            int stoneCount = Math.min(stones.size(), targetSlots);
+            int mapCount = Math.min(maps.size(), targetSlots);
+            int gearCount = loot.size() - consumableCount - stoneCount - mapCount;
+            LOGGER.atInfo().log("Generated %d items for %d target slots (tier %s): %d gear, %d stones, %d maps, %d consumables",
+                loot.size(), targetSlots, tier, gearCount, stoneCount, mapCount, consumableCount);
         }
 
         return loot;
@@ -533,6 +556,90 @@ public final class ContainerLootGenerator {
             return generator.generateItem(baseItem, mapLevel, playerRarityBonus);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to generate map for level %d", lootContext.sourceLevel());
+            return null;
+        }
+    }
+
+    // =========================================================================
+    // CONSUMABLE GENERATION
+    // =========================================================================
+
+    /**
+     * Generates consumable items (food/potions) for a container.
+     *
+     * <p>Uses the unified {@link GearRarity} system via {@link RarityRoller}
+     * for consistent rarity rolling. Player WIND stat and container tier
+     * bonuses affect the quality of consumables dropped.
+     *
+     * @param playerLevel       The opening player's level
+     * @param tier              The container tier
+     * @param playerRarityBonus Player's WIND-based rarity bonus
+     * @return List of generated consumable items
+     */
+    @Nonnull
+    private List<ItemStack> generateConsumables(int playerLevel, @Nonnull ContainerTier tier, double playerRarityBonus) {
+        if (consumableRegistry == null || !consumableRegistry.isEnabled() || !consumableRegistry.hasItems()) {
+            return List.of();
+        }
+
+        ContainerLootConfig.ConsumableDrops consumableConfig = config.getConsumableDrops();
+        if (!consumableConfig.isEnabled()) {
+            return List.of();
+        }
+
+        double baseChance = consumableConfig.getBaseChance();
+        double tierMultiplier = tierClassifier.getConsumableChanceMultiplier(tier);
+        double effectiveChance = baseChance * tierMultiplier;
+
+        List<ItemStack> consumables = new ArrayList<>();
+        int maxConsumables = consumableConfig.getMaxPerContainer();
+
+        for (int i = 0; i < maxConsumables; i++) {
+            if (random.nextDouble() < effectiveChance) {
+                ItemStack consumable = generateSingleConsumable(playerLevel, playerRarityBonus, consumableConfig);
+                if (consumable != null) {
+                    consumables.add(consumable);
+                }
+            }
+        }
+
+        return consumables;
+    }
+
+    /**
+     * Generates a single consumable item.
+     *
+     * @param playerLevel       The player's level (for tier filtering)
+     * @param playerRarityBonus Player's WIND-based rarity bonus (percentage)
+     * @param consumableConfig  The consumable drop config (for food/potion weights)
+     * @return Generated consumable, or null on failure
+     */
+    @Nullable
+    private ItemStack generateSingleConsumable(int playerLevel, double playerRarityBonus,
+                                                @Nonnull ContainerLootConfig.ConsumableDrops consumableConfig) {
+        try {
+            // Roll rarity using shared RarityRoller (same as stones/gear)
+            GearRarity rarity = rarityRoller.roll(playerRarityBonus / 100.0);
+
+            // Select food or potion and pick a random item from the registry
+            ItemStack consumable = consumableRegistry.rollConsumable(
+                rarity, playerLevel,
+                consumableConfig.getFoodWeight(),
+                consumableConfig.getPotionWeight(),
+                random
+            );
+
+            // Defense-in-depth: verify the item actually exists in the asset map
+            if (consumable != null) {
+                Item item = Item.getAssetMap().getAsset(consumable.getItemId());
+                if (item == null || item == Item.UNKNOWN) {
+                    LOGGER.atWarning().log("Consumable '%s' not in asset map — skipping", consumable.getItemId());
+                    return null;
+                }
+            }
+            return consumable;
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to generate consumable");
             return null;
         }
     }

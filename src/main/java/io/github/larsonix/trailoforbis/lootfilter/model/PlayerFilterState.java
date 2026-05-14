@@ -3,6 +3,7 @@ package io.github.larsonix.trailoforbis.lootfilter.model;
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -60,6 +61,22 @@ public final class PlayerFilterState {
         Optional<FilterProfile> profile = getActiveProfile();
         if (profile.isEmpty()) return FilterAction.ALLOW;
         return profile.get().evaluate(gearData, equipmentType);
+    }
+
+    /**
+     * Evaluates a realm map against the active filter.
+     * Quick filter checks rarity (applies to both gear and maps).
+     * Profile evaluation uses map-specific rules.
+     */
+    @Nonnull
+    public FilterAction evaluateMap(@Nonnull RealmMapData mapData) {
+        if (quickFilterRarity != null) {
+            return mapData.rarity().ordinal() >= quickFilterRarity.ordinal()
+                    ? FilterAction.ALLOW : FilterAction.BLOCK;
+        }
+        Optional<FilterProfile> profile = getActiveProfile();
+        if (profile.isEmpty()) return FilterAction.ALLOW;
+        return profile.get().evaluateMap(mapData);
     }
 
     /**

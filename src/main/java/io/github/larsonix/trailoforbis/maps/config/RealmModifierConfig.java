@@ -242,6 +242,7 @@ public class RealmModifierConfig {
         private int baseMin;
         private int baseMax;
         private double scalePerLevel;
+        private int maxCap = -1; // -1 = no cap; positive value = hard ceiling for scaled values
         private boolean enabled = true;
         private Set<RealmModifierType> incompatibleWith = new HashSet<>();
 
@@ -277,25 +278,34 @@ public class RealmModifierConfig {
             this.scalePerLevel = scalePerLevel;
         }
 
+        public int getMaxCap() {
+            return maxCap;
+        }
+
+        public void setMaxCap(int maxCap) {
+            this.maxCap = maxCap;
+        }
+
         /**
          * Gets the effective minimum value at a given map level.
          *
          * @param level The map level
-         * @return Minimum value at that level (clamped to >= 0)
+         * @return Minimum value at that level (clamped to >= 0, and <= maxCap if set)
          */
         public int getMinValue(int level) {
             if (isBinary()) {
                 return baseMin;
             }
             double effectiveLevel = (LevelScaling.getMultiplier(level) - 1.0) * LevelScaling.getTransitionLevel();
-            return Math.max(0, (int) Math.round(baseMin + effectiveLevel * scalePerLevel));
+            int value = Math.max(0, (int) Math.round(baseMin + effectiveLevel * scalePerLevel));
+            return maxCap > 0 ? Math.min(value, maxCap) : value;
         }
 
         /**
          * Gets the effective maximum value at a given map level.
          *
          * @param level The map level
-         * @return Maximum value at that level (clamped to >= min)
+         * @return Maximum value at that level (clamped to >= min, and <= maxCap if set)
          */
         public int getMaxValue(int level) {
             if (isBinary()) {
@@ -303,7 +313,8 @@ public class RealmModifierConfig {
             }
             double effectiveLevel = (LevelScaling.getMultiplier(level) - 1.0) * LevelScaling.getTransitionLevel();
             int scaledMax = (int) Math.round(baseMax + effectiveLevel * scalePerLevel);
-            return Math.max(getMinValue(level), Math.max(0, scaledMax));
+            int result = Math.max(getMinValue(level), Math.max(0, scaledMax));
+            return maxCap > 0 ? Math.min(result, maxCap) : result;
         }
 
         /**

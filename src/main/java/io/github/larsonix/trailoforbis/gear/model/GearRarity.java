@@ -34,7 +34,7 @@ public enum GearRarity {
 
     UNCOMMON(
         2,
-        1,      // maxPrefixes
+        2,      // maxPrefixes
         2,      // maxSuffixes
         0.5,    // +0.2 jump
         1.2,
@@ -45,8 +45,8 @@ public enum GearRarity {
 
     RARE(
         3,
-        2,      // maxPrefixes
-        2,      // maxSuffixes
+        3,      // maxPrefixes
+        3,      // maxSuffixes
         0.8,    // +0.3 jump
         1.5,
         4.0,    // dropWeight (4× geometric: 4.69%)
@@ -56,8 +56,8 @@ public enum GearRarity {
 
     EPIC(
         4,
-        2,      // maxPrefixes
-        2,      // maxSuffixes
+        3,      // maxPrefixes
+        3,      // maxSuffixes
         1.2,    // +0.4 jump
         2.0,
         1.0,    // dropWeight (4× geometric: 1.17%)
@@ -66,9 +66,9 @@ public enum GearRarity {
     ),
 
     LEGENDARY(
-        5,      // maxModifiers (was 4)
-        2,      // maxPrefixes
-        3,      // maxSuffixes (was 2)
+        5,      // maxModifiers
+        3,      // maxPrefixes
+        3,      // maxSuffixes
         1.7,    // +0.5 jump
         3.0,
         0.25,   // dropWeight (4× geometric: 0.29%)
@@ -77,9 +77,9 @@ public enum GearRarity {
     ),
 
     MYTHIC(
-        6,      // maxModifiers (was 4)
-        3,      // maxPrefixes (was 2)
-        3,      // maxSuffixes (was 2)
+        6,      // maxModifiers
+        3,      // maxPrefixes
+        3,      // maxSuffixes
         2.3,    // +0.6 jump
         5.0,
         0.0625, // dropWeight (4× geometric: 0.073%)
@@ -93,7 +93,7 @@ public enum GearRarity {
         3,      // maxSuffixes
         2.8,    // +0.5 jump (best stats)
         5.0,    // durabilityMultiplier
-        0.016,  // dropWeight (4× geometric: 0.018%)
+        0.0,    // dropWeight — DISABLED: Unique items don't drop naturally
         "#AF6025", // PoE-style orange
         "Unique"
     );
@@ -126,12 +126,12 @@ public enum GearRarity {
      * <p>Distribution between prefixes and suffixes is determined by rarity config:
      * <ul>
      *   <li>COMMON: 0-1 prefix, 0-1 suffix (max 1 total)</li>
-     *   <li>UNCOMMON: 0-1 prefix, 0-2 suffix (max 2 total)</li>
-     *   <li>RARE: 1-2 prefix, 1-2 suffix (max 3 total)</li>
-     *   <li>EPIC: 1-2 prefix, 1-2 suffix (max 4 total)</li>
-     *   <li>LEGENDARY: 1-2 prefix, 1-3 suffix (max 5 total)</li>
-     *   <li>MYTHIC: 1-3 prefix, 1-3 suffix (max 6 total)</li>
-     *   <li>UNIQUE: 1-3 prefix, 1-3 suffix (max 6 total, stronger stats)</li>
+     *   <li>UNCOMMON: 0-2 prefix, 0-2 suffix (max 2 total)</li>
+     *   <li>RARE: 0-3 prefix, 0-3 suffix (max 3 total)</li>
+     *   <li>EPIC: 1-3 prefix, 1-3 suffix (max 4 total)</li>
+     *   <li>LEGENDARY: 2-3 prefix, 2-3 suffix (max 5 total)</li>
+     *   <li>MYTHIC: 3 prefix, 3 suffix (always 6 total)</li>
+     *   <li>UNIQUE: 3 prefix, 3 suffix (always 6 total, does not drop naturally)</li>
      * </ul>
      *
      * @return Maximum total modifiers (1-6)
@@ -145,7 +145,7 @@ public enum GearRarity {
      *
      * <p>These are default values that can be overridden via gear-balance.yml.
      *
-     * @return Maximum prefixes (1-2)
+     * @return Maximum prefixes (1-3)
      */
     public int getMaxPrefixes() {
         return maxPrefixes;
@@ -156,7 +156,7 @@ public enum GearRarity {
      *
      * <p>These are default values that can be overridden via gear-balance.yml.
      *
-     * @return Maximum suffixes (1-2)
+     * @return Maximum suffixes (1-3)
      */
     public int getMaxSuffixes() {
         return maxSuffixes;

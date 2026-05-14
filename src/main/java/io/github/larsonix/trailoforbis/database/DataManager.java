@@ -96,10 +96,15 @@ public class DataManager {
      * already defines all columns.
      */
     private void performMigrations() {
-        // No migrations needed - schema already has all elemental attribute columns.
-        // The old 5-attribute system (STR, DEX, INT, VIT, LUCK) has been replaced with
-        // 6 elements (fire, water, lightning, earth, wind, void_attr).
-        // Since this plugin is not yet released, no backward compatibility is needed.
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+            // v1.0.8: Add level column to rpg_levels for XP curve migration protection.
+            // Stores the last-known derived level so players never lose levels when the
+            // XP formula changes between versions.
+            migrateAddColumn(stmt, "rpg_levels", "level", "INT DEFAULT NULL");
+        } catch (SQLException e) {
+            LOGGER.at(Level.SEVERE).withCause(e).log("Database migration failed");
+        }
     }
 
     /**

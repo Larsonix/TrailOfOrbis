@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.leveling.core;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -17,12 +18,14 @@ import java.util.UUID;
  *
  * @param uuid The player's UUID
  * @param xp The player's total XP (never negative)
+ * @param storedLevel The last-known derived level (null if never recorded, used for curve migration protection)
  * @param createdAt When the record was first created
  * @param lastUpdated When the record was last modified
  */
 public record PlayerLevelData(
     @Nonnull UUID uuid,
     long xp,
+    @Nullable Integer storedLevel,
     @Nonnull Instant createdAt,
     @Nonnull Instant lastUpdated
 ) {
@@ -32,6 +35,7 @@ public record PlayerLevelData(
      *
      * @param uuid The player's UUID
      * @param xp The player's total XP (clamped to >= 0)
+     * @param storedLevel The last-known derived level (nullable)
      * @param createdAt When the record was first created
      * @param lastUpdated When the record was last modified
      */
@@ -60,7 +64,7 @@ public record PlayerLevelData(
     @Nonnull
     public static PlayerLevelData createNew(@Nonnull UUID uuid) {
         Instant now = Instant.now();
-        return new PlayerLevelData(uuid, 0, now, now);
+        return new PlayerLevelData(uuid, 0, null, now, now);
     }
 
     /**
@@ -73,7 +77,7 @@ public record PlayerLevelData(
     @Nonnull
     public static PlayerLevelData createWithXp(@Nonnull UUID uuid, long xp) {
         Instant now = Instant.now();
-        return new PlayerLevelData(uuid, xp, now, now);
+        return new PlayerLevelData(uuid, xp, null, now, now);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -88,7 +92,7 @@ public record PlayerLevelData(
      */
     @Nonnull
     public PlayerLevelData withXp(long newXp) {
-        return new PlayerLevelData(uuid, Math.max(0, newXp), createdAt, Instant.now());
+        return new PlayerLevelData(uuid, Math.max(0, newXp), storedLevel, createdAt, Instant.now());
     }
 
     /**
@@ -100,6 +104,20 @@ public record PlayerLevelData(
     @Nonnull
     public PlayerLevelData withXpDelta(long amount) {
         return withXp(xp + amount);
+    }
+
+    /**
+     * Returns a new instance with the stored level updated.
+     *
+     * <p>The stored level is persisted to DB and used to detect level loss
+     * when the XP formula changes between versions.
+     *
+     * @param level The derived level to store
+     * @return A new PlayerLevelData with updated stored level
+     */
+    @Nonnull
+    public PlayerLevelData withStoredLevel(int level) {
+        return new PlayerLevelData(uuid, xp, level, createdAt, Instant.now());
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -117,7 +135,7 @@ public record PlayerLevelData(
 
     @Override
     public String toString() {
-        return String.format("PlayerLevelData{uuid=%s, xp=%d, created=%s, updated=%s}",
-            uuid, xp, createdAt, lastUpdated);
+        return String.format("PlayerLevelData{uuid=%s, xp=%d, storedLevel=%s, created=%s, updated=%s}",
+            uuid, xp, storedLevel, createdAt, lastUpdated);
     }
 }

@@ -58,6 +58,7 @@ import io.github.larsonix.trailoforbis.listeners.EquipmentChangeListener;
 import io.github.larsonix.trailoforbis.listeners.PlayerJoinListener;
 import io.github.larsonix.trailoforbis.ui.UIManager;
 import io.github.larsonix.trailoforbis.combat.EnergyShieldTracker;
+import io.github.larsonix.trailoforbis.combat.CombatRequirementNotifier;
 import io.github.larsonix.trailoforbis.combat.RPGDamageSystem;
 import io.github.larsonix.trailoforbis.combat.RPGDamageIndicatorSuppressor;
 import io.github.larsonix.trailoforbis.combat.projectile.ProjectileConfig;
@@ -92,11 +93,17 @@ import io.github.larsonix.trailoforbis.ui.hud.XpBarHudManager;
 import io.github.larsonix.trailoforbis.skilltree.map.SkillTreeMapManager;
 import io.github.larsonix.trailoforbis.skilltree.repository.SkillTreeRepository;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
+import io.github.larsonix.trailoforbis.compat.HexcodeCompatManager;
 import io.github.larsonix.trailoforbis.compat.HexcodeSkillTreeOverlay;
 import io.github.larsonix.trailoforbis.compat.HytaleAPICompat;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierManager;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierService;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierTickSystem;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
 import io.github.larsonix.trailoforbis.mobs.MobScalingService;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 import io.github.larsonix.trailoforbis.mobs.spawn.component.RPGSpawnedMarker;
@@ -106,7 +113,6 @@ import io.github.larsonix.trailoforbis.mobs.systems.MobRegenerationSystem;
 import io.github.larsonix.trailoforbis.mobs.systems.DeferredSpawnSystem;
 import io.github.larsonix.trailoforbis.mobs.systems.MobScalingSystem;
 import io.github.larsonix.trailoforbis.gear.systems.GameModeChangeSystem;
-import io.github.larsonix.trailoforbis.gear.systems.WeaponSlotChangeSystem;
 import io.github.larsonix.trailoforbis.gear.systems.HotbarSlotTrackingSystem;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -213,15 +219,21 @@ public class TrailOfOrbis extends JavaPlugin {
     private SkillTreeManager skillTreeManager;
     private RegenerationTickSystem regenerationSystem;
     private MobScalingManager mobScalingManager;
+    private MobModifierManager mobModifierManager;
 
     // Leveling system (native, replaces LevelingCore)
     private LevelingManager levelingManager;
     private MobStatsXpCalculator xpCalculator;
     private LevelUpCelebrationService celebrationService;
+    private io.github.larsonix.trailoforbis.leveling.XpGainNotificationService xpGainNotificationService;
+    private io.github.larsonix.trailoforbis.leveling.XpLossNotificationService xpLossNotificationService;
     private NodeAllocationFeedbackService nodeAllocationFeedbackService;
 
     // Mob scaling component type (registered in setup(), used by MobScalingSystem)
     private ComponentType<EntityStore, MobScalingComponent> mobScalingComponentType;
+
+    // Mob modifier component type (registered in setup(), used by MobModifierManager)
+    private ComponentType<EntityStore, MobModifierComponent> mobModifierComponentType;
 
     // New mob stat component type (for Dirichlet-based stat generation)
     private ComponentType<EntityStore, MobStatComponent> mobStatComponentType;
@@ -238,6 +250,9 @@ public class TrailOfOrbis extends JavaPlugin {
     // Combat detail mode - tracks which players have detailed damage breakdown enabled
     private final Set<UUID> combatDetailEnabled = ConcurrentHashMap.newKeySet();
 
+    // Combat debug mode - full context dump on hit (attributes, tree, gear, stats, result)
+    private final Set<UUID> combatDebugEnabled = ConcurrentHashMap.newKeySet();
+
     // Ailment system (PoE2-style elemental ailments)
     private AilmentTracker ailmentTracker;
     private AilmentCalculator ailmentCalculator;
@@ -248,12 +263,16 @@ public class TrailOfOrbis extends JavaPlugin {
     private io.github.larsonix.trailoforbis.combat.tracking.ConsecutiveHitTracker consecutiveHitTracker;
     private io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry combatEffectRegistry;
     private io.github.larsonix.trailoforbis.ailments.AilmentImmunityTracker ailmentImmunityTracker;
+    private RPGDamageSystem rpgDamageSystem;
 
     // Projectile stats system config (projectile speed/gravity modifiers)
     private ProjectileConfig projectileConfig;
 
     // Conditional effect trigger system (on-kill, on-crit, threshold bonuses)
     private ConditionalTriggerSystem conditionalTriggerSystem;
+
+    // Container sync tick system - syncs custom item definitions on container open
+    private ContainerSyncTickSystem containerSyncTickSystem;
 
     // Gear equipment listener
     private GearEquipmentListener gearEquipmentListener;
@@ -298,6 +317,9 @@ public class TrailOfOrbis extends JavaPlugin {
 
     // Party mod integration (PartyPro compatibility)
     private io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager partyIntegrationManager;
+
+    // XP distribution service (handles party and proximity XP sharing)
+    private io.github.larsonix.trailoforbis.leveling.xp.XpDistributionService xpDistributionService;
 
     // Inventory detection system (shows Stats button when inventory is open)
     private InventoryDetectionManager inventoryDetectionManager;
@@ -369,7 +391,7 @@ public class TrailOfOrbis extends JavaPlugin {
         getLogger().atInfo().log("Setting up TrailOfOrbis v%s...", getManifest().getVersion());
 
         // Phase 1: Lightweight manager instantiation (NO I/O)
-        configManager = new ConfigManager(dataFolder);
+        configManager = new ConfigManager(dataFolder, getManifest().getVersion().toString());
         // Note: DataManager requires RPGConfig, created in start()
 
         // Set config directory for layout config (actual loading happens lazily)
@@ -508,6 +530,14 @@ public class TrailOfOrbis extends JavaPlugin {
         );
         getLogger().atFine().log("Registered MobStatComponent (with CODEC)");
 
+        // MobModifierComponent - stores active modifiers on elite/boss mobs
+        mobModifierComponentType = getEntityStoreRegistry().registerComponent(
+            MobModifierComponent.class,
+            "trailoforbis:MobModifierComponent",
+            MobModifierComponent.CODEC
+        );
+        getLogger().atFine().log("Registered MobModifierComponent (with CODEC)");
+
         // RPGSpawnedMarker - spawn loop prevention
         rpgSpawnedMarkerType = getEntityStoreRegistry().registerComponent(
             RPGSpawnedMarker.class,
@@ -591,6 +621,93 @@ public class TrailOfOrbis extends JavaPlugin {
      *
      * <p>Called in start() so PermissionsModule is guaranteed to be initialized.
      */
+    /**
+     * Injects a fake "Buuz135:MultipleHUD" entry into PluginManager so that
+     * PartyPro (and other mods) find a working MHUD without needing a standalone JAR.
+     *
+     * <p>PartyPro's HudWrapper checks {@code PluginManager.getPlugin("Buuz135:MultipleHUD")}
+     * before using the multi-HUD path. Without this, it falls back to direct
+     * {@code player.getHudManager().setCustomHud()} which replaces the entire MCHUD.
+     *
+     * <p>The actual MHUD API is provided by {@link com.buuz135.mhud.MultipleHUD} (our shim)
+     * which delegates to HyUI's {@code MultiHudWrapper}.
+     */
+    /**
+     * Injects MHUD shim state into PartyPro's HudWrapper so it uses multi-HUD mode.
+     *
+     * <p>PartyPro checks {@code PluginManager.getPlugin("Buuz135:MultipleHUD")} and if found,
+     * uses reflection to call methods on {@code com.buuz135.mhud.MultipleHUD}. Without a
+     * standalone MHUD plugin, PartyPro falls back to destructive single-HUD mode.
+     *
+     * <p>We can't inject into PluginManager because HyUI's {@code MultiHudWrapper.getMultipleHudClass()}
+     * uses {@code existingPlugin.getClass()} which would return our plugin class instead of the
+     * MHUD class, causing NoSuchMethodException.
+     *
+     * <p>Instead, we directly set PartyPro's HudWrapper static fields via reflection:
+     * {@code multipleHudAvailable=true}, {@code multipleHudInstance}, and the method handles.
+     * This bypasses PartyPro's own PluginManager check entirely.
+     */
+    private void injectMhudShim() {
+        try {
+            // Skip if standalone MHUD is already installed — no shim needed
+            var pm = com.hypixel.hytale.server.core.plugin.PluginManager.get();
+            var mhudId = new com.hypixel.hytale.common.plugin.PluginIdentifier("Buuz135", "MultipleHUD");
+            if (pm.getPlugin(mhudId) != null) {
+                LOGGER.atInfo().log("Standalone MultipleHUD already registered — shim not needed");
+                return;
+            }
+
+            // Skip if PartyPro isn't installed
+            Class<?> hudWrapperClass;
+            try {
+                hudWrapperClass = Class.forName("me.tsumori.partypro.hud.HudWrapper");
+            } catch (ClassNotFoundException e) {
+                LOGGER.atFine().log("PartyPro not found — MHUD shim not needed");
+                return;
+            }
+
+            // Get our shim instance and its methods
+            var shimInstance = com.buuz135.mhud.MultipleHUD.getInstance();
+            var shimClass = shimInstance.getClass();
+            var setMethod = shimClass.getMethod("setCustomHud",
+                com.hypixel.hytale.server.core.entity.entities.Player.class,
+                com.hypixel.hytale.server.core.universe.PlayerRef.class,
+                String.class,
+                com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud.class);
+            var hideMethod = shimClass.getMethod("hideCustomHud",
+                com.hypixel.hytale.server.core.entity.entities.Player.class,
+                com.hypixel.hytale.server.core.universe.PlayerRef.class,
+                String.class);
+
+            // Inject into PartyPro's HudWrapper static fields
+            var availableField = hudWrapperClass.getDeclaredField("multipleHudAvailable");
+            availableField.setAccessible(true);
+            availableField.set(null, Boolean.TRUE);
+
+            var instanceField = hudWrapperClass.getDeclaredField("multipleHudInstance");
+            instanceField.setAccessible(true);
+            instanceField.set(null, shimInstance);
+
+            var setField = hudWrapperClass.getDeclaredField("setCustomHudMethod");
+            setField.setAccessible(true);
+            setField.set(null, setMethod);
+
+            var hideField = hudWrapperClass.getDeclaredField("hideCustomHudMethod");
+            hideField.setAccessible(true);
+            hideField.set(null, hideMethod);
+
+            // Set attempts past the threshold so it doesn't re-check
+            var attemptsField = hudWrapperClass.getDeclaredField("checkAttempts");
+            attemptsField.setAccessible(true);
+            attemptsField.set(null, 10);
+
+            LOGGER.atInfo().log("Injected MHUD shim into PartyPro — multi-HUD mode enabled");
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log(
+                "Failed to inject MHUD shim — PartyPro may overwrite HUDs on some transitions");
+        }
+    }
+
     private void grantDefaultPermissions() {
         try {
             PermissionsModule perms = PermissionsModule.get();
@@ -626,6 +743,16 @@ public class TrailOfOrbis extends JavaPlugin {
         );
         getLogger().atInfo().log("Registered RealmVictoryPortalInteraction");
 
+        // Register RealmEntryPortalInteraction for Portal_Device CollisionEnter
+        // Fixes vanilla EnterPortalInteraction bug: simulateInteractWithBlock() is empty,
+        // causing "Counter: 2 vs 1" desync when mobs walk onto active portals.
+        Interaction.CODEC.register(
+            "RealmEntryPortal",
+            io.github.larsonix.trailoforbis.maps.completion.interactions.RealmEntryPortalInteraction.class,
+            io.github.larsonix.trailoforbis.maps.completion.interactions.RealmEntryPortalInteraction.CODEC
+        );
+        getLogger().atInfo().log("Registered RealmEntryPortalInteraction");
+
         // Register stone picker page supplier so the PAGE_CODEC can resolve "RPG_StonePicker"
         // during asset loading (when inline OpenCustomUI interactions in stone JSONs are deserialized).
         // tryCreate() is only called at runtime (player right-click), so onEnable services are available.
@@ -648,91 +775,45 @@ public class TrailOfOrbis extends JavaPlugin {
     private void registerEcsSystems() {
         // --- Combat systems ---
 
-        // HexCastEvent interceptor — captures spell caster identity for damage attribution.
-        // HexCastEvent is a WorldEventSystem event (same pattern as Hexcode's own
-        // HexCastDiagnosticListener). Register via entityStoreRegistry.
+        // Register all Hexcode ECS systems (event interceptor, entity tracker,
+        // damage attribution, casting aura). All Hexcode class references are isolated
+        // inside HexcodeBridgeImpl — zero Hexcode imports in this file.
         if (HexcodeCompat.isLoaded()) {
             try {
-                Class<?> hexCastEventClass = Class.forName("com.riprod.hexcode.api.event.HexCastEvent");
-                getEntityStoreRegistry().registerSystem(
-                        new io.github.larsonix.trailoforbis.compat.HexCastEventInterceptor(hexCastEventClass));
-                getLogger().atInfo().log("Registered HexCastEvent interceptor (WorldEventSystem) for caster tracking");
-            } catch (ClassNotFoundException e) {
-                getLogger().atWarning().log("HexCastEvent class not found — spell caster tracking disabled");
-            }
-
-            // Initialize hex entity tracking (construct/projectile caster attribution)
-            io.github.larsonix.trailoforbis.compat.HexcodeCompat.initializeHexTracking();
-
-            // Hex entity tracker — HolderSystem that watches for Hexcode construct and
-            // projectile entities, extracting caster identity via reflection and
-            // registering it in HexCasterRegistry for damage attribution.
-            try {
-                getEntityStoreRegistry().registerSystem(
-                        new io.github.larsonix.trailoforbis.compat.HexEntityTracker());
-                getLogger().atInfo().log("Registered HexEntityTracker (construct/projectile caster tracking)");
+                HexcodeCompatManager.get().bridge().registerEcsSystems(getEntityStoreRegistry());
             } catch (Exception e) {
-                getLogger().atSevere().log("FAILED to register HexEntityTracker: %s", e);
+                getLogger().atSevere().log("FAILED to register Hexcode ECS systems: %s", e);
             }
-
-            // Hex damage attribution — runs in FilterDamageGroup (same as Erode/Fortify).
-            // 3-tier attribution: ThreadLocal (direct spells) → Construct Registry →
-            // Projectile Registry. Rewrites EnvironmentSource to EntitySource(caster).
-            try {
-                getEntityStoreRegistry().registerSystem(
-                        new io.github.larsonix.trailoforbis.compat.HexDamageAttributionSystem());
-                getLogger().atInfo().log("Registered HexDamageAttributionSystem (3-tier FilterDamageGroup)");
-            } catch (Exception e) {
-                getLogger().atSevere().log("FAILED to register HexDamageAttributionSystem: %s", e);
-            }
-
-            // Casting aura particle injector — sends SpawnModelParticles to Casting_Anchor
-            // entities for RPG staffs. The entity tracker's model sync doesn't reliably
-            // deliver particles for dynamically spawned entities.
-            io.github.larsonix.trailoforbis.compat.CastingAuraInjector.initialize();
-            getEntityStoreRegistry().registerSystem(
-                    new io.github.larsonix.trailoforbis.compat.CastingAuraTickSystem());
-            getLogger().atInfo().log("Registered CastingAuraTickSystem for RPG casting particles");
         }
 
         // RPGDamageSystem - hooks into Hytale's damage pipeline
-        RPGDamageSystem rpgDamageSystem = new RPGDamageSystem(this);
+        rpgDamageSystem = new RPGDamageSystem(this);
         getEntityStoreRegistry().registerSystem(rpgDamageSystem);
         getLogger().atInfo().log("Registered RPGDamageSystem");
 
         // Initialize combat effect registry for keystone behavioral effects
         combatEffectRegistry = new io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry();
-        // Migrated effects (previously hardcoded in RPGDamageSystem)
+        // Octant keystone effects (havoc, warlock, etc. — unchanged)
         if (ailmentTracker != null) {
             combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ChainDetonationEffect(ailmentTracker));
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.GlacialMasteryEffect(ailmentTracker));
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ThundergodEffect(ailmentTracker));
+            // GlacialMastery, Thundergod — deregistered: main branch keystones replaced with universal stats
         }
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SpellEchoEffect());
-        // New keystone effects
+        // Main branch keystone effects (universal)
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BerserkersRageEffect());
+        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.FeastOrFamineEffect());
+        // Octant keystone effects
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BladeDanceEffect());
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.RampageEffect());
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SoulSiphonEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.LivingFortressEffect());
+        // LivingFortress, SkyPiercer — deregistered: main branch keystones replaced with universal stats
         combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BloodFortressEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SkyPiercerEffect());
-        // Bridge payoff effects
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.LifeStreamEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.InfernalCorruptionEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.SoulGardenEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.BoilingCurrentsEffect());
-        combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ArcticArcanaEffect());
-        if (ailmentTracker != null) {
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.ThunderingBlowsEffect(ailmentTracker));
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.VoidChillEffect(ailmentTracker));
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.StormShatterEffect(ailmentTracker));
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.VoidStormEffect(ailmentTracker));
-        }
-        if (energyShieldTracker != null) {
-            combatEffectRegistry.register(new io.github.larsonix.trailoforbis.combat.effects.impl.GlacialFortressEffect(energyShieldTracker));
-        }
+        // Bridge payoff effects — ALL deregistered: bridges redesigned with universal stat packages
+        // Old specialist effects (LifeStream, InfernalCorruption, SoulGarden, BoilingCurrents,
+        // ArcticArcana, ThunderingBlows, VoidChill, StormShatter, VoidStorm, GlacialFortress)
+        // preserved in code for potential future use but not registered.
         rpgDamageSystem.setCombatEffectRegistry(combatEffectRegistry);
+        rpgDamageSystem.initialize();
         getLogger().atInfo().log("CombatEffectRegistry initialized (%d effects registered)", combatEffectRegistry.getRegisteredCount());
 
         // Damage indicator suppressor - prevents vanilla from showing duplicate indicators
@@ -781,11 +862,11 @@ public class TrailOfOrbis extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new MobRegenerationSystem(this));
         getLogger().atInfo().log("Registered MobRegenerationSystem");
 
-        // --- Equipment tracking systems ---
+        // MobModifierTickSystem - behavioral modifiers (enrage, regen, auras)
+        getEntityStoreRegistry().registerSystem(new MobModifierTickSystem(this));
+        getLogger().atInfo().log("Registered MobModifierTickSystem");
 
-        // WeaponSlotChangeSystem - triggers stat recalc on utility slot switch (event-based)
-        getEntityStoreRegistry().registerSystem(new WeaponSlotChangeSystem());
-        getLogger().atInfo().log("Registered WeaponSlotChangeSystem");
+        // --- Equipment tracking systems ---
 
         // GameModeChangeSystem - toggles gear requirement bypass on Creative/Adventure switch
         getEntityStoreRegistry().registerSystem(new GameModeChangeSystem());
@@ -905,7 +986,8 @@ public class TrailOfOrbis extends JavaPlugin {
         getLogger().atInfo().log("Registered RPGItemPreSyncSystem");
 
         // ContainerSyncTickSystem - syncs custom item definitions on container open
-        getEntityStoreRegistry().registerSystem(new ContainerSyncTickSystem());
+        containerSyncTickSystem = new ContainerSyncTickSystem();
+        getEntityStoreRegistry().registerSystem(containerSyncTickSystem);
         getLogger().atInfo().log("Registered ContainerSyncTickSystem");
 
         // ItemEntitySpawnSyncSystem - syncs definitions when item entities spawn in world
@@ -922,7 +1004,7 @@ public class TrailOfOrbis extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new ProjectileSystem(this));
         getLogger().atInfo().log("Registered ProjectileSystem");
 
-        getLogger().atInfo().log("All ECS systems registered (%d systems)", 26);
+        getLogger().atInfo().log("All ECS systems registered");
     }
 
     // ==================== START (I/O allowed) ====================
@@ -953,6 +1035,13 @@ public class TrailOfOrbis extends JavaPlugin {
         // Phase 1.5: Initialize API compatibility layer
         HytaleAPICompat.initialize();
 
+        // Phase 1.5-MHUD: Inject MultipleHUD shim for PartyPro compatibility
+        // PartyPro has its own MHUD lookup (PluginManager.getPlugin("Buuz135:MultipleHUD"))
+        // separate from HyUI. When it can't find the standalone MHUD plugin, it falls back to
+        // direct setCustomHud() which replaces the entire MCHUD and destroys all HUDs.
+        // This shim injects a fake plugin entry so PartyPro uses the multi-HUD path.
+        injectMhudShim();
+
         // Phase 1.5a: Detect Hexcode spell-crafting mod (soft dependency)
         HexcodeCompat.initialize();
 
@@ -965,6 +1054,15 @@ public class TrailOfOrbis extends JavaPlugin {
         // Phase 1.5a4: Initialize hex asset map access for RPG item registration
         // Allows pedestal detection, casting particles, and glyph colors to work with rpg_gear_xxx IDs
         HexcodeCompat.initializeHexAssetMaps();
+
+        // Phase 1.5a5: Cache glyph basePower values for ratio-based hex damage replacement
+        // Enables: rpgBase = ourRPGPower × (vanillaDamage / glyphBasePower)
+        HexcodeCompat.cacheGlyphBasePowers();
+
+        // Phase 1.5a5: Run Hexcode integration health check (logs structured summary)
+        if (HexcodeCompat.isLoaded()) {
+            HexcodeCompatManager.get().runHealthCheck();
+        }
 
         // Phase 1.5b: Grant Default group permissions for player-facing commands
         // Without this, only OP players can use commands (permissions default to denied).
@@ -999,6 +1097,16 @@ public class TrailOfOrbis extends JavaPlugin {
         // Wire debug stat override provider (admin testing tool)
         debugStatOverrideProvider = new io.github.larsonix.trailoforbis.attributes.debug.DebugStatOverrideProvider();
         attributeManager.setDebugStatOverrideProvider(debugStatOverrideProvider);
+
+        // Wire Hexcode dependencies: mana cost refund, spell echo, stat caps
+        // Pass ConfigManager (not config object) so /rpg reload picks up changes
+        if (HexcodeCompat.isLoaded()) {
+            io.github.larsonix.trailoforbis.compat.HexCastEventHandler.setDependencies(
+                    attributeManager, configManager);
+            StatMapBridge.setConfigManager(configManager);
+            io.github.larsonix.trailoforbis.compat.HexDamageAttributor.loadConstructSources(
+                    configManager.getHexcodeSpellConfig());
+        }
 
         // Register stats application callback for automatic ECS sync
         // This ensures skill tree allocations, commands, and other stat changes
@@ -1087,6 +1195,18 @@ public class TrailOfOrbis extends JavaPlugin {
         ServiceRegistry.register(AttributeService.class, attributeManager);
         ServiceRegistry.register(AttributeManager.class, attributeManager);
         getLogger().atInfo().log("AttributeManager registered in ServiceRegistry");
+
+        // Phase 3.4: Patch weapons with missing InteractionVars
+        // Must run BEFORE GearManager so base items have valid damage interactions
+        // when our system creates RPG weapons from them.
+        try {
+            var weaponPatcher = new io.github.larsonix.trailoforbis.gear.vanilla.WeaponInteractionPatcher(
+                    dataFolder.resolve("config"), getClass().getClassLoader());
+            weaponPatcher.patchAll();
+        } catch (Exception e) {
+            getLogger().atWarning().withCause(e).log(
+                    "Weapon interaction patcher failed — some weapon skins may deal zero damage");
+        }
 
         // Phase 3.5: Initialize Gear System using GearManager
         // GearManager.initialize() requires AttributeManager to be in ServiceRegistry
@@ -1180,11 +1300,41 @@ public class TrailOfOrbis extends JavaPlugin {
                     effortConfig.getBaseMobs(), effortConfig.getTargetMobs(), effortConfig.getTargetLevel());
             }
 
+            // Build previous formula for XP curve migration (if configured)
+            LevelFormula previousFormula = null;
+            LevelingConfig.MigrationConfig migrationConfig = levelingConfig.getMigration();
+            if (migrationConfig.isEnabled()) {
+                LevelingConfig.MigrationEffortConfig prev = migrationConfig.getPreviousEffort();
+                EffortCurve oldCurve = new EffortCurve(
+                    prev.getBaseMobs(), prev.getTargetMobs(), prev.getTargetLevel());
+
+                // Use override params if specified, else fall back to current config
+                MobXpEstimator oldEstimator = new MobXpEstimator(
+                    prev.getXpPerMobLevel() != null ? prev.getXpPerMobLevel()
+                        : levelingConfig.getXpGain().getXpPerMobLevel(),
+                    prev.getPoolMultiplier() != null ? prev.getPoolMultiplier()
+                        : levelingConfig.getXpGain().getPoolMultiplier(),
+                    prev.getPointsPerLevel() != null ? prev.getPointsPerLevel()
+                        : configManager.getMobStatPoolConfig().getPointsPerLevel(),
+                    prev.getProgressiveScalingEnabled() != null ? prev.getProgressiveScalingEnabled()
+                        : configManager.getMobStatPoolConfig().isProgressiveScalingEnabled(),
+                    prev.getSoftCapLevel() != null ? prev.getSoftCapLevel()
+                        : configManager.getMobStatPoolConfig().getProgressiveScalingSoftCapLevel(),
+                    prev.getMinScalingFactor() != null ? prev.getMinScalingFactor()
+                        : configManager.getMobStatPoolConfig().getProgressiveScalingMinFactor()
+                );
+
+                previousFormula = new EffortBasedFormula(oldCurve, oldEstimator, formulaConfig.getMaxLevel());
+                getLogger().atInfo().log(
+                    "XP curve migration enabled (previous: base_mobs=%.1f, target_mobs=%.1f, target_level=%d)",
+                    prev.getBaseMobs(), prev.getTargetMobs(), prev.getTargetLevel());
+            }
+
             // Create repository with cache
             LevelingRepository levelingRepo = new LevelingRepository(dataManager);
 
             // Create leveling manager
-            levelingManager = new LevelingManager(levelingRepo, formula, levelingConfig);
+            levelingManager = new LevelingManager(levelingRepo, formula, previousFormula, levelingConfig);
 
             // Create XP calculator for mob kills
             xpCalculator = new MobStatsXpCalculator(
@@ -1234,6 +1384,11 @@ public class TrailOfOrbis extends JavaPlugin {
                 // Celebrate!
                 celebrationService.celebrate(playerId, oldLevel, newLevel,
                         attrPoints, skillPoints, totalAttr, totalSkill);
+
+                // Update PartyPro HUD level display (slot 1, replaces distance)
+                if (partyIntegrationManager != null) {
+                    partyIntegrationManager.updateHudLevel(playerId, newLevel);
+                }
             });
 
             // Register guide milestone triggers on level up
@@ -1260,6 +1415,16 @@ public class TrailOfOrbis extends JavaPlugin {
             xpBarHudManager.registerEventListeners(levelingManager);
             getLogger().atInfo().log("XP bar HUD manager initialized");
 
+            // Phase 6.2: Initialize XP gain/loss notification services
+            xpGainNotificationService = new io.github.larsonix.trailoforbis.leveling.XpGainNotificationService(
+                configManager.getLevelingConfig());
+            levelingManager.registerXpGainListener(xpGainNotificationService);
+
+            xpLossNotificationService = new io.github.larsonix.trailoforbis.leveling.XpLossNotificationService(
+                configManager.getLevelingConfig());
+            levelingManager.registerXpLossListener(xpLossNotificationService);
+            getLogger().atInfo().log("XP gain/loss notification services initialized");
+
         } else {
             getLogger().atInfo().log("Leveling system disabled in config");
         }
@@ -1278,7 +1443,19 @@ public class TrailOfOrbis extends JavaPlugin {
             getLogger().atWarning().log("Mob scaling initialization failed");
         }
 
-        // Phase 6.6: Initialize Projectile Stats System Config
+        // Phase 6.6: Initialize Mob Modifier System
+        mobModifierManager = new MobModifierManager(this, configManager);
+        if (mobModifierManager.initialize()) {
+            if (mobModifierManager.isEnabled()) {
+                ServiceRegistry.register(MobModifierService.class, mobModifierManager);
+                getLogger().atInfo().log("MobModifierService registered (%d modifier types)",
+                    ModifierType.values().length);
+            }
+        } else {
+            getLogger().atWarning().log("Mob modifier initialization failed");
+        }
+
+        // Phase 6.7: Initialize Projectile Stats System Config
         // Config is already loaded via SnakeYAML in RPGConfig, just grab the reference
         projectileConfig = configManager.getRPGConfig().getProjectile();
         if (projectileConfig != null && projectileConfig.isEnabled()) {
@@ -1305,6 +1482,7 @@ public class TrailOfOrbis extends JavaPlugin {
         combatFeedbackGhostManager = new io.github.larsonix.trailoforbis.combat.indicators.CombatFeedbackGhostManager();
         hudLifecycleManager.register(combatFeedbackGhostManager);
         hudLifecycleManager.registerEventListeners(getEventRegistry());
+        hudLifecycleManager.startHealthChecker(5, realmsManager);
         getLogger().atInfo().log("HUD lifecycle manager initialized");
 
         // Phase 7: Initialize Mob Level Refresh System (throttled: max 5 mobs/tick)
@@ -1342,6 +1520,12 @@ public class TrailOfOrbis extends JavaPlugin {
             if (gearManager.getTimedCraftHandler() != null && inventoryChangeEventSystem != null) {
                 inventoryChangeEventSystem.addHandler(gearManager.getTimedCraftHandler()::onInventoryChange);
             }
+            // Register deferred CraftingBenchPreviewSystem Phase 2 handler
+            // (was null at initial handler registration time — created in registerDeferredSystems)
+            if (gearManager.getCraftingBenchPreviewSystem() != null && inventoryChangeEventSystem != null) {
+                inventoryChangeEventSystem.addHandler(
+                    gearManager.getCraftingBenchPreviewSystem()::onInventoryChange);
+            }
         }
 
         // Phase 7.7.2: Register container loot interceptor (ECS system for UseBlockEvent.Pre)
@@ -1376,6 +1560,16 @@ public class TrailOfOrbis extends JavaPlugin {
             }
         } catch (Exception e) {
             getLogger().atWarning().log("Party integration failed to initialize: %s", e.getMessage());
+        }
+
+        // Phase 7.7.7: Initialize XP Distribution Service (party + proximity XP sharing)
+        if (levelingManager != null) {
+            var partyConfigForXp = configManager.getPartyConfig();
+            xpDistributionService = new io.github.larsonix.trailoforbis.leveling.xp.XpDistributionService(
+                levelingManager, partyConfigForXp, partyIntegrationManager);
+            getLogger().atInfo().log("XP distribution service initialized (party=%s, proximity=%s)",
+                partyIntegrationManager != null ? "available" : "unavailable",
+                partyConfigForXp.getProximity().isEnabled() ? "enabled" : "disabled");
         }
 
         // Phase 7.8: Initialize Stone System (currency items for modifying gear/maps)
@@ -1440,7 +1634,11 @@ public class TrailOfOrbis extends JavaPlugin {
 
         // Phase 0: Clear ServiceRegistry and hex tracking
         ServiceRegistry.clear();
-        io.github.larsonix.trailoforbis.compat.HexCasterRegistry.clear();
+        if (io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()) {
+            io.github.larsonix.trailoforbis.compat.HexCastStateStore.clear();
+            io.github.larsonix.trailoforbis.compat.HexSpellEchoService.clear();
+        }
+        io.github.larsonix.trailoforbis.compat.HexEntityRegistry.clear();
 
         // Phase 1: Save all player data
         if (attributeManager != null) {
@@ -1517,7 +1715,18 @@ public class TrailOfOrbis extends JavaPlugin {
             gearManager = null;
         }
 
-        // Phase 1.10.5: Shutdown Party Integration
+        // Phase 1.10.5: Shutdown XP gain/loss notification services
+        if (xpGainNotificationService != null && levelingManager != null) {
+            levelingManager.unregisterXpGainListener(xpGainNotificationService);
+            xpGainNotificationService = null;
+        }
+        if (xpLossNotificationService != null && levelingManager != null) {
+            levelingManager.unregisterXpLossListener(xpLossNotificationService);
+            xpLossNotificationService = null;
+        }
+
+        // Phase 1.10.6: Shutdown XP Distribution Service + Party Integration
+        xpDistributionService = null;
         if (partyIntegrationManager != null) {
             getLogger().atInfo().log("Shutting down party integration...");
             partyIntegrationManager.shutdown();
@@ -1712,6 +1921,12 @@ public class TrailOfOrbis extends JavaPlugin {
         return xpCalculator;
     }
 
+    /** @return null if leveling is disabled */
+    @Nullable
+    public io.github.larsonix.trailoforbis.leveling.xp.XpDistributionService getXpDistributionService() {
+        return xpDistributionService;
+    }
+
     /** @return null if disabled */
     @Nullable
     public SkillTreeManager getSkillTreeManager() {
@@ -1766,6 +1981,14 @@ public class TrailOfOrbis extends JavaPlugin {
 
     /** @return null if disabled or not initialized */
     @Nullable
+    public ComponentType<EntityStore, MobModifierComponent> getMobModifierComponentType() {
+        return mobModifierComponentType;
+    }
+
+    public MobModifierManager getMobModifierManager() {
+        return mobModifierManager;
+    }
+
     public MobScalingManager getMobScalingManager() {
         return mobScalingManager;
     }
@@ -1803,6 +2026,20 @@ public class TrailOfOrbis extends JavaPlugin {
         }
     }
 
+    /** When enabled, players see a full context dump (attributes, tree, gear, stats, result) on hit. */
+    public boolean isCombatDebugEnabled(@Nonnull UUID playerUuid) {
+        return combatDebugEnabled.contains(playerUuid);
+    }
+
+    /** Sets combat debug mode for a player. */
+    public void setCombatDebugEnabled(@Nonnull UUID playerUuid, boolean enabled) {
+        if (enabled) {
+            combatDebugEnabled.add(playerUuid);
+        } else {
+            combatDebugEnabled.remove(playerUuid);
+        }
+    }
+
     /**
      * Manages active ailments (Burn, Freeze, Shock, Poison)
      * for all entities.
@@ -1829,6 +2066,11 @@ public class TrailOfOrbis extends JavaPlugin {
     @Nullable
     public io.github.larsonix.trailoforbis.ailments.AilmentImmunityTracker getAilmentImmunityTracker() {
         return ailmentImmunityTracker;
+    }
+
+    @Nullable
+    public CombatRequirementNotifier getCombatRequirementNotifier() {
+        return rpgDamageSystem != null ? rpgDamageSystem.getRequirementNotifier() : null;
     }
 
     /**
@@ -1874,6 +2116,12 @@ public class TrailOfOrbis extends JavaPlugin {
     @Nullable
     public ConditionalTriggerSystem getConditionalTriggerSystem() {
         return conditionalTriggerSystem;
+    }
+
+    /** @return null if not yet registered */
+    @Nullable
+    public ContainerSyncTickSystem getContainerSyncTickSystem() {
+        return containerSyncTickSystem;
     }
 
     /** @return null if not yet registered */
@@ -2124,7 +2372,8 @@ public class TrailOfOrbis extends JavaPlugin {
         l4eComponentBridge = io.github.larsonix.trailoforbis.compat.L4EComponentBridge.tryCreate();
 
         var interceptor = containerLootSystem.createInterceptor(
-            rewardChestManager, realmsManager, processedContainerResourceType, l4eComponentBridge);
+            rewardChestManager, realmsManager, processedContainerResourceType, l4eComponentBridge,
+            gearManager.getItemWorldSyncService());
         if (interceptor != null) {
             getEntityStoreRegistry().registerSystem(interceptor);
             getLogger().atInfo().log("Registered ContainerLootInterceptor ECS system (scope: %s, clearAll: %s, l4eBridge: %s)",
@@ -2197,9 +2446,10 @@ public class TrailOfOrbis extends JavaPlugin {
                 return;
             }
 
-            // Create stone action registry with both realm and gear modifier configs
+            // Create stone action registry with realm config (biome authorization) + gear configs
             StoneActionRegistry actionRegistry = new StoneActionRegistry(
                     realmsManager.getModifierConfig(),
+                    realmsManager.getConfig(),
                     gearManager.getModifierConfig(),
                     gearManager.getBalanceConfig(),
                     gearManager.getEquipmentStatConfig());
@@ -2732,7 +2982,8 @@ public class TrailOfOrbis extends JavaPlugin {
             // LegacyEquipment in the entity tracker pipeline.
             var broadcastSystem = new io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem(
                     gearManager.getItemDefinitionBuilder(),
-                    gearManager.getTranslationSyncService());
+                    gearManager.getTranslationSyncService(),
+                    gearManager.getItemDisplayNameService());
             gearManager.setEquipmentBroadcastSystem(broadcastSystem);
             getEntityStoreRegistry().registerSystem(broadcastSystem);
             getLogger().atInfo().log("Registered EquipmentDefinitionBroadcastSystem");

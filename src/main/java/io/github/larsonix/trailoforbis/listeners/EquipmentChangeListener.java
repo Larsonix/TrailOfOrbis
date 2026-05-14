@@ -40,8 +40,8 @@ import java.util.logging.Level;
  *   <li>Utility - offhand items with various modifiers</li>
  * </ul>
  *
- * <p>Note: Hotbar/utility slot <b>switches</b> are handled separately by
- * {@link io.github.larsonix.trailoforbis.gear.systems.WeaponSlotChangeSystem}.
+ * <p>Note: Hotbar/utility slot <b>switches</b> are handled by
+ * {@link io.github.larsonix.trailoforbis.gear.systems.HotbarSlotTrackingSystem} (tick-based).
  * This listener handles item <b>additions/removals</b> in these containers.
  */
 public class EquipmentChangeListener {

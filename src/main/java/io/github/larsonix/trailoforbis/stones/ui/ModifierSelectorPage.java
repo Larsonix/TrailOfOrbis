@@ -451,7 +451,6 @@ public class ModifierSelectorPage {
         }
 
         // Apply the stone
-        // TODO: Pass modifier index to application service when StoneActionContext is implemented
         StoneApplicationService.ApplicationResult result = applicationService.apply(
             inventory,
             stoneType,

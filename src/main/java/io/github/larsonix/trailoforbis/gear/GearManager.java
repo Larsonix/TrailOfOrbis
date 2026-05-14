@@ -7,48 +7,34 @@ import io.github.larsonix.trailoforbis.attributes.AttributeType;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig;
 import io.github.larsonix.trailoforbis.gear.config.GearConfigLoader;
 import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
-import io.github.larsonix.trailoforbis.gear.conversion.ChestLootConversionListener;
-import io.github.larsonix.trailoforbis.gear.conversion.VanillaConversionConfig;
-import io.github.larsonix.trailoforbis.gear.systems.CraftGuidePreSystem;
-import io.github.larsonix.trailoforbis.gear.systems.CraftingConversionSystem;
-import com.hypixel.hytale.server.core.event.events.ecs.CraftRecipeEvent;
 import io.github.larsonix.trailoforbis.gear.conversion.VanillaItemConverter;
-import io.github.larsonix.trailoforbis.gear.equipment.EquipmentFeedback;
+import io.github.larsonix.trailoforbis.gear.core.GearCoreModule;
+import io.github.larsonix.trailoforbis.gear.systems.CraftingConversionSystem;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentListener;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator.ValidationResult;
-import io.github.larsonix.trailoforbis.gear.equipment.RequirementCalculator;
 import io.github.larsonix.trailoforbis.gear.generation.GearGenerator;
 import io.github.larsonix.trailoforbis.gear.migration.ItemMigrationService;
 import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.DynamicLootRegistry;
-import io.github.larsonix.trailoforbis.gear.loot.LootCalculator;
-import io.github.larsonix.trailoforbis.gear.loot.LootCategoryConfig;
-import io.github.larsonix.trailoforbis.gear.loot.LootDiscoveryConfig;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
 import io.github.larsonix.trailoforbis.gear.loot.LootListener;
-import io.github.larsonix.trailoforbis.gear.loot.LootSettings;
 import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinCraftInterceptor;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinDataPreserver;
-import io.github.larsonix.trailoforbis.gear.reskin.ReskinRecipeGenerator;
-import io.github.larsonix.trailoforbis.gear.reskin.ReskinResourceTypeRegistry;
 import io.github.larsonix.trailoforbis.gear.stats.GearBonusProvider;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatApplier;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator;
 import io.github.larsonix.trailoforbis.gear.stats.GearStatCalculator.GearBonuses;
 import io.github.larsonix.trailoforbis.gear.tooltip.ItemNameFormatter;
 import io.github.larsonix.trailoforbis.gear.tooltip.RichTooltipFormatter;
-import io.github.larsonix.trailoforbis.gear.tooltip.TooltipConfig;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemData;
-import io.github.larsonix.trailoforbis.gear.item.CustomItemDefinitionBuilder;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemSyncService;
 import io.github.larsonix.trailoforbis.gear.item.ItemDefinitionBuilder;
 import io.github.larsonix.trailoforbis.gear.item.ItemDisplayNameService;
 import io.github.larsonix.trailoforbis.gear.item.ItemRegistryService;
-import io.github.larsonix.trailoforbis.gear.item.ItemSyncConfig;
 import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.item.ItemWorldSyncService;
 import io.github.larsonix.trailoforbis.gear.item.TranslationSyncService;
@@ -57,24 +43,13 @@ import io.github.larsonix.trailoforbis.gear.notification.PickupNotificationServi
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.gear.vanilla.VanillaWeaponDiscovery;
 import io.github.larsonix.trailoforbis.gear.vanilla.VanillaWeaponProfile;
-import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
-import io.github.larsonix.trailoforbis.loot.container.ContainerLootConfig;
 import io.github.larsonix.trailoforbis.loot.container.ContainerLootSystem;
-import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
-import io.github.larsonix.trailoforbis.maps.items.RealmMapGenerator;
-import io.github.larsonix.trailoforbis.maps.items.RealmMapUtils;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.server.core.asset.type.item.config.Item;
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import io.github.larsonix.trailoforbis.util.PlayerWorldCache;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -110,84 +85,26 @@ public final class GearManager implements GearService {
     private GearBalanceConfig balanceConfig;
     private ModifierConfig modifierConfig;
 
-    // Core components
-    private GearGenerator gearGenerator;
-    private RequirementCalculator requirementCalculator;
-    private EquipmentValidator equipmentValidator;
-    private EquipmentListener equipmentListener;
-    private GearStatCalculator statCalculator;
-    private GearStatApplier statApplier;
-    private ItemMigrationService itemMigrationService;
+    // Core module (generation, validation, stats, tooltips, migration, vanilla weapons)
+    private GearCoreModule core;
 
-    // Rich tooltip components (Message API)
-    private TooltipConfig tooltipConfig;
-    private RichTooltipFormatter richTooltipFormatter;
-    private ItemNameFormatter itemNameFormatter;
-
-    // Item display name service (centralized naming)
-    private ItemDisplayNameService itemDisplayNameService;
-
-    // Item sync system
+    // Shared infrastructure (used by core, sync, conversion — owned here)
     private ItemRegistryService itemRegistryService;
-    private ItemDefinitionBuilder itemDefinitionBuilder;
-    private TranslationSyncService translationSyncService;
-    private ItemSyncService itemSyncService;
 
-    // Custom item sync (maps, stones)
-    private CustomItemDefinitionBuilder customItemDefinitionBuilder;
-    private CustomItemSyncService customItemSyncService;
+    // Item sync module (definitions, translations, sync services, coordinator, broadcast, resync)
+    private io.github.larsonix.trailoforbis.gear.sync.GearItemSyncManager itemSyncManager;
 
-    // World-level item sync (for pickup notification fix)
-    private ItemWorldSyncService itemWorldSyncService;
+    // Loot module
+    private io.github.larsonix.trailoforbis.gear.loot.GearLootManager lootManager;
 
-    // Equipment definition broadcast (armor rendering on remote clients)
-    private io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem equipmentBroadcastSystem;
-
-    // Sync coordinator (coalesces dirty-marking into minimal packet bursts)
-    private ItemSyncCoordinator syncCoordinator;
-
-    // Unified pickup notification service
-    private PickupNotificationService pickupNotificationService;
-
-    // Loot system
-    private LootSettings lootSettings;
-    private RarityBonusCalculator rarityBonusCalculator;
-    private LootCalculator lootCalculator;
-    private LootGenerator lootGenerator;
-    private LootListener lootListener;
-    private DynamicLootRegistry dynamicLootRegistry;
-    private DropLevelBlender dropLevelBlender;
-
-    // Vanilla item conversion system
-    private VanillaItemConverter vanillaItemConverter;
-    private CraftingConversionSystem craftingConversionSystem;
-    private ChestLootConversionListener chestLootConversionListener;
-
-    // Container loot replacement system
-    private ContainerLootSystem containerLootSystem;
-
-    // Vanilla weapon attack profiles (for attack effectiveness calculation)
-    private VanillaWeaponDiscovery vanillaWeaponDiscovery;
-
-    // Crafting preview tooltips (RPG info on vanilla weapon/armor tooltips)
-    @Nullable private io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService craftingPreviewService;
-    @Nullable private io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem craftingBenchPreviewSystem;
-
-    // Timed craft conversion handler (InventoryChangeEvent fallback for queueCraft benches)
-    @Nullable private io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler timedCraftHandler;
-
-    // Reskin system (Builder's Workbench skin changing with RPG data preservation)
-    private ReskinResourceTypeRegistry reskinResourceTypeRegistry;
-    private ReskinDataPreserver reskinDataPreserver;
-    private ReskinCraftInterceptor reskinCraftInterceptor;
+    // Conversion module (vanilla conversion, container loot, crafting preview, reskin)
+    private io.github.larsonix.trailoforbis.gear.conversion.GearConversionManager conversionManager;
 
     // Requirement bypass (Creative mode)
     private final Set<UUID> requirementBypassPlayers = ConcurrentHashMap.newKeySet();
 
     // State
     private boolean initialized = false;
-    private boolean craftingConversionPending = false;  // Deferred until LevelingService available
-    private boolean timedCraftPending = false;          // Deferred until LevelingService available
 
     /**
      * Creates a GearManager.
@@ -271,62 +188,7 @@ public final class GearManager implements GearService {
             LOGGER.at(Level.WARNING).log("Cannot register deferred systems - GearManager not initialized");
             return;
         }
-
-        // Register crafting conversion system if it was deferred
-        if (craftingConversionPending && vanillaItemConverter != null) {
-            ServiceRegistry.get(LevelingService.class).ifPresentOrElse(
-                levelingService -> {
-                    craftingConversionSystem = new CraftingConversionSystem(
-                        vanillaItemConverter,
-                        levelingService,
-                        createDistanceCalculator(),
-                        getConversionConfig().getCraftingLevelMultiplier(),
-                        itemSyncService
-                    );
-                    // Register reskin interceptor BEFORE crafting conversion — it handles
-                    // CraftRecipeEvent.Pre and cancels reskin crafts before they reach the queue
-                    if (reskinCraftInterceptor != null) {
-                        plugin.getEntityStoreRegistry().registerSystem(reskinCraftInterceptor);
-                        LOGGER.at(Level.INFO).log("Registered ReskinCraftInterceptor ECS system");
-                    }
-                    plugin.getEntityStoreRegistry().registerSystem(craftingConversionSystem);
-                    // Guide trigger: fire FIRST_CRAFT on CraftRecipeEvent.Pre (before craft completes)
-                    plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
-                    // Crafting bench preview: Phase 1 (UseBlockEvent.Post) sends definitions
-                    // immediately on bench open. Phase 2 (InventoryChangeEvent, registered
-                    // separately in TrailOfOrbis) handles close callback + safety cleanup.
-                    craftingBenchPreviewSystem = new io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem();
-                    plugin.getEntityStoreRegistry().registerSystem(craftingBenchPreviewSystem);
-                    LOGGER.at(Level.INFO).log("Registered CraftingBenchPreviewSystem (ECS + InventoryChange hybrid)");
-                    craftingConversionPending = false;
-                    LOGGER.at(Level.INFO).log("Registered deferred crafting conversion ECS system");
-
-                    // Update crafting preview translations on level-up while a bench is open.
-                    // Routes through the coordinator for coalescing (100ms window) — no redundant
-                    // packets on rapid level-ups. The coordinator checks isActiveBenchSession()
-                    // and only sends translations if a bench window is currently open.
-                    if (syncCoordinator != null) {
-                        levelingService.registerLevelUpListener((playerId, newLevel, oldLevel, totalXp) -> {
-                            syncCoordinator.markCraftingPreviewDirty(playerId);
-                        });
-                    }
-                },
-                () -> LOGGER.at(Level.WARNING).log(
-                    "LevelingService still not available - crafting conversion will not work")
-            );
-        }
-
-        // Initialize timed craft handler if it was deferred
-        if (timedCraftPending && timedCraftHandler == null) {
-            initializeTimedCraftHandler();
-            if (timedCraftHandler != null) {
-                timedCraftPending = false;
-                LOGGER.at(Level.INFO).log("Deferred timed craft handler now initialized");
-            } else {
-                LOGGER.at(Level.WARNING).log(
-                    "LevelingService still not available - timed craft conversion will not work");
-            }
-        }
+        conversionManager.registerDeferredSystems();
     }
 
     /**
@@ -347,57 +209,36 @@ public final class GearManager implements GearService {
         // Clear bypass set
         requirementBypassPlayers.clear();
 
-        // Shutdown sync coordinator
-        if (syncCoordinator != null) {
-            syncCoordinator.shutdown();
-            syncCoordinator = null;
+        // Shutdown in reverse initialization order
+
+        // Conversion (last to init, depends on core + sync + loot)
+        if (conversionManager != null) {
+            conversionManager.shutdown();
+            conversionManager = null;
         }
 
-        // Shutdown item registry service (cleans up all registered custom items)
+        // Loot (depends on core)
+        if (lootManager != null) {
+            lootManager.shutdown();
+            lootManager = null;
+        }
+
+        // Item sync (depends on core)
+        if (itemSyncManager != null) {
+            itemSyncManager.shutdown();
+            itemSyncManager = null;
+        }
+
+        // Core (depends on item registry)
+        if (core != null) {
+            core.shutdown();
+            core = null;
+        }
+
+        // Item registry service (shared infrastructure, last to go)
         if (itemRegistryService != null) {
             itemRegistryService.shutdown();
             itemRegistryService = null;
-        }
-
-        // Shutdown item world sync service
-        if (itemWorldSyncService != null) {
-            itemWorldSyncService.shutdown();
-            itemWorldSyncService = null;
-        }
-
-        // Shutdown equipment broadcast system
-        if (equipmentBroadcastSystem != null) {
-            equipmentBroadcastSystem.shutdown();
-            equipmentBroadcastSystem = null;
-        }
-
-        // Clear references (allow GC)
-        gearGenerator = null;
-        requirementCalculator = null;
-        equipmentValidator = null;
-        statCalculator = null;
-        statApplier = null;
-        tooltipConfig = null;
-        richTooltipFormatter = null;
-        itemNameFormatter = null;
-        itemDisplayNameService = null;
-        itemDefinitionBuilder = null;
-        translationSyncService = null;
-        itemSyncService = null;
-        customItemDefinitionBuilder = null;
-        customItemSyncService = null;
-        pickupNotificationService = null;
-        lootSettings = null;
-        lootCalculator = null;
-        lootGenerator = null;
-        lootListener = null;
-        dynamicLootRegistry = null;
-        vanillaItemConverter = null;
-        craftingConversionSystem = null;
-        chestLootConversionListener = null;
-        if (containerLootSystem != null) {
-            containerLootSystem.shutdown();
-            containerLootSystem = null;
         }
         balanceConfig = null;
         modifierConfig = null;
@@ -422,6 +263,13 @@ public final class GearManager implements GearService {
         LOGGER.at(Level.INFO).log("Reloading Gear System configuration...");
 
         try {
+            // Shutdown old sub-managers before re-creating (reverse init order)
+            if (conversionManager != null) { conversionManager.shutdown(); conversionManager = null; }
+            if (lootManager != null) { lootManager.shutdown(); lootManager = null; }
+            if (itemSyncManager != null) { itemSyncManager.shutdown(); itemSyncManager = null; }
+            if (core != null) { core.shutdown(); core = null; }
+            // ItemRegistryService is reused (not recreated)
+
             // Reload configs
             loadConfigs();
 
@@ -453,471 +301,66 @@ public final class GearManager implements GearService {
                 .orElseThrow(() -> new GearInitializationException(
                         "AttributeManager not registered. Ensure AttributeManager is initialized before GearManager."));
 
-        // Item registry service - must be initialized before GearGenerator
-        // This allows custom item IDs to be recognized by Hytale's server-side validation
-        // Persistence enabled: loads cached item registrations from DB on startup
+        // Item registry service - shared infrastructure, must be initialized before everything
         if (itemRegistryService == null) {
             itemRegistryService = new ItemRegistryService();
         }
-        // Initialize with DataManager for database persistence of item registrations
-        // This ensures items don't show as "?" after server restarts
         itemRegistryService.initialize(plugin.getDataManager());
 
-        // Gear generation (now with item registry for server-side validation)
-        gearGenerator = new GearGenerator(balanceConfig, modifierConfig,
-                configLoader.getEquipmentStatConfig(), itemRegistryService);
-
-        // Item migration (validates + fixes stale gear on player login)
-        itemMigrationService = new ItemMigrationService(
-                modifierConfig, balanceConfig, configLoader.getEquipmentStatConfig());
-        // Wire item registry for resolving legacy items' base IDs from custom rpg_gear_* IDs
-        itemMigrationService.setItemRegistryService(itemRegistryService);
-        // Wire gear generator as source of truth for implicit correctness
-        itemMigrationService.setGearGenerator(gearGenerator);
-
-        // Requirements
-        requirementCalculator = new RequirementCalculator(balanceConfig, modifierConfig);
-
-        // Equipment validation (with Creative mode bypass predicate)
+        // Initialize core module (generation, validation, stats, tooltips, migration)
         boolean bypassEnabled = plugin.getConfigManager().getRPGConfig().isCreativeModeBypassRequirements();
-        equipmentValidator = new EquipmentValidator(
-                requirementCalculator, attributeManager,
-                bypassEnabled ? requirementBypassPlayers::contains : uuid -> false);
+        core = new GearCoreModule();
+        core.initialize(balanceConfig, modifierConfig, configLoader,
+                attributeManager, itemRegistryService,
+                bypassEnabled ? requirementBypassPlayers::contains : uuid -> false,
+                plugin);
 
-        // Equipment listener (armor slot filters + requirement validation)
-        equipmentListener = new EquipmentListener(equipmentValidator, new EquipmentFeedback());
+        // Initialize item sync module
+        itemSyncManager = new io.github.larsonix.trailoforbis.gear.sync.GearItemSyncManager();
+        itemSyncManager.initialize(core, modifierConfig, itemRegistryService, attributeManager, plugin);
 
-        // Stat calculation (with ItemRegistryService for vanilla item ID lookup)
-        statCalculator = new GearStatCalculator(balanceConfig, equipmentValidator, itemRegistryService);
-
-        // Stat application
-        statApplier = new GearStatApplier();
-
-        // Vanilla weapon discovery - enumerates all weapon attacks from Hytale's asset map
-        // This enables attack effectiveness calculation using geometric mean reference
-        vanillaWeaponDiscovery = new VanillaWeaponDiscovery(balanceConfig.vanillaWeaponProfiles());
-        vanillaWeaponDiscovery.discoverAll();
-
-        // Rich tooltip formatting (Message API)
-        tooltipConfig = configLoader.getTooltipConfig();
-        richTooltipFormatter = new RichTooltipFormatter(
-                modifierConfig, balanceConfig, requirementCalculator, attributeManager, tooltipConfig);
-        itemNameFormatter = new ItemNameFormatter(
-                modifierConfig,
-                tooltipConfig.includePrefix(),
-                tooltipConfig.includeSuffix(),
-                tooltipConfig.boldThreshold());
-
-        // Item display name service (centralized naming for UIs and notifications)
-        itemDisplayNameService = new ItemDisplayNameService(modifierConfig);
-
-        // Item sync system
-        // IMPORTANT: Pass itemDisplayNameService for consistent naming in native pickup UI
-        itemDefinitionBuilder = new ItemDefinitionBuilder(
-                modifierConfig, richTooltipFormatter, itemNameFormatter, itemDisplayNameService);
-        translationSyncService = new TranslationSyncService();
-        itemSyncService = new ItemSyncService(
-                itemDefinitionBuilder, translationSyncService, ItemSyncConfig.defaults());
-
-        // Wire stats version provider so tooltips update when player stats change
-        itemSyncService.setStatsVersionProvider(attributeManager::getStatsVersion);
-
-        // Register tooltip refresh callback on AttributeManager
-        // This triggers tooltip resync whenever stats are recalculated
-        registerTooltipRefreshCallback(attributeManager);
-
-        // Custom item sync (maps, stones)
-        // Pass ItemRegistryService so custom items are registered server-side when synced
-        // This ensures drop/move/use operations work for stones and realm maps
-        // IMPORTANT: Pass itemDisplayNameService for consistent naming in native pickup UI
-        customItemDefinitionBuilder = new CustomItemDefinitionBuilder(itemDisplayNameService);
-        customItemSyncService = new CustomItemSyncService(
-                customItemDefinitionBuilder, translationSyncService, itemRegistryService);
-
-        // Sync coordinator — coalesces dirty-marking into minimal packet bursts.
-        // Created after both sync services so it can delegate to them.
-        syncCoordinator = new ItemSyncCoordinator(itemSyncService);
-
-        // Suppress sync during world transitions to prevent packet flood
-        // when client is processing JoinWorldPacket.
-        plugin.getEventRegistry().registerGlobal(
-            com.hypixel.hytale.event.EventPriority.NORMAL,
-            com.hypixel.hytale.server.core.event.events.player.DrainPlayerFromWorldEvent.class,
-            event -> {
-                try {
-                    var uuidComp = event.getHolder().getComponent(
-                        com.hypixel.hytale.server.core.entity.UUIDComponent.getComponentType());
-                    if (uuidComp != null) {
-                        syncCoordinator.suppressPlayer(uuidComp.getUuid());
-                    }
-                } catch (Exception e) {
-                    // Holder may be invalid during edge cases — suppress silently
-                }
-            });
-
-        // Unified pickup notification service
-        // Handles item sync and guide milestones for all item types
-        pickupNotificationService = new PickupNotificationService(
-                itemSyncService, customItemSyncService);
-
-        // World-level item sync (for pickup notification fix)
-        // This syncs custom items to ALL nearby players when items spawn,
-        // ensuring clients have definitions before notifyPickupItem() fires
-        // CRITICAL: Pass itemRegistryService for server-side registration
-        itemWorldSyncService = new ItemWorldSyncService(
-            itemSyncService, customItemSyncService, itemRegistryService);
-
-        // Register level-up listener for tooltip resync
-        // When a player levels up, requirement colors may change (red -> green)
-        registerLevelUpListener();
-    }
-
-    /**
-     * Registers a listener to resync gear tooltips when players level up.
-     *
-     * <p>This ensures requirement text colors update in real-time when a player
-     * gains levels (e.g., red "Requires Level 10" turns green when they reach level 10).
-     */
-    private void registerLevelUpListener() {
-        ServiceRegistry.get(LevelingService.class).ifPresent(levelingSvc -> {
-            levelingSvc.registerLevelUpListener((playerId, newLevel, oldLevel, totalXp) -> {
-                // Mark stats dirty — coordinator will flush once, only changed tooltips
-                if (syncCoordinator != null) {
-                    syncCoordinator.markStatsDirty(playerId);
-                }
-            });
-            LOGGER.at(Level.INFO).log("Registered gear tooltip resync listener for level-ups");
-        });
-    }
-
-    /**
-     * Registers the tooltip refresh callback on AttributeManager.
-     *
-     * <p>This callback is invoked after every stat recalculation, triggering
-     * a tooltip resync for the player. This ensures requirement colors (green/red)
-     * update in real-time when players:
-     * <ul>
-     *   <li>Allocate attribute points</li>
-     *   <li>Respec attributes</li>
-     *   <li>Allocate skill tree nodes that affect stats</li>
-     *   <li>Equip/unequip gear that affects stats</li>
-     * </ul>
-     *
-     * @param attributeManager The attribute manager to register with
-     */
-    private void registerTooltipRefreshCallback(@Nonnull AttributeManager attributeManager) {
-        attributeManager.setTooltipRefreshCallback(playerId -> {
-            // Mark stats dirty — coordinator coalesces into one flush per event burst
-            if (syncCoordinator != null) {
-                syncCoordinator.markStatsDirty(playerId);
-            }
-        });
-        LOGGER.at(Level.INFO).log("Registered tooltip refresh callback - gear requirements will update on stat changes");
+        // Wire active-item supplier for demotion sweep safety scan
+        // This ensures items held by online players are never demoted from the asset map
+        var syncService = itemSyncManager.getItemSyncService();
+        if (syncService != null) {
+            itemRegistryService.setActiveItemsSupplier(
+                () -> syncService.getPlayerCache().getAllTrackedItemIds());
+        }
     }
 
     private void initializeLootSystem() {
-        // Get AttributeManager
-        AttributeManager attributeManager = ServiceRegistry.require(AttributeManager.class);
+        // Initialize loot module
+        lootManager = new io.github.larsonix.trailoforbis.gear.loot.GearLootManager();
+        lootManager.initialize(balanceConfig, core.getGearGenerator(), plugin);
 
-        // Loot settings
-        lootSettings = new LootSettings(balanceConfig);
-
-        // Drop level blender
-        dropLevelBlender = new DropLevelBlender(balanceConfig.levelBlending());
-
-        // Shared rarity bonus calculator (WIND → rarity %)
-        rarityBonusCalculator = new RarityBonusCalculator(attributeManager, lootSettings.getLuckToRarityPercent());
-
-        // Loot calculator
-        lootCalculator = new LootCalculator(lootSettings, rarityBonusCalculator, dropLevelBlender);
-
-        // Initialize dynamic loot registry (with Hexcode item config when Hexcode is loaded)
-        LootDiscoveryConfig discoveryConfig = plugin.getConfigManager().getLootDiscoveryConfig();
-        io.github.larsonix.trailoforbis.compat.HexcodeItemConfig hexcodeItemConfig =
-                io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()
-                        ? plugin.getConfigManager().getHexcodeItemConfig()
-                        : null;
-        dynamicLootRegistry = new DynamicLootRegistry(discoveryConfig, hexcodeItemConfig);
-
-        // Discover items from Hytale's registry (this scans all mods)
-        dynamicLootRegistry.discoverItems();
-
-        // Initialize reskin system — generates StructuralCrafting recipes for Builder's Workbench
-        initializeReskinSystem();
-
-        // Build loot category config from discovery config (implicit-driven pipeline)
-        LootCategoryConfig categoryConfig = discoveryConfig.buildCategoryConfig();
-
-        // Loot generator using dynamic registry + category pipeline
-        lootGenerator = new LootGenerator(gearGenerator, dynamicLootRegistry, categoryConfig);
-
-        // Loot listener
-        lootListener = new LootListener(plugin, lootCalculator, lootGenerator);
-
-        // Initialize vanilla item conversion system (creates vanillaItemConverter)
-        initializeVanillaConversion();
-
-        // Timed craft conversion handler — catches queueCraft() output via InventoryChangeEvent.
-        // MUST be after initializeVanillaConversion() since it needs the converter.
-        initializeTimedCraftHandler();
-
-        // Crafting preview tooltips — appends RPG info to vanilla weapon/armor descriptions.
-        // MUST be after initializeVanillaConversion() for ItemClassifier and MaterialTierMapper.
-        initializeCraftingPreview();
-
-        // Wire crafting preview into reskin preserver (deferred — reskin system initializes
-        // before crafting preview because it doesn't need VanillaItemConverter)
-        if (craftingPreviewService != null && reskinDataPreserver != null) {
-            reskinDataPreserver.setCraftingPreviewService(craftingPreviewService);
-        }
-    }
-
-    /**
-     * Initializes the vanilla item conversion system.
-     *
-     * <p>Creates the VanillaItemConverter and registers conversion listeners
-     * for crafting, chest loot, and mob drops.
-     */
-    private void initializeVanillaConversion() {
-        // Get vanilla conversion config from ConfigManager
-        VanillaConversionConfig conversionConfig = plugin.getConfigManager().getVanillaConversionConfig();
-
-        if (!conversionConfig.isEnabled()) {
-            LOGGER.at(Level.INFO).log("Vanilla item conversion is disabled");
-            return;
-        }
-
-        // Create vanilla item converter
-        vanillaItemConverter = new VanillaItemConverter(
-            conversionConfig,
-            gearGenerator,
-            gearGenerator.getRarityRoller()
-        );
-
-        // Wire into item migration service for login-time conversion of vanilla inventory items
-        if (itemMigrationService != null) {
-            itemMigrationService.setVanillaItemConverter(vanillaItemConverter);
-        }
-
-        // Register ECS system for crafting conversion (may be deferred if LevelingService not yet available)
-        if (vanillaItemConverter.isSourceEnabled(VanillaItemConverter.AcquisitionSource.CRAFTING)) {
-            ServiceRegistry.get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class)
-                .ifPresentOrElse(
-                    levelingService -> {
-                        // Create and register ECS event system for crafting conversion
-                        craftingConversionSystem = new CraftingConversionSystem(
-                            vanillaItemConverter,
-                            levelingService,
-                            createDistanceCalculator(),
-                            getConversionConfig().getCraftingLevelMultiplier(),
-                            itemSyncService
-                        );
-                        plugin.getEntityStoreRegistry().registerSystem(craftingConversionSystem);
-                        // Guide trigger: fire FIRST_CRAFT on CraftRecipeEvent.Pre (before craft completes)
-                        plugin.getEntityStoreRegistry().registerSystem(new CraftGuidePreSystem());
-                        LOGGER.at(Level.INFO).log("Registered crafting conversion ECS system (material-based levels)");
-                    },
-                    () -> {
-                        // LevelingService not yet available - mark for deferred registration
-                        // This will be completed when registerDeferredSystems() is called
-                        craftingConversionPending = true;
-                        LOGGER.at(Level.INFO).log(
-                            "Crafting conversion deferred (LevelingService will be available later)");
-                    }
-                );
-        }
-
-        // Create chest loot conversion listener
-        chestLootConversionListener = new ChestLootConversionListener(
-            vanillaItemConverter,
-            plugin.getConfigManager().getMobScalingConfig()
-        );
-        chestLootConversionListener.register(plugin.getEventRegistry());
-
-        // Initialize container loot system
-        initializeContainerLootSystem(conversionConfig);
-
-        LOGGER.at(Level.INFO).log("Vanilla item conversion initialized: mob_drops=%s, chest_loot=%s, crafting=%s",
-            conversionConfig.getSources().isMobDrops() ? "enabled" : "disabled",
-            conversionConfig.getSources().isChestLoot() ? "enabled" : "disabled",
-            conversionConfig.getSources().isCrafting() ? "enabled" : "disabled"
-        );
-    }
-
-    /**
-     * Initializes the gear reskin system for the Builder's Workbench.
-     *
-     * <p>Generates StructuralCrafting recipes for all (slot, quality, category) groups
-     * with 2+ items, and creates a {@link ReskinDataPreserver} for RPG data preservation
-     * during workbench crafting.
-     */
-    private void initializeTimedCraftHandler() {
-        io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator distCalc = createDistanceCalculator();
-        VanillaConversionConfig convConfig = getConversionConfig();
-        if (distCalc == null || vanillaItemConverter == null) {
-            LOGGER.at(Level.WARNING).log("Cannot initialize timed craft handler: missing distance calculator or converter");
-            return;
-        }
-        ServiceRegistry.get(io.github.larsonix.trailoforbis.leveling.api.LevelingService.class).ifPresentOrElse(
-            levelingService -> {
-                timedCraftHandler = new io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler(
-                        vanillaItemConverter, distCalc, convConfig, levelingService, itemSyncService);
-                LOGGER.at(Level.INFO).log("Initialized timed craft conversion handler (BasicCrafting, DiagramCrafting, Processing)");
-            },
-            () -> {
-                timedCraftPending = true;
-                LOGGER.at(Level.INFO).log("Timed craft handler deferred (LevelingService will be available later)");
-            }
-        );
+        // Initialize conversion module (reskin, vanilla conversion, crafting preview, timed craft)
+        conversionManager = new io.github.larsonix.trailoforbis.gear.conversion.GearConversionManager();
+        conversionManager.initialize(core, itemSyncManager, lootManager,
+                itemRegistryService, balanceConfig, plugin);
     }
 
     @Nullable
     public io.github.larsonix.trailoforbis.gear.systems.TimedCraftConversionHandler getTimedCraftHandler() {
-        return timedCraftHandler;
-    }
-
-    private void initializeCraftingPreview() {
-        io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator distCalc = createDistanceCalculator();
-        VanillaConversionConfig convConfig = getConversionConfig();
-        if (distCalc == null || vanillaItemConverter == null) {
-            LOGGER.at(Level.WARNING).log("Cannot initialize crafting preview: missing distance calculator or converter");
-            return;
-        }
-
-        craftingPreviewService = new io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService(
-                vanillaItemConverter.getMaterialMapper(),
-                distCalc,
-                convConfig,
-                vanillaItemConverter.getItemClassifier(),
-                balanceConfig
-        );
-        craftingPreviewService.initialize();
-
-        // Wire into the sync coordinator so crafting preview is sent right before
-        // RPG item flush — guarantees RPG tooltips override the crafting preview.
-        if (syncCoordinator != null) {
-            syncCoordinator.setCraftingPreviewService(craftingPreviewService);
-        }
+        return conversionManager != null ? conversionManager.getTimedCraftHandler() : null;
     }
 
     @Nullable
     public io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService getCraftingPreviewService() {
-        return craftingPreviewService;
+        return conversionManager != null ? conversionManager.getCraftingPreviewService() : null;
     }
 
     @Nullable
     public io.github.larsonix.trailoforbis.gear.systems.CraftingBenchPreviewSystem getCraftingBenchPreviewSystem() {
-        return craftingBenchPreviewSystem;
+        return conversionManager != null ? conversionManager.getCraftingBenchPreviewSystem() : null;
     }
 
-    @Nullable
-    private io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator createDistanceCalculator() {
-        if (plugin.getConfigManager() == null || plugin.getConfigManager().getMobScalingConfig() == null) {
-            return null;
-        }
-        return new io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator(
-                plugin.getConfigManager().getMobScalingConfig());
-    }
-
-    @Nonnull
-    private VanillaConversionConfig getConversionConfig() {
-        VanillaConversionConfig config = plugin.getConfigManager().getVanillaConversionConfig();
-        return config != null ? config : new VanillaConversionConfig();
-    }
-
-    private void initializeReskinSystem() {
-        reskinResourceTypeRegistry = new ReskinResourceTypeRegistry();
-
-        ReskinRecipeGenerator recipeGenerator = new ReskinRecipeGenerator(
-                dynamicLootRegistry, reskinResourceTypeRegistry);
-        int recipeCount = recipeGenerator.generate();
-
-        // Wire the registry into ItemRegistryService so new RPG items get reskin ResourceTypes
-        itemRegistryService.setReskinRegistry(reskinResourceTypeRegistry);
-
-        // Retroactively inject reskin ResourceTypes into items already loaded from cache.
-        // These were created before the reskin system initialized, so they missed injection.
-        int retroInjected = itemRegistryService.retroInjectReskinResourceTypes();
-
-        // Cache-only data preserver (registered later via InventoryChangeEventSystem)
-        reskinDataPreserver = new ReskinDataPreserver();
-
-        // Note: craftingPreviewService wiring is deferred to after initializeCraftingPreview()
-        // because the crafting preview system needs VanillaItemConverter which isn't ready yet.
-
-        // Craft interceptor (registered as ECS system in TrailOfOrbis.registerEcsSystems)
-        reskinCraftInterceptor = new ReskinCraftInterceptor(
-                reskinDataPreserver, itemRegistryService, itemSyncService);
-
-        LOGGER.at(Level.INFO).log("Reskin system initialized: %d recipes, %d groups, %d cached items patched",
-                recipeCount, reskinResourceTypeRegistry.size(), retroInjected);
-    }
-
-    /**
-     * Gets the reskin data preserver for handler registration.
-     *
-     * @return The preserver, or null if not initialized
-     */
     public ReskinDataPreserver getReskinDataPreserver() {
-        return reskinDataPreserver;
+        return conversionManager != null ? conversionManager.getReskinDataPreserver() : null;
     }
 
-    /**
-     * Gets the reskin craft interceptor for ECS system registration.
-     */
     @Nullable
     public ReskinCraftInterceptor getReskinCraftInterceptor() {
-        return reskinCraftInterceptor;
-    }
-
-    /**
-     * Initializes the container loot replacement system.
-     *
-     * <p>This system replaces vanilla weapons/armor in containers with RPG gear.
-     * The actual interception is handled by {@link ContainerLootInterceptor},
-     * which is an ECS system registered separately in {@code TrailOfOrbis.setup()}.
-     *
-     * @param conversionConfig The vanilla conversion config for item classification
-     */
-    private void initializeContainerLootSystem(@Nonnull VanillaConversionConfig conversionConfig) {
-        // Load container loot config from ConfigManager
-        ContainerLootConfig containerLootConfig = plugin.getConfigManager().getContainerLootConfig();
-
-        if (!containerLootConfig.isEnabled()) {
-            LOGGER.at(Level.INFO).log("Container loot replacement system is disabled");
-            return;
-        }
-
-        // Get realm map generator from RealmsManager (if available)
-        RealmMapGenerator mapGenerator = null;
-        try {
-            var realmsManager = plugin.getRealmsManager();
-            if (realmsManager != null) {
-                mapGenerator = realmsManager.getMapGenerator();
-            }
-        } catch (Exception e) {
-            LOGGER.at(Level.FINE).log("RealmsManager not available for container loot system");
-        }
-
-        if (mapGenerator == null) {
-            // RealmMapGenerator not yet available - ContainerLootGenerator uses lazy lookup
-            // at generation time, so this is fine. Map drops will work once RealmsManager initializes.
-            LOGGER.at(Level.INFO).log(
-                "RealmMapGenerator deferred (RealmsManager will be available later)");
-        }
-
-        // Create container loot system (coordinator only — ECS interceptor registered in TrailOfOrbis.setup())
-        containerLootSystem = new ContainerLootSystem(
-            containerLootConfig,
-            lootGenerator,
-            mapGenerator,
-            conversionConfig,
-            dropLevelBlender,
-            rarityBonusCalculator,
-            gearGenerator.getRarityRoller()
-        );
-
-        LOGGER.at(Level.INFO).log("Container loot replacement system initialized");
+        return conversionManager != null ? conversionManager.getReskinCraftInterceptor() : null;
     }
 
     // =========================================================================
@@ -955,28 +398,28 @@ public final class GearManager implements GearService {
     @Nonnull
     public ItemStack generateGear(@Nonnull ItemStack baseItem, int itemLevel, @Nonnull String slot) {
         ensureInitialized();
-        return gearGenerator.generate(baseItem, itemLevel, slot);
+        return core.getGearGenerator().generate(baseItem, itemLevel, slot);
     }
 
     @Override
     @Nonnull
     public ItemStack generateGear(@Nonnull ItemStack baseItem, int itemLevel, @Nonnull String slot, @Nonnull GearRarity rarity) {
         ensureInitialized();
-        return gearGenerator.generate(baseItem, itemLevel, slot, rarity);
+        return core.getGearGenerator().generate(baseItem, itemLevel, slot, rarity);
     }
 
     @Override
     @Nonnull
     public ItemStack generateGear(@Nonnull ItemStack baseItem, int itemLevel, @Nonnull String slot, double rarityBonus) {
         ensureInitialized();
-        return gearGenerator.generate(baseItem, itemLevel, slot, rarityBonus);
+        return core.getGearGenerator().generate(baseItem, itemLevel, slot, rarityBonus);
     }
 
     @Override
     @Nonnull
     public GearData generateGearData(int itemLevel, @Nonnull String slot, @Nonnull GearRarity rarity) {
         ensureInitialized();
-        return gearGenerator.generateData(itemLevel, slot, rarity);
+        return core.getGearGenerator().generateData(itemLevel, slot, rarity);
     }
 
     // =========================================================================
@@ -986,21 +429,21 @@ public final class GearManager implements GearService {
     @Override
     public boolean canEquip(@Nonnull UUID playerId, @Nullable ItemStack item) {
         ensureInitialized();
-        return equipmentValidator.canEquip(playerId, item);
+        return core.getEquipmentValidator().canEquip(playerId, item);
     }
 
     @Override
     @Nonnull
     public ValidationResult checkRequirements(@Nonnull UUID playerId, @Nullable ItemStack item) {
         ensureInitialized();
-        return equipmentValidator.checkRequirements(playerId, item);
+        return core.getEquipmentValidator().checkRequirements(playerId, item);
     }
 
     @Override
     @Nonnull
     public Map<AttributeType, Integer> getRequirements(@Nullable ItemStack item) {
         ensureInitialized();
-        return equipmentValidator.getRequirements(item);
+        return core.getEquipmentValidator().getRequirements(item);
     }
 
     // =========================================================================
@@ -1041,7 +484,7 @@ public final class GearManager implements GearService {
     @Nonnull
     public GearBonuses calculateGearBonuses(@Nonnull UUID playerId, @Nonnull Inventory inventory) {
         ensureInitialized();
-        return statCalculator.calculateBonuses(playerId, inventory);
+        return core.getStatCalculator().calculateBonuses(playerId, inventory);
     }
 
     // =========================================================================
@@ -1052,21 +495,21 @@ public final class GearManager implements GearService {
     @Nonnull
     public Message buildRichTooltip(@Nonnull GearData gearData) {
         ensureInitialized();
-        return richTooltipFormatter.build(gearData);
+        return core.getRichTooltipFormatter().build(gearData);
     }
 
     @Override
     @Nonnull
     public Message buildRichTooltip(@Nonnull GearData gearData, @Nonnull UUID playerId) {
         ensureInitialized();
-        return richTooltipFormatter.build(gearData, playerId);
+        return core.getRichTooltipFormatter().build(gearData, playerId);
     }
 
     @Override
     @Nonnull
     public Message buildItemName(@Nonnull String baseItemName, @Nonnull GearData gearData) {
         ensureInitialized();
-        return itemNameFormatter.buildItemName(baseItemName, gearData);
+        return core.getItemNameFormatter().buildItemName(baseItemName, gearData);
     }
 
     // =========================================================================
@@ -1075,56 +518,37 @@ public final class GearManager implements GearService {
 
     public GearGenerator getGearGenerator() {
         ensureInitialized();
-        return gearGenerator;
+        return core.getGearGenerator();
     }
 
     public EquipmentValidator getEquipmentValidator() {
         ensureInitialized();
-        return equipmentValidator;
+        return core.getEquipmentValidator();
     }
 
     public EquipmentListener getEquipmentListener() {
         ensureInitialized();
-        return equipmentListener;
+        return core.getEquipmentListener();
     }
 
     public GearStatCalculator getStatCalculator() {
         ensureInitialized();
-        return statCalculator;
+        return core.getStatCalculator();
     }
 
     public GearStatApplier getStatApplier() {
         ensureInitialized();
-        return statApplier;
+        return core.getStatApplier();
     }
 
-    /**
-     * Gets the vanilla weapon discovery service.
-     *
-     * <p>This service enumerates all weapon attacks from Hytale's asset map
-     * and provides pre-computed effectiveness multipliers using geometric mean.
-     *
-     * @return The vanilla weapon discovery service
-     */
     public VanillaWeaponDiscovery getVanillaWeaponDiscovery() {
         ensureInitialized();
-        return vanillaWeaponDiscovery;
+        return core.getVanillaWeaponDiscovery();
     }
 
-    /**
-     * Gets the vanilla weapon profile for an item ID.
-     *
-     * <p>Convenience method that delegates to {@link VanillaWeaponDiscovery#getProfile(String)}.
-     *
-     * @param itemId The Hytale item ID (e.g., "Weapon_Daggers_Iron")
-     * @return The weapon profile, or null if not found
-     */
     @Nullable
     public VanillaWeaponProfile getVanillaWeaponProfile(@Nullable String itemId) {
-        if (itemId == null || vanillaWeaponDiscovery == null) {
-            return null;
-        }
-        return vanillaWeaponDiscovery.getProfile(itemId);
+        return core.getVanillaWeaponProfile(itemId);
     }
 
     /**
@@ -1142,27 +566,27 @@ public final class GearManager implements GearService {
 
     public ItemDefinitionBuilder getItemDefinitionBuilder() {
         ensureInitialized();
-        return itemDefinitionBuilder;
+        return itemSyncManager.getItemDefinitionBuilder();
     }
 
     public TranslationSyncService getTranslationSyncService() {
         ensureInitialized();
-        return translationSyncService;
+        return itemSyncManager.getTranslationSyncService();
     }
 
     public ItemSyncService getItemSyncService() {
         ensureInitialized();
-        return itemSyncService;
+        return itemSyncManager.getItemSyncService();
     }
 
     public CustomItemSyncService getCustomItemSyncService() {
         ensureInitialized();
-        return customItemSyncService;
+        return itemSyncManager.getCustomItemSyncService();
     }
 
     @Nullable
     public ItemSyncCoordinator getSyncCoordinator() {
-        return syncCoordinator;
+        return itemSyncManager != null ? itemSyncManager.getSyncCoordinator() : null;
     }
 
     /**
@@ -1177,17 +601,22 @@ public final class GearManager implements GearService {
      */
     public ItemWorldSyncService getItemWorldSyncService() {
         ensureInitialized();
-        return itemWorldSyncService;
+        return itemSyncManager.getItemWorldSyncService();
     }
 
     public void setEquipmentBroadcastSystem(
             @Nonnull io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem system) {
-        this.equipmentBroadcastSystem = system;
+        itemSyncManager.setEquipmentBroadcastSystem(system);
     }
 
     @Nullable
     public io.github.larsonix.trailoforbis.gear.systems.EquipmentDefinitionBroadcastSystem getEquipmentBroadcastSystem() {
-        return equipmentBroadcastSystem;
+        return itemSyncManager != null ? itemSyncManager.getEquipmentBroadcastSystem() : null;
+    }
+
+    @Nullable
+    public CraftingConversionSystem getCraftingConversionSystem() {
+        return conversionManager != null ? conversionManager.getCraftingConversionSystem() : null;
     }
 
     /**
@@ -1200,49 +629,32 @@ public final class GearManager implements GearService {
      */
     public PickupNotificationService getPickupNotificationService() {
         ensureInitialized();
-        return pickupNotificationService;
+        return itemSyncManager.getPickupNotificationService();
     }
 
     public LootListener getLootListener() {
         ensureInitialized();
-        return lootListener;
+        return lootManager.getLootListener();
     }
 
-    /**
-     * Gets the loot generator for creating gear drops.
-     *
-     * <p>This is used by the victory reward system to generate
-     * gear items when players complete realms.
-     *
-     * @return The loot generator
-     */
     public LootGenerator getLootGenerator() {
         ensureInitialized();
-        return lootGenerator;
+        return lootManager.getLootGenerator();
     }
 
     public RarityBonusCalculator getRarityBonusCalculator() {
         ensureInitialized();
-        return rarityBonusCalculator;
+        return lootManager.getRarityBonusCalculator();
     }
 
     public DropLevelBlender getDropLevelBlender() {
         ensureInitialized();
-        return dropLevelBlender;
+        return lootManager.getDropLevelBlender();
     }
 
-    /**
-     * Gets the dynamic loot registry.
-     *
-     * <p>This registry automatically discovers droppable weapons and armor
-     * from Hytale's item registry, making the plugin compatible with any mod
-     * that properly registers equipment using the Item API.
-     *
-     * @return The dynamic loot registry
-     */
     public DynamicLootRegistry getDynamicLootRegistry() {
         ensureInitialized();
-        return dynamicLootRegistry;
+        return lootManager.getDynamicLootRegistry();
     }
 
     /**
@@ -1252,7 +664,7 @@ public final class GearManager implements GearService {
      */
     @Nullable
     public VanillaItemConverter getVanillaItemConverter() {
-        return vanillaItemConverter;
+        return conversionManager != null ? conversionManager.getVanillaItemConverter() : null;
     }
 
     /**
@@ -1265,7 +677,7 @@ public final class GearManager implements GearService {
      */
     @Nullable
     public ContainerLootSystem getContainerLootSystem() {
-        return containerLootSystem;
+        return conversionManager != null ? conversionManager.getContainerLootSystem() : null;
     }
 
     public GearBalanceConfig getBalanceConfig() {
@@ -1293,7 +705,7 @@ public final class GearManager implements GearService {
 
     public ItemMigrationService getItemMigrationService() {
         ensureInitialized();
-        return itemMigrationService;
+        return core.getItemMigrationService();
     }
 
     public boolean isInitialized() {
@@ -1302,25 +714,17 @@ public final class GearManager implements GearService {
 
     public RichTooltipFormatter getRichTooltipFormatter() {
         ensureInitialized();
-        return richTooltipFormatter;
+        return core.getRichTooltipFormatter();
     }
 
     public ItemNameFormatter getItemNameFormatter() {
         ensureInitialized();
-        return itemNameFormatter;
+        return core.getItemNameFormatter();
     }
 
-    /**
-     * Gets the item display name service for centralized item naming.
-     *
-     * <p>This service provides consistent display names across all plugin systems:
-     * UIs, notifications, tooltips, and chat messages.
-     *
-     * @return The item display name service
-     */
     public ItemDisplayNameService getItemDisplayNameService() {
         ensureInitialized();
-        return itemDisplayNameService;
+        return core.getItemDisplayNameService();
     }
 
     /**
@@ -1332,289 +736,34 @@ public final class GearManager implements GearService {
      */
     public GearBonusProvider createGearBonusProvider() {
         ensureInitialized();
-        return new GearBonusProvider(statCalculator, statApplier);
+        return core.createGearBonusProvider();
     }
 
     // =========================================================================
     // ITEM REGISTRATION (Reconnect Support)
     // =========================================================================
 
-    /**
-     * Ensures all gear items in the collection are registered in the server's asset map.
-     *
-     * <p>Custom gear items use unique item IDs (e.g., "rpg_gear_xxx") that must be registered
-     * in Hytale's internal asset map for server-side validation to work. This registration
-     * normally happens during gear generation, but is lost when:
-     * <ul>
-     *   <li>The server restarts</li>
-     *   <li>The player reconnects (items exist in inventory but registration is memory-only)</li>
-     * </ul>
-     *
-     * <p>Call this on player reconnect, before syncing items to clients.
-     *
-     * <p><b>Thread Safety:</b> Uses synchronous registration with write locks to ensure
-     * items are immediately visible to Hytale's validation system.
-     *
-     * @param items Collection of items to check and register
-     * @return Number of items re-registered
-     */
     public int ensureItemsRegistered(@Nonnull Collection<ItemStack> items) {
-        Objects.requireNonNull(items, "items cannot be null");
-
-        if (itemRegistryService == null || !itemRegistryService.isInitialized()) {
-            LOGGER.at(Level.WARNING).log("ItemRegistryService not available for item registration");
-            return 0;
-        }
-
-        int registered = 0;
-        for (ItemStack item : items) {
-            if (item == null || item.isEmpty()) {
-                continue;
-            }
-
-            Optional<GearData> gearDataOpt = GearUtils.readGearData(item);
-            if (gearDataOpt.isEmpty() || !gearDataOpt.get().hasInstanceId()) {
-                continue;
-            }
-
-            GearData gearData = gearDataOpt.get();
-            String customId = gearData.getItemId();
-
-            // Check if already registered in our service
-            if (itemRegistryService.isRegistered(customId)) {
-                continue;
-            }
-
-            // IMPROVED: Try multiple sources for base item ID
-            // 1. First try metadata (most reliable if present)
-            String baseItemId = GearUtils.getBaseItemId(item);
-
-            // 2. If not in metadata, check our registry's in-memory cache (from DB)
-            if (baseItemId == null) {
-                baseItemId = itemRegistryService.getBaseItemId(customId);
-            }
-
-            // 3. If still not found, we can't re-register
-            if (baseItemId == null) {
-                LOGGER.at(Level.WARNING).log(
-                    "Cannot re-register %s - no base item ID in metadata or registry cache",
-                    customId);
-                continue;
-            }
-
-            // Get base item from Hytale's asset map
-            Item baseItem = Item.getAssetMap().getAsset(baseItemId);
-            if (baseItem == null || baseItem == Item.UNKNOWN) {
-                LOGGER.at(Level.WARNING).log(
-                    "Cannot re-register %s - base item '%s' not in Hytale asset map",
-                    customId, baseItemId);
-                continue;
-            }
-
-            // Re-register in server's asset map SYNCHRONOUSLY
-            // This ensures the item is immediately visible to Hytale's validation system
-            // (ItemModule.exists() will return true) before the player can interact with it
-            itemRegistryService.createAndRegisterSync(baseItem, customId);
-            registered++;
-            LOGGER.at(Level.FINE).log("Re-registered custom item: %s (base: %s)", customId, baseItemId);
-        }
-
-        return registered;
+        return itemSyncManager.ensureItemsRegistered(items);
     }
 
-    /**
-     * Ensures all custom items (stones, maps) in the collection are registered in the server's asset map.
-     *
-     * <p>Custom items use unique item IDs (e.g., "rpg_stone_xxx", "rpg_map_xxx") that must be
-     * registered in Hytale's internal asset map for server-side validation to work. This registration
-     * normally happens during item creation, but is lost when:
-     * <ul>
-     *   <li>The server restarts</li>
-     *   <li>The player reconnects (items exist in inventory but registration is memory-only)</li>
-     * </ul>
-     *
-     * <p>This method also repairs items with missing instanceId by recovering it from the
-     * ItemStack's item ID (e.g., "rpg_stone_xxx" → instanceId).
-     *
-     * <p>Call this on player reconnect, before syncing items to clients.
-     *
-     * <p><b>Thread Safety:</b> Uses synchronous registration with write locks to ensure
-     * items are immediately visible to Hytale's validation system.
-     *
-     * @param items Collection of items to check and register
-     * @return Number of items re-registered
-     */
     public int ensureCustomItemsRegistered(@Nonnull Collection<ItemStack> items) {
-        Objects.requireNonNull(items, "items cannot be null");
-
-        if (itemRegistryService == null || !itemRegistryService.isInitialized()) {
-            LOGGER.at(Level.WARNING).log("ItemRegistryService not available for custom item registration");
-            return 0;
-        }
-
-        int registered = 0;
-
-        for (ItemStack item : items) {
-            if (item == null || item.isEmpty()) {
-                continue;
-            }
-
-            // Stones are now native Hytale items — no custom registration needed
-
-            // Try to register realm map (use fallback detection for reconnect recovery)
-            if (RealmMapUtils.isMapAnyMethod(item)) {
-                if (registerMapIfNeeded(item)) {
-                    registered++;
-                }
-            }
-        }
-
-        return registered;
+        return itemSyncManager.ensureCustomItemsRegistered(items);
     }
 
-    /**
-     * Registers a realm map item in the asset map if not already registered.
-     *
-     * @param item The realm map item
-     * @return true if the item was registered, false if already registered or failed
-     */
-    private boolean registerMapIfNeeded(@Nonnull ItemStack item) {
-        // Use fallback method to recover data from backup keys when BSON fails
-        Optional<RealmMapData> mapDataOpt = RealmMapUtils.readMapDataWithFallback(item);
-        if (mapDataOpt.isEmpty()) {
-            return false;
-        }
-
-        // readMapDataWithFallback already repairs instanceId if needed
-        RealmMapData mapData = mapDataOpt.get();
-
-        if (!mapData.hasInstanceId()) {
-            // Map uses vanilla item type - no custom registration needed
-            return false;
-        }
-
-        String customId = mapData.getItemId();
-
-        // Check if already registered
-        if (itemRegistryService.isRegistered(customId)) {
-            return false;
-        }
-
-        // Get base item from Hytale's asset map
-        String baseItemId = mapData.getBaseItemId();
-        Item baseItem = Item.getAssetMap().getAsset(baseItemId);
-
-        if (baseItem == null || baseItem == Item.UNKNOWN) {
-            LOGGER.at(Level.WARNING).log(
-                "Cannot register map %s - base item '%s' not in Hytale asset map",
-                customId, baseItemId);
-            return false;
-        }
-
-        // Register in server's asset map SYNCHRONOUSLY
-        itemRegistryService.createAndRegisterSync(baseItem, customId);
-        LOGGER.at(Level.FINE).log("Registered map: %s (base: %s, biome: %s)",
-            customId, baseItemId, mapData.biome().name());
-
-        return true;
-    }
-
-    // =========================================================================
-    // TOOLTIP RESYNC (Real-Time Updates)
-    // =========================================================================
-
-    /**
-     * Resync all gear tooltips for a player.
-     *
-     * <p>Call this when player stats or level change to update requirement colors.
-     * This clears the player's item cache and re-syncs all gear items, causing
-     * tooltips to be rebuilt with the player's current stats.
-     *
-     * @param playerId The player's UUID
-     */
     public void resyncPlayerGear(@Nonnull UUID playerId) {
-        Objects.requireNonNull(playerId, "playerId cannot be null");
-
-        // Delegate to coordinator — marks all gear dirty, flushes on next tick.
-        // No cache clearing, no immediate packets. Hash dedup filters naturally.
-        if (syncCoordinator != null) {
-            syncCoordinator.markStatsDirty(playerId);
-        }
+        itemSyncManager.resyncPlayerGear(playerId);
     }
 
-    /**
-     * Resync a custom item (map, stone) after modification.
-     *
-     * <p>Call this after a stone modifies a map (e.g., identification, reroll)
-     * to update the client's view of the item.
-     *
-     * @param playerRef The player reference
-     * @param customData The updated custom item data
-     * @return true if the item was resynced
-     */
     public boolean resyncCustomItem(@Nonnull PlayerRef playerRef, @Nonnull CustomItemData customData) {
-        Objects.requireNonNull(playerRef, "playerRef cannot be null");
-        Objects.requireNonNull(customData, "customData cannot be null");
-
-        if (customItemSyncService == null) {
-            LOGGER.at(Level.WARNING).log("CustomItemSyncService not available for resync");
-            return false;
-        }
-
-        boolean resynced = customItemSyncService.invalidateAndResync(playerRef, customData);
-        if (resynced) {
-            LOGGER.at(Level.FINE).log("Resynced custom item %s for player %s",
-                customData.getItemId(), playerRef.getUuid());
-        }
-        return resynced;
+        return itemSyncManager.resyncCustomItem(playerRef, customData);
     }
 
-    /**
-     * Resync a gear item after modification.
-     *
-     * <p>Call this after a stone modifies gear (e.g., reroll modifiers)
-     * to update the client's view of the item.
-     *
-     * @param playerRef The player reference
-     * @param itemStack The item stack
-     * @param gearData The updated gear data
-     * @return true if the item was resynced
-     */
     public boolean resyncGearItem(
             @Nonnull PlayerRef playerRef,
             @Nonnull ItemStack itemStack,
             @Nonnull GearData gearData) {
-        Objects.requireNonNull(playerRef, "playerRef cannot be null");
-        Objects.requireNonNull(itemStack, "itemStack cannot be null");
-        Objects.requireNonNull(gearData, "gearData cannot be null");
-
-        if (itemSyncService == null || !itemSyncService.isEnabled()) {
-            LOGGER.at(Level.WARNING).log("ItemSyncService not available for resync");
-            return false;
-        }
-
-        if (!gearData.hasInstanceId()) {
-            LOGGER.at(Level.FINE).log("Gear has no instanceId, cannot resync");
-            return false;
-        }
-
-        // Clear the cached hash to force resync
-        String itemId = gearData.getItemId();
-        itemSyncService.getPlayerCache().removeItem(playerRef.getUuid(), itemId);
-
-        // Also clear translation so it gets re-registered with updated content
-        if (gearData.instanceId() != null) {
-            translationSyncService.unregisterTranslation(
-                playerRef.getUuid(), gearData.instanceId().toCompactString());
-        }
-
-        // Resync the item
-        boolean resynced = itemSyncService.syncItem(playerRef, itemStack, gearData);
-        if (resynced) {
-            LOGGER.at(Level.FINE).log("Resynced gear item %s for player %s",
-                itemId, playerRef.getUuid());
-        }
-        return resynced;
+        return itemSyncManager.resyncGearItem(playerRef, itemStack, gearData);
     }
 
     // =========================================================================
@@ -1624,32 +773,12 @@ public final class GearManager implements GearService {
     /**
      * Collects all items from an inventory.
      *
-     * @param inventory The inventory to collect items from
-     * @return List of all items (non-null, non-empty items only)
+     * @deprecated Use {@link GearUtils#collectAllInventoryItems(Inventory)} instead.
      */
+    @Deprecated
     @Nonnull
     public static List<ItemStack> collectAllInventoryItems(@Nonnull Inventory inventory) {
-        Objects.requireNonNull(inventory, "inventory cannot be null");
-
-        List<ItemStack> items = new ArrayList<>();
-        collectFromContainer(inventory.getArmor(), items);
-        collectFromContainer(inventory.getHotbar(), items);
-        collectFromContainer(inventory.getStorage(), items);  // Main inventory grid
-        collectFromContainer(inventory.getBackpack(), items);
-        collectFromContainer(inventory.getUtility(), items);
-        return items;
-    }
-
-    private static void collectFromContainer(@Nullable ItemContainer container, @Nonnull List<ItemStack> items) {
-        if (container == null) {
-            return;
-        }
-        for (short i = 0; i < container.getCapacity(); i++) {
-            ItemStack item = container.getItemStack(i);
-            if (item != null && !item.isEmpty()) {
-                items.add(item);
-            }
-        }
+        return GearUtils.collectAllInventoryItems(inventory);
     }
 
     // =========================================================================

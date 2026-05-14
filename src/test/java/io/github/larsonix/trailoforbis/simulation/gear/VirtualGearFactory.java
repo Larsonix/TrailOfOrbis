@@ -132,6 +132,7 @@ public final class VirtualGearFactory {
                 Collections.unmodifiableMap(percentBonuses),
                 weaponBaseDamage,
                 weaponCategory.weaponItemId(),
+                null, // No weapon raw item ID in simulation
                 true, null
         );
     }

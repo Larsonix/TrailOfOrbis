@@ -13,6 +13,7 @@ import io.github.larsonix.trailoforbis.database.repository.ItemRegistryRepositor
 import io.github.larsonix.trailoforbis.database.repository.ItemRegistryRepository.ItemRegistryEntry;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator.EquipmentSlot;
 import io.github.larsonix.trailoforbis.gear.model.ArmorMaterial;
+import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.gear.reskin.ReskinResourceTypeRegistry;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
@@ -23,8 +24,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -89,11 +92,40 @@ public final class ItemRegistryService {
     /** Default retention period: 30 days */
     private static final int DEFAULT_RETENTION_DAYS = 30;
 
+    /** Demotion threshold: items not observed for this long move from Hot → Cold */
+    private static final long DEMOTION_THRESHOLD_HOURS = 6;
+
+    /** Eviction threshold: cold items not observed for this long are fully removed */
+    private static final long EVICTION_THRESHOLD_HOURS = 72;
+
+    /** Startup load window: only load items seen within this many days */
+    private static final int STARTUP_LOAD_DAYS = 7;
+
+    /** Maximum items to demote/evict per sweep (lock is held briefly per batch, not per item) */
+    private static final int SWEEP_BATCH_SIZE = 5000;
+
     /**
-     * Tracks all items registered by this service.
+     * HOT tier: items actively in use. Full Item objects exist in the asset map.
      * Map: customId → ItemRegistryEntry (baseItemId + optional secondaryInteractionId)
      */
     private final Map<String, ItemRegistryEntry> registeredItems = new ConcurrentHashMap<>();
+
+    /**
+     * COLD tier: items removed from asset map but retaining metadata for instant re-materialization.
+     * Items here can be synchronously promoted back to Hot on demand.
+     */
+    private final Map<String, ColdEntry> coldItems = new ConcurrentHashMap<>();
+
+    /**
+     * Last observation timestamp for all items (hot + cold).
+     * Updated by observeItem() whenever an item is seen in a player inventory, equipped, or picked up.
+     */
+    private final Map<String, Long> lastObservedAt = new ConcurrentHashMap<>();
+
+    /**
+     * Metadata retained for a demoted (cold) item. Enough to re-materialize the full Item clone.
+     */
+    record ColdEntry(@Nonnull String baseItemId, @Nullable String secondaryInteractionId, long demotedAt) {}
 
     /**
      * Cached reflection field for accessing the internal asset map.
@@ -137,6 +169,14 @@ public final class ItemRegistryService {
      * Whether persistence is enabled (requires DataManager).
      */
     private volatile boolean persistenceEnabled = false;
+
+    /**
+     * Supplier for currently-active item IDs across all online players.
+     * Called by the demotion sweep to ensure equipped items are never demoted.
+     * Set via {@link #setActiveItemsSupplier(java.util.function.Supplier)}.
+     */
+    @Nullable
+    private volatile java.util.function.Supplier<Set<String>> activeItemsSupplier;
 
     /**
      * Tracks hex injections during bulk operations (startup, etc.) for summary logging.
@@ -303,7 +343,7 @@ public final class ItemRegistryService {
             return;
         }
 
-        Map<String, ItemRegistryEntry> cached = repository.loadAll();
+        Map<String, ItemRegistryEntry> cached = repository.loadRecent(STARTUP_LOAD_DAYS);
         int registered = 0;
         int skipped = 0;
         int withSecondary = 0;
@@ -365,23 +405,40 @@ public final class ItemRegistryService {
             return t;
         });
 
-        // Run cleanup once per day
+        // Demotion sweep: run every hour, move unobserved hot items to cold
+        cleanupScheduler.scheduleAtFixedRate(() -> {
+            try {
+                demotionSweep();
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log("Item registry demotion sweep failed");
+            }
+        }, 1, 1, TimeUnit.HOURS);
+
+        // Eviction sweep: run every 6 hours, permanently remove old cold items
+        cleanupScheduler.scheduleAtFixedRate(() -> {
+            try {
+                evictionSweep();
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log("Item registry eviction sweep failed");
+            }
+        }, 6, 6, TimeUnit.HOURS);
+
+        // DB cleanup: run once per day, remove very old entries as safety net
         cleanupScheduler.scheduleAtFixedRate(() -> {
             try {
                 if (repository != null) {
                     int removed = repository.cleanupOldEntries(DEFAULT_RETENTION_DAYS);
                     if (removed > 0) {
-                        LOGGER.atInfo().log(
-                            "Cleaned up %d stale item registry entries", removed);
+                        LOGGER.atInfo().log("DB safety cleanup: %d stale entries removed (>%d days)", removed, DEFAULT_RETENTION_DAYS);
                     }
                 }
             } catch (Exception e) {
-                LOGGER.atWarning().withCause(e).log("Item registry cleanup failed");
+                LOGGER.atWarning().withCause(e).log("Item registry DB cleanup failed");
             }
         }, CLEANUP_INTERVAL_HOURS, CLEANUP_INTERVAL_HOURS, TimeUnit.HOURS);
 
-        LOGGER.atFine().log("Item registry cleanup scheduled (every %d hours, retain %d days)",
-            CLEANUP_INTERVAL_HOURS, DEFAULT_RETENTION_DAYS);
+        LOGGER.atInfo().log("Item registry cleanup scheduled: demotion every 1h (threshold %dh), eviction every 6h (threshold %dh), DB cleanup every %dh",
+            DEMOTION_THRESHOLD_HOURS, EVICTION_THRESHOLD_HOURS, CLEANUP_INTERVAL_HOURS);
     }
 
     // =========================================================================
@@ -806,15 +863,33 @@ public final class ItemRegistryService {
      * Injects the reskin ResourceType onto a custom item so it matches
      * StructuralCrafting reskin recipes at the Builder's Workbench.
      *
-     * <p>Determines the item's equipment slot and vanilla quality, then REPLACES
-     * all ResourceTypes with our single reskin ResourceType. This ensures only
-     * our reskin recipes match at the workbench — other mods' recipes (Armory
-     * color variants, salvage recipes) are suppressed for RPG items.
+     * <p>Uses the base item's vanilla quality to determine the recipe group.
+     * For RPG rarity-aware injection, use {@link #injectReskinResourceType(Item, Item, GearRarity)}.
      *
      * @param customItem The cloned custom item to modify
      * @param baseItem   The original base item (for slot/quality lookup)
      */
     private void injectReskinResourceType(@Nonnull Item customItem, @Nonnull Item baseItem) {
+        injectReskinResourceType(customItem, baseItem, null);
+    }
+
+    /**
+     * Injects reskin ResourceType(s) onto a custom item based on RPG rarity.
+     *
+     * <p>When {@code rarity} is non-null, uses {@link GearRarity#getAllowedSkinQualities()}
+     * to determine which recipe groups the item should match. For LEGENDARY/MYTHIC/UNIQUE,
+     * this returns both "Epic" and "Legendary", so the item gets TWO ResourceTypes and
+     * matches recipes in both groups at the Builder's Workbench.
+     *
+     * <p>When {@code rarity} is null, falls back to the base item's vanilla quality
+     * (used during retro-inject at startup when GearData is not yet available).
+     *
+     * @param customItem The cloned custom item to modify
+     * @param baseItem   The original base item (for slot/quality lookup)
+     * @param rarity     The RPG rarity (null = use vanilla quality fallback)
+     */
+    private void injectReskinResourceType(@Nonnull Item customItem, @Nonnull Item baseItem,
+                                           @Nullable GearRarity rarity) {
         ReskinResourceTypeRegistry registry = this.reskinRegistry;
         if (registry == null) {
             return;
@@ -827,6 +902,8 @@ public final class ItemRegistryService {
             if (baseItem.getWeapon() != null) {
                 isWeapon = true;
                 if (baseItemId != null && baseItemId.toLowerCase().contains("shield")) {
+                    slot = EquipmentSlot.OFF_HAND;
+                } else if (baseItemId != null && WeaponType.fromItemIdOrUnknown(baseItemId) == WeaponType.SPELLBOOK) {
                     slot = EquipmentSlot.OFF_HAND;
                 } else {
                     slot = EquipmentSlot.WEAPON;
@@ -846,41 +923,54 @@ public final class ItemRegistryService {
                 return;
             }
 
-            int qualityIndex = baseItem.getQualityIndex();
-            ItemQuality quality = ItemQuality.getAssetMap().getAsset(qualityIndex);
-            if (quality == null) {
-                return;
-            }
-            String qualityId = quality.getId();
-
-            // Weapons: lookup by (slot, quality, weapon type)
-            // Armor: lookup by (slot, quality)
-            String reskinTypeId;
-            if (isWeapon) {
-                String category = WeaponType.fromItemIdOrUnknown(baseItemId).name();
-                reskinTypeId = registry.getResourceTypeId(slot, qualityId, category);
+            // Determine which vanilla quality IDs to use for ResourceType lookup
+            Set<String> qualityIds;
+            if (rarity != null) {
+                qualityIds = rarity.getAllowedSkinQualities();
             } else {
-                reskinTypeId = registry.getResourceTypeId(slot, qualityId);
+                // Fallback: use the base item's vanilla quality
+                int qualityIndex = baseItem.getQualityIndex();
+                ItemQuality quality = (qualityIndex > 0)
+                        ? ItemQuality.getAssetMap().getAsset(qualityIndex)
+                        : null;
+                String qualityId = (quality != null && quality.getId() != null)
+                        ? quality.getId()
+                        : "Common"; // Default for items with no explicit quality
+                qualityIds = Set.of(qualityId);
             }
-            if (reskinTypeId == null) {
+
+            // Collect ResourceType IDs for all applicable qualities.
+            // For LEGENDARY/MYTHIC/UNIQUE this yields 2 entries (Epic + Legendary).
+            String category = isWeapon ? WeaponType.fromItemIdOrUnknown(baseItemId).name() : null;
+            List<ItemResourceType> reskinTypes = new ArrayList<>();
+
+            for (String qualityId : qualityIds) {
+                String reskinTypeId;
+                if (isWeapon) {
+                    reskinTypeId = registry.getResourceTypeId(slot, qualityId, category);
+                } else {
+                    reskinTypeId = registry.getResourceTypeId(slot, qualityId);
+                }
+                if (reskinTypeId != null) {
+                    ItemResourceType rt = new ItemResourceType();
+                    rt.id = reskinTypeId;
+                    rt.quantity = 1;
+                    reskinTypes.add(rt);
+                }
+            }
+
+            if (reskinTypes.isEmpty()) {
                 return;
             }
 
-            // REPLACE all ResourceTypes with ONLY our reskin type.
-            // This stops other mods' recipes (Armory color variants, salvage)
-            // from matching RPG items at the workbench.
-            ItemResourceType reskinType = new ItemResourceType();
-            reskinType.id = reskinTypeId;
-            reskinType.quantity = 1;
-            ItemResourceType[] newTypes = new ItemResourceType[]{ reskinType };
+            // REPLACE all ResourceTypes with our reskin type(s).
+            ItemResourceType[] newTypes = reskinTypes.toArray(new ItemResourceType[0]);
 
             Field resourceTypesField = Item.class.getDeclaredField("resourceTypes");
             resourceTypesField.setAccessible(true);
             resourceTypesField.set(customItem, newTypes);
 
             // Clear the cached toPacket() result so the client gets the updated ResourceTypes.
-            // Without this, retro-injected items send stale packets missing the ResourceType,
-            // causing the client to grey out workbench options.
             try {
                 Field cachedPacketField = Item.class.getDeclaredField("cachedPacket");
                 cachedPacketField.setAccessible(true);
@@ -889,12 +979,53 @@ public final class ItemRegistryService {
                 // Not critical — field may not exist in all versions
             }
 
-            LOGGER.atFine().log("Set reskin ResourceType %s for %s (replaced originals)",
-                    reskinTypeId, baseItem.getId());
+            LOGGER.atFine().log("Set %d reskin ResourceType(s) for %s (rarity=%s, qualities=%s)",
+                    reskinTypes.size(), baseItem.getId(),
+                    rarity != null ? rarity.name() : "vanilla-fallback", qualityIds);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
                     "Failed to inject reskin ResourceType for %s", baseItem.getId());
         }
+    }
+
+    /**
+     * Re-injects reskin ResourceType(s) for an already-registered custom item
+     * using the correct RPG rarity.
+     *
+     * <p>Called when GearData becomes available (e.g., during item sync after player
+     * login) to correct the vanilla-quality-based fallback from retro-inject.
+     *
+     * @param customId The custom item ID (e.g., "rpg_gear_XXXX")
+     * @param rarity   The RPG rarity from GearData
+     */
+    public void reinjectReskinResourceType(@Nonnull String customId, @Nonnull GearRarity rarity) {
+        ReskinResourceTypeRegistry registry = this.reskinRegistry;
+        if (registry == null) {
+            return;
+        }
+
+        long stamp = assetMapLock.readLock();
+        Item customItem;
+        try {
+            customItem = internalAssetMap.get(customId);
+        } finally {
+            assetMapLock.unlockRead(stamp);
+        }
+        if (customItem == null) {
+            return;
+        }
+
+        ItemRegistryEntry entry = registeredItems.get(customId);
+        if (entry == null) {
+            return;
+        }
+
+        Item baseItem = Item.getAssetMap().getAsset(entry.baseItemId());
+        if (baseItem == null || baseItem == Item.UNKNOWN) {
+            return;
+        }
+
+        injectReskinResourceType(customItem, baseItem, rarity);
     }
 
     /**
@@ -1407,6 +1538,30 @@ public final class ItemRegistryService {
     }
 
     /**
+     * Creates and registers a custom item with SYNCHRONOUS persistence and RPG rarity.
+     *
+     * <p>When {@code rarity} is non-null, the reskin ResourceType is assigned based
+     * on the RPG rarity (e.g., MYTHIC → Epic+Legendary recipe groups) instead of
+     * the base item's vanilla quality. This ensures the Builder's Workbench shows
+     * skin options matching the item's RPG rarity tier.
+     *
+     * @param baseItem The base item to clone
+     * @param customId The custom item ID
+     * @param rarity   The RPG rarity for reskin ResourceType (null = use vanilla quality fallback)
+     * @return The created custom Item
+     */
+    @Nonnull
+    public Item createAndRegisterSync(@Nonnull Item baseItem, @Nonnull String customId,
+                                      @Nullable GearRarity rarity) {
+        Item customItem = createCustomItem(baseItem, customId);
+        if (rarity != null) {
+            injectReskinResourceType(customItem, baseItem, rarity);
+        }
+        registerItemInternal(customId, customItem, baseItem.getId(), null, true, true);
+        return customItem;
+    }
+
+    /**
      * Creates and registers a custom item with a Secondary interaction injected.
      *
      * <p>This is used for stones and realm maps that need right-click behavior.
@@ -1492,6 +1647,9 @@ public final class ItemRegistryService {
         // Track for cleanup and re-registration on restart
         String effectiveBaseItemId = baseItemId != null ? baseItemId : customItem.getId();
         registeredItems.put(customId, new ItemRegistryEntry(effectiveBaseItemId, secondaryInteractionId));
+        lastObservedAt.put(customId, System.currentTimeMillis());
+        // If this item was previously cold (re-registered from fallback), remove from cold tier
+        coldItems.remove(customId);
 
         // Register in Hexcode's hex asset maps so pedestal detection, casting particles,
         // and glyph colors work with our custom item IDs.
@@ -1613,8 +1771,22 @@ public final class ItemRegistryService {
     public void markItemsSeen(@Nonnull Collection<String> customIds) {
         Objects.requireNonNull(customIds, "customIds cannot be null");
 
-        if (persistenceEnabled && repository != null && !customIds.isEmpty()) {
-            repository.updateLastSeen(customIds);
+        if (!customIds.isEmpty()) {
+            // Update in-memory observation timestamps (always, even without persistence)
+            long now = System.currentTimeMillis();
+            for (String id : customIds) {
+                lastObservedAt.put(id, now);
+                // Promote cold items synchronously (player has this item — it must be Hot)
+                ColdEntry cold = coldItems.get(id);
+                if (cold != null) {
+                    promoteToHot(id, cold);
+                }
+            }
+
+            // Update DB timestamps
+            if (persistenceEnabled && repository != null) {
+                repository.updateLastSeen(customIds);
+            }
         }
     }
 
@@ -1635,6 +1807,8 @@ public final class ItemRegistryService {
 
         if (!initialized || internalAssetMap == null) {
             registeredItems.remove(customId);
+            coldItems.remove(customId);
+            lastObservedAt.remove(customId);
             return;
         }
 
@@ -1646,6 +1820,8 @@ public final class ItemRegistryService {
             assetMapLock.unlockWrite(stamp);
         }
         registeredItems.remove(customId);
+        coldItems.remove(customId);
+        lastObservedAt.remove(customId);
 
         LOGGER.atFine().log("Unregistered custom item: %s", customId);
     }
@@ -1657,7 +1833,16 @@ public final class ItemRegistryService {
      * @return true if registered by this service
      */
     public boolean isRegistered(@Nonnull String customId) {
-        return registeredItems.containsKey(customId);
+        if (registeredItems.containsKey(customId)) return true;
+        // Also check cold tier — item is still "ours" even if demoted
+        ColdEntry cold = coldItems.get(customId);
+        if (cold != null) {
+            // Auto-promote: something is asking about this item, it's probably needed
+            promoteToHot(customId, cold);
+            // Verify promotion succeeded (fails if base item no longer exists)
+            return registeredItems.containsKey(customId);
+        }
+        return false;
     }
 
     /**
@@ -1666,7 +1851,10 @@ public final class ItemRegistryService {
     @Nullable
     public String getBaseItemId(@Nonnull String customId) {
         ItemRegistryEntry entry = registeredItems.get(customId);
-        return entry != null ? entry.baseItemId() : null;
+        if (entry != null) return entry.baseItemId();
+        // Check cold tier
+        ColdEntry cold = coldItems.get(customId);
+        return cold != null ? cold.baseItemId() : null;
     }
 
     /**
@@ -1675,7 +1863,9 @@ public final class ItemRegistryService {
     @Nullable
     public String getSecondaryInteractionId(@Nonnull String customId) {
         ItemRegistryEntry entry = registeredItems.get(customId);
-        return entry != null ? entry.secondaryInteractionId() : null;
+        if (entry != null) return entry.secondaryInteractionId();
+        ColdEntry cold = coldItems.get(customId);
+        return cold != null ? cold.secondaryInteractionId() : null;
     }
 
     /**
@@ -1683,7 +1873,15 @@ public final class ItemRegistryService {
      */
     @Nullable
     public ItemRegistryEntry getRegistryEntry(@Nonnull String customId) {
-        return registeredItems.get(customId);
+        ItemRegistryEntry entry = registeredItems.get(customId);
+        if (entry != null) return entry;
+        // Check cold tier — promote if needed
+        ColdEntry cold = coldItems.get(customId);
+        if (cold != null) {
+            promoteToHot(customId, cold);
+            return registeredItems.get(customId);
+        }
+        return null;
     }
 
     public int getRegisteredCount() {
@@ -1697,6 +1895,208 @@ public final class ItemRegistryService {
     public ItemRegistryRepository getRepository() {
         return repository;
     }
+
+    // =========================================================================
+    // HOT/COLD TIER MANAGEMENT
+    // =========================================================================
+
+    /**
+     * Sets the supplier for active item IDs. Called during plugin init.
+     * The supplier should return all RPG item IDs currently held by online players.
+     */
+    public void setActiveItemsSupplier(@Nullable java.util.function.Supplier<Set<String>> supplier) {
+        this.activeItemsSupplier = supplier;
+    }
+
+    /**
+     * Observes an item as currently in use. Keeps it in the Hot tier.
+     * If the item is in the Cold tier, synchronously promotes it back to Hot.
+     *
+     * <p>Call this from any code path that interacts with an RPG item:
+     * inventory sync, equipment change, item pickup, weapon switch.
+     *
+     * @param customId The custom item ID (rpg_gear_*, rpg_map_*, rpg_gem_*)
+     */
+    public void observeItem(@Nonnull String customId) {
+        if (customId == null || customId.isEmpty()) return;
+        lastObservedAt.put(customId, System.currentTimeMillis());
+
+        // If cold, promote synchronously — the item is needed right now
+        ColdEntry cold = coldItems.get(customId);
+        if (cold != null) {
+            promoteToHot(customId, cold);
+        }
+    }
+
+    /**
+     * Synchronously re-materializes a cold item into the asset map (Hot tier).
+     * Called when any observation detects a cold item.
+     */
+    private void promoteToHot(@Nonnull String customId, @Nonnull ColdEntry cold) {
+        if (!initialized || internalAssetMap == null) return;
+
+        Item baseItem = Item.getAssetMap().getAsset(cold.baseItemId());
+        if (baseItem == null || baseItem == Item.UNKNOWN) {
+            LOGGER.atWarning().log("Cannot promote cold item %s — base item %s not found",
+                customId, cold.baseItemId());
+            coldItems.remove(customId);
+            return;
+        }
+
+        try {
+            Item customItem;
+            if (cold.secondaryInteractionId() != null) {
+                customItem = createCustomItemWithSecondaryInteraction(
+                    baseItem, customId, cold.secondaryInteractionId());
+            } else {
+                customItem = createCustomItem(baseItem, customId);
+            }
+
+            long stamp = assetMapLock.writeLock();
+            try {
+                internalAssetMap.put(customId, customItem);
+            } finally {
+                assetMapLock.unlockWrite(stamp);
+            }
+
+            registeredItems.put(customId, new ItemRegistryEntry(cold.baseItemId(), cold.secondaryInteractionId()));
+            coldItems.remove(customId);
+            lastObservedAt.put(customId, System.currentTimeMillis());
+
+            // Re-register in Hexcode's hex asset maps (if applicable)
+            if (HexcodeCompat.isLoaded()) {
+                WeaponType baseWeaponType = WeaponType.fromItemIdOrUnknown(cold.baseItemId());
+                if (baseWeaponType == WeaponType.STAFF || baseWeaponType == WeaponType.WAND) {
+                    HexcodeCompat.registerHexAsset(customId, cold.baseItemId(), true);
+                } else if (baseWeaponType == WeaponType.SPELLBOOK) {
+                    HexcodeCompat.registerHexAsset(customId, cold.baseItemId(), false);
+                }
+            }
+
+            LOGGER.atFine().log("Promoted cold item %s back to Hot (base: %s)", customId, cold.baseItemId());
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to promote cold item %s", customId);
+            coldItems.remove(customId);
+        }
+    }
+
+    /**
+     * Demotion sweep: moves hot items not observed within the threshold to Cold tier.
+     * Removes their full Item clone from the asset map, retaining only lightweight metadata.
+     * Batched to avoid holding the write lock for too long.
+     */
+    private void demotionSweep() {
+        if (!initialized || internalAssetMap == null) return;
+
+        // SAFETY: Before checking timestamps, refresh observations for all items
+        // currently held by online players. This prevents demoting equipped weapons.
+        java.util.function.Supplier<Set<String>> supplier = this.activeItemsSupplier;
+        if (supplier != null) {
+            try {
+                Set<String> activeIds = supplier.get();
+                if (activeIds != null && !activeIds.isEmpty()) {
+                    long now = System.currentTimeMillis();
+                    for (String id : activeIds) {
+                        lastObservedAt.put(id, now);
+                    }
+                    LOGGER.atFine().log("Demotion safety scan: refreshed %d active player items", activeIds.size());
+                }
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log("Demotion safety scan failed — skipping sweep to be safe");
+                return;
+            }
+        }
+
+        long cutoff = System.currentTimeMillis() - (DEMOTION_THRESHOLD_HOURS * 60 * 60 * 1000);
+        List<String> candidates = new ArrayList<>();
+
+        for (Map.Entry<String, ItemRegistryEntry> entry : registeredItems.entrySet()) {
+            Long lastSeen = lastObservedAt.get(entry.getKey());
+            if (lastSeen == null || lastSeen < cutoff) {
+                candidates.add(entry.getKey());
+            }
+        }
+
+        if (candidates.isEmpty()) return;
+
+        // Phase 1: Move entries from hot to cold (ConcurrentHashMap ops, no lock needed)
+        List<String> toDemote = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < candidates.size() && toDemote.size() < SWEEP_BATCH_SIZE; i++) {
+            String customId = candidates.get(i);
+            ItemRegistryEntry entry = registeredItems.remove(customId);
+            if (entry == null) continue; // already removed by another thread
+            coldItems.put(customId, new ColdEntry(entry.baseItemId(), entry.secondaryInteractionId(), now));
+            toDemote.add(customId);
+        }
+
+        // Phase 2: Batch-remove from asset map under a single write lock
+        // Guard: only remove items still in cold tier (a concurrent promotion may have moved them back)
+        if (!toDemote.isEmpty()) {
+            long stamp = assetMapLock.writeLock();
+            try {
+                for (String customId : toDemote) {
+                    if (coldItems.containsKey(customId)) {
+                        internalAssetMap.remove(customId);
+                    }
+                }
+            } finally {
+                assetMapLock.unlockWrite(stamp);
+            }
+
+            LOGGER.atInfo().log("Demotion sweep: %d items moved Hot -> Cold (threshold: %dh, hot: %d, cold: %d)",
+                toDemote.size(), DEMOTION_THRESHOLD_HOURS, registeredItems.size(), coldItems.size());
+        }
+    }
+
+    /**
+     * Eviction sweep: permanently removes cold items not observed within the eviction threshold.
+     * Removes from cold tier, lastObservedAt, and database.
+     */
+    private void evictionSweep() {
+        long cutoff = System.currentTimeMillis() - (EVICTION_THRESHOLD_HOURS * 60 * 60 * 1000);
+        List<String> candidates = new ArrayList<>();
+
+        for (Map.Entry<String, ColdEntry> entry : coldItems.entrySet()) {
+            Long lastSeen = lastObservedAt.get(entry.getKey());
+            if (lastSeen == null || lastSeen < cutoff) {
+                candidates.add(entry.getKey());
+            }
+        }
+
+        if (candidates.isEmpty()) return;
+
+        int evicted = 0;
+        List<String> toDeleteFromDb = new ArrayList<>();
+
+        for (int i = 0; i < candidates.size() && evicted < SWEEP_BATCH_SIZE; i++) {
+            String customId = candidates.get(i);
+            if (coldItems.remove(customId) != null) {
+                lastObservedAt.remove(customId);
+                toDeleteFromDb.add(customId);
+                evicted++;
+            }
+        }
+
+        // Batch-delete from database
+        if (!toDeleteFromDb.isEmpty() && persistenceEnabled && repository != null) {
+            int dbRemoved = repository.deleteByIds(toDeleteFromDb);
+            LOGGER.atInfo().log("Eviction sweep: %d items permanently removed (threshold: %dh, %d deleted from DB, hot: %d, cold: %d)",
+                evicted, EVICTION_THRESHOLD_HOURS, dbRemoved, registeredItems.size(), coldItems.size());
+        } else if (evicted > 0) {
+            LOGGER.atInfo().log("Eviction sweep: %d items permanently removed (threshold: %dh, hot: %d, cold: %d)",
+                evicted, EVICTION_THRESHOLD_HOURS, registeredItems.size(), coldItems.size());
+        }
+    }
+
+    /** @return Number of items in the Hot tier (full asset map entries). */
+    public int getHotItemCount() { return registeredItems.size(); }
+
+    /** @return Number of items in the Cold tier (metadata only, no asset map entry). */
+    public int getColdItemCount() { return coldItems.size(); }
+
+    /** @return Total items tracked across both tiers. */
+    public int getTotalItemCount() { return registeredItems.size() + coldItems.size(); }
 
     // =========================================================================
     // LIFECYCLE
@@ -1718,9 +2118,10 @@ public final class ItemRegistryService {
             cleanupScheduler = null;
         }
 
-        int count = registeredItems.size();
+        int hotCount = registeredItems.size();
+        int coldCount = coldItems.size();
 
-        // Remove all registered items from the asset map (with lock)
+        // Remove all hot items from the asset map (with lock)
         if (internalAssetMap != null && assetMapLock != null) {
             long stamp = assetMapLock.writeLock();
             try {
@@ -1733,13 +2134,15 @@ public final class ItemRegistryService {
         }
 
         registeredItems.clear();
+        coldItems.clear();
+        lastObservedAt.clear();
         internalAssetMap = null;
         assetMapLock = null;
         repository = null;
         persistenceEnabled = false;
         initialized = false;
 
-        LOGGER.atInfo().log("ItemRegistryService shutdown, cleaned up %d items", count);
+        LOGGER.atInfo().log("ItemRegistryService shutdown, cleaned up %d hot + %d cold items", hotCount, coldCount);
     }
 
     /**

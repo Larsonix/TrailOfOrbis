@@ -77,7 +77,7 @@ public final class TooAdminTestAtkSpdCommand extends AbstractPlayerCommand {
         }
 
         Inventory inventory = player.getInventory();
-        ItemStack heldItem = inventory.getItemInHand();
+        ItemStack heldItem = inventory.getActiveHotbarItem();
         if (heldItem == null || heldItem.isEmpty()) {
             sender.sendMessage(msg("Hold a weapon first!", MessageColors.ERROR));
             return;

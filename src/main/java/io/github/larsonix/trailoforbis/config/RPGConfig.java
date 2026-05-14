@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.config;
 
 import io.github.larsonix.trailoforbis.combat.projectile.ProjectileConfig;
 import io.github.larsonix.trailoforbis.skilltree.config.SkillTreeSettings;
+import io.github.larsonix.trailoforbis.systems.StatsApplicationSystem;
 import io.github.larsonix.trailoforbis.util.LevelScaling;
 
 /**
@@ -53,6 +54,11 @@ public class RPGConfig {
             scaling.validate();
             LevelScaling.configure(scaling.getTransitionLevel(), scaling.getMaxMultiplierRatio(), scaling.getDecayDivisor());
         }
+
+        // Movement speed curve
+        if (movement != null) {
+            StatsApplicationSystem.configureMoveSpeed(movement.getMoveSpeedCap());
+        }
     }
 
     /**
@@ -86,6 +92,9 @@ public class RPGConfig {
 
     // Level scaling settings (shared by gear + mobs)
     private ScalingConfig scaling = new ScalingConfig();
+
+    // Movement settings (speed curves)
+    private MovementConfig movement = new MovementConfig();
 
     // General settings
     private boolean debugMode = false;
@@ -156,6 +165,14 @@ public class RPGConfig {
 
     public void setScaling(ScalingConfig scaling) {
         this.scaling = scaling;
+    }
+
+    public MovementConfig getMovement() {
+        return movement;
+    }
+
+    public void setMovement(MovementConfig movement) {
+        this.movement = movement;
     }
 
     public boolean isDebugMode() {
@@ -1445,9 +1462,9 @@ public class RPGConfig {
         /**
          * Level scale in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant).
          * Controls how much each attacker level increases the armor demand.
-         * Default: 9.0
+         * Default: 5.0
          */
-        private float levelScale = 9.0f;
+        private float levelScale = 5.0f;
 
         /**
          * Base constant in armor formula: armor / (armor + levelScale * attackerLevel + baseConstant).
@@ -1681,6 +1698,31 @@ public class RPGConfig {
                 throw new ConfigValidationException(
                     "scaling.decayDivisor must be >= 1.0, got: " + decayDivisor);
             }
+        }
+    }
+
+    /**
+     * Movement speed configuration.
+     *
+     * <p>Controls diminishing returns on movement speed via a hyperbolic curve:
+     * {@code effective = raw * cap / (raw + cap)}
+     *
+     * <p>The cap is the asymptotic ceiling — effective speed approaches this value
+     * but never reaches it. Higher cap = gentler curve, 0 = disabled (linear).
+     */
+    public static class MovementConfig {
+        /**
+         * Asymptotic cap for movement speed percent.
+         * 0 = disabled (no diminishing returns). Default: 100.
+         */
+        private float moveSpeedCap = 100.0f;
+
+        public float getMoveSpeedCap() {
+            return moveSpeedCap;
+        }
+
+        public void setMoveSpeedCap(float moveSpeedCap) {
+            this.moveSpeedCap = moveSpeedCap;
         }
     }
 

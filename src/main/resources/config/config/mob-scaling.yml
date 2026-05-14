@@ -351,3 +351,21 @@ exponential_scaling:
   base_multiplier: 1.0
   soft_cap_level: 100
   soft_cap_divisor: 2.0
+
+# -----------------------------------------------------------------------------
+# LATE-GAME SCALING
+# -----------------------------------------------------------------------------
+# Accelerating power-curve bonus on mob HP, damage, and armor above a threshold.
+# Formula: multiplier = 1.0 + ((level - threshold) / divisor) ^ exponent
+# Divisor = levels above threshold for 2x. Exponent = acceleration curve.
+
+late_game_scaling:
+  enabled: true
+  threshold: 120
+  hp_divisor: 40.0
+  hp_exponent: 1.5
+  damage_divisor: 55.0
+  damage_exponent: 1.4
+  armor_divisor: 65.0
+  armor_exponent: 1.3
+  max_multiplier: 6.0

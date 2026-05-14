@@ -9,7 +9,6 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
@@ -22,6 +21,9 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntitySta
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierManager;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
@@ -39,14 +41,14 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DamageCalculatorSyst
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.server.DamageEntityInteraction;
 import com.hypixel.hytale.server.core.meta.MetaKey;
 import io.github.larsonix.trailoforbis.gear.equipment.EquipmentValidator;
-import io.github.larsonix.trailoforbis.compat.HexCastEventInterceptor;
+import io.github.larsonix.trailoforbis.compat.HexCastStateStore;
+import io.github.larsonix.trailoforbis.compat.HexDamageAttributor;
+import io.github.larsonix.trailoforbis.compat.HexSpellNormalizer;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig;
+import io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
-import io.github.larsonix.trailoforbis.mobs.classification.RPGMobClass;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
-import io.github.larsonix.trailoforbis.mobs.model.MobStats;
-import io.github.larsonix.trailoforbis.mobs.stats.MobStatPoolConfig;
 import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 
@@ -54,35 +56,35 @@ import io.github.larsonix.trailoforbis.attributes.breakdown.StatBreakdownResult;
 import io.github.larsonix.trailoforbis.combat.ailments.CombatAilmentApplicator;
 import io.github.larsonix.trailoforbis.combat.ailments.CombatAilmentApplicator.AilmentSummary;
 import io.github.larsonix.trailoforbis.combat.avoidance.AvoidanceProcessor;
+import io.github.larsonix.trailoforbis.combat.avoidance.AvoidanceResultHandler;
 import io.github.larsonix.trailoforbis.combat.deathrecap.CombatSnapshot;
 import io.github.larsonix.trailoforbis.combat.deathrecap.DeathRecapRecorder;
 import io.github.larsonix.trailoforbis.combat.detection.DamageTypeClassifier;
 import io.github.larsonix.trailoforbis.combat.durability.DurabilityHandler;
 import io.github.larsonix.trailoforbis.combat.effects.CombatEffectContext;
 import io.github.larsonix.trailoforbis.combat.effects.CombatEffectRegistry;
+import io.github.larsonix.trailoforbis.combat.environmental.EnvironmentalDamageProcessor;
+import io.github.larsonix.trailoforbis.combat.format.CombatDebugFormatter;
+import io.github.larsonix.trailoforbis.combat.format.CombatDebugLogger;
 import io.github.larsonix.trailoforbis.combat.indicators.CombatIndicatorService;
 import io.github.larsonix.trailoforbis.combat.indicators.CombatIndicatorService.CombatTextParams;
 import io.github.larsonix.trailoforbis.combat.modifiers.ConditionalMultiplierCalculator;
 import io.github.larsonix.trailoforbis.combat.modifiers.ConditionalResult;
 import io.github.larsonix.trailoforbis.combat.modifiers.DamageModifierProcessor;
 import io.github.larsonix.trailoforbis.combat.tracking.ConsecutiveHitTracker;
+import io.github.larsonix.trailoforbis.combat.realm.RealmCombatModifierProcessor;
 import io.github.larsonix.trailoforbis.combat.recovery.CombatRecoveryProcessor;
 import io.github.larsonix.trailoforbis.combat.resolution.CombatEntityResolver;
 import io.github.larsonix.trailoforbis.combat.resolution.CombatStatsResolver;
+import io.github.larsonix.trailoforbis.combat.resolution.MobDamageResolver;
 import io.github.larsonix.trailoforbis.combat.triggers.CombatTriggerHandler;
-import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.util.PlayerWorldCache;
+import com.hypixel.hytale.server.core.Message;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
-import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
-import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
-import io.github.larsonix.trailoforbis.sanctum.components.SkillNodeComponent;
-import io.github.larsonix.trailoforbis.skilltree.NodeState;
-import io.github.larsonix.trailoforbis.sanctum.ui.SkillNodeDetailHud;
-import io.github.larsonix.trailoforbis.sanctum.ui.SkillNodeHudManager;
+import io.github.larsonix.trailoforbis.sanctum.SkillNodeInspectionHandler;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
-import io.github.larsonix.trailoforbis.skilltree.config.SkillNode;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -111,6 +113,10 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>{@link CombatTriggerHandler} - Skill tree triggers</li>
  *   <li>{@link CombatAilmentApplicator} - Ailment application</li>
  *   <li>{@link DeathRecapRecorder} - Death recap recording</li>
+ *   <li>{@link MobDamageResolver} - Mob/vanilla damage resolution</li>
+ *   <li>{@link AvoidanceResultHandler} - Avoidance result handling + active blocking</li>
+ *   <li>{@link RealmCombatModifierProcessor} - Realm modifier lookups</li>
+ *   <li>{@link EnvironmentalDamageProcessor} - DOT + environmental pipelines</li>
  * </ul>
  */
 public class RPGDamageSystem extends DamageEventSystem {
@@ -157,44 +163,51 @@ public class RPGDamageSystem extends DamageEventSystem {
     /** MetaKey for hex spell display name (for death recap). */
     public static final MetaKey<String> HEX_SPELL_DISPLAY_NAME = Damage.META_REGISTRY.registerMetaObject(d -> null);
 
-    // ── Active Blocking Reduction ──
-    // Deterministic damage reduction when holding block (right-click).
-    // Separate from BLOCK_CHANCE (perfect block = full avoidance in avoidance pipeline).
-
-    /** Base damage reduction when weapon-blocking (right-click with weapon). */
-    private static final float WEAPON_BLOCK_REDUCTION = 0.33f;
-    /** Base damage reduction when shield-blocking (shield in utility slot). */
-    private static final float SHIELD_BLOCK_REDUCTION = 0.66f;
-    /** Maximum total reduction for weapon blocking (base + BLOCK_DAMAGE_REDUCTION stat). */
-    private static final float WEAPON_BLOCK_CAP = 0.80f;
-    /** Maximum total reduction for shield blocking (base + BLOCK_DAMAGE_REDUCTION stat). */
-    private static final float SHIELD_BLOCK_CAP = 0.95f;
+    /** MetaKey for hex spell source type ID (e.g., "hex_bolt") for per-glyph multiplier lookup. */
+    public static final MetaKey<String> HEX_SPELL_SOURCE_TYPE = Damage.META_REGISTRY.registerMetaObject(d -> null);
 
     // ==================== Dependencies ====================
 
     private final TrailOfOrbis plugin;
-    private volatile CombatCalculator calculator;
-    private volatile RPGDamageCalculator rpgCalculator;
+    private CombatCalculator calculator;
+    private RPGDamageCalculator rpgCalculator;
 
-    // Processor classes (lazily initialized)
-    private volatile CombatEntityResolver entityResolver;
-    private volatile CombatStatsResolver statsResolver;
-    private volatile DamageTypeClassifier classifier;
-    private volatile AvoidanceProcessor avoidanceProcessor;
-    private volatile ConditionalMultiplierCalculator multiplierCalculator;
-    private volatile DamageModifierProcessor modifierProcessor;
-    private volatile CombatIndicatorService indicatorService;
-    private volatile CombatFeedbackService feedbackService;
-    private volatile CombatRecoveryProcessor recoveryProcessor;
-    private volatile DurabilityHandler durabilityHandler;
-    private volatile CombatTriggerHandler triggerHandler;
-    private volatile CombatAilmentApplicator ailmentApplicator;
-    private volatile DeathRecapRecorder deathRecapRecorder;
-    private volatile CombatRequirementNotifier requirementNotifier;
+    // Processor classes (eagerly initialized via initialize(), fallback lazy init)
+    private CombatEntityResolver entityResolver;
+    private CombatStatsResolver statsResolver;
+    private DamageTypeClassifier classifier;
+    private AvoidanceProcessor avoidanceProcessor;
+    private ConditionalMultiplierCalculator multiplierCalculator;
+    private DamageModifierProcessor modifierProcessor;
+    private CombatIndicatorService indicatorService;
+    private CombatFeedbackService feedbackService;
+    private CombatRecoveryProcessor recoveryProcessor;
+    private DurabilityHandler durabilityHandler;
+    private CombatTriggerHandler triggerHandler;
+    private CombatAilmentApplicator ailmentApplicator;
+    private DeathRecapRecorder deathRecapRecorder;
+    private CombatRequirementNotifier requirementNotifier;
+    private MobDamageResolver mobDamageResolver;
+    private SkillNodeInspectionHandler skillNodeInspectionHandler;
+    private RealmCombatModifierProcessor realmModifierProcessor;
+    private EnvironmentalDamageProcessor environmentalProcessor;
+    private AvoidanceResultHandler avoidanceResultHandler;
 
     /** Combat effect registry for keystone behavioral effects. */
     @Nullable
     private volatile CombatEffectRegistry combatEffectRegistry;
+
+    /** Re-entrancy guard: prevents recursive damage pipeline execution (e.g., combat effects firing damage). */
+    private boolean processingDamage = false;
+
+    // ── Attacker context cache for AoE performance ──
+    // For Hexcode area spells hitting 40+ targets, all damage events share the same attacker.
+    // Cache attacker-side data on first hit, reuse for subsequent targets in the same burst.
+    // Keyed by attacker player UUID (not ref identity — ref identity is fragile across source rewrites).
+    @Nullable
+    private io.github.larsonix.trailoforbis.combat.context.AttackerContext cachedAttackerCtx;
+    @Nullable
+    private UUID cachedAttackerUuid;
 
     public RPGDamageSystem(@Nonnull TrailOfOrbis plugin) {
         this.plugin = plugin;
@@ -205,78 +218,116 @@ public class RPGDamageSystem extends DamageEventSystem {
      */
     public void setCombatEffectRegistry(@Nullable CombatEffectRegistry registry) {
         this.combatEffectRegistry = registry;
+        if (realmModifierProcessor != null) {
+            realmModifierProcessor.setCombatEffectRegistry(registry);
+        }
+        if (environmentalProcessor != null) {
+            environmentalProcessor.setCombatEffectRegistry(registry);
+        }
+        if (avoidanceResultHandler != null) {
+            avoidanceResultHandler.setCombatEffectRegistry(registry);
+        }
     }
 
-    // ==================== Lazy Initialization ====================
+    // ==================== Initialization ====================
+
+    /**
+     * Eagerly initializes all combat processors and calculators.
+     *
+     * <p>Called from TrailOfOrbis.onEnable() after all managers are ready.
+     * This eliminates the synchronized DCL blocks that caused contention
+     * when Hexcode AoE spells fired dozens of damage events simultaneously.
+     */
+    public void initialize() {
+        initCalculators();
+        initProcessors();
+    }
+
+    private void initCalculators() {
+        if (calculator == null) {
+            var armorConfig = plugin.getConfigManager().getRPGConfig().getArmor();
+            calculator = new CombatCalculator(armorConfig.getMaxReduction(), armorConfig.getLevelScale(), armorConfig.getBaseConstant());
+            calculator.setMinArmorEffectiveness(armorConfig.getArmorPenetrationFloor());
+            LOGGER.at(Level.INFO).log("CombatCalculator initialized (levelScale=%.1f, baseConstant=%.1f, pen floor: %.0f%%)",
+                armorConfig.getLevelScale(), armorConfig.getBaseConstant(), armorConfig.getArmorPenetrationFloor() * 100);
+        }
+        if (rpgCalculator == null) {
+            rpgCalculator = new RPGDamageCalculator(getCalculator());
+            LOGGER.at(Level.INFO).log("RPGDamageCalculator initialized");
+        }
+    }
+
+    private void initProcessors() {
+        if (entityResolver != null) return; // Already initialized
+
+        CombatEntityResolver localResolver = new CombatEntityResolver();
+        statsResolver = new CombatStatsResolver(localResolver, plugin.getMobScalingComponentType());
+        classifier = new DamageTypeClassifier();
+        avoidanceProcessor = new AvoidanceProcessor(plugin.getConfigManager());
+        multiplierCalculator = new ConditionalMultiplierCalculator(
+            localResolver, plugin.getAilmentTracker(), plugin.getConsecutiveHitTracker());
+        // Apply Shock amplification cap when Hexcode is present
+        if (HexcodeCompat.isLoaded()) {
+            float maxAmp = plugin.getConfigManager().getHexcodeSpellConfig().getMax_damage_amplification();
+            multiplierCalculator.setMaxShockAmplification(maxAmp);
+            LOGGER.at(Level.INFO).log("Hexcode detected — Shock amplification cap set to %.2f", maxAmp);
+        }
+        modifierProcessor = new DamageModifierProcessor(
+            localResolver, plugin.getConfigManager(),
+            plugin.getEnergyShieldTracker(), plugin.getAilmentTracker());
+        indicatorService = new CombatIndicatorService(localResolver, plugin, plugin.getCombatTextColorManager(), plugin.getCombatFeedbackGhostManager());
+        feedbackService = new CombatFeedbackService();
+        feedbackService.init();
+        recoveryProcessor = new CombatRecoveryProcessor(localResolver);
+        durabilityHandler = new DurabilityHandler();
+        triggerHandler = new CombatTriggerHandler(localResolver, plugin.getConditionalTriggerSystem());
+        ailmentApplicator = new CombatAilmentApplicator(
+            localResolver, plugin.getAilmentTracker(), plugin.getAilmentCalculator(),
+            plugin.getAilmentImmunityTracker(), plugin.getAilmentEffectManager());
+        deathRecapRecorder = new DeathRecapRecorder(
+            localResolver, classifier, plugin::getDeathRecapTracker,
+            plugin.getMobScalingComponentType(),
+            playerId -> plugin.getLevelingManager() != null
+                ? plugin.getLevelingManager().getLevel(playerId) : 1);
+        mobDamageResolver = new MobDamageResolver(plugin);
+        skillNodeInspectionHandler = new SkillNodeInspectionHandler(plugin);
+        realmModifierProcessor = new RealmCombatModifierProcessor(localResolver);
+        avoidanceResultHandler = new AvoidanceResultHandler(
+            localResolver, statsResolver, indicatorService, feedbackService,
+            recoveryProcessor, deathRecapRecorder, triggerHandler);
+        environmentalProcessor = new EnvironmentalDamageProcessor(
+            plugin, statsResolver, classifier, localResolver, indicatorService,
+            deathRecapRecorder, recoveryProcessor, rpgCalculator,
+            this::markMobDamaged, this::fireModifierDeathTriggers, this::resolveAttackerLevel);
+        // Requirement notification on attack
+        if (plugin.getGearManager() != null && plugin.getGearManager().getEquipmentValidator() != null) {
+            requirementNotifier = new CombatRequirementNotifier(plugin.getGearManager().getEquipmentValidator());
+        }
+        LOGGER.at(Level.INFO).log("Combat processors initialized");
+        entityResolver = localResolver;
+    }
 
     private CombatCalculator getCalculator() {
-        if (calculator == null) {
-            synchronized (this) {
-                if (calculator == null) {
-                    var armorConfig = plugin.getConfigManager().getRPGConfig().getArmor();
-                    calculator = new CombatCalculator(armorConfig.getMaxReduction(), armorConfig.getLevelScale(), armorConfig.getBaseConstant());
-                    calculator.setMinArmorEffectiveness(armorConfig.getArmorPenetrationFloor());
-                    LOGGER.at(Level.INFO).log("CombatCalculator initialized (levelScale=%.1f, baseConstant=%.1f, pen floor: %.0f%%)",
-                        armorConfig.getLevelScale(), armorConfig.getBaseConstant(), armorConfig.getArmorPenetrationFloor() * 100);
-                }
-            }
-        }
         return calculator;
     }
 
     private RPGDamageCalculator getRPGCalculator() {
-        if (rpgCalculator == null) {
-            synchronized (this) {
-                if (rpgCalculator == null) {
-                    rpgCalculator = new RPGDamageCalculator(getCalculator());
-                    LOGGER.at(Level.INFO).log("RPGDamageCalculator initialized");
-                }
-            }
-        }
         return rpgCalculator;
     }
 
+    /**
+     * Returns the combat requirement notifier for disconnect cleanup.
+     */
+    @Nullable
+    public CombatRequirementNotifier getRequirementNotifier() {
+        return requirementNotifier;
+    }
+
+    /** Fallback lazy init — only used if initialize() wasn't called (shouldn't happen). */
     private void ensureProcessorsInitialized() {
         if (entityResolver == null) {
-            synchronized (this) {
-                if (entityResolver == null) {
-                    CombatEntityResolver localResolver = new CombatEntityResolver();
-                    statsResolver = new CombatStatsResolver(localResolver, plugin.getMobScalingComponentType());
-                    classifier = new DamageTypeClassifier();
-                    avoidanceProcessor = new AvoidanceProcessor(plugin.getConfigManager());
-                    multiplierCalculator = new ConditionalMultiplierCalculator(
-                        localResolver, plugin.getAilmentTracker(), plugin.getConsecutiveHitTracker());
-                    // Apply Shock amplification cap when Hexcode is present
-                    if (HexcodeCompat.isLoaded()) {
-                        float maxAmp = plugin.getConfigManager().getHexcodeSpellConfig().getMax_damage_amplification();
-                        multiplierCalculator.setMaxShockAmplification(maxAmp);
-                        LOGGER.at(Level.INFO).log("Hexcode detected — Shock amplification cap set to %.2f", maxAmp);
-                    }
-                    modifierProcessor = new DamageModifierProcessor(
-                        localResolver, plugin.getConfigManager(),
-                        plugin.getEnergyShieldTracker(), plugin.getAilmentTracker());
-                    indicatorService = new CombatIndicatorService(localResolver, plugin, plugin.getCombatTextColorManager(), plugin.getCombatFeedbackGhostManager());
-                    feedbackService = new CombatFeedbackService();
-                    feedbackService.init();
-                    recoveryProcessor = new CombatRecoveryProcessor(localResolver);
-                    durabilityHandler = new DurabilityHandler();
-                    triggerHandler = new CombatTriggerHandler(localResolver, plugin.getConditionalTriggerSystem());
-                    ailmentApplicator = new CombatAilmentApplicator(
-                        localResolver, plugin.getAilmentTracker(), plugin.getAilmentCalculator(),
-                        plugin.getAilmentImmunityTracker(), plugin.getAilmentEffectManager());
-                    deathRecapRecorder = new DeathRecapRecorder(
-                        localResolver, classifier, plugin.getDeathRecapTracker(),
-                        plugin.getMobScalingComponentType(),
-                        playerId -> plugin.getLevelingManager() != null
-                            ? plugin.getLevelingManager().getLevel(playerId) : 1);
-                    // Requirement notification on attack (lazy — GearManager may not be ready at system creation)
-                    if (plugin.getGearManager() != null && plugin.getGearManager().getEquipmentValidator() != null) {
-                        requirementNotifier = new CombatRequirementNotifier(plugin.getGearManager().getEquipmentValidator());
-                    }
-                    LOGGER.at(Level.INFO).log("Combat processors initialized");
-                    entityResolver = localResolver; // LAST — volatile sentinel for DCL
-                }
-            }
+            LOGGER.atWarning().log("RPGDamageSystem processors not eagerly initialized — falling back to lazy init");
+            initialize();
         }
     }
 
@@ -309,6 +360,49 @@ public class RPGDamageSystem extends DamageEventSystem {
         @Nonnull CommandBuffer<EntityStore> commandBuffer,
         @Nonnull Damage damage
     ) {
+        // Re-entrancy guard: blocks recursive damage from combat effects
+        // (e.g., keystone effect → executeDamage → handle re-entered).
+        //
+        // DOT ticks (burn, poison) are EXEMPT: they fire from independent ECS tick
+        // systems (RpgBurnTickSystem, RpgPoisonTickSystem), not as re-entrant calls
+        // from within our pipeline. Even if they arrive while processingDamage is true
+        // (unlikely in single-threaded ECS, but possible via world.execute callbacks),
+        // they must still be processed — blocking them silently kills DOT damage.
+        if (processingDamage && !isDOTSource(damage)) {
+            LOGGER.atWarning().log("[RPGDamageSystem] Re-entrant non-DOT damage detected — skipping RPG pipeline");
+            return;
+        }
+        boolean wasProcessing = processingDamage;
+        processingDamage = true;
+        try {
+        handleInner(index, archetypeChunk, store, commandBuffer, damage);
+        } finally {
+            processingDamage = wasProcessing;
+        }
+    }
+
+    /**
+     * Identifies DOT damage by its DamageCause (not source type).
+     *
+     * <p>DOT damage uses {@code EntitySource} (the player who applied the burn/poison)
+     * or {@code NULL_SOURCE} (if the applicator left the world) — never {@code EnvironmentSource}.
+     * The reliable identifier is the DamageCause: "Rpg_Burn_Dot" or "Rpg_Poison_Dot",
+     * set by RpgBurnTickSystem and RpgPoisonTickSystem respectively.
+     */
+    private static boolean isDOTSource(@Nonnull Damage damage) {
+        DamageCause cause = DamageTypeClassifier.getDamageCause(damage);
+        if (cause == null) return false;
+        return DamageTypeClassifier.isRpgDotCause(cause.getId());
+    }
+
+    /** Inner handle method — contains the actual damage pipeline logic. */
+    private void handleInner(
+        int index,
+        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
+        @Nonnull Damage damage
+    ) {
         ensureProcessorsInitialized();
 
         // Skip invulnerable entities (Creative mode, god mode, spawn protection, etc.).
@@ -326,9 +420,9 @@ public class RPGDamageSystem extends DamageEventSystem {
             return;
         }
 
-        // Diagnostic: log ALL damage source types to trace hex spell routing
+        // Diagnostic: log EnvironmentSource damage (FINE level — not in production logs)
         if (damage.getSource() instanceof Damage.EnvironmentSource env) {
-            LOGGER.atInfo().log("[RPG-DIAG] EnvironmentSource damage: type=%s amount=%.1f cancelled=%s",
+            LOGGER.atFine().log("[RPG-DIAG] EnvironmentSource damage: type=%s amount=%.1f cancelled=%s",
                 env.getType(), damage.getAmount(), damage.isCancelled());
         }
 
@@ -380,7 +474,7 @@ public class RPGDamageSystem extends DamageEventSystem {
         }
 
         if (isDOT) {
-            handleDOTDamage(index, archetypeChunk, store, commandBuffer, damage);
+            environmentalProcessor.handleDOTDamage(index, archetypeChunk, store, commandBuffer, damage);
             return;
         }
 
@@ -392,14 +486,15 @@ public class RPGDamageSystem extends DamageEventSystem {
             if (HexcodeSpellConfig.isHexSpellSource(sourceType)) {
                 HexcodeSpellConfig spellConfig = plugin.getConfigManager().getHexcodeSpellConfig();
                 if (spellConfig == null || !spellConfig.isEnabled()) {
-                    handleEnvironmentalDamage(index, archetypeChunk, store, commandBuffer, damage);
+                    environmentalProcessor.handleEnvironmentalDamage(index, archetypeChunk, store, commandBuffer, damage);
                     return;
                 }
 
                 // Resolve caster via ThreadLocal (same synchronous invoke chain) or recent caster fallback
-                Ref<EntityStore> casterRef = HexCastEventInterceptor.getFreshCaster();
+                HexCastStateStore.CastRecord freshCast = HexCastStateStore.getFreshCast();
+                Ref<EntityStore> casterRef = freshCast != null ? freshCast.casterRef() : null;
                 if (casterRef == null || !casterRef.isValid()) {
-                    casterRef = HexCastEventInterceptor.findRecentCaster(store);
+                    casterRef = HexCastStateStore.findRecentCaster(store);
                 }
 
                 // Rewrite source to EntitySource for attacker resolution in the main pipeline.
@@ -415,7 +510,7 @@ public class RPGDamageSystem extends DamageEventSystem {
                         UUID casterUuid = casterPlayerRef.getUuid();
                         Player casterEntity = store.getComponent(casterRef, Player.getComponentType());
                         if (casterEntity != null && casterEntity.getInventory() != null) {
-                            ItemStack weapon = casterEntity.getInventory().getItemInHand();
+                            ItemStack weapon = casterEntity.getInventory().getActiveHotbarItem();
                             EquipmentValidator eqValidator = plugin.getGearManager() != null
                                 ? plugin.getGearManager().getEquipmentValidator() : null;
                             if (eqValidator != null && !ItemStack.isEmpty(weapon)
@@ -436,6 +531,7 @@ public class RPGDamageSystem extends DamageEventSystem {
                 damage.putMetaObject(HEX_SPELL_ELEMENT, element);
                 damage.putMetaObject(HEX_SPELL_BASE_DAMAGE, vanillaDamage);
                 damage.putMetaObject(HEX_SPELL_DISPLAY_NAME, spellConfig.getDisplayName(sourceType));
+                damage.putMetaObject(HEX_SPELL_SOURCE_TYPE, sourceType);
 
                 LOGGER.atFine().log("[SpellDmg] %s: routing through main pipeline, element=%s, hexBase=%.1f",
                     sourceType, element != null ? element.name() : "NONE", vanillaDamage);
@@ -446,7 +542,7 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // Handle HP-based environmental damage (lava, drowning, etc.)
         if (classifier.isEnvironmentalDamage(damage)) {
-            handleEnvironmentalDamage(index, archetypeChunk, store, commandBuffer, damage);
+            environmentalProcessor.handleEnvironmentalDamage(index, archetypeChunk, store, commandBuffer, damage);
             return;
         }
 
@@ -469,7 +565,7 @@ public class RPGDamageSystem extends DamageEventSystem {
             return;
         }
 
-        if (handleSkillNodeInspection(store, defenderRef, damage)) {
+        if (skillNodeInspectionHandler.handleSkillNodeInspection(store, defenderRef, damage)) {
             return;
         }
 
@@ -505,7 +601,6 @@ public class RPGDamageSystem extends DamageEventSystem {
         ctx.vanillaDamage = vanillaDamage;
 
         gatherCombatInputs(index, archetypeChunk, store, damage, ctx);
-
         // ========== PHASE 2.5: REQUIREMENT NOTIFICATION ==========
         // Check if the attacker is a player with unmet equipment requirements
         if (requirementNotifier != null) {
@@ -531,7 +626,7 @@ public class RPGDamageSystem extends DamageEventSystem {
             LOGGER.at(Level.FINE).log("[DmgPipeline] ──── AVOIDANCE CHECK ────");
             LOGGER.at(Level.FINE).log("[DmgPipeline] Result: %s", avoidance.get().reason().name());
             LOGGER.at(Level.FINE).log("[DmgPipeline] ════════════ DAMAGE EVENT END ════════════");
-            handleAvoidedDamage(index, archetypeChunk, store, defenderRef, damage, avoidance.get(), ctx.avoidanceStats);
+            avoidanceResultHandler.handleAvoidedDamage(index, archetypeChunk, store, defenderRef, damage, avoidance.get(), ctx.avoidanceStats);
             return;
         }
 
@@ -542,25 +637,72 @@ public class RPGDamageSystem extends DamageEventSystem {
         ctx.trace = getRPGCalculator().calculateTraced(
             ctx.rpgBaseDamage, ctx.attackerStats, ctx.attackerElemental, ctx.defenderStats, ctx.defenderElemental,
             ctx.attackType, ctx.conditionalMultiplier, ctx.conditionalDetail, ctx.attackTypeMultiplier,
-            ctx.spellElement, ctx.attackerLevel, ctx.isHexSpell);
+            ctx.spellElement, ctx.attackerLevel, ctx.isHexSpell, ctx.hexBakedElement);
         ctx.trace.setAttackerBreakdown(null); // will be populated later if player
         ctx.breakdown = ctx.trace.breakdown();
 
         // ========== PHASE 4.5: POPULATE TRACE CONTEXT ==========
-        populateTraceContext(store, damage, ctx);
+        // Only populate expensive trace context (weapon profiles, derivation) when
+        // someone has combat detail mode on. The trace builder still records phases
+        // during calculation, but post-calc enrichment is skipped for AoE performance.
+        boolean detailMode = (ctx.attackerUuid != null && plugin.isCombatDetailEnabled(ctx.attackerUuid))
+            || (ctx.defenderUuid != null && plugin.isCombatDetailEnabled(ctx.defenderUuid));
+        if (detailMode) {
+            populateTraceContext(store, damage, ctx);
+        }
+
+        // ── COMBAT DEBUG: Full context dump to chat + server log ──
+        if (ctx.attackerUuid != null && plugin.isCombatDebugEnabled(ctx.attackerUuid)) {
+            try {
+                // Send formatted message to player chat
+                Message debugMsg = CombatDebugFormatter.format(
+                    ctx.attackerUuid, ctx.attackerStats, ctx.attackerElemental,
+                    ctx.breakdown, ctx.attackType != null ? ctx.attackType : AttackType.UNKNOWN,
+                    ctx.spellElement, ctx.rpgBaseDamage, ctx.attackTypeMultiplier,
+                    ctx.conditionalMultiplier
+                );
+                PlayerRef debugRef = PlayerWorldCache.findPlayerRef(ctx.attackerUuid);
+                if (debugRef != null) debugRef.sendMessage(debugMsg);
+
+                // Also log plain-text version to server log (so we can read it remotely)
+                String logDump = CombatDebugFormatter.formatForLog(
+                    ctx.attackerUuid, ctx.attackerStats, ctx.attackerElemental,
+                    ctx.breakdown, ctx.attackType != null ? ctx.attackType : AttackType.UNKNOWN,
+                    ctx.spellElement, ctx.rpgBaseDamage, ctx.attackTypeMultiplier,
+                    ctx.conditionalMultiplier
+                );
+                LOGGER.atInfo().log("[COMBAT-DEBUG]\n%s", logDump);
+            } catch (Exception e) {
+                LOGGER.at(Level.WARNING).log("[CombatDebug] Failed to send debug dump: %s", e.getMessage());
+            }
+        }
 
         // ========== PHASE 5: POST-CALC ADJUSTMENTS ==========
         applyPostCalcModifications(store, commandBuffer, damage, ctx);
 
         // ========== PHASE 5.5: ACTIVE BLOCKING REDUCTION ==========
         // Must run BEFORE Phase 6 (indicators) so damage numbers reflect the reduced amount.
-        applyActiveBlockingReduction(store, damage, commandBuffer, ctx);
+        {
+            var blockResult = avoidanceResultHandler.applyActiveBlockingReduction(
+                store, ctx.defenderRef, ctx.defenderStats, ctx.rpgDamage);
+            if (blockResult.wasBlocking()) {
+                ctx.rpgDamage = blockResult.newDamage();
+                ctx.trace.setActiveBlocking(blockResult.hasShield(), blockResult.reductionPercent(),
+                    blockResult.preDamage(), blockResult.newDamage());
+                // Combat Effect Hooks: Block
+                float blockedDamage = blockResult.preDamage() - blockResult.newDamage();
+                if (combatEffectRegistry != null && blockedDamage > 0 && ctx.defenderUuid != null) {
+                    CombatEffectContext blockCtx = ctx.toEffectContext(damage, store, commandBuffer);
+                    combatEffectRegistry.runOnBlock(ctx.defenderUuid, blockedDamage, ctx.rpgDamage, blockCtx);
+                }
+            }
+        }
 
         // ========== PHASE 6: METADATA & TRIGGERS ==========
         emitCombatFeedback(index, archetypeChunk, store, commandBuffer, damage, ctx);
 
         // ========== PHASE 7: RECOVERY & THORNS ==========
-        processRecoveryAndThorns(store, damage, ctx);
+        processRecoveryAndThorns(store, commandBuffer, damage, ctx);
 
         // ========== PHASE 7.9: FINALIZE & APPLY ==========
         finalizeAndApply(index, archetypeChunk, store, commandBuffer, damage, ctx);
@@ -612,6 +754,9 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Also determines projectile scaling: hex spells always benefit from projectileDamagePercent
         // because they require a delivery glyph (Beam/Projectile) to reach the target.
         boolean isHexSpell;
+        // When non-null, Step 2 skips this element's flat damage (already baked into hex base).
+        // Step 1 (flat spell) is also skipped. Non-main elements still enter the pipeline.
+        @Nullable ElementType hexBakedElement;
 
         // Conditional multipliers
         ConditionalResult conditionalDetail;
@@ -681,13 +826,97 @@ public class RPGDamageSystem extends DamageEventSystem {
         @Nonnull Damage damage,
         @Nonnull DamageContext ctx
     ) {
-        ctx.attackerStats = statsResolver.getAttackerStats(store, damage);
+        // ── Attacker cache: reuse attacker-side data for AoE (same attacker, many targets) ──
+        // Cache hit requires: same UUID AND same stats version. The stats version increments
+        // on every recalculateStats() call. This ensures weapon switches (which trigger
+        // recalculation) invalidate the cache, while AoE hits within the same tick reuse it.
+        UUID resolvedAttackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
+        long currentStatsVersion = (resolvedAttackerUuid != null && plugin.getAttributeManager() != null)
+            ? plugin.getAttributeManager().getStatsVersion(resolvedAttackerUuid) : 0L;
+        boolean cacheHit = (cachedAttackerCtx != null
+            && resolvedAttackerUuid != null
+            && resolvedAttackerUuid.equals(cachedAttackerUuid)
+            && cachedAttackerCtx.statsVersion() == currentStatsVersion);
+
+        if (cacheHit) {
+            // Reuse cached attacker data — avoids 6-8 redundant lookups per target
+            ctx.attackerStats = cachedAttackerCtx.attackerStats();
+            ctx.attackerElemental = cachedAttackerCtx.attackerElemental();
+            ctx.attackerUuid = resolvedAttackerUuid;
+        } else {
+            // Cache miss — resolve fresh
+            ctx.attackerStats = statsResolver.getAttackerStats(store, damage);
+            ctx.attackerElemental = statsResolver.getAttackerElementalStats(store, damage);
+            ctx.attackerUuid = resolvedAttackerUuid;
+        }
+
+        // ── Weapon staleness detector + self-healing ──
+        // HotbarSlotTrackingSystem tracks weapon identity per-tick and triggers recalculation
+        // on any change. If a stale weapon reaches combat despite that, this detector:
+        //   1. Invalidates the AoE attacker cache (so this hit doesn't propagate stale data)
+        //   2. Re-resolves stats fresh from AttributeService for the CURRENT attack
+        //   3. Defers a full recalculateStats() to the next tick (can't do it inline in ECS)
+        if (ctx.attackerStats != null && resolvedAttackerUuid != null
+                && !(damage.getSource() instanceof Damage.EnvironmentSource)) {
+            try {
+                PlayerRef validationRef = PlayerWorldCache.findPlayerRef(resolvedAttackerUuid);
+                if (validationRef != null) {
+                    Ref<EntityStore> entityRef = validationRef.getReference();
+                    if (entityRef != null && entityRef.isValid()) {
+                        Player player = store.getComponent(entityRef, Player.getComponentType());
+                        if (player != null && player.getInventory() != null) {
+                            ItemStack liveWeapon = player.getInventory().getActiveHotbarItem();
+                            String liveRawId = (liveWeapon != null && liveWeapon.getItem() != null)
+                                ? liveWeapon.getItem().getId() : null;
+                            String cachedRawId = ctx.attackerStats.getWeaponRawItemId();
+
+                            if (!java.util.Objects.equals(liveRawId, cachedRawId)) {
+                                LOGGER.atWarning().log(
+                                    "[DmgPipeline] WEAPON STALE: live=%s cached=%s — self-healing: defer recalc + invalidate cache",
+                                    liveRawId, cachedRawId);
+
+                                // Invalidate AoE cache so no more targets use stale data
+                                cachedAttackerCtx = null;
+                                cachedAttackerUuid = null;
+
+                                // Defer a full recalculation to the next tick
+                                // (can't call recalculateStats inline during ECS damage processing)
+                                final UUID healUuid = resolvedAttackerUuid;
+                                var world = PlayerWorldCache.getPlayerWorld(healUuid).orElse(null);
+                                if (world != null && world.isAlive()) {
+                                    world.execute(() -> {
+                                        try {
+                                            io.github.larsonix.trailoforbis.api.ServiceRegistry
+                                                    .get(io.github.larsonix.trailoforbis.api.services.AttributeService.class)
+                                                    .ifPresent(svc -> {
+                                                        ComputedStats healed = svc.recalculateStats(healUuid);
+                                                        if (healed != null) {
+                                                            LOGGER.atInfo().log(
+                                                                    "[DmgPipeline] Self-healed weapon stats for %s: weapon=%s",
+                                                                    healUuid.toString().substring(0, 8),
+                                                                    healed.getWeaponRawItemId());
+                                                        }
+                                                    });
+                                        } catch (Exception e) {
+                                            LOGGER.atWarning().withCause(e).log(
+                                                    "[DmgPipeline] Self-heal recalc failed for %s", healUuid);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Best-effort detection — non-fatal
+            }
+        }
+
+        // Defender is always per-target (never cached)
         ctx.defenderStats = statsResolver.getDefenderStats(index, archetypeChunk, store);
-        ctx.attackerElemental = statsResolver.getAttackerElementalStats(store, damage);
         ctx.defenderElemental = statsResolver.getDefenderElementalStats(index, archetypeChunk, store, ctx.defenderStats);
         ctx.defenderHealthPercent = entityResolver.getDefenderHealthPercent(index, archetypeChunk, store);
         ctx.defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
-        ctx.attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
 
         // Check if this is a hex spell routed through the main pipeline.
         // Gate on HEX_SPELL_BASE_DAMAGE (always set for hex spells), not element
@@ -696,29 +925,51 @@ public class RPGDamageSystem extends DamageEventSystem {
         boolean isSpellDamage = (hexBaseMeta != null);
 
         if (isSpellDamage) {
-            // ---- Hex spell damage path ----
-            // Base = hex spell base (scaled) + weapon implicit (staff scales spell power)
+            // ── Hex spell damage: per-glyph normalization via HexSpellNormalizer ──
             ElementType spellElementMeta = damage.getIfPresentMetaObject(HEX_SPELL_ELEMENT);
             ctx.attackType = AttackType.SPELL;
             ctx.isHexSpell = true;
-            ctx.spellElement = spellElementMeta; // May be null for unmapped spells (physical magic)
+            ctx.spellElement = spellElementMeta;
             ctx.rpgWeaponDamage = (ctx.attackerStats != null) ? ctx.attackerStats.getWeaponBaseDamage() : 0f;
             ctx.hasRpgWeapon = (ctx.attackerStats != null) && ctx.attackerStats.isHoldingRpgGear();
+            ctx.attackTypeMultiplier = 1.0f;
 
-            // Apply spell_base_multiplier to hex base damage to prevent double-scaling
-            // with our spell stats pipeline. Weapon implicit stays at full value.
-            float scaledHexBase = hexBaseMeta;
-            HexcodeSpellConfig spellCfg = plugin.getConfigManager().getHexcodeSpellConfig();
-            if (spellCfg != null) {
-                scaledHexBase = Math.max(0f, hexBaseMeta * spellCfg.getSpell_base_multiplier());
+            String spellSourceType = damage.getIfPresentMetaObject(HEX_SPELL_SOURCE_TYPE);
+
+            // Resolve caster's base magic power (pre-echo)
+            boolean isConstruct = HexDamageAttributor.isConstructSource(spellSourceType);
+            float hexMagicPower;
+            if (isConstruct && ctx.attackerUuid != null) {
+                hexMagicPower = HexCastStateStore.getBasePowerForPlayer(ctx.attackerUuid);
+            } else {
+                hexMagicPower = HexCastStateStore.getCurrentBasePower();
             }
-            ctx.rpgBaseDamage = scaledHexBase + ctx.rpgWeaponDamage;
-            ctx.attackTypeMultiplier = 1.0f; // No light/heavy differentiation for spells
 
-            LOGGER.at(Level.FINE).log("[DmgPipeline] HEX SPELL damage: element=%s, hexBase=%.1f (×%.2f=%.1f) + weaponImplicit=%.1f = %.1f",
-                spellElementMeta != null ? spellElementMeta.name() : "NONE",
-                hexBaseMeta, spellCfg != null ? spellCfg.getSpell_base_multiplier() : 1.0f,
-                scaledHexBase, ctx.rpgWeaponDamage, ctx.rpgBaseDamage);
+            // Compute RPG power from player stats
+            float weaponBase = ctx.rpgWeaponDamage;
+            float flatSpell = (ctx.attackerStats != null) ? ctx.attackerStats.getSpellDamage() : 0f;
+            float flatElemental = 0f;
+            if (spellElementMeta != null && ctx.attackerElemental != null) {
+                flatElemental = (float) ctx.attackerElemental.getFlatDamage(spellElementMeta);
+            }
+            float ourRPGPower = Math.max(1f, weaponBase + flatSpell + flatElemental);
+
+            // Per-glyph normalization: config-driven profile handles LINEAR/PHYSICS/FIXED
+            HexcodeSpellConfig hexCfg = plugin.getConfigManager().getHexcodeSpellConfig();
+            float slotDefault = (spellSourceType != null)
+                    ? HexcodeCompat.getGlyphBasePower(spellSourceType) : 0f;
+
+            if (hexCfg != null && spellSourceType != null && hexMagicPower > 0 && ctx.attackerStats != null) {
+                HexcodeSpellConfig.SpellBalanceProfile profile =
+                        hexCfg.getSpellBalance(spellSourceType, slotDefault);
+                float glyphMultiplier = HexSpellNormalizer.normalize(
+                        spellSourceType, hexBaseMeta, hexMagicPower, profile);
+                ctx.rpgBaseDamage = ourRPGPower * glyphMultiplier;
+            } else {
+                // Fallback: unmapped glyph, no hex power, or mob caster
+                ctx.rpgBaseDamage = hexBaseMeta;
+            }
+            ctx.hexBakedElement = spellElementMeta;
         } else {
             // ---- Normal melee/projectile/area path ----
             ctx.attackType = classifier.detectAttackType(store, damage);
@@ -774,7 +1025,7 @@ public class RPGDamageSystem extends DamageEventSystem {
             } else {
                 // Vanilla weapon or unarmed: use vanilla damage directly, no attack type adjustment
                 // (vanilla damage already includes attack type differentiation)
-                ctx.rpgBaseDamage = getWeaponBaseDamage(damage, ctx.attackerStats, ctx.vanillaDamage, store);
+                ctx.rpgBaseDamage = mobDamageResolver.getWeaponBaseDamage(damage, ctx.attackerStats, ctx.vanillaDamage, store);
                 ctx.attackTypeMultiplier = 1.0f;
             }
 
@@ -789,7 +1040,7 @@ public class RPGDamageSystem extends DamageEventSystem {
                     // Use the weapon's fixed element if available, otherwise fall back to
                     // player's dominant attribute element (for legacy "spell_damage" staves)
                     ElementType fixedElement = ctx.attackerStats.getWeaponSpellElement();
-                    ctx.spellElement = fixedElement != null ? fixedElement : resolveDominantSpellElement(ctx.attackerElemental);
+                    ctx.spellElement = fixedElement != null ? fixedElement : mobDamageResolver.resolveDominantSpellElement(ctx.attackerElemental);
                     ctx.attackTypeMultiplier = 1.0f; // No light/heavy differentiation for spells
                     LOGGER.at(Level.FINE).log("[DmgPipeline] Magic weapon override: %s → SPELL (element=%s, fixed=%s)",
                         weaponItemId, ctx.spellElement != null ? ctx.spellElement.name() : "NONE",
@@ -811,15 +1062,33 @@ public class RPGDamageSystem extends DamageEventSystem {
             }
         }
 
-        // Resolve attacker level for armor formula (needed BEFORE calculator runs)
-        ctx.attackerLevel = resolveAttackerLevel(store, damage);
+        // Resolve attacker level: use cache or resolve fresh
+        if (cacheHit) {
+            ctx.attackerLevel = cachedAttackerCtx.attackerLevel();
+        } else {
+            ctx.attackerLevel = resolveAttackerLevel(store, damage);
+
+            // Update attacker cache for subsequent targets in this AoE burst.
+            // Only cache player attackers (mob attackers have per-entity stats, no sharing benefit).
+            if (resolvedAttackerUuid != null) {
+                Ref<EntityStore> currentAttackerRef = entityResolver.getAttackerRef(store, damage);
+                cachedAttackerUuid = resolvedAttackerUuid;
+                cachedAttackerCtx = new io.github.larsonix.trailoforbis.combat.context.AttackerContext(
+                    currentAttackerRef, resolvedAttackerUuid,
+                    ctx.attackerStats, ctx.attackerElemental, ctx.attackerLevel,
+                    ctx.hasRpgWeapon, ctx.rpgWeaponDamage,
+                    ctx.attackerStats != null ? ctx.attackerStats.getWeaponItemId() : null,
+                    currentStatsVersion
+                );
+            }
+        }
 
         // Log attack type
         LOGGER.at(Level.FINE).log("[DmgPipeline] Attack type: %s, attackerLevel: %d", ctx.attackType, ctx.attackerLevel);
 
         // Log attacker/defender stats (FINE-level)
-        logAttackerStats(ctx.attackerStats, ctx.attackerElemental, ctx.hasRpgWeapon, ctx.rpgWeaponDamage);
-        logDefenderStats(ctx.defenderStats, ctx.defenderElemental);
+        CombatDebugLogger.logAttackerStats(ctx.attackerStats, ctx.attackerElemental, ctx.hasRpgWeapon, ctx.rpgWeaponDamage);
+        CombatDebugLogger.logDefenderStats(ctx.defenderStats, ctx.defenderElemental);
 
         // Calculate conditional multipliers with full detail for traced output
         ctx.conditionalDetail = multiplierCalculator.calculateDetailed(
@@ -965,7 +1234,7 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // Realm PLAYER_VULNERABILITY — player takes increased damage
         if (ctx.defenderUuid != null && ctx.rpgDamage > 0) {
-            int vulnPercent = getRealmPlayerVulnerability(ctx.defenderUuid);
+            int vulnPercent = realmModifierProcessor.getRealmPlayerVulnerability(ctx.defenderUuid);
             if (vulnPercent > 0) {
                 ctx.rpgDamage *= (1.0f + vulnPercent / 100.0f);
             }
@@ -974,7 +1243,7 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Realm ARMORED_MONSTERS — mob takes reduced physical damage (extra armor)
         if (ctx.rpgDamage > 0 && ctx.defenderUuid == null) {
             // defenderUuid is null for mobs (only set for player defenders)
-            int armorBonus = getRealmArmoredMonstersBonus(store, ctx.defenderRef);
+            int armorBonus = realmModifierProcessor.getRealmArmoredMonstersBonus(store, ctx.defenderRef);
             if (armorBonus > 0) {
                 // Reduce damage as if mob had extra armor (physical attacks only)
                 // Formula: 40% armor bonus = 20% less damage. Capped at 75% max reduction.
@@ -987,7 +1256,7 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // Realm MONSTERS_EXTRA_[ELEMENT] — mob deals bonus elemental damage to player
         if (ctx.defenderUuid != null && ctx.rpgDamage > 0 && ctx.defenderElemental != null) {
-            float elementalBonus = calculateRealmElementalBonusDamage(
+            float elementalBonus = realmModifierProcessor.calculateRealmElementalBonusDamage(
                 store, damage, ctx.rpgDamage, ctx.defenderElemental);
             if (elementalBonus > 0) {
                 ctx.rpgDamage += elementalBonus;
@@ -1016,7 +1285,7 @@ public class RPGDamageSystem extends DamageEventSystem {
         }
 
         // Log damage breakdown (FINE-level)
-        logDamageBreakdown(ctx.breakdown, ctx.rpgBaseDamage, ctx.attackTypeMultiplier, ctx.conditionalMultiplier,
+        CombatDebugLogger.logDamageBreakdown(ctx.breakdown, ctx.rpgBaseDamage, ctx.attackTypeMultiplier, ctx.conditionalMultiplier,
             ctx.attackerStats, ctx.defenderStats, ctx.attackerElemental, ctx.defenderElemental, ctx.rpgDamage);
     }
 
@@ -1103,8 +1372,8 @@ public class RPGDamageSystem extends DamageEventSystem {
         DeathRecapRecorder.AttackerInfo attackerInfo = deathRecapRecorder.getAttackerInfo(store, damage);
 
         // Extract raw elemental resistances for combat log display
-        Map<ElementType, Float> defenderRawResistances = extractRawResistances(ctx.defenderElemental);
-        Map<ElementType, Float> attackerElemPenetration = extractPenetration(ctx.attackerElemental);
+        Map<ElementType, Float> defenderRawResistances = CombatDebugLogger.extractRawResistances(ctx.defenderElemental);
+        Map<ElementType, Float> attackerElemPenetration = CombatDebugLogger.extractPenetration(ctx.attackerElemental);
 
         CombatSnapshot snapshot = CombatSnapshot.fromBreakdown(
             ctx.breakdown, attackerInfo.name(), attackerInfo.type(), attackerInfo.level(), attackerInfo.mobClass(),
@@ -1133,7 +1402,7 @@ public class RPGDamageSystem extends DamageEventSystem {
                     healAmount *= (1f + recoveryMult / 100f);
                 }
                 // Apply realm REDUCED_HEALING modifier (defender is the healer)
-                healAmount *= getRealmHealingMultiplier(ctx.defenderUuid);
+                healAmount *= realmModifierProcessor.getRealmHealingMultiplier(ctx.defenderUuid);
                 if (healAmount > 0) {
                     recoveryProcessor.applyBlockHeal(index, archetypeChunk, store, healAmount);
                 }
@@ -1142,7 +1411,7 @@ public class RPGDamageSystem extends DamageEventSystem {
             float counterPct = ctx.defenderStats.getBlockCounterDamage();
             if (counterPct > 0 && preBlockDamage > 0) {
                 float counterDamage = preBlockDamage * (counterPct / 100f);
-                applyBlockCounterDamage(store, damage, counterDamage);
+                avoidanceResultHandler.applyBlockCounterDamage(store, damage, counterDamage);
             }
 
             // Fire block trigger for conditional effects
@@ -1158,6 +1427,23 @@ public class RPGDamageSystem extends DamageEventSystem {
      */
     private void processRecoveryAndThorns(
         @Nonnull Store<EntityStore> store,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
+        @Nonnull Damage damage,
+        @Nonnull DamageContext ctx
+    ) {
+        // Set hinted attacker for recovery processor (avoids 6 redundant resolveTrueAttacker calls)
+        Ref<EntityStore> attackerRef = entityResolver.getAttackerRef(store, damage);
+        recoveryProcessor.setHintedAttacker(attackerRef);
+        try {
+        processRecoveryAndThornsInner(store, commandBuffer, damage, ctx);
+        } finally {
+            recoveryProcessor.clearHintedAttacker();
+        }
+    }
+
+    private void processRecoveryAndThornsInner(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
         @Nonnull Damage damage,
         @Nonnull DamageContext ctx
     ) {
@@ -1167,12 +1453,11 @@ public class RPGDamageSystem extends DamageEventSystem {
             float healthRecoveryPct = ctx.attackerStats.getHealthRecoveryPercent();
             boolean didHealHealth = false;
 
-            // Resolve realm REDUCED_HEALING multiplier for the attacker (once per damage event)
-            UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
-            float realmHealMult = getRealmHealingMultiplier(attackerUuid);
+            // Use pre-resolved attacker UUID from context (avoids redundant resolution)
+            float realmHealMult = realmModifierProcessor.getRealmHealingMultiplier(ctx.attackerUuid);
 
             // Berserker's Rage: life steal capped at 50% max HP
-            float leechCap = getBerserkersRageLeechCap(attackerUuid, store, damage);
+            float leechCap = realmModifierProcessor.getBerserkersRageLeechCap(ctx.attackerUuid, store, damage);
 
             // Life Leech - always heals from damage dealt
             float lifeLeech = ctx.attackerStats.getLifeLeech();
@@ -1240,17 +1525,44 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Thorns Application
         // After damage is dealt, if defender has thorns/reflect stats, deal damage back to attacker.
         // Formula: thornsDamage x (1 + thornsDamagePercent/100) + damageTaken x (reflectDamagePercent/100)
-        // Thorns is non-lethal (attacker left at 1 HP minimum).
+        // Thorns is lethal — attacker can be killed by thorns damage.
         if (ctx.defenderStats != null && ctx.rpgDamage > 0) {
             float thornsDamage = ctx.defenderStats.getThornsDamage();
             float reflectPercent = ctx.defenderStats.getReflectDamagePercent();
+
+            // Add Reflective mob modifier reflect% if defender is a modified mob
+            if (ctx.defenderRef != null && ctx.defenderRef.isValid()) {
+                ComponentType<EntityStore, MobModifierComponent> modType = plugin.getMobModifierComponentType();
+                if (modType != null) {
+                    MobModifierComponent mobMods = store.getComponent(ctx.defenderRef, modType);
+                    if (mobMods != null && mobMods.hasModifier(ModifierType.REFLECTIVE)) {
+                        float modReflect = (float) (ModifierType.REFLECTIVE.getStatBonus().reflectPercent() * 100);
+                        reflectPercent += modReflect;
+                    }
+                }
+            }
 
             if (thornsDamage > 0 || reflectPercent > 0) {
                 float thornsPercent = ctx.defenderStats.getThornsDamagePercent();
                 float flatThorns = thornsDamage * (1f + thornsPercent / 100f);
                 float reflected = ctx.rpgDamage * (reflectPercent / 100f);
                 ctx.trace.setThorns(thornsDamage, thornsPercent, reflectPercent, flatThorns + reflected);
-                recoveryProcessor.applyThornsDamage(store, damage, ctx.defenderStats, ctx.rpgDamage);
+                Ref<EntityStore> killedAttacker = recoveryProcessor.applyThornsDamage(
+                    store, damage, ctx.defenderStats, ctx.rpgDamage);
+
+                // Thorns was lethal — trigger death on the attacker
+                if (killedAttacker != null && killedAttacker.isValid()) {
+                    ComponentType<EntityStore, MobScalingComponent> scalingType = plugin.getMobScalingComponentType();
+                    if (scalingType != null) {
+                        MobScalingComponent scaling = store.getComponent(killedAttacker, scalingType);
+                        if (scaling != null) {
+                            scaling.setDying(true);
+                        }
+                    }
+                    markMobDamaged(killedAttacker, store);
+                    DeathComponent.tryAddComponent(commandBuffer, killedAttacker, damage);
+                    LOGGER.atInfo().log("Thorns killed attacker — DeathComponent added");
+                }
             }
 
             // Block heal/counter handled in emitCombatFeedback (Phase 6) which has index/archetypeChunk
@@ -1261,198 +1573,14 @@ public class RPGDamageSystem extends DamageEventSystem {
             CombatEffectContext effectCtx = ctx.toEffectContext(damage, store, null);
             float extraRecovery = combatEffectRegistry.runOnRecovery(ctx.attackerUuid, effectCtx);
             if (extraRecovery > 0 && ctx.attackerStats != null) {
+                // Apply Health Recovery multiplier (consistent with leech/steal paths)
+                float recoveryPct = ctx.attackerStats.getHealthRecoveryPercent();
+                if (recoveryPct != 0) {
+                    extraRecovery *= (1.0f + recoveryPct / 100.0f);
+                }
                 recoveryProcessor.applyLifeLeech(store, damage, extraRecovery);
             }
         }
-    }
-
-    /**
-     * Returns the maximum HP that can be recovered via leech/steal for this attacker.
-     * If Berserker's Rage is active, caps recovery to not exceed 50% max HP.
-     * Returns Float.MAX_VALUE if no cap applies.
-     */
-    private float getBerserkersRageLeechCap(@Nullable UUID attackerUuid,
-                                             @Nonnull Store<EntityStore> store,
-                                             @Nonnull Damage damage) {
-        if (attackerUuid == null || combatEffectRegistry == null) return Float.MAX_VALUE;
-
-        // Check if berserkers_rage is active for this player
-        boolean hasRage = combatEffectRegistry.getActiveEffects(attackerUuid).stream()
-            .anyMatch(e -> "berserkers_rage".equals(e.getId()));
-        if (!hasRage) return Float.MAX_VALUE;
-
-        // Resolve attacker HP to enforce the 50% cap
-        Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
-        if (atkRef == null || !atkRef.isValid()) return Float.MAX_VALUE;
-
-        try {
-            EntityStatMap statMap = store.getComponent(atkRef, EntityStatMap.getComponentType());
-            if (statMap == null) return Float.MAX_VALUE;
-            EntityStatValue hpStat = statMap.get(DefaultEntityStatTypes.getHealth());
-            if (hpStat == null) return Float.MAX_VALUE;
-
-            float currentHp = hpStat.get();
-            float maxHp = hpStat.getMax();
-            float capHp = maxHp * 0.50f;
-
-            if (currentHp >= capHp) {
-                return 0f; // Already at or above 50% — no leech allowed
-            }
-            return capHp - currentHp; // Only heal up to the 50% threshold
-        } catch (Exception e) {
-            return Float.MAX_VALUE;
-        }
-    }
-
-    /** Mapping of elemental modifier types to their element. */
-    private static final java.util.Map<RealmModifierType, ElementType> ELEMENTAL_MODIFIERS = java.util.Map.of(
-        RealmModifierType.MONSTERS_EXTRA_FIRE, ElementType.FIRE,
-        RealmModifierType.MONSTERS_EXTRA_WATER, ElementType.WATER,
-        RealmModifierType.MONSTERS_EXTRA_LIGHTNING, ElementType.LIGHTNING,
-        RealmModifierType.MONSTERS_EXTRA_EARTH, ElementType.EARTH,
-        RealmModifierType.MONSTERS_EXTRA_WIND, ElementType.WIND,
-        RealmModifierType.MONSTERS_EXTRA_VOID, ElementType.VOID
-    );
-
-    /**
-     * Calculates bonus elemental damage from realm MONSTERS_EXTRA_[ELEMENT] modifiers.
-     *
-     * <p>When a realm mob attacks a player, each elemental modifier adds bonus damage
-     * of that element, reduced by the player's resistance.
-     *
-     * @param store The entity store
-     * @param damage The damage event (to resolve attacker's realm)
-     * @param baseDamage The base damage dealt (before elemental bonus)
-     * @param defenderElemental The defender's elemental stats (for resistance)
-     * @return Total bonus elemental damage to add
-     */
-    private float calculateRealmElementalBonusDamage(
-            @Nonnull Store<EntityStore> store,
-            @Nonnull Damage damage,
-            float baseDamage,
-            @Nonnull ElementalStats defenderElemental) {
-
-        // Resolve the attacker's realm (mob → realm)
-        Ref<EntityStore> attackerRef = entityResolver.getAttackerRef(store, damage);
-        if (attackerRef == null) {
-            return 0f;
-        }
-        RealmMobComponent realmMob = store.getComponent(attackerRef, RealmMobComponent.getComponentType());
-        if (realmMob == null || realmMob.getRealmId() == null) {
-            return 0f;
-        }
-        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-        if (rpg == null) {
-            return 0f;
-        }
-        RealmsManager rm = rpg.getRealmsManager();
-        if (rm == null) {
-            return 0f;
-        }
-        Optional<RealmInstance> realmOpt = rm.getRealm(realmMob.getRealmId());
-        if (realmOpt.isEmpty()) {
-            return 0f;
-        }
-
-        // Check each elemental modifier
-        float totalBonus = 0f;
-        var mapData = realmOpt.get().getMapData();
-        for (var entry : ELEMENTAL_MODIFIERS.entrySet()) {
-            int modValue = mapData.getModifierValue(entry.getKey());
-            if (modValue > 0) {
-                ElementType element = entry.getValue();
-                float rawBonus = baseDamage * (modValue / 100.0f);
-                // Reduce by player's resistance to this element
-                double resistance = defenderElemental.getResistance(element);
-                float afterResist = rawBonus * (1.0f - (float) (resistance / 100.0));
-                if (afterResist > 0) {
-                    totalBonus += afterResist;
-                }
-            }
-        }
-        return totalBonus;
-    }
-
-    /**
-     * Returns the ARMORED_MONSTERS modifier value for a realm mob defender.
-     *
-     * @param store The entity store
-     * @param defenderRef The defender entity reference (mob)
-     * @return Armor bonus percentage (0 if not a realm mob or no modifier)
-     */
-    private int getRealmArmoredMonstersBonus(@Nonnull Store<EntityStore> store, @Nullable Ref<EntityStore> defenderRef) {
-        if (defenderRef == null || !defenderRef.isValid()) {
-            return 0;
-        }
-        RealmMobComponent realmMob = store.getComponent(defenderRef, RealmMobComponent.getComponentType());
-        if (realmMob == null || realmMob.getRealmId() == null) {
-            return 0;
-        }
-        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-        if (rpg == null) {
-            return 0;
-        }
-        RealmsManager rm = rpg.getRealmsManager();
-        if (rm == null) {
-            return 0;
-        }
-        Optional<RealmInstance> realmOpt = rm.getRealm(realmMob.getRealmId());
-        if (realmOpt.isEmpty()) {
-            return 0;
-        }
-        return realmOpt.get().getMapData().getModifierValue(RealmModifierType.ARMORED_MONSTERS);
-    }
-
-    /**
-     * Returns the PLAYER_VULNERABILITY modifier value for a player in a realm.
-     *
-     * @param defenderUuid The player UUID being damaged
-     * @return Vulnerability percentage (0 if not in realm or no modifier)
-     */
-    private int getRealmPlayerVulnerability(@Nonnull UUID defenderUuid) {
-        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-        if (rpg == null) {
-            return 0;
-        }
-        RealmsManager rm = rpg.getRealmsManager();
-        if (rm == null) {
-            return 0;
-        }
-        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(defenderUuid);
-        if (realmOpt.isEmpty()) {
-            return 0;
-        }
-        return realmOpt.get().getMapData().getModifierValue(RealmModifierType.PLAYER_VULNERABILITY);
-    }
-
-    /**
-     * Returns the healing multiplier from the REDUCED_HEALING realm modifier.
-     *
-     * <p>If the healer is inside a realm with REDUCED_HEALING, returns a value
-     * less than 1.0 (e.g., 0.6 for 40% reduced healing). Returns 1.0 if not
-     * in a realm or no modifier is present.
-     *
-     * @param healerUuid The UUID of the player receiving healing (may be null)
-     * @return Healing multiplier in range (0, 1.0]
-     */
-    private float getRealmHealingMultiplier(@Nullable UUID healerUuid) {
-        if (healerUuid == null) {
-            return 1.0f;
-        }
-        TrailOfOrbis rpg = TrailOfOrbis.getInstanceOrNull();
-        if (rpg == null) {
-            return 1.0f;
-        }
-        RealmsManager rm = rpg.getRealmsManager();
-        if (rm == null) {
-            return 1.0f;
-        }
-        Optional<RealmInstance> realmOpt = rm.getPlayerRealm(healerUuid);
-        if (realmOpt.isEmpty()) {
-            return 1.0f;
-        }
-        int reduction = realmOpt.get().getMapData().getModifierValue(RealmModifierType.REDUCED_HEALING);
-        return reduction > 0 ? 1.0f - (reduction / 100.0f) : 1.0f;
     }
 
     /**
@@ -1466,22 +1594,66 @@ public class RPGDamageSystem extends DamageEventSystem {
         @Nonnull Damage damage,
         @Nonnull DamageContext ctx
     ) {
-        // Fetch per-source stat breakdowns for trace (only for players, ~1ms cost)
-        Ref<EntityStore> traceAttackerRef = entityResolver.getAttackerRef(store, damage);
-        if (traceAttackerRef != null) {
-            PlayerRef attackerPlayer = store.getComponent(traceAttackerRef, PlayerRef.getComponentType());
-            if (attackerPlayer != null && attackerPlayer.isValid()) {
-                ctx.trace.setAttackerBreakdown(
-                    plugin.getAttributeManager().getStatBreakdown(attackerPlayer.getUuid()));
+        // Fetch per-source stat breakdowns for trace — only when combat detail mode is on.
+        // This costs ~1ms per player and is only used for the /combatdetail chat breakdown.
+        // For AoE (40+ hits), skipping this saves ~40-80ms.
+        boolean needsBreakdown = (ctx.attackerUuid != null && plugin.isCombatDetailEnabled(ctx.attackerUuid))
+            || (ctx.defenderUuid != null && plugin.isCombatDetailEnabled(ctx.defenderUuid));
+        if (needsBreakdown) {
+            Ref<EntityStore> traceAttackerRef = entityResolver.getAttackerRef(store, damage);
+            if (traceAttackerRef != null) {
+                PlayerRef attackerPlayer = store.getComponent(traceAttackerRef, PlayerRef.getComponentType());
+                if (attackerPlayer != null && attackerPlayer.isValid()) {
+                    ctx.trace.setAttackerBreakdown(
+                        plugin.getAttributeManager().getStatBreakdown(attackerPlayer.getUuid()));
+                }
             }
-        }
-        PlayerRef defenderPlayer = store.getComponent(ctx.defenderRef, PlayerRef.getComponentType());
-        if (defenderPlayer != null && defenderPlayer.isValid()) {
-            ctx.trace.setDefenderBreakdown(
-                plugin.getAttributeManager().getStatBreakdown(defenderPlayer.getUuid()));
+            PlayerRef defenderPlayer = store.getComponent(ctx.defenderRef, PlayerRef.getComponentType());
+            if (defenderPlayer != null && defenderPlayer.isValid()) {
+                ctx.trace.setDefenderBreakdown(
+                    plugin.getAttributeManager().getStatBreakdown(defenderPlayer.getUuid()));
+            }
         }
 
         if (ctx.attackType == AttackType.SPELL && ctx.isHexSpell) {
+            // ── Two-Layer Volatility Damage Scaling ──
+            // Layer 1 (across-cast): startingBudget / volatilityMax — penalizes repeated casting
+            //   without redrawing. Exponent from config (default 1.5).
+            // Layer 2 (within-cast): remainingBudget / startingBudget — penalizes later glyphs
+            //   in a multi-glyph chain. Linear by default (exponent 1.0).
+            // Construct damage (Glaciate, Ensnare, Phase) fires on later ticks without the
+            // active tracker — both ratios return 1.0, which is correct (construct balance
+            // is mana-based via CostScaledGlyphWrapper).
+            HexcodeSpellConfig hexCfg = plugin.getConfigManager().getHexcodeSpellConfig();
+
+            // Layer 1: across-cast decay
+            float acrossCastRatio = HexCastStateStore.getVolatilityRatio();
+            float acrossMult = 1.0f;
+            if (acrossCastRatio < 1.0f) {
+                float acrossExp = hexCfg != null ? hexCfg.getVolatilityRatioExponent() : 1.5f;
+                acrossMult = (float) Math.pow(acrossCastRatio, acrossExp);
+            }
+
+            // Layer 2: within-cast depletion
+            float withinMult = 1.0f;
+            if (hexCfg == null || hexCfg.isWithinCastVolatilityScaling()) {
+                float withinCastRatio = HexCastStateStore.getWithinCastVolatilityRatio();
+                if (withinCastRatio < 1.0f) {
+                    float withinExp = hexCfg != null ? hexCfg.getWithinCastExponent() : 1.0f;
+                    withinMult = (withinExp == 1.0f)
+                            ? withinCastRatio
+                            : (float) Math.pow(withinCastRatio, withinExp);
+                }
+            }
+
+            float combinedMult = acrossMult * withinMult;
+            if (combinedMult < 1.0f) {
+                ctx.rpgDamage *= combinedMult;
+                LOGGER.atFine().log("[SpellDmg] Volatility scaling: across=%.2f within=%.2f → combined=%.3f → damage=%.0f",
+                        acrossCastRatio, HexCastStateStore.getWithinCastVolatilityRatio(),
+                        combinedMult, ctx.rpgDamage);
+            }
+
             // Hex spells: set amount to RPG value and let Hytale's pipeline apply health subtraction.
             // This preserves downstream Hexcode systems (Erode, Fortify in FilterDamageGroup)
             // that process the damage event after us. Do NOT cancel the event.
@@ -1500,6 +1672,8 @@ public class RPGDamageSystem extends DamageEventSystem {
                         scaling.setDying(true);
                     }
                 }
+                markMobDamaged(ctx.defenderRef, store);
+                fireModifierDeathTriggers(ctx.defenderRef, store);
                 triggerHandler.fireOnKillTrigger(store, damage);
                 // ── Combat Effect Hooks: On Kill ──
                 if (combatEffectRegistry != null && ctx.attackerUuid != null) {
@@ -1510,6 +1684,7 @@ public class RPGDamageSystem extends DamageEventSystem {
             } else {
                 triggerHandler.fireWhenHitTrigger(index, archetypeChunk, store);
             }
+            markMobDamaged(ctx.defenderRef, store);
 
             LOGGER.at(Level.FINE).log("[SpellDmg] Final: rpg=%.1f, passing to Hytale pipeline (uncancelled)",
                 ctx.rpgDamage);
@@ -1596,324 +1771,6 @@ public class RPGDamageSystem extends DamageEventSystem {
             entityStatsOnHit.length, hits);
     }
 
-    // ==================== DOT Handling ====================
-
-    private void handleDOTDamage(
-        int index,
-        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
-        @Nonnull Store<EntityStore> store,
-        @Nonnull CommandBuffer<EntityStore> commandBuffer,
-        @Nonnull Damage damage
-    ) {
-        float baseDamage = damage.getAmount();
-        if (baseDamage <= 0 || damage.isCancelled()) {
-            return;
-        }
-
-        Ref<EntityStore> defenderRef = archetypeChunk.getReferenceTo(index);
-        if (defenderRef == null || !defenderRef.isValid()) {
-            return;
-        }
-
-        EntityStatMap statMap = store.getComponent(defenderRef, EntityStatMap.getComponentType());
-        if (statMap == null) {
-            return;
-        }
-
-        int healthIndex = DefaultEntityStatTypes.getHealth();
-        EntityStatValue healthStat = statMap.get(healthIndex);
-        if (healthStat == null) {
-            return;
-        }
-        float healthBefore = healthStat.get();
-
-        ComputedStats defenderStats = statsResolver.getDefenderStats(index, archetypeChunk, store);
-        ElementalStats defenderElemental = statsResolver.getDefenderElementalStats(index, archetypeChunk, store, defenderStats);
-        DamageCause damageCause = DamageTypeClassifier.getDamageCause(damage);
-        ElementType dotElement = classifier.getElementFromDOTCause(damageCause);
-
-        int dotAttackerLevel = resolveAttackerLevel(store, damage);
-        DamageBreakdown breakdown = getRPGCalculator().calculateDOT(
-            baseDamage, defenderStats, defenderElemental, dotElement, dotAttackerLevel);
-
-        float rpgDamage = breakdown.totalDamage();
-
-        // Apply shock amplification: if target is shocked, DOT damage is increased
-        UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
-        if (defenderUuid != null && plugin.getAilmentTracker() != null) {
-            float shockAmp = plugin.getAilmentTracker().getShockDamageIncreasePercent(defenderUuid);
-            if (shockAmp > 0) {
-                float shockMult = 1f + shockAmp / 100f;
-                rpgDamage *= shockMult;
-                LOGGER.at(Level.FINE).log("DOT shock amp: %.1f%% -> damage %.1f -> %.1f",
-                    shockAmp, breakdown.totalDamage(), rpgDamage);
-            }
-        }
-
-        damage.putMetaObject(DAMAGE_TYPE, breakdown.damageType());
-        damage.putMetaObject(WAS_CRITICAL, false);
-        damage.putMetaObject(RPG_DAMAGE_VALUE, rpgDamage);
-        damage.putMetaObject(ATTACK_TYPE, AttackType.UNKNOWN);
-        damage.setAmount(0);
-
-        // Only show combat text if damage is positive — fully resisted DOTs (0.0) are silent
-        if (rpgDamage > 0f) {
-            indicatorService.sendDamageIndicatorsVisualOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
-        }
-        damage.putMetaObject(INDICATORS_SENT, true);
-
-        // SHIELD_REGEN_ON_DOT: restore energy shield to the DOT applicator
-        processShieldRegenOnDot(damage, rpgDamage, store);
-
-        // Combat Effect Hooks: DoT recovery (burn leech, DoT heal, etc.)
-        if (combatEffectRegistry != null && rpgDamage > 0) {
-            UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
-            if (attackerUuid != null) {
-                // Build minimal context for DoT recovery
-                Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
-                CombatEffectContext dotCtx = new CombatEffectContext(
-                    attackerUuid, defenderUuid, null, defenderStats,
-                    null, defenderElemental, breakdown, null,
-                    AttackType.UNKNOWN, dotElement, rpgDamage, baseDamage,
-                    healthBefore, healthStat.getMax(), false,
-                    damage, store, defenderRef, atkRef, commandBuffer, -1f
-                );
-                float dotRecovery = combatEffectRegistry.runOnRecovery(attackerUuid, dotCtx);
-                if (dotRecovery > 0) {
-                    recoveryProcessor.applyLifeLeech(store, damage, dotRecovery);
-                }
-            }
-        }
-
-        float newHealth = Math.max(0f, healthBefore - rpgDamage);
-        if (newHealth <= 0) {
-            // Set isDying flag IMMEDIATELY to prevent race condition with regen/refresh systems
-            ComponentType<EntityStore, MobScalingComponent> scalingType = plugin.getMobScalingComponentType();
-            if (scalingType != null) {
-                MobScalingComponent scaling = store.getComponent(defenderRef, scalingType);
-                if (scaling != null) {
-                    scaling.setDying(true);
-                }
-            }
-
-            damage.setAmount(rpgDamage);
-            LOGGER.at(Level.FINE).log("Lethal DOT: base=%.1f -> rpg=%.1f", baseDamage, rpgDamage);
-            return;
-        }
-
-        damage.setCancelled(true);
-        statMap.subtractStatValue(healthIndex, healthBefore - newHealth);
-        LOGGER.at(Level.FINE).log("DOT: base=%.1f -> rpg=%.1f, health: %.1f -> %.1f",
-            baseDamage, rpgDamage, healthBefore, newHealth);
-    }
-
-    /**
-     * Processes SHIELD_REGEN_ON_DOT: restores energy shield to the DOT applicator
-     * proportional to the DOT damage dealt.
-     *
-     * <p>Only fires if the source is an EntitySource (player who applied the DOT),
-     * and that player has the shieldRegenOnDot stat.
-     */
-    private void processShieldRegenOnDot(@Nonnull Damage damage, float dotDamage, @Nonnull Store<EntityStore> store) {
-        if (dotDamage <= 0) return;
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) return;
-
-        Ref<EntityStore> sourceRef = entitySource.getRef();
-        if (sourceRef == null || !sourceRef.isValid()) return;
-
-        PlayerRef sourcePlayer = store.getComponent(sourceRef, PlayerRef.getComponentType());
-        if (sourcePlayer == null) return;
-
-        UUID sourceUuid = sourcePlayer.getUuid();
-        ComputedStats sourceStats = plugin.getAttributeManager() != null
-            ? plugin.getAttributeManager().getStats(sourceUuid) : null;
-        if (sourceStats == null) return;
-
-        float regenPct = sourceStats.getShieldRegenOnDot();
-        if (regenPct <= 0) return;
-
-        float shieldRestore = dotDamage * (regenPct / 100f);
-        if (shieldRestore <= 0) return;
-
-        var shieldTracker = plugin.getEnergyShieldTracker();
-        if (shieldTracker == null) return;
-
-        float maxShield = sourceStats.getEnergyShield();
-        shieldTracker.addShield(sourceUuid, shieldRestore, maxShield);
-
-        // Notify shield HUD of change
-        if (plugin.getEnergyShieldHudManager() != null) {
-            plugin.getEnergyShieldHudManager().notifyShieldChanged(sourceUuid);
-        }
-
-        LOGGER.at(Level.FINE).log("SHIELD_REGEN_ON_DOT: %.2f shield to %s (%.0f%% of %.2f DOT damage)",
-            shieldRestore, sourceUuid.toString().substring(0, 8), regenPct, dotDamage);
-    }
-
-    // handleSpellDamage REMOVED — spell damage now routes through the main pipeline.
-    // Hex spells are detected early in handle(), metadata is set on the damage event,
-    // source is rewritten to EntitySource, and gatherCombatInputs populates the
-    // DamageContext with spell-specific inputs (AttackType.SPELL + spellElement).
-    // The full RPG calculator pipeline now handles stat scaling, avoidance, crit,
-    // recovery, and all other phases for spells.
-
-    // ==================== Environmental Damage Handling ====================
-
-    /**
-     * Handles HP-based environmental damage (lava, drowning, suffocation, etc.).
-     *
-     * <p>Environmental damage is converted from fixed values to max HP percentage-based
-     * damage. This ensures hazards scale with player progression:
-     * <ul>
-     *   <li>Early game (100 HP): 5% lava = 5 damage per tick</li>
-     *   <li>Late game (5000 HP): 5% lava = 250 damage per tick</li>
-     * </ul>
-     *
-     * <p>Fire resistance applies to fire/lava damage (capped at 75%).
-     *
-     * @param index The entity index in the archetype chunk
-     * @param archetypeChunk The archetype chunk containing the entity
-     * @param store The entity store
-     * @param commandBuffer The command buffer for entity modifications
-     * @param damage The damage event
-     */
-    private void handleEnvironmentalDamage(
-        int index,
-        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
-        @Nonnull Store<EntityStore> store,
-        @Nonnull CommandBuffer<EntityStore> commandBuffer,
-        @Nonnull Damage damage
-    ) {
-        float vanillaDamage = damage.getAmount();
-        if (vanillaDamage <= 0 || damage.isCancelled()) {
-            return;
-        }
-
-        Ref<EntityStore> defenderRef = archetypeChunk.getReferenceTo(index);
-        if (defenderRef == null || !defenderRef.isValid()) {
-            return;
-        }
-
-        EntityStatMap statMap = store.getComponent(defenderRef, EntityStatMap.getComponentType());
-        if (statMap == null) {
-            return;
-        }
-
-        int healthIndex = DefaultEntityStatTypes.getHealth();
-        EntityStatValue healthStat = statMap.get(healthIndex);
-        if (healthStat == null) {
-            return;
-        }
-        float healthBefore = healthStat.get();
-        float maxHealth = healthStat.getMax();
-
-        // Get HP% from config based on damage cause
-        DamageCause cause = DamageTypeClassifier.getDamageCause(damage);
-        String causeId = cause != null ? cause.getId() : "environment";
-        var envConfig = plugin.getConfigManager().getRPGConfig().getCombat().getEnvironmentalDamage();
-        float hpPercent = envConfig.getHpPercentForCause(causeId);
-
-        float rpgDamage;
-        if (hpPercent > 0) {
-            // Use HP-based damage with minimum 1 damage floor
-            rpgDamage = Math.max(1f, maxHealth * (hpPercent / 100f));
-            LOGGER.at(Level.FINE).log("Environmental damage '%s': %.1f%% of %.0f HP = %.1f",
-                causeId, hpPercent, maxHealth, rpgDamage);
-        } else {
-            // Fallback to vanilla fixed damage (config value = 0)
-            rpgDamage = vanillaDamage;
-            LOGGER.at(Level.FINE).log("Environmental damage '%s': using vanilla %.1f",
-                causeId, vanillaDamage);
-        }
-
-        // Apply fire resistance for fire/lava damage
-        ElementType envElement = getElementForEnvironmentalCause(causeId);
-        float resistanceReduction = 0f;
-        if (envElement != null) {
-            // Get defender's elemental stats for resistance
-            ComputedStats defenderStats = statsResolver.getDefenderStats(index, archetypeChunk, store);
-            ElementalStats defenderElemental = statsResolver.getDefenderElementalStats(
-                index, archetypeChunk, store, defenderStats);
-            if (defenderElemental != null) {
-                float resistance = (float) defenderElemental.getResistance(envElement);
-                // Cap resistance at 75%
-                resistance = Math.min(resistance, 75f);
-                if (resistance > 0) {
-                    resistanceReduction = resistance;
-                    rpgDamage *= (1f - resistance / 100f);
-                    rpgDamage = Math.max(1f, rpgDamage); // Maintain minimum 1 damage
-                    LOGGER.at(Level.FINE).log("Applied %s resistance: %.1f%% → damage reduced to %.1f",
-                        envElement.name(), resistance, rpgDamage);
-                }
-            }
-        }
-
-        // Apply damage metadata
-        DamageType damageType = envElement == ElementType.FIRE ? DamageType.MAGIC : DamageType.PHYSICAL;
-        damage.putMetaObject(DAMAGE_TYPE, damageType);
-        damage.putMetaObject(WAS_CRITICAL, false);
-        damage.putMetaObject(RPG_DAMAGE_VALUE, rpgDamage);
-        damage.putMetaObject(ATTACK_TYPE, AttackType.UNKNOWN);
-        damage.setAmount(0);
-
-        // Create a simple breakdown for indicators
-        DamageBreakdown breakdown = DamageBreakdown.simple(rpgDamage, damageType);
-
-        // Send damage indicators
-        indicatorService.sendDamageIndicatorsVisualOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
-        damage.putMetaObject(INDICATORS_SENT, true);
-
-        // Apply damage
-        float newHealth = Math.max(0f, healthBefore - rpgDamage);
-        if (newHealth <= 0) {
-            // Lethal damage - let vanilla handle death
-            damage.setAmount(rpgDamage);
-            statMap.subtractStatValue(healthIndex, healthBefore);
-
-            // Set isDying flag IMMEDIATELY to prevent race condition with regen/refresh systems
-            ComponentType<EntityStore, MobScalingComponent> scalingType = plugin.getMobScalingComponentType();
-            if (scalingType != null) {
-                MobScalingComponent scaling = store.getComponent(defenderRef, scalingType);
-                if (scaling != null) {
-                    scaling.setDying(true);
-                }
-            }
-
-            DeathComponent.tryAddComponent(commandBuffer, defenderRef, damage);
-            LOGGER.at(Level.FINE).log("Lethal environmental damage '%s': %.1f (%.1f%% HP)",
-                causeId, rpgDamage, hpPercent);
-            return;
-        }
-
-        // Non-lethal damage - cancel vanilla and apply manually
-        damage.setCancelled(true);
-        statMap.subtractStatValue(healthIndex, healthBefore - newHealth);
-        LOGGER.at(Level.FINE).log("Environmental damage '%s': %.1f, health: %.1f -> %.1f",
-            causeId, rpgDamage, healthBefore, newHealth);
-    }
-
-    /**
-     * Maps environmental damage causes to element types for resistance application.
-     *
-     * <p>Currently only fire/lava maps to FIRE resistance. Other environmental
-     * hazards (drowning, suffocation) are considered non-elemental.
-     *
-     * @param causeId The damage cause ID
-     * @return The element type, or null for non-elemental damage
-     */
-    @Nullable
-    private ElementType getElementForEnvironmentalCause(@Nullable String causeId) {
-        if (causeId == null) {
-            return null;
-        }
-        String lower = causeId.toLowerCase();
-        if (lower.contains("fire") || lower.contains("burn") || lower.contains("lava")) {
-            return ElementType.FIRE;
-        }
-        // Drowning, suffocation, void, etc. have no elemental resistance
-        return null;
-    }
-
     // ==================== Helper Methods ====================
 
     /**
@@ -1983,254 +1840,6 @@ public class RPGDamageSystem extends DamageEventSystem {
         return partyOpt.get().shouldBlockPvp(attackerPlayerRef.getUuid(), defenderPlayerRef.getUuid());
     }
 
-    /**
-     * Determines the dominant spell element for a magic weapon attack.
-     *
-     * <p>Uses the attacker's elemental stats to find which element has the highest
-     * flat damage (indicating the strongest elemental investment). Falls back to
-     * WATER (the spell attribute) if no elemental damage exists.
-     *
-     * @param elemental The attacker's elemental stats (may be null)
-     * @return The dominant element, or WATER as fallback
-     */
-    @Nonnull
-    private ElementType resolveDominantSpellElement(@Nullable ElementalStats elemental) {
-        if (elemental == null) {
-            return ElementType.WATER;
-        }
-        ElementType best = null;
-        double bestVal = 0;
-        for (ElementType type : ElementType.values()) {
-            double flat = elemental.getFlatDamage(type);
-            if (flat > bestVal) {
-                bestVal = flat;
-                best = type;
-            }
-        }
-        return best != null ? best : ElementType.WATER;
-    }
-
-    /**
-     * Gets the base damage for non-RPG weapon attacks (vanilla weapons, unarmed, mobs).
-     *
-     * <p>This method is called when the attacker does NOT have an RPG weapon equipped.
-     * For RPG weapons, the implicit damage is used directly in the main handle method.
-     *
-     * <p>Fallback order:
-     * <ul>
-     *   <li>Environment damage (fall, drowning): Uses vanilla amount</li>
-     *   <li>Mob attacks: Uses weighted RPG formula (same as mob HP)</li>
-     *   <li>Vanilla weapons: Uses vanilla calculated damage (preserves attack differentiation)</li>
-     *   <li>Truly unarmed (fists, no weapon): Uses configured unarmed base damage</li>
-     * </ul>
-     *
-     * @param damage The damage event
-     * @param attackerStats The attacker's computed stats (may be null)
-     * @param vanillaDamage The vanilla-calculated damage amount
-     * @param store The entity store for component lookup
-     * @return The base damage to use for calculations
-     */
-    private float getWeaponBaseDamage(
-        @Nonnull Damage damage,
-        @Nullable ComputedStats attackerStats,
-        float vanillaDamage,
-        @Nonnull Store<EntityStore> store
-    ) {
-        // Environment damage (fall, drowning, etc.) - keep vanilla value
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return vanillaDamage;
-        }
-
-        // Check if attacker is a scaled mob - apply weighted RPG damage formula
-        Ref<EntityStore> attackerRef = entitySource.getRef();
-        if (attackerRef != null && attackerRef.isValid()) {
-            float weightedMobDamage = calculateWeightedMobDamage(attackerRef, vanillaDamage, store);
-            if (weightedMobDamage > 0) {
-                return weightedMobDamage;
-            }
-        }
-
-        // Check if there's a damage sequence (indicates weapon attack, not fists)
-        DamageCalculatorSystems.DamageSequence damageSequence =
-            damage.getIfPresentMetaObject(DamageCalculatorSystems.DAMAGE_SEQUENCE);
-
-        if (damageSequence != null) {
-            // Vanilla weapon attack - use vanilla damage directly
-            // This preserves all attack differentiation (swing types, backstabs, signatures)
-            return vanillaDamage;
-        }
-
-        // Truly unarmed (no damage sequence = fist punch or mob attack)
-        RPGConfig.CombatConfig combatConfig = plugin.getConfigManager().getRPGConfig().getCombat();
-        float unarmedBase = combatConfig.getUnarmedBaseDamage();
-        LOGGER.at(Level.FINE).log("Unarmed attack, using base: %.1f", unarmedBase);
-        return unarmedBase;
-    }
-
-    /**
-     * Calculates weighted mob damage using the same formula as mob HP.
-     *
-     * <p><b>Weighted RPG Formula:</b> Creates parallel progression between mob HP and damage.
-     * <pre>
-     * weight = √(vanillaDamage / 10)
-     * effectiveRpg = max(rpgTargetDmg × progressiveScale, 5 × bossMultiplier)
-     * finalDamage = effectiveRpg × weight
-     * </pre>
-     *
-     * <p>This formula:
-     * <ul>
-     *   <li>Uses mob's RPG physical_damage stat as base</li>
-     *   <li>Compresses vanilla damage range via square root weight</li>
-     *   <li>Scales with progressive factor (17.8% at Lv1 → 100% at Lv30+)</li>
-     *   <li>Ensures bosses/elites deal meaningful damage</li>
-     * </ul>
-     *
-     * @param attackerRef The attacker entity reference
-     * @param vanillaDamage The vanilla base damage from Hytale attack
-     * @param store The entity store
-     * @return Weighted RPG damage, or -1 if not a scaled mob
-     */
-    private float calculateWeightedMobDamage(
-        @Nonnull Ref<EntityStore> attackerRef,
-        float vanillaDamage,
-        @Nonnull Store<EntityStore> store
-    ) {
-        ComponentType<EntityStore, MobScalingComponent> scalingType = plugin.getMobScalingComponentType();
-        if (scalingType == null) {
-            return -1f;
-        }
-
-        MobScalingComponent scaling = store.getComponent(attackerRef, scalingType);
-        if (scaling == null) {
-            return -1f;
-        }
-
-        MobStats mobStats = scaling.getStats();
-        if (mobStats == null) {
-            return -1f;
-        }
-
-        // Get RPG target damage from mob stat pool (with global balance multiplier)
-        double balanceMult = plugin.getMobScalingManager() != null
-            ? plugin.getMobScalingManager().getConfig().getBalanceMultipliers().getPhysicalDamage()
-            : 1.0;
-        double rpgTargetDmg = mobStats.physicalDamage() * balanceMult;
-        int mobLevel = scaling.getMobLevel();
-        RPGMobClass classification = scaling.getClassification();
-
-        // Get progressive scaling factor (0.15 → 1.0 based on level)
-        MobStatPoolConfig poolConfig = plugin.getMobScalingManager() != null
-            ? plugin.getMobScalingManager().getStatPoolConfig()
-            : null;
-        double progressiveScale = poolConfig != null
-            ? poolConfig.calculateScalingFactor(mobLevel)
-            : 1.0;
-
-        // Boss/Elite damage multiplier (parallel to HP multiplier)
-        double classMultiplier = switch (classification) {
-            case BOSS -> 2.0;
-            case ELITE -> 1.5;
-            default -> 1.0;
-        };
-
-        // Weight: compresses vanilla damage range via square root
-        // vanillaDamage 10 → weight 1.0
-        // vanillaDamage 40 → weight 2.0
-        // vanillaDamage 5 → weight 0.71
-        float effectiveVanilla = Math.max(vanillaDamage, 5f);
-        double weight = Math.sqrt(effectiveVanilla / 10.0);
-
-        // Effective RPG: scales with level, has a floor to prevent 0 damage
-        double minDamage = 5.0 * classMultiplier;
-        double effectiveRpg = Math.max(rpgTargetDmg * progressiveScale * classMultiplier, minDamage);
-
-        // Final damage: weighted RPG value
-        double finalDamage = effectiveRpg * weight;
-
-        LOGGER.at(Level.FINE).log(
-            "[MobDamage] Weighted formula: vanilla=%.1f, rpgTarget=%.1f, scale=%.2f, class=%s(×%.1f), weight=%.2f, final=%.1f",
-            vanillaDamage, rpgTargetDmg, progressiveScale, classification, classMultiplier, weight, finalDamage);
-
-        return (float) finalDamage;
-    }
-
-    private void handleAvoidedDamage(
-        int index,
-        @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Ref<EntityStore> defenderRef,
-        @Nonnull Damage damage,
-        @Nonnull AvoidanceProcessor.AvoidanceResult result,
-        @Nonnull AvoidanceProcessor.AvoidanceDetail avoidanceStats
-    ) {
-        // Set avoidance metadata
-        switch (result.reason()) {
-            case DODGED -> damage.putMetaObject(WAS_DODGED, true);
-            case BLOCKED -> damage.putMetaObject(WAS_BLOCKED, true);
-            case PARRIED -> damage.putMetaObject(WAS_PARRIED, true);
-            case MISSED -> damage.putMetaObject(WAS_MISSED, true);
-        }
-        damage.putMetaObject(RPG_DAMAGE_VALUE, 0f);
-        damage.setCancelled(true);
-
-        // Send avoidance indicators (floating text to attacker + defender)
-        indicatorService.sendAvoidanceIndicators(store, defenderRef, damage, result.reason());
-        damage.putMetaObject(INDICATORS_SENT, true);
-
-        // Spawn avoidance particles and sounds (shield bash, parry reflect)
-        feedbackService.onDamageAvoided(store, defenderRef, result.reason());
-
-        // Send avoidance log to defender's chat (shows them they avoided damage)
-        DeathRecapRecorder.AttackerInfo attackerInfo = deathRecapRecorder.getAttackerInfo(store, damage);
-        indicatorService.sendAvoidanceLog(store, defenderRef, result.reason(), attackerInfo, result.estimatedDamage(), avoidanceStats);
-
-        // Fire appropriate trigger
-        switch (result.reason()) {
-            case DODGED -> triggerHandler.fireOnEvadeTrigger(index, archetypeChunk, store);
-            case BLOCKED -> {
-                triggerHandler.fireOnBlockTrigger(index, archetypeChunk, store);
-                // Block heal - heals based on blocked damage amount
-                ComputedStats defenderStats = statsResolver.getDefenderStats(index, archetypeChunk, store);
-                if (defenderStats != null) {
-                    float blockHealPct = defenderStats.getBlockHealPercent();
-                    if (blockHealPct > 0 && result.estimatedDamage() > 0) {
-                        float healAmount = result.estimatedDamage() * (blockHealPct / 100f);
-                        // Apply global health recovery multiplier to block heal
-                        float healthRecoveryPct = defenderStats.getHealthRecoveryPercent();
-                        if (healthRecoveryPct != 0) {
-                            healAmount *= (1.0f + healthRecoveryPct / 100.0f);
-                        }
-                        recoveryProcessor.applyBlockHeal(index, archetypeChunk, store, healAmount);
-                    }
-
-                    // Block counter damage - reflect % of blocked damage back to attacker
-                    float counterPct = defenderStats.getBlockCounterDamage();
-                    if (counterPct > 0 && result.estimatedDamage() > 0) {
-                        float counterDamage = result.estimatedDamage() * (counterPct / 100f);
-                        applyBlockCounterDamage(store, damage, counterDamage);
-                    }
-                }
-            }
-            default -> {} // PARRIED, MISSED - no special handling
-        }
-
-        // ── Combat Effect Hooks: Avoidance ──
-        // Notify effects that an attack was avoided (BladeDance charges on evade, LifeStream heals).
-        if (combatEffectRegistry != null) {
-            UUID attackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
-            UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
-            if (defenderUuid != null) {
-                Ref<EntityStore> atkRef = (damage.getSource() instanceof Damage.EntitySource es) ? es.getRef() : null;
-                CombatEffectContext avoidCtx = new CombatEffectContext(
-                    attackerUuid, defenderUuid, null, null, null, null,
-                    null, null, AttackType.UNKNOWN, null,
-                    0f, result.estimatedDamage(), 0f, 0f, false,
-                    damage, store, defenderRef, atkRef, null, -1f
-                );
-                combatEffectRegistry.runOnAvoidance(attackerUuid, defenderUuid, result.reason(), avoidCtx);
-            }
-        }
-    }
 
     private void setDamageMetadata(
         @Nonnull Damage damage,
@@ -2254,130 +1863,11 @@ public class RPGDamageSystem extends DamageEventSystem {
             damage.setDamageCauseIndex(causeIndex);
         }
 
-        LOGGER.at(Level.FINE).log("Damage: %.1f %s%s", rpgDamage, damageType, wasCrit ? " (CRIT)" : "");
+        String critLabel = !wasCrit ? "" : breakdown.critTier() > 1
+            ? " (CRIT T" + breakdown.critTier() + ")" : " (CRIT)";
+        LOGGER.at(Level.FINE).log("Damage: %.1f %s%s", rpgDamage, damageType, critLabel);
     }
 
-    /**
-     * Applies block counter damage to the attacker.
-     *
-     * <p>When a defender has the BLOCK_COUNTER_DAMAGE stat, a percentage of the
-     * blocked damage is reflected back as physical damage to the attacker.
-     */
-    private void applyBlockCounterDamage(
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Damage damage,
-        float counterDamage
-    ) {
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return;
-        }
-
-        Ref<EntityStore> attackerRef = entitySource.getRef();
-        if (attackerRef == null || !attackerRef.isValid()) {
-            return;
-        }
-
-        Ref<EntityStore> trueAttackerRef = entityResolver.resolveTrueAttacker(store, attackerRef);
-        if (trueAttackerRef == null) {
-            return;
-        }
-
-        EntityStatMap attackerStatMap = store.getComponent(trueAttackerRef, EntityStatMap.getComponentType());
-        if (attackerStatMap == null) {
-            return;
-        }
-
-        EntityStatValue attackerHealth = attackerStatMap.get(DefaultEntityStatTypes.getHealth());
-        if (attackerHealth == null || attackerHealth.get() <= 0) {
-            return;
-        }
-
-        float healthBefore = attackerHealth.get();
-        float newHealth = Math.max(0f, healthBefore - counterDamage);
-        attackerStatMap.subtractStatValue(attackerHealth.getIndex(), counterDamage);
-
-        LOGGER.at(Level.FINE).log("Block counter: reflected %.1f damage to attacker (%.1f → %.1f HP)",
-            counterDamage, healthBefore, newHealth);
-    }
-
-    /**
-     * Phase 5.5: Applies deterministic active blocking damage reduction.
-     *
-     * <p>When the defender is holding block (right-click) but didn't get a perfect
-     * block (handled earlier in the avoidance pipeline), they receive a base
-     * reduction that scales with gear:
-     * <ul>
-     *   <li>Weapon blocking: 33% base, capped at 80%</li>
-     *   <li>Shield blocking: 66% base, capped at 95%</li>
-     *   <li>BLOCK_DAMAGE_REDUCTION stat from gear adds to the base</li>
-     * </ul>
-     *
-     * <p>Runs BEFORE Phase 6 (indicators/combat log) so all feedback shows the
-     * correctly reduced damage amount. Tracks the reduction in DamageTrace for
-     * {@code /too combat detail}.
-     */
-    private void applyActiveBlockingReduction(
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Damage damage,
-        @Nonnull CommandBuffer<EntityStore> commandBuffer,
-        @Nonnull DamageContext ctx
-    ) {
-        // Check if defender is actively blocking
-        DamageDataComponent damageData = store.getComponent(ctx.defenderRef, DamageDataComponent.getComponentType());
-        if (damageData == null || damageData.getCurrentWielding() == null) {
-            return;
-        }
-
-        // Only apply to players
-        PlayerRef playerRef = store.getComponent(ctx.defenderRef, PlayerRef.getComponentType());
-        if (playerRef == null) {
-            return;
-        }
-
-        // Determine shield vs weapon blocking.
-        // Only the actively selected utility item counts — utility slots work like hotbar.
-        // Check the BASE item ID because RPG gear shields have custom IDs (rpg_gear_xxx).
-        Player player = store.getComponent(ctx.defenderRef, Player.getComponentType());
-        boolean hasShield = false;
-        if (player != null && player.getInventory() != null) {
-            ItemStack activeUtility = player.getInventory().getUtilityItem();
-            if (!ItemStack.isEmpty(activeUtility)) {
-                String baseId = io.github.larsonix.trailoforbis.gear.util.GearUtils.getBaseItemId(activeUtility);
-                String checkId = (baseId != null) ? baseId : activeUtility.getItemId();
-                if (checkId != null && checkId.toLowerCase().contains("shield")) {
-                    hasShield = true;
-                }
-            }
-        }
-
-        float baseReduction = hasShield ? SHIELD_BLOCK_REDUCTION : WEAPON_BLOCK_REDUCTION;
-        float cap = hasShield ? SHIELD_BLOCK_CAP : WEAPON_BLOCK_CAP;
-
-        // Add BLOCK_DAMAGE_REDUCTION from gear, capped
-        float statBonus = (ctx.defenderStats != null)
-            ? ctx.defenderStats.getBlockDamageReduction() / 100f
-            : 0f;
-        float totalReduction = Math.min(baseReduction + statBonus, cap);
-
-        float preDamage = ctx.rpgDamage;
-        ctx.rpgDamage = preDamage * (1.0f - totalReduction);
-
-        // Track in DamageTrace for /too combat detail
-        ctx.trace.setActiveBlocking(hasShield, totalReduction * 100f, preDamage, ctx.rpgDamage);
-
-        LOGGER.atFine().log("Active block: %s %.0f%% (base %.0f%% + gear %.0f%%), damage: %.1f → %.1f",
-            hasShield ? "SHIELD" : "WEAPON",
-            totalReduction * 100, baseReduction * 100, statBonus * 100,
-            preDamage, ctx.rpgDamage);
-
-        // ── Combat Effect Hooks: Block ──
-        // Notify effects that damage was blocked (BloodFortress charges, LivingFortress heals).
-        float blockedDamage = preDamage - ctx.rpgDamage;
-        if (combatEffectRegistry != null && blockedDamage > 0 && ctx.defenderUuid != null) {
-            CombatEffectContext blockCtx = ctx.toEffectContext(damage, store, commandBuffer);
-            combatEffectRegistry.runOnBlock(ctx.defenderUuid, blockedDamage, ctx.rpgDamage, blockCtx);
-        }
-    }
 
     private void applyFinalDamage(
         @Nonnull Store<EntityStore> store,
@@ -2414,6 +1904,8 @@ public class RPGDamageSystem extends DamageEventSystem {
                         scaling.setDying(true);
                     }
                 }
+                markMobDamaged(defenderRef, store);
+                fireModifierDeathTriggers(defenderRef, store);
 
                 DeathComponent.tryAddComponent(commandBuffer, defenderRef, damage);
             }
@@ -2427,279 +1919,66 @@ public class RPGDamageSystem extends DamageEventSystem {
         statMap.subtractStatValue(healthIndex, healthBefore - newHealth);
         LOGGER.at(Level.FINE).log("Damage applied: rpg=%.1f, health: %.1f -> %.1f", rpgDamage, healthBefore, newHealth);
 
+        // Mark mob as damaged for modifier tracking (Regenerating idle timer)
+        Ref<EntityStore> defenderRefNonLethal = archetypeChunk.getReferenceTo(index);
+        if (defenderRefNonLethal != null) {
+            markMobDamaged(defenderRefNonLethal, store);
+        }
+
         triggerHandler.fireWhenHitTrigger(index, archetypeChunk, store);
     }
 
-    // ==================== Skill Node Inspection ====================
-
-    private boolean handleSkillNodeInspection(
-        @Nonnull Store<EntityStore> store,
-        @Nonnull Ref<EntityStore> defenderRef,
-        @Nonnull Damage damage
-    ) {
-        TrailOfOrbis pluginInstance = TrailOfOrbis.getInstance();
-        if (pluginInstance == null) {
-            return false;
-        }
-
-        ComponentType<EntityStore, SkillNodeComponent> nodeComponentType = pluginInstance.getSkillNodeComponentType();
-        if (nodeComponentType == null) {
-            return false;
-        }
-
-        SkillNodeComponent nodeComponent = store.getComponent(defenderRef, nodeComponentType);
-        if (nodeComponent == null) {
-            return false;
-        }
-
-        damage.setCancelled(true);
-
-        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) {
-            return true;
-        }
-
-        Ref<EntityStore> attackerRef = entitySource.getRef();
-        if (attackerRef == null || !attackerRef.isValid()) {
-            return true;
-        }
-
-        Player playerComponent = store.getComponent(attackerRef, Player.getComponentType());
-        if (playerComponent == null) {
-            return true;
-        }
-
-        PlayerRef playerRef = store.getComponent(attackerRef, PlayerRef.getComponentType());
-        if (playerRef == null || !playerRef.isValid()) {
-            return true;
-        }
-
-        UUID playerId = playerRef.getUuid();
-        UUID nodeOwnerId = nodeComponent.getOwnerPlayerId();
-
-        if (!playerId.equals(nodeOwnerId)) {
-            return true;
-        }
-
-        String nodeId = nodeComponent.getNodeId();
-        SkillTreeManager skillTreeManager = pluginInstance.getSkillTreeManager();
-        if (skillTreeManager == null) {
-            return true;
-        }
-
-        Optional<SkillNode> nodeOpt = skillTreeManager.getNode(nodeId);
-        if (nodeOpt.isEmpty()) {
-            return true;
-        }
-
-        SkillNodeHudManager hudManager = pluginInstance.getSkillSanctumManager().getSkillNodeHudManager();
-        String currentNodeId = hudManager.getActiveNodeId(playerId);
-        if (nodeId.equals(currentNodeId)) {
-            hudManager.removeHud(playerId);
-            return true;
-        }
-
-        // Skip if a HUD was just opened — prevents client crash from rapid
-        // add/hide/remove CustomUI command bursts during multi-hit swings
-        if (hudManager.isOnCooldown(playerId)) {
-            return true;
-        }
-
-        SkillNode node = nodeOpt.get();
-        NodeState nodeState = nodeComponent.getState();
-        int availablePoints = skillTreeManager.getAvailablePoints(playerId);
-
-        // Check if this node can be deallocated (connectivity + refund points)
-        boolean canDeallocate = (nodeState == NodeState.ALLOCATED)
-            && skillTreeManager.canDeallocate(playerId, nodeId)
-            && skillTreeManager.getSkillTreeData(playerId).getSkillRefundPoints() > 0;
-
-        // Calculate synergy progress for live display (null if not a synergy node)
-        var synergyProgress = skillTreeManager.getSynergyProgress(playerId, node);
-
-        SkillNodeDetailHud detailHud = new SkillNodeDetailHud(
-            pluginInstance, playerRef, node, nodeState, availablePoints, canDeallocate, hudManager, synergyProgress);
-        detailHud.show();
-
-        LOGGER.atInfo().log("Opened skill node detail HUD for player=%s, node=%s",
-            playerId.toString().substring(0, 8), nodeId);
-
-        return true;
-    }
-
-    // ==================== Debug Logging Helpers ====================
-
-    private void logAttackerStats(
-        @Nullable ComputedStats stats,
-        @Nullable ElementalStats elemental,
-        boolean hasRpgWeapon,
-        float rpgWeaponDamage
-    ) {
-        LOGGER.at(Level.FINE).log("[DmgPipeline] ──── ATTACKER STATS ────");
-        if (stats == null) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] (no stats - environment/mob damage)");
-            return;
-        }
-
-        String weaponId = stats.getWeaponItemId() != null ? stats.getWeaponItemId() : "(none)";
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Weapon: %s | RPG: %s | BaseDmg: %.1f",
-            weaponId, hasRpgWeapon, rpgWeaponDamage);
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Physical: flat=%.1f, %%=%.1f",
-            stats.getPhysicalDamage(), stats.getPhysicalDamagePercent());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Melee: flat=%.1f, %%=%.1f",
-            stats.getMeleeDamage(), stats.getMeleeDamagePercent());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Crit: %.1f%% / x%.2f",
-            stats.getCriticalChance(), stats.getCriticalMultiplier() / 100f);
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Armor Pen: %.1f%% | True Dmg: %.1f",
-            stats.getArmorPenetration(), stats.getTrueDamage());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] All Dmg%%: %.1f | Multiplier: %.1f",
-            stats.getAllDamagePercent(), stats.getDamageMultiplier());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Life Steal: %.1f%% | Mana Leech: %.1f%%",
-            stats.getLifeSteal(), stats.getManaLeech());
-
-        // Elemental stats from attacker's elemental
-        if (elemental != null) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] Elemental - Fire: %.1f+%.1f%% | Cold: %.1f+%.1f%% | Lightning: %.1f+%.1f%% | Chaos: %.1f+%.1f%%",
-                elemental.getFlatDamage(ElementType.FIRE), elemental.getPercentDamage(ElementType.FIRE),
-                elemental.getFlatDamage(ElementType.WATER), elemental.getPercentDamage(ElementType.WATER),
-                elemental.getFlatDamage(ElementType.LIGHTNING), elemental.getPercentDamage(ElementType.LIGHTNING),
-                elemental.getFlatDamage(ElementType.VOID), elemental.getPercentDamage(ElementType.VOID));
-        }
-
-        // Conversions
-        float fireConv = stats.getFireConversion();
-        float coldConv = stats.getWaterConversion();
-        float lightConv = stats.getLightningConversion();
-        float chaosConv = stats.getVoidConversion();
-        if (fireConv > 0 || coldConv > 0 || lightConv > 0 || chaosConv > 0) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] Conversions - Fire: %.1f%% | Cold: %.1f%% | Lightning: %.1f%% | Chaos: %.1f%%",
-                fireConv, coldConv, lightConv, chaosConv);
-        }
-    }
-
-    private void logDefenderStats(
-        @Nullable ComputedStats stats,
-        @Nullable ElementalStats elemental
-    ) {
-        LOGGER.at(Level.FINE).log("[DmgPipeline] ──── DEFENDER STATS ────");
-        if (stats == null) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] (no stats)");
-            return;
-        }
-
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Armor: %.1f | Phys Resist: %.1f%%",
-            stats.getArmor(), stats.getPhysicalResistance());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Evasion: %.1f | Dodge: %.1f%% | Passive Block: %.1f%%",
-            stats.getEvasion(), stats.getDodgeChance(), stats.getPassiveBlockChance());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Crit Nullify: %.1f%%", stats.getCritNullifyChance());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Energy Shield: %.1f", stats.getEnergyShield());
-
-        // Elemental resistances
-        if (elemental != null) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] Elemental Resist - Fire: %.1f%% | Cold: %.1f%% | Lightning: %.1f%% | Chaos: %.1f%%",
-                elemental.getResistance(ElementType.FIRE),
-                elemental.getResistance(ElementType.WATER),
-                elemental.getResistance(ElementType.LIGHTNING),
-                elemental.getResistance(ElementType.VOID));
-        }
-    }
-
-    private void logDamageBreakdown(
-        @Nonnull DamageBreakdown breakdown,
-        float rpgBaseDamage,
-        float attackTypeMultiplier,
-        float conditionalMultiplier,
-        @Nullable ComputedStats attackerStats,
-        @Nullable ComputedStats defenderStats,
-        @Nullable ElementalStats attackerElemental,
-        @Nullable ElementalStats defenderElemental,
-        float finalDamage
-    ) {
-        LOGGER.at(Level.FINE).log("[DmgPipeline] ──── DAMAGE BREAKDOWN ────");
-
-        // Base calculation
-        float rawCondMult = conditionalMultiplier / attackTypeMultiplier;
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Base Input: %.1f × attackMult(%.2f) × condMult(%.2f)",
-            rpgBaseDamage, attackTypeMultiplier, rawCondMult);
-
-        // Physical damage with armor
-        float armorReduct = breakdown.armorReduction();
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Physical: %.1f (after armor: -%.1f%%)",
-            breakdown.physicalDamage(), armorReduct);
-
-        // Elemental damage with resistances
-        for (ElementType elem : ElementType.values()) {
-            float elemDmg = breakdown.getElementalDamage(elem);
-            float elemResist = breakdown.getResistanceReduction(elem);
-            if (elemDmg > 0 || elemResist > 0) {
-                LOGGER.at(Level.FINE).log("[DmgPipeline] %s: %.1f (resist: -%.1f%%)",
-                    elem.name(), elemDmg, elemResist);
-            }
-        }
-
-        // True damage
-        if (breakdown.trueDamage() > 0) {
-            LOGGER.at(Level.FINE).log("[DmgPipeline] True: %.1f", breakdown.trueDamage());
-        }
-
-        // Critical
-        String critStr = breakdown.wasCritical()
-            ? String.format("YES x%.2f", breakdown.critMultiplier())
-            : "NO";
-        LOGGER.at(Level.FINE).log("[DmgPipeline] Critical: %s", critStr);
-
-        // Final summary
-        LOGGER.at(Level.FINE).log("[DmgPipeline] ═══════════════════════════════════════════");
-        LOGGER.at(Level.FINE).log("[DmgPipeline] FINAL DAMAGE: %.1f (%s)", finalDamage, breakdown.damageType());
-        LOGGER.at(Level.FINE).log("[DmgPipeline] ════════════ DAMAGE EVENT END ════════════");
-    }
-
-    // ==================== Combat Log Helper Methods ====================
+    // ==================== Modifier Damage Tracking ====================
 
     /**
-     * Extracts raw elemental resistances from defender's elemental stats for combat log display.
+     * Marks a mob as recently damaged for the modifier system.
      *
-     * @param elemental The defender's elemental stats (may be null)
-     * @return Map of raw resistance values per element, or null if no stats
+     * <p>Called on EVERY damage path (lethal and non-lethal) so that
+     * the Regenerating modifier's idle timer resets correctly.
+     * Without this, Regenerating mobs would always heal because the
+     * lastDamageTimestamp would never be set.
+     *
+     * @param defenderRef The entity that took damage
+     * @param store       The entity store
      */
-    @Nullable
-    private Map<ElementType, Float> extractRawResistances(@Nullable ElementalStats elemental) {
-        if (elemental == null) {
-            return null;
+    private void markMobDamaged(@Nonnull Ref<EntityStore> defenderRef, @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, MobModifierComponent> modType = plugin.getMobModifierComponentType();
+        if (modType == null) return;
+        MobModifierComponent modComp = store.getComponent(defenderRef, modType);
+        if (modComp != null) {
+            modComp.markDamaged();
         }
-
-        EnumMap<ElementType, Float> result = new EnumMap<>(ElementType.class);
-        boolean hasAny = false;
-        for (ElementType type : ElementType.values()) {
-            float resistance = (float) elemental.getResistance(type);
-            result.put(type, resistance);
-            if (resistance != 0f) {
-                hasAny = true;
-            }
-        }
-        return hasAny ? result : null;
     }
 
     /**
-     * Extracts elemental penetration values from attacker's elemental stats for combat log display.
+     * Fires death triggers for modified mobs.
      *
-     * @param elemental The attacker's elemental stats (may be null)
-     * @return Map of penetration values per element, or null if no penetration
+     * <p>Called when a modified mob's isDying flag is set. Delegates to
+     * {@link MobModifierDeathHandler} which queues effects (Volatile explosion,
+     * Summoner cleanup) without modifying the store during damage processing.
      */
-    @Nullable
-    private Map<ElementType, Float> extractPenetration(@Nullable ElementalStats elemental) {
-        if (elemental == null) {
-            return null;
-        }
+    private void fireModifierDeathTriggers(
+            @Nonnull Ref<EntityStore> defenderRef,
+            @Nonnull Store<EntityStore> store) {
+        MobModifierManager modManager = plugin.getMobModifierManager();
+        if (modManager == null || !modManager.isEnabled()) return;
 
-        EnumMap<ElementType, Float> result = new EnumMap<>(ElementType.class);
-        boolean hasAny = false;
-        for (ElementType type : ElementType.values()) {
-            float penetration = (float) elemental.getPenetration(type);
-            result.put(type, penetration);
-            if (penetration > 0f) {
-                hasAny = true;
-            }
-        }
-        return hasAny ? result : null;
+        ComponentType<EntityStore, MobModifierComponent> modType = plugin.getMobModifierComponentType();
+        if (modType == null) return;
+
+        MobModifierComponent modComp = store.getComponent(defenderRef, modType);
+        if (modComp == null || !modComp.hasAnyDeathTrigger()) return;
+
+        ComponentType<EntityStore, MobScalingComponent> scalingType = plugin.getMobScalingComponentType();
+        MobScalingComponent scaling = scalingType != null ? store.getComponent(defenderRef, scalingType) : null;
+        if (scaling == null) return;
+
+        modManager.getDeathHandler().onMobDeath(defenderRef, modComp, scaling, store);
     }
+
+
+
+
+
+
 }

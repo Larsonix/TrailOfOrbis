@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
  *   <tr><td>{@link #rerollValues}</td><td>GAIAS_CALIBRATION</td></tr>
  *   <tr><td>{@link #rerollOneValue}</td><td>EMBER_OF_TUNING</td></tr>
  *   <tr><td>{@link #rerollTypes}</td><td>ALTERVERSE_SHARD</td></tr>
+ *   <tr><td>{@link #rerollPrefixTypes}</td><td>ALTERVERSE_SPLINTER</td></tr>
+ *   <tr><td>{@link #rerollSuffixTypes}</td><td>ALTERVERSE_FRAGMENT</td></tr>
  *   <tr><td>{@link #addModifier}</td><td>GAIAS_GIFT, tier upgrades</td></tr>
  *   <tr><td>{@link #removeModifier}</td><td>EROSION_SHARD</td></tr>
  * </table>
@@ -172,7 +174,80 @@ public final class GearModifierRoller {
             @Nullable EquipmentType equipmentType,
             @Nonnull Random random) {
 
-        // Process prefixes
+        // Separate locked modifiers (preserved unchanged)
+        List<GearModifier> lockedPrefixes = gear.prefixes().stream()
+            .filter(GearModifier::locked)
+            .toList();
+        List<GearModifier> lockedSuffixes = gear.suffixes().stream()
+            .filter(GearModifier::locked)
+            .toList();
+
+        int totalUnlocked = (gear.prefixes().size() - lockedPrefixes.size())
+                          + (gear.suffixes().size() - lockedSuffixes.size());
+
+        if (totalUnlocked <= 0) {
+            return gear; // All modifiers are locked
+        }
+
+        // Get authoritative caps from balance config (overrides enum defaults)
+        RarityConfig rarityConfig = balanceConfig.rarityConfig(gear.rarity());
+        int availPrefixSlots = Math.max(0, rarityConfig.maxPrefixes() - lockedPrefixes.size());
+        int availSuffixSlots = Math.max(0, rarityConfig.maxSuffixes() - lockedSuffixes.size());
+
+        // Redistribute: roll a new prefix/suffix split within valid bounds
+        int minNewPrefixes = Math.max(0, totalUnlocked - availSuffixSlots);
+        int maxNewPrefixes = Math.min(totalUnlocked, availPrefixSlots);
+        maxNewPrefixes = Math.max(minNewPrefixes, maxNewPrefixes);
+
+        int newPrefixCount = minNewPrefixes
+                + (maxNewPrefixes > minNewPrefixes ? random.nextInt(maxNewPrefixes - minNewPrefixes + 1) : 0);
+        int newSuffixCount = totalUnlocked - newPrefixCount;
+
+        // Build exclusion sets from locked modifier IDs
+        Set<String> excludedPrefixIds = lockedPrefixes.stream()
+            .map(GearModifier::id)
+            .collect(Collectors.toSet());
+        Set<String> excludedSuffixIds = lockedSuffixes.stream()
+            .map(GearModifier::id)
+            .collect(Collectors.toSet());
+
+        // Roll new modifiers with redistributed counts
+        List<GearModifier> newPrefixes = new ArrayList<>(lockedPrefixes);
+        if (newPrefixCount > 0) {
+            List<GearModifier> rolledPrefixes = rollModifiersExcluding(
+                ModifierType.PREFIX, newPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random);
+            newPrefixes.addAll(rolledPrefixes);
+        }
+
+        List<GearModifier> newSuffixes = new ArrayList<>(lockedSuffixes);
+        if (newSuffixCount > 0) {
+            List<GearModifier> rolledSuffixes = rollModifiersExcluding(
+                ModifierType.SUFFIX, newSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random);
+            newSuffixes.addAll(rolledSuffixes);
+        }
+
+        return gear.withPrefixes(newPrefixes).withSuffixes(newSuffixes);
+    }
+
+    /**
+     * Rerolls only unlocked PREFIX modifier types and values.
+     *
+     * <p>Used by ALTERVERSE_SPLINTER stone. Suffixes are preserved unchanged.
+     * Locked prefixes are preserved.
+     *
+     * @param gear The gear to modify
+     * @param slot The gear slot (for filtering available modifiers)
+     * @param equipmentType The equipment type (for modifier pool filtering)
+     * @param random Random source
+     * @return New GearData with rerolled prefix types, suffixes unchanged
+     */
+    @Nonnull
+    public GearData rerollPrefixTypes(
+            @Nonnull GearData gear,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
+
         List<GearModifier> lockedPrefixes = gear.prefixes().stream()
             .filter(GearModifier::locked)
             .toList();
@@ -189,7 +264,28 @@ public final class GearModifierRoller {
             newPrefixes.addAll(rolledPrefixes);
         }
 
-        // Process suffixes
+        return gear.withPrefixes(newPrefixes);
+    }
+
+    /**
+     * Rerolls only unlocked SUFFIX modifier types and values.
+     *
+     * <p>Used by ALTERVERSE_FRAGMENT stone. Prefixes are preserved unchanged.
+     * Locked suffixes are preserved.
+     *
+     * @param gear The gear to modify
+     * @param slot The gear slot (for filtering available modifiers)
+     * @param equipmentType The equipment type (for modifier pool filtering)
+     * @param random Random source
+     * @return New GearData with rerolled suffix types, prefixes unchanged
+     */
+    @Nonnull
+    public GearData rerollSuffixTypes(
+            @Nonnull GearData gear,
+            @Nonnull String slot,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Random random) {
+
         List<GearModifier> lockedSuffixes = gear.suffixes().stream()
             .filter(GearModifier::locked)
             .toList();
@@ -206,7 +302,7 @@ public final class GearModifierRoller {
             newSuffixes.addAll(rolledSuffixes);
         }
 
-        return gear.withPrefixes(newPrefixes).withSuffixes(newSuffixes);
+        return gear.withSuffixes(newSuffixes);
     }
 
     // ═══════════════════════════════════════════════════════════════════

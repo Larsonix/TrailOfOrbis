@@ -31,6 +31,7 @@ public class MobScalingConfig {
     private ExponentialScalingConfig exponentialScaling = new ExponentialScalingConfig();
     private EliteChanceConfig eliteChance = new EliteChanceConfig();
     private BalanceMultiplierConfig balanceMultipliers = new BalanceMultiplierConfig();
+    private LateGameScalingConfig lateGameScaling = new LateGameScalingConfig();
 
     // MobStatPoolConfig is now loaded standalone from ConfigManager (mob-stat-pool.yml)
 
@@ -156,6 +157,19 @@ public class MobScalingConfig {
         this.balanceMultipliers = balanceMultipliers;
     }
 
+    public LateGameScalingConfig getLateGameScaling() {
+        return lateGameScaling;
+    }
+
+    public void setLateGameScaling(LateGameScalingConfig lateGameScaling) {
+        this.lateGameScaling = lateGameScaling;
+    }
+
+    // YAML snake_case setter
+    public void setLate_game_scaling(LateGameScalingConfig lateGameScaling) {
+        this.lateGameScaling = lateGameScaling;
+    }
+
     // ==================== Validation ====================
 
     /**
@@ -202,6 +216,9 @@ public class MobScalingConfig {
         }
         if (balanceMultipliers != null) {
             balanceMultipliers.validate();
+        }
+        if (lateGameScaling != null) {
+            lateGameScaling.validate();
         }
     }
 
@@ -1121,6 +1138,196 @@ public class MobScalingConfig {
             }
             if (elementalDamage <= 0) {
                 throw new ConfigValidationException("balance_multipliers.elemental_damage must be > 0");
+            }
+        }
+    }
+
+    /**
+     * Late-game scaling: accelerating HP/damage/armor bonus above a threshold level.
+     *
+     * <p>Prevents player power (attributes + skill tree + gear) from outpacing
+     * mob scaling at high levels. Uses a power curve that starts gentle near the
+     * threshold and accelerates at extreme levels, matching how player power compounds.
+     *
+     * <p>Formula: {@code multiplier = 1.0 + min(((mobLevel - threshold) / divisor) ^ exponent, maxMultiplier - 1.0)}
+     *
+     * <p>The {@code divisor} is the number of levels above threshold where the multiplier
+     * reaches exactly 2.0×. The {@code exponent} controls acceleration (1.0 = linear,
+     * 1.5 = moderate acceleration, 2.0 = quadratic).
+     */
+    public static class LateGameScalingConfig {
+
+        private boolean enabled = false;
+        private int threshold = 120;
+
+        // Power-curve parameters per stat
+        private double hpDivisor = 40.0;
+        private double hpExponent = 1.5;
+        private double damageDivisor = 55.0;
+        private double damageExponent = 1.4;
+        private double armorDivisor = 65.0;
+        private double armorExponent = 1.3;
+
+        private double maxMultiplier = 6.0;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getThreshold() {
+            return threshold;
+        }
+
+        public void setThreshold(int threshold) {
+            this.threshold = threshold;
+        }
+
+        public double getHpDivisor() {
+            return hpDivisor;
+        }
+
+        public void setHpDivisor(double hpDivisor) {
+            this.hpDivisor = hpDivisor;
+        }
+
+        public void setHp_divisor(double hpDivisor) {
+            this.hpDivisor = hpDivisor;
+        }
+
+        public double getHpExponent() {
+            return hpExponent;
+        }
+
+        public void setHpExponent(double hpExponent) {
+            this.hpExponent = hpExponent;
+        }
+
+        public void setHp_exponent(double hpExponent) {
+            this.hpExponent = hpExponent;
+        }
+
+        public double getDamageDivisor() {
+            return damageDivisor;
+        }
+
+        public void setDamageDivisor(double damageDivisor) {
+            this.damageDivisor = damageDivisor;
+        }
+
+        public void setDamage_divisor(double damageDivisor) {
+            this.damageDivisor = damageDivisor;
+        }
+
+        public double getDamageExponent() {
+            return damageExponent;
+        }
+
+        public void setDamageExponent(double damageExponent) {
+            this.damageExponent = damageExponent;
+        }
+
+        public void setDamage_exponent(double damageExponent) {
+            this.damageExponent = damageExponent;
+        }
+
+        public double getArmorDivisor() {
+            return armorDivisor;
+        }
+
+        public void setArmorDivisor(double armorDivisor) {
+            this.armorDivisor = armorDivisor;
+        }
+
+        public void setArmor_divisor(double armorDivisor) {
+            this.armorDivisor = armorDivisor;
+        }
+
+        public double getArmorExponent() {
+            return armorExponent;
+        }
+
+        public void setArmorExponent(double armorExponent) {
+            this.armorExponent = armorExponent;
+        }
+
+        public void setArmor_exponent(double armorExponent) {
+            this.armorExponent = armorExponent;
+        }
+
+        public double getMaxMultiplier() {
+            return maxMultiplier;
+        }
+
+        public void setMaxMultiplier(double maxMultiplier) {
+            this.maxMultiplier = maxMultiplier;
+        }
+
+        public void setMax_multiplier(double maxMultiplier) {
+            this.maxMultiplier = maxMultiplier;
+        }
+
+        // Legacy YAML setters (no-ops — old linear fields are ignored by the power-curve formula)
+        public void setHp_per_level(double ignored) { }
+        public void setDamage_per_level(double ignored) { }
+
+        /**
+         * Computes the power-curve multiplier for a given stat.
+         *
+         * @param mobLevel      The mob's level
+         * @param divisor       Levels above threshold for 2× multiplier
+         * @param exponent      Curve acceleration (1.0=linear, 1.5=moderate, 2.0=quadratic)
+         * @return Multiplier >= 1.0, capped at maxMultiplier
+         */
+        private double calculatePowerCurveMultiplier(int mobLevel, double divisor, double exponent) {
+            if (!enabled || mobLevel <= threshold) return 1.0;
+            double overshoot = (double) (mobLevel - threshold) / divisor;
+            double bonus = Math.pow(overshoot, exponent);
+            return Math.min(1.0 + bonus, maxMultiplier);
+        }
+
+        /** Returns the HP multiplier for the given mob level. 1.0 if at or below threshold. */
+        public double calculateHpMultiplier(int mobLevel) {
+            return calculatePowerCurveMultiplier(mobLevel, hpDivisor, hpExponent);
+        }
+
+        /** Returns the damage multiplier for the given mob level. 1.0 if at or below threshold. */
+        public double calculateDamageMultiplier(int mobLevel) {
+            return calculatePowerCurveMultiplier(mobLevel, damageDivisor, damageExponent);
+        }
+
+        /** Returns the armor multiplier for the given mob level. 1.0 if at or below threshold. */
+        public double calculateArmorMultiplier(int mobLevel) {
+            return calculatePowerCurveMultiplier(mobLevel, armorDivisor, armorExponent);
+        }
+
+        public void validate() throws ConfigValidationException {
+            if (threshold < 1) {
+                throw new ConfigValidationException("late_game_scaling.threshold must be >= 1");
+            }
+            if (hpDivisor <= 0) {
+                throw new ConfigValidationException("late_game_scaling.hp_divisor must be > 0");
+            }
+            if (hpExponent <= 0) {
+                throw new ConfigValidationException("late_game_scaling.hp_exponent must be > 0");
+            }
+            if (damageDivisor <= 0) {
+                throw new ConfigValidationException("late_game_scaling.damage_divisor must be > 0");
+            }
+            if (damageExponent <= 0) {
+                throw new ConfigValidationException("late_game_scaling.damage_exponent must be > 0");
+            }
+            if (armorDivisor <= 0) {
+                throw new ConfigValidationException("late_game_scaling.armor_divisor must be > 0");
+            }
+            if (armorExponent <= 0) {
+                throw new ConfigValidationException("late_game_scaling.armor_exponent must be > 0");
+            }
+            if (maxMultiplier < 1.0) {
+                throw new ConfigValidationException("late_game_scaling.max_multiplier must be >= 1.0");
             }
         }
     }

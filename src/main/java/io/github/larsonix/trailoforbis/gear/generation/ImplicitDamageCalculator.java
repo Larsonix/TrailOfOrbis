@@ -54,6 +54,18 @@ public final class ImplicitDamageCalculator {
     /** Stat type for spellbook implicit (mana regeneration, not damage). */
     public static final String MANA_REGEN = "mana_regen";
 
+    /** Stat type for spellbook volatility implicit (hex glyph budget). */
+    public static final String VOLATILITY_MAX = "volatility_max";
+
+    /** Stat type for spellbook magic power implicit (hex effect magnitude). */
+    public static final String MAGIC_POWER = "magic_power";
+
+    // Spellbook implicit type weights
+    private static final int WEIGHT_MANA_REGEN = 50;
+    private static final int WEIGHT_VOLATILITY = 30;
+    private static final int WEIGHT_MAGIC_POWER = 20;
+    private static final int TOTAL_SPELLBOOK_WEIGHT = WEIGHT_MANA_REGEN + WEIGHT_VOLATILITY + WEIGHT_MAGIC_POWER;
+
     private final ImplicitDamageConfig config;
 
     /**
@@ -166,7 +178,7 @@ public final class ImplicitDamageCalculator {
     @Nonnull
     public static Set<String> getValidDamageTypes(@Nonnull WeaponType weaponType) {
         if (weaponType == WeaponType.SPELLBOOK) {
-            return Set.of(MANA_REGEN);
+            return Set.of(MANA_REGEN, VOLATILITY_MAX, MAGIC_POWER);
         }
         // All weapons can have physical or any elemental damage type.
         // Physical weapons get elemental implicits via loot discovery (30% chance).
@@ -301,9 +313,13 @@ public final class ImplicitDamageCalculator {
         Objects.requireNonNull(existing, "existing cannot be null");
         Objects.requireNonNull(weaponType, "weaponType cannot be null");
 
-        // Spellbooks use a separate range calculation
+        // Spellbooks use stat-specific range calculations
         if (weaponType == WeaponType.SPELLBOOK) {
-            WeaponBaseRange newRange = config.calculateSpellbookRange(newLevel);
+            WeaponBaseRange newRange = switch (existing.damageType()) {
+                case VOLATILITY_MAX -> config.calculateSpellbookVolatilityRange(newLevel);
+                case MAGIC_POWER -> config.calculateSpellbookMagicPowerRange(newLevel);
+                default -> config.calculateSpellbookRange(newLevel);
+            };
             return existing.withPreservedPercentile(newRange.min(), newRange.max());
         }
 
@@ -322,26 +338,48 @@ public final class ImplicitDamageCalculator {
     }
 
     /**
-     * Calculates the spellbook-specific mana_regen implicit.
+     * Calculates a spellbook implicit, randomly selecting the stat type.
      *
-     * <p>Spellbooks are support/utility weapons — their identity is mana regeneration,
-     * not damage. Uses a separate config section with values scaled for mana_regen
-     * (much smaller than damage numbers).
+     * <p>Spellbooks can roll one of three implicit types:
+     * <ul>
+     *   <li>{@code mana_regen} (weight 50) — mana sustain identity</li>
+     *   <li>{@code volatility_max} (weight 30) — hex glyph budget</li>
+     *   <li>{@code magic_power} (weight 20) — hex effect magnitude</li>
+     * </ul>
+     *
+     * <p>Each type has its own scaling range in config. The selection makes
+     * spellbooks more varied — players chase the implicit they need for their build.
      */
     @Nonnull
     private WeaponImplicit calculateSpellbookImplicit(int itemLevel, @Nonnull Random random) {
-        WeaponBaseRange range = config.calculateSpellbookRange(itemLevel);
+        String statType;
+        WeaponBaseRange range;
 
-        WeaponImplicit implicit = WeaponImplicit.roll(
-                MANA_REGEN,
-                range.min(),
-                range.max(),
-                random
-        );
+        // Hex stat implicits only available when Hexcode is installed.
+        // Without Hexcode, volatility_max and magic_power do nothing — always roll mana_regen.
+        boolean hexLoaded = io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded();
+        if (!hexLoaded) {
+            statType = MANA_REGEN;
+            range = config.calculateSpellbookRange(itemLevel);
+        } else {
+            int roll = random.nextInt(TOTAL_SPELLBOOK_WEIGHT);
+            if (roll < WEIGHT_MANA_REGEN) {
+                statType = MANA_REGEN;
+                range = config.calculateSpellbookRange(itemLevel);
+            } else if (roll < WEIGHT_MANA_REGEN + WEIGHT_VOLATILITY) {
+                statType = VOLATILITY_MAX;
+                range = config.calculateSpellbookVolatilityRange(itemLevel);
+            } else {
+                statType = MAGIC_POWER;
+                range = config.calculateSpellbookMagicPowerRange(itemLevel);
+            }
+        }
+
+        WeaponImplicit implicit = WeaponImplicit.roll(statType, range.min(), range.max(), random);
 
         LOGGER.atFine().log(
-                "Calculated spellbook implicit at level %d: %s (range: %.2f-%.2f)",
-                itemLevel, implicit, range.min(), range.max()
+                "Calculated spellbook implicit at level %d: %s=%s (range: %.2f-%.2f)",
+                itemLevel, statType, implicit, range.min(), range.max()
         );
 
         return implicit;

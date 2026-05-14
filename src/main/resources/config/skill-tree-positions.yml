@@ -101,31 +101,31 @@ nodes:
   bridge_fire_void_1:
     x: 21.0
     y: 77.0
-    z: 1.0
+    z: 0.0
 
   bridge_fire_void_2:
     x: 16.0
     y: 82.0
-    z: 1.5
+    z: 0.0
 
   bridge_fire_void_3:
     x: 11.0
     y: 87.0
-    z: 1.0
+    z: 0.0
 
   # LIGHTNING_SYNERGY_1 ↔ VOID_SYNERGY_4
   bridge_lightning_void_1:
-    x: 1.0
+    x: 0.0
     y: 79.0
     z: 20.0
 
   bridge_lightning_void_2:
-    x: 1.5
+    x: 0.0
     y: 86.0
     z: 14.0
 
   bridge_lightning_void_3:
-    x: 1.0
+    x: 0.0
     y: 92.0
     z: 9.0
 
@@ -133,31 +133,31 @@ nodes:
   bridge_water_void_1:
     x: -21.0
     y: 77.0
-    z: -1.0
+    z: 0.0
 
   bridge_water_void_2:
     x: -16.0
     y: 82.0
-    z: -1.5
+    z: 0.0
 
   bridge_water_void_3:
     x: -11.0
     y: 87.0
-    z: -1.0
+    z: 0.0
 
   # EARTH_SYNERGY_1 ↔ VOID_SYNERGY_3
   bridge_earth_void_1:
-    x: -1.0
+    x: 0.0
     y: 79.0
     z: -20.0
 
   bridge_earth_void_2:
-    x: -1.5
+    x: 0.0
     y: 86.0
     z: -14.0
 
   bridge_earth_void_3:
-    x: -1.0
+    x: 0.0
     y: 92.0
     z: -9.0
 
@@ -170,31 +170,31 @@ nodes:
   bridge_fire_wind_1:
     x: 21.0
     y: 53.0
-    z: 1.0
+    z: 0.0
 
   bridge_fire_wind_2:
     x: 16.0
     y: 48.0
-    z: 1.5
+    z: 0.0
 
   bridge_fire_wind_3:
     x: 11.0
     y: 43.0
-    z: 1.0
+    z: 0.0
 
   # LIGHTNING_SYNERGY_2 ↔ WIND_SYNERGY_4
   bridge_lightning_wind_1:
-    x: 1.0
+    x: 0.0
     y: 51.0
     z: 20.0
 
   bridge_lightning_wind_2:
-    x: 1.5
+    x: 0.0
     y: 44.0
     z: 14.0
 
   bridge_lightning_wind_3:
-    x: 1.0
+    x: 0.0
     y: 38.0
     z: 9.0
 
@@ -202,31 +202,31 @@ nodes:
   bridge_water_wind_1:
     x: -21.0
     y: 53.0
-    z: -1.0
+    z: 0.0
 
   bridge_water_wind_2:
     x: -16.0
     y: 48.0
-    z: -1.5
+    z: 0.0
 
   bridge_water_wind_3:
     x: -11.0
     y: 43.0
-    z: -1.0
+    z: 0.0
 
   # EARTH_SYNERGY_2 ↔ WIND_SYNERGY_3
   bridge_earth_wind_1:
-    x: -1.0
+    x: 0.0
     y: 51.0
     z: -20.0
 
   bridge_earth_wind_2:
-    x: -1.5
+    x: 0.0
     y: 44.0
     z: -14.0
 
   bridge_earth_wind_3:
-    x: -1.0
+    x: 0.0
     y: 38.0
     z: -9.0
 

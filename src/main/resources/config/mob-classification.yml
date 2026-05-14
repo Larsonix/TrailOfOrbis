@@ -16,7 +16,7 @@ xp_multipliers:
   PASSIVE: 0.1    # 10% XP for passive creatures (chickens, rabbits, etc.)
   MINOR: 0.5      # 50% XP for small hostiles (larvae, foxes) - prevents farming
   HOSTILE: 1.0    # Base XP for standard enemies
-  ELITE: 1.5      # +50% XP for mini-bosses
+  ELITE: 2.0      # +100% XP for mini-bosses
   BOSS: 5.0       # +400% XP for major bosses
 
 # Stat Multipliers (Applied to HP, Damage, etc.)
@@ -44,3 +44,6 @@ bosses:
   - "yeti"
   - "goblin_duke"
   - "scarak_broodmother"
+  - "rex_cave"
+  - "skeleton_burnt_praetorian"
+  - "trork_chieftain"

@@ -218,6 +218,14 @@ public final class OffensiveStats {
     private String weaponItemId;
 
     /**
+     * The raw item definition ID of the equipped weapon (e.g., "rpg_gear_1778246038077_0").
+     * Unlike {@code weaponItemId} (which stores the vanilla BASE ID for profile lookup),
+     * this stores the unique per-item ID used to detect weapon swaps between RPG items
+     * that share the same base type.
+     */
+    private String weaponRawItemId;
+
+    /**
      * Whether the player is holding RPG-generated gear (regardless of requirements).
      *
      * <p>This is critical for damage path selection: when true, the damage system
@@ -317,6 +325,7 @@ public final class OffensiveStats {
         this.castSpeed = builder.castSpeed;
         this.weaponBaseDamage = builder.weaponBaseDamage;
         this.weaponItemId = builder.weaponItemId;
+        this.weaponRawItemId = builder.weaponRawItemId;
         this.holdingRpgGear = builder.holdingRpgGear;
         this.weaponSpellElement = builder.weaponSpellElement;
     }
@@ -901,6 +910,16 @@ public final class OffensiveStats {
         this.weaponItemId = weaponItemId;
     }
 
+    /** Gets the raw item definition ID (rpg_gear_* or vanilla). Unique per generated item. */
+    public String getWeaponRawItemId() {
+        return weaponRawItemId;
+    }
+
+    /** Sets the raw item definition ID of the equipped weapon. */
+    public void setWeaponRawItemId(String weaponRawItemId) {
+        this.weaponRawItemId = weaponRawItemId;
+    }
+
     /** Sets whether the player is holding RPG-generated gear. */
     public void setHoldingRpgGear(boolean holdingRpgGear) {
         this.holdingRpgGear = holdingRpgGear;
@@ -997,6 +1016,7 @@ public final class OffensiveStats {
         castSpeed = 0;
         weaponBaseDamage = 0;
         weaponItemId = null;
+        weaponRawItemId = null;
         holdingRpgGear = false;
         weaponSpellElement = null;
     }
@@ -1077,6 +1097,7 @@ public final class OffensiveStats {
             .castSpeed(castSpeed)
             .weaponBaseDamage(weaponBaseDamage)
             .weaponItemId(weaponItemId)
+            .weaponRawItemId(weaponRawItemId)
             .holdingRpgGear(holdingRpgGear)
             .weaponSpellElement(weaponSpellElement);
     }
@@ -1150,6 +1171,7 @@ public final class OffensiveStats {
         private float castSpeed;
         private float weaponBaseDamage;
         private String weaponItemId;
+        private String weaponRawItemId;
         private boolean holdingRpgGear;
         @Nullable private ElementType weaponSpellElement;
 
@@ -1495,6 +1517,11 @@ public final class OffensiveStats {
             return this;
         }
 
+        public Builder weaponRawItemId(String value) {
+            this.weaponRawItemId = value;
+            return this;
+        }
+
         public Builder holdingRpgGear(boolean value) {
             this.holdingRpgGear = value;
             return this;
@@ -1529,13 +1556,20 @@ public final class OffensiveStats {
             && Float.compare(trueDamage, that.trueDamage) == 0
             && Float.compare(meleeDamagePercent, that.meleeDamagePercent) == 0
             && Float.compare(projectileDamagePercent, that.projectileDamagePercent) == 0
-            && Float.compare(attackSpeedPercent, that.attackSpeedPercent) == 0;
+            && Float.compare(attackSpeedPercent, that.attackSpeedPercent) == 0
+            // Weapon identity — switching swords with similar stats must still propagate
+            && Float.compare(weaponBaseDamage, that.weaponBaseDamage) == 0
+            && Objects.equals(weaponItemId, that.weaponItemId)
+            && Objects.equals(weaponRawItemId, that.weaponRawItemId)
+            && Objects.equals(weaponSpellElement, that.weaponSpellElement)
+            && holdingRpgGear == that.holdingRpgGear;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(physicalDamage, spellDamage, criticalChance, criticalMultiplier, armorPenetration,
-            allDamagePercent, meleeDamage, fireConversion, waterConversion);
+            allDamagePercent, meleeDamage, fireConversion, waterConversion,
+            weaponBaseDamage, weaponRawItemId, weaponSpellElement);
     }
 
     @Override

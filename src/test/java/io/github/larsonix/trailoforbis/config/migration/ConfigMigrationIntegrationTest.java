@@ -15,10 +15,10 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test for the full config migration pipeline.
+ * Integration test for version-based config sync.
  *
- * <p>Tests the complete flow: user has an old config → migration adds new keys,
- * preserves user values, creates backup, and produces valid YAML output.
+ * <p>Tests the complete flow: JAR templates are synced to disk on version change,
+ * missing files are restored on restart, and backups are created on update.
  */
 class ConfigMigrationIntegrationTest {
 
@@ -34,71 +34,108 @@ class ConfigMigrationIntegrationTest {
     }
 
     @Test
-    void freshInstallNoMigrationNeeded() {
-        // No files exist — migration should be a no-op
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
-        service.migrateAll(); // Should not throw
+    void freshInstallCreatesAllFiles() {
+        // No files exist, no .last-synced-version — should create files from JAR
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.0");
+        service.migrateAll();
 
-        // Versions file should not be created (nothing was migrated)
-        assertFalse(Files.exists(configDir.resolve(".versions.yml")));
+        // Version file should be created
+        Path versionFile = configDir.resolve(".last-synced-version");
+        assertTrue(Files.exists(versionFile), "Version file should be created on fresh install");
+
+        // Check version content
+        try {
+            String version = Files.readString(versionFile, StandardCharsets.UTF_8).trim();
+            assertEquals("1.0.0", version);
+        } catch (IOException e) {
+            fail("Should be able to read version file");
+        }
     }
 
     @Test
-    void existingFileGetsMigratedWithNewKeys() throws IOException {
-        // Simulate a user's old config.yml that's missing some keys
-        String oldConfig = """
-            # My server config
-            debugMode: false
-            language: "en_US"
+    void versionChangeOverwritesAllConfigs() throws IOException {
+        // Simulate existing install at version 1.0.0
+        String customConfig = "debugMode: true\nlanguage: fr_FR\n";
+        Files.writeString(configDir.resolve("config.yml"), customConfig, StandardCharsets.UTF_8);
+        Files.writeString(configDir.resolve(".last-synced-version"), "1.0.0", StandardCharsets.UTF_8);
 
-            database:
-              type: "H2"
-              host: "localhost"
-              port: 3306
-            """;
-        Files.writeString(configDir.resolve("config.yml"), oldConfig, StandardCharsets.UTF_8);
-
-        // Run migration
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
+        // Update to 1.0.1
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.1");
         service.migrateAll();
 
-        // Verify: file should still be valid YAML
-        String migrated = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
+        // config.yml should be overwritten from JAR template (user values lost)
+        String result = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
         Yaml yaml = new Yaml();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = yaml.loadAs(migrated, Map.class);
-        assertNotNull(result, "Migrated file should be valid YAML");
+        Map<String, Object> parsed = yaml.loadAs(result, Map.class);
 
-        // Verify: user values preserved
-        assertEquals(false, result.get("debugMode"));
-        assertEquals("en_US", result.get("language"));
+        // JAR template has debugMode: false (the default)
+        assertEquals(false, parsed.get("debugMode"),
+            "JAR template should overwrite user value on version change");
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> db = (Map<String, Object>) result.get("database");
-        assertNotNull(db);
-        assertEquals("H2", db.get("type"));
-        assertEquals("localhost", db.get("host"));
-
-        // Verify: version is now tracked
-        assertTrue(Files.exists(configDir.resolve(".versions.yml")));
-        String versionsContent = Files.readString(configDir.resolve(".versions.yml"));
-        assertTrue(versionsContent.contains("config.yml"),
-            "Versions file should track config.yml");
+        // Version file updated
+        String version = Files.readString(configDir.resolve(".last-synced-version"), StandardCharsets.UTF_8).trim();
+        assertEquals("1.0.1", version);
     }
 
     @Test
-    void backupCreatedBeforeMigration() throws IOException {
-        String oldConfig = "debugMode: true\n";
-        Files.writeString(configDir.resolve("config.yml"), oldConfig, StandardCharsets.UTF_8);
+    void sameVersionPreservesExistingFiles() throws IOException {
+        // Write a custom config and mark as synced at current version
+        String customConfig = "debugMode: true\n";
+        Files.writeString(configDir.resolve("config.yml"), customConfig, StandardCharsets.UTF_8);
+        Files.writeString(configDir.resolve(".last-synced-version"), "1.0.0", StandardCharsets.UTF_8);
 
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
+        long beforeModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
+        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+
+        // Restart with same version
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.0");
         service.migrateAll();
 
-        // Verify backup exists in a timestamped subdirectory
-        Path backupDir = configDir.resolve("backups");
-        assertTrue(Files.isDirectory(backupDir), "Backups directory should be created");
+        // File should NOT be modified
+        long afterModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
+        assertEquals(beforeModified, afterModified,
+            "File should not be modified on same-version restart");
 
-        // Backups are now in timestamped subdirectories: backups/2026-05-05_10-36-30/config.yml.v0.bak
+        // Content should be unchanged
+        String result = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
+        assertEquals(customConfig, result, "User config should be preserved on same-version restart");
+    }
+
+    @Test
+    void missingFileRestoredOnSameVersion() throws IOException {
+        // Synced at 1.0.0 but config.yml is missing (deleted by user)
+        Files.writeString(configDir.resolve(".last-synced-version"), "1.0.0", StandardCharsets.UTF_8);
+        assertFalse(Files.exists(configDir.resolve("config.yml")));
+
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.0");
+        service.migrateAll();
+
+        // File should be restored from JAR template if available
+        // (config.yml is in the JAR test resources)
+        InputStream templateStream = getClass().getClassLoader()
+            .getResourceAsStream("config/config.yml");
+        if (templateStream != null) {
+            templateStream.close();
+            assertTrue(Files.exists(configDir.resolve("config.yml")),
+                "Missing config should be restored from JAR on same-version restart");
+        }
+    }
+
+    @Test
+    void backupCreatedOnVersionChange() throws IOException {
+        String oldConfig = "debugMode: true\n";
+        Files.writeString(configDir.resolve("config.yml"), oldConfig, StandardCharsets.UTF_8);
+        Files.writeString(configDir.resolve(".last-synced-version"), "1.0.0", StandardCharsets.UTF_8);
+
+        // Update to 1.0.1
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.1");
+        service.migrateAll();
+
+        // Verify backup exists
+        Path backupDir = configDir.resolve("backups");
+        assertTrue(Files.isDirectory(backupDir), "Backups directory should be created on update");
+
         long backupCount = Files.walk(backupDir)
             .filter(p -> p.toString().contains("config.yml") && p.toString().endsWith(".bak"))
             .count();
@@ -106,148 +143,55 @@ class ConfigMigrationIntegrationTest {
     }
 
     @Test
-    void alreadyMigratedFileIsSkipped() throws IOException {
-        String config = "debugMode: false\n";
-        Files.writeString(configDir.resolve("config.yml"), config, StandardCharsets.UTF_8);
+    void noBackupOnFreshInstall() {
+        // Fresh install — no files to back up
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.0");
+        service.migrateAll();
 
-        // First migration
-        ConfigMigrationService service1 = new ConfigMigrationService(configDir);
+        Path backupDir = configDir.resolve("backups");
+        assertFalse(Files.isDirectory(backupDir),
+            "No backup directory should be created on fresh install");
+    }
+
+    @Test
+    void idempotentOnSameVersion() throws IOException {
+        // First run: fresh install
+        ConfigMigrationService service1 = new ConfigMigrationService(configDir, "1.0.0");
         service1.migrateAll();
 
-        long firstModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
-
-        // Wait a bit and run again
-        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
-
-        // Second migration — should be a no-op
-        ConfigMigrationService service2 = new ConfigMigrationService(configDir);
-        service2.migrateAll();
-
-        long secondModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
-        assertEquals(firstModified, secondModified,
-            "File should NOT be modified on second run (already at current version)");
-    }
-
-    @Test
-    void corruptFileGetsBackedUpAndDeleted() throws IOException {
-        // Write invalid YAML
-        Files.writeString(configDir.resolve("config.yml"), "{{{{invalid yaml!!!!",
-            StandardCharsets.UTF_8);
-
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
-        service.migrateAll(); // Should not throw
-
-        // File should be deleted (so copyDefaultIfMissing will recreate it)
-        assertFalse(Files.exists(configDir.resolve("config.yml")),
-            "Corrupt file should be removed after backup");
-
-        // Backup should exist
-        Path backupDir = configDir.resolve("backups");
-        assertTrue(Files.isDirectory(backupDir));
-    }
-
-    @Test
-    void userCustomValuesPreservedAfterMigration() throws IOException {
-        // User has customized several values
-        String customConfig = """
-            debugMode: true
-            language: "fr_FR"
-            suppressVanillaGearDrops: false
-            creativeModeBypassRequirements: false
-
-            database:
-              type: "MySQL"
-              host: "db.myserver.com"
-              port: 5432
-              database: "mydb"
-              username: "admin"
-              password: "secret123"
-              poolSize: 50
-
-            attributes:
-              pointsPerLevel: 2
-              startingPoints: 5
-            """;
-        Files.writeString(configDir.resolve("config.yml"), customConfig, StandardCharsets.UTF_8);
-
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
-        service.migrateAll();
-
-        // Parse result
-        String migrated = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
-        Yaml yaml = new Yaml();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = yaml.loadAs(migrated, Map.class);
-
-        // All user values must be preserved
-        assertEquals(true, result.get("debugMode"));
-        assertEquals("fr_FR", result.get("language"));
-        assertEquals(false, result.get("suppressVanillaGearDrops"));
-        assertEquals(false, result.get("creativeModeBypassRequirements"));
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> db = (Map<String, Object>) result.get("database");
-        assertEquals("MySQL", db.get("type"));
-        assertEquals("db.myserver.com", db.get("host"));
-        assertEquals(5432, db.get("port"));
-        assertEquals("mydb", db.get("database"));
-        assertEquals("admin", db.get("username"));
-        assertEquals("secret123", db.get("password"));
-        assertEquals(50, db.get("poolSize"));
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> attrs = (Map<String, Object>) result.get("attributes");
-        assertEquals(2, attrs.get("pointsPerLevel"));
-        assertEquals(5, attrs.get("startingPoints"));
-    }
-
-    @Test
-    void migratedFilePreservesComments() throws IOException {
-        // User has a minimal config (will trigger migration with template merge)
-        String oldConfig = "debugMode: true\n";
-        Files.writeString(configDir.resolve("config.yml"), oldConfig, StandardCharsets.UTF_8);
-
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
-        service.migrateAll();
-
-        String migrated = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
-
-        // The bundled template for config.yml has comments — they should be preserved
-        assertTrue(migrated.contains("#"), "Migrated file should contain comments from template");
-
-        // Verify it's still valid YAML (comments don't break parsing)
-        Yaml yaml = new Yaml();
-        assertDoesNotThrow(() -> yaml.loadAs(migrated, Map.class));
-    }
-
-    @Test
-    void realConfigFileRoundTrip() throws IOException {
-        // Load the actual bundled config.yml template
+        // Record state
         InputStream templateStream = getClass().getClassLoader()
             .getResourceAsStream("config/config.yml");
-        if (templateStream == null) {
-            // Skip if resource not available in test classpath
-            return;
+        if (templateStream == null) return; // Skip if no template available
+        templateStream.close();
+
+        if (Files.exists(configDir.resolve("config.yml"))) {
+            long firstModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+
+            // Second run: same version — should be no-op
+            ConfigMigrationService service2 = new ConfigMigrationService(configDir, "1.0.0");
+            service2.migrateAll();
+
+            long secondModified = Files.getLastModifiedTime(configDir.resolve("config.yml")).toMillis();
+            assertEquals(firstModified, secondModified,
+                "File should NOT be modified on second run with same version");
         }
+    }
 
-        String templateContent = new String(templateStream.readAllBytes(), StandardCharsets.UTF_8);
-        Files.writeString(configDir.resolve("config.yml"), templateContent, StandardCharsets.UTF_8);
-
-        // Modify one value (simulates user customization)
-        String modified = templateContent.replace("debugMode: false", "debugMode: true");
-        Files.writeString(configDir.resolve("config.yml"), modified, StandardCharsets.UTF_8);
-
-        // Run migration
-        ConfigMigrationService service = new ConfigMigrationService(configDir);
+    @Test
+    void migratedFileContainsComments() throws IOException {
+        // Fresh install creates file from JAR template
+        ConfigMigrationService service = new ConfigMigrationService(configDir, "1.0.0");
         service.migrateAll();
 
-        // Parse result
-        String result = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
-        Yaml yaml = new Yaml();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> parsed = yaml.loadAs(result, Map.class);
+        if (Files.exists(configDir.resolve("config.yml"))) {
+            String content = Files.readString(configDir.resolve("config.yml"), StandardCharsets.UTF_8);
+            assertTrue(content.contains("#"), "Config from JAR template should contain comments");
 
-        assertNotNull(parsed, "Result must be valid YAML");
-        assertEquals(true, parsed.get("debugMode"), "User's modified value must be preserved");
+            // Verify valid YAML
+            Yaml yaml = new Yaml();
+            assertDoesNotThrow(() -> yaml.loadAs(content, Map.class));
+        }
     }
 }

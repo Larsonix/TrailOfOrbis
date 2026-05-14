@@ -2,23 +2,23 @@
 # Maps Hexcode damage source IDs to RPG damage types, elements, and display names.
 # When Hexcode spells deal damage via EnvironmentSource("hex_xxx"),
 # this config controls how it flows through the RPG damage pipeline.
+#
+# HOW HEX SPELL DAMAGE WORKS:
+# 1. Pre-cast: RPG casting power (weaponBase + flatSpellDamage) is injected into
+#    Hexcode's setPowerMultiplier. Hexcode's glyph system amplifies this value.
+# 2. Hexcode processes: glyph multipliers, volatility, etc. operate on our power.
+# 3. Result arrives: used directly as base damage for the RPG pipeline.
+# 4. Pipeline adds flat elemental per-glyph-element, then applies % scaling, crit, defenses.
 
 enabled: true
 
 # Maximum elemental resistance cap for spell damage (%)
 max_resistance_cap: 75
 
-# Maximum total damage amplification from Shock + Erode combined.
-# 2.0 = 200% = double damage max. Caps the Shock conditional multiplier
-# in our pipeline. Erode (Hexcode) runs in a separate pipeline stage —
-# this cap limits our contribution only.
-max_damage_amplification: 2.0
-
-# Multiplier applied to hex spell base damage before RPG scaling.
-# Hex spells have their own base damage that stacks with staff implicit,
-# then gets amplified by all spell scaling stats. This prevents double-scaling.
-# 1.0 = no reduction, 0.5 = halved hex base. Staff implicit is unaffected.
-spell_base_multiplier: 0.5
+# Maximum total damage amplification from Shock conditional multiplier.
+# Erode (Hexcode) runs in a separate pipeline stage — this only limits our side.
+# Set very high to effectively disable. Tune via actual gameplay testing.
+max_damage_amplification: 999.0
 
 # Maps source ID -> { type: DamageType, element: ElementType }
 # DamageType: PHYSICAL, MAGIC, FIRE, WATER, LIGHTNING, EARTH, WIND, VOID
@@ -28,9 +28,6 @@ damage_type_map:
   hex_bolt:
     type: MAGIC
     element: LIGHTNING
-  hex_combust:
-    type: FIRE
-    element: FIRE
   hex_gust:
     type: WIND
     element: WIND
@@ -53,18 +50,143 @@ realm_pedestal:
   min_distance_from_spawn: 20 # blocks from spawn point
   max_distance_from_spawn: 40 # blocks from spawn point
   tier_by_realm_tier:         # Pedestal tier scales with realm difficulty
-    1: "Hexcode_Pedestal_Thorium"
-    2: "Hexcode_Pedestal_Fire"
-    3: "Hexcode_Pedestal_Arcane"
-    4: "Hexcode_Pedestal_Void"
-    5: "Hexcode_Pedestal_Void"
+    1: Hexcode_Pedestal_Thorium
+    2: Hexcode_Pedestal_Fire
+    3: Hexcode_Pedestal_Arcane
+    4: Hexcode_Pedestal_Void
+    5: Hexcode_Pedestal_Void
+
+# Maximum mana cost reduction from RPG stats (%).
+# Prevents manaCostReduction from making spells completely free.
+# Balance via source values in skill tree and gear modifiers rather than hard-capping.
+max_mana_cost_reduction: 90
+
+# Spell echo: chance to re-cast the hex spell at reduced power (keystone ability).
+# When echo procs, the spell fires again immediately at echo_damage_percent% power,
+# zero mana cost. The player sees their spell visually echo.
+echo_cooldown_ms: 5000       # Minimum time between spell echoes (ms)
+echo_damage_percent: 0       # DISABLED — echo creates phantom idle state. Set >0 to re-enable once fixed.
+
+# Volatility ratio damage multiplier — natural diminishing returns for hex spells.
+# Each glyph execution drains volatility. Remaining/starting ratio determines
+# how much of the RPG-calculated damage is applied.
+#
+# Formula: damageMult = (remainingVolatility / startingVolatility) ^ exponent
+#
+# exponent=1.0: linear (50% remaining = 50% damage)
+# exponent=1.5: moderate (50% remaining = 35% damage, 10% = 3.2%)
+# exponent=2.0: aggressive (50% remaining = 25% damage, 10% = 1%)
+#
+# This naturally handles multi-hit spam (each hit drains more → later hits weaker)
+# and single focused hits (little drain → nearly full damage).
+volatility_ratio_exponent: 1.5
+
+# Within-cast volatility damage scaling — scales each glyph's damage by
+# the remaining/starting volatility at the moment it fires.
+# First glyph in a chain = nearly full damage, later glyphs = less damage.
+# Redrawing the spell resets volatility → back to full damage.
+#
+# within_cast_exponent=1.0: linear (50% remaining = 50% damage)
+# within_cast_exponent=0.5: generous (50% remaining = 71% damage)
+# within_cast_exponent=2.0: aggressive (50% remaining = 25% damage)
+within_cast_volatility_scaling: true
+within_cast_exponent: 1.0
+
+# Construct damage sources — these hex source IDs come from construct tick damage
+# (not direct glyph damage). Used by HexDamageAttributionSystem to skip Tier 1
+# (ThreadLocal) and go straight to Tier 2 (construct registry proximity lookup).
+# Add new entries here when Hexcode adds new construct-type spells.
+construct_sources:
+  - hex_ensnare
+  - hex_glaciate
+  - hex_phase
+
+# Construct spell physics — used to reverse velocity→height for proper damage scaling.
+# Velocity-based constructs (Glaciate) need their gravity value so we can compute:
+#   actualHeight = velocity² / (2 × gravity), then ratio = actualHeight / slotDefault
+# This gives true linear height→damage scaling. Constructs with gravity=0 use
+# standard glyph normalization (their slot value IS the damage, not velocity).
+construct_physics:
+  hex_glaciate:
+    gravity: 20.0       # From GlaciatePhysicsConfig — must match Hexcode's value
+  hex_ensnare:
+    gravity: 0           # Direct damage slot, not velocity-based
+  hex_phase:
+    gravity: 0           # Direct damage slot, not velocity-based
+
+# Maximum damage multiplier from construct height/slot inflation.
+# Caps how much extra damage a player gets from dropping ice from extreme heights.
+# 5.0 = max 5x damage (Glaciate: ≈62.5 blocks before cap, with gravity=20)
+max_construct_multiplier: 5.0
 
 # Display names for death recap / combat log
 spell_display_names:
   hex_bolt: "Lightning Bolt"
-  hex_combust: "Combustion"
   hex_gust: "Gust"
   hex_glaciate: "Glaciate"
   hex_ensnare: "Ensnare"
   hex_phase: "Phase Crush"
   default: "Hex Spell"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PER-SPELL BALANCE PROFILES
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Each spell type gets its own normalization strategy and balance parameters.
+# This replaces the one-size-fits-all formula that was broken for constructs.
+#
+# Fields:
+#   power_scale        — RPG base damage multiplier (1.0 = full RPG power)
+#   multiplier_cap     — Max damage multiplier from slot inflation
+#   cost_scale         — Mana cost multiplier for slot-inflated casts
+#   strips_magic_power — Whether Hexcode applied magicPowerMultiplier (we strip it)
+#   normalization      — "linear" (slot-based), "physics" (velocity→height), "fixed" (hardcoded)
+#   physics_gravity    — For "physics" type: gravity value for v²/2g reversal
+#
+# slot_default is auto-populated from Hexcode's GlyphAsset at startup — NOT in YAML.
+#
+# Balance anchor: Bolt at 80% of previous RPG power (20% reduction for spell vs melee parity).
+# Other spells derived from Bolt to reward complexity through sustained/AoE damage, not burst.
+
+spell_balance:
+  # Bolt: simple, instant, reliable. The baseline.
+  hex_bolt:
+    power_scale: 0.80
+    multiplier_cap: 3.0
+    cost_scale: 1.0
+    strips_magic_power: true
+    normalization: linear
+
+  # Glaciate: construct, AoE, physics-based. Multi-tick compensates lower per-tick.
+  hex_glaciate:
+    power_scale: 0.75
+    multiplier_cap: 2.0
+    cost_scale: 1.5
+    strips_magic_power: true
+    normalization: physics
+    physics_gravity: 20.0
+
+  # Ensnare: construct, AoE ticking spikes. Per-tick × 4s duration.
+  # FIX: strips_magic_power=false because Hexcode does NOT apply it to Ensnare.
+  hex_ensnare:
+    power_scale: 0.35
+    multiplier_cap: 2.5
+    cost_scale: 1.2
+    strips_magic_power: false
+    normalization: linear
+
+  # Phase: utility spell, hardcoded 4.0 damage. Disabled in v0.7.0.
+  hex_phase:
+    power_scale: 0.30
+    multiplier_cap: 1.0
+    cost_scale: 1.0
+    strips_magic_power: false
+    normalization: fixed
+
+  # Fallback for unknown hex_ sources (future glyphs, mods)
+  default:
+    power_scale: 0.70
+    multiplier_cap: 3.0
+    cost_scale: 1.0
+    strips_magic_power: true
+    normalization: linear

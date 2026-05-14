@@ -13,8 +13,10 @@ import io.github.larsonix.trailoforbis.gear.loot.LootDiscoveryConfig;
 
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipConfig;
 import io.github.larsonix.trailoforbis.loot.container.ContainerLootConfig;
+import io.github.larsonix.trailoforbis.loot.consumable.ConsumableLootConfig;
 import io.github.larsonix.trailoforbis.leveling.config.LevelingConfig;
 import io.github.larsonix.trailoforbis.mobs.MobRarityConfig;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierConfig;
 import io.github.larsonix.trailoforbis.mobs.MobScalingConfig;
 import io.github.larsonix.trailoforbis.mobs.archetype.MobArchetypeConfig;
 import io.github.larsonix.trailoforbis.mobs.classification.EntityDiscoveryConfig;
@@ -62,6 +64,7 @@ public class ConfigManager implements ConfigService {
     private MobResistanceConfig mobResistanceConfig;
     private MobArchetypeConfig mobArchetypeConfig;
     private MobRarityConfig mobRarityConfig;
+    private MobModifierConfig mobModifierConfig;
     private LevelingConfig levelingConfig;
     private DeathRecapConfig deathRecapConfig;
     private InventoryDetectionConfig inventoryDetectionConfig;
@@ -79,18 +82,28 @@ public class ConfigManager implements ConfigService {
     private TooltipConfig tooltipConfig;
     private VanillaConversionConfig vanillaConversionConfig;
     private ContainerLootConfig containerLootConfig;
+    private ConsumableLootConfig consumableLootConfig;
     private final GearConfigLoader gearConfigLoader;
 
+    private final String pluginVersion;
+
     /** @param dataFolder typically mods/TrailOfOrbis/ */
-    public ConfigManager(Path dataFolder) {
+    public ConfigManager(Path dataFolder, String pluginVersion) {
         // Load configs from config/ subfolder to avoid old config files in root folder
         this.configDir = dataFolder.resolve("config");
+        this.pluginVersion = pluginVersion;
         this.gearConfigLoader = new GearConfigLoader(dataFolder.resolve("config"));
+    }
+
+    /** For testing — skips version-based config sync. */
+    public ConfigManager(Path dataFolder) {
+        this(dataFolder, "test");
     }
 
     /** For testing with pre-loaded config. */
     public ConfigManager(Path dataFolder, RPGConfig rpgConfig) {
         this.configDir = dataFolder;
+        this.pluginVersion = "test";
         this.rpgConfig = rpgConfig;
         this.mobClassificationConfig = new MobClassificationConfig(); // Default for testing
         this.entityDiscoveryConfig = EntityDiscoveryConfig.createDefaults(); // Default for testing
@@ -117,8 +130,8 @@ public class ConfigManager implements ConfigService {
             // Create config directory if it doesn't exist
             Files.createDirectories(configDir);
 
-            // Migrate all configs before loading (adds new keys, preserves user values)
-            new ConfigMigrationService(configDir).migrateAll();
+            // Sync configs from JAR on plugin update, fill missing files on restart
+            new ConfigMigrationService(configDir, pluginVersion).migrateAll();
 
             // Load main config
             rpgConfig = loadConfig("config.yml", RPGConfig.class, new RPGConfig());
@@ -222,6 +235,10 @@ public class ConfigManager implements ConfigService {
             // Load mob rarity config
             mobRarityConfig = loadConfig("mob-rarity.yml", MobRarityConfig.class, MobRarityConfig.createDefaults());
             LOGGER.at(Level.INFO).log("Mob Rarity loaded");
+
+            mobModifierConfig = loadConfig("mob-modifiers.yml", MobModifierConfig.class, MobModifierConfig.createDefaults());
+            mobModifierConfig.validate();
+            LOGGER.at(Level.INFO).log("Mob Modifiers loaded: enabled=%s", mobModifierConfig.isEnabled() ? "yes" : "no");
 
             // Load leveling config
             levelingConfig = loadConfig("leveling.yml", LevelingConfig.class, new LevelingConfig());
@@ -451,6 +468,10 @@ public class ConfigManager implements ConfigService {
 
     public MobRarityConfig getMobRarityConfig() {
         return mobRarityConfig;
+    }
+
+    public MobModifierConfig getMobModifierConfig() {
+        return mobModifierConfig;
     }
 
     public DeathRecapConfig getDeathRecapConfig() {
@@ -719,6 +740,24 @@ public class ConfigManager implements ConfigService {
             }
         }
         return containerLootConfig;
+    }
+
+    /** Lazy-loads consumable loot config. Controls food/potion drops in containers. */
+    public ConsumableLootConfig getConsumableLootConfig() {
+        if (consumableLootConfig == null) {
+            try {
+                copyDefaultIfMissing("consumable-loot.yml");
+                consumableLootConfig = loadConfig(
+                    "consumable-loot.yml",
+                    ConsumableLootConfig.class,
+                    ConsumableLootConfig.createDefaults()
+                );
+            } catch (IOException e) {
+                LOGGER.at(Level.WARNING).withCause(e).log("Failed to load consumable-loot.yml, using defaults");
+                consumableLootConfig = ConsumableLootConfig.createDefaults();
+            }
+        }
+        return consumableLootConfig;
     }
 
     private void copyDefaultIfMissing(String filename) {

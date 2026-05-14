@@ -157,7 +157,7 @@ class RealmCompletionTrackerTest {
         @Test
         @DisplayName("Should return true when completing")
         void shouldReturnTrueWhenCompleting() {
-            // 10 mobs, buffer=3 → effective=7, required=ceil(7*0.95)=7
+            // 10 mobs, buffer=3 → effective=7, required=ceil(7*0.90)=7
             tracker = new RealmCompletionTracker(realmId, 10);
 
             // Kill 6 — not enough yet

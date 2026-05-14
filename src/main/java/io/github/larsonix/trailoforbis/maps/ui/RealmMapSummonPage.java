@@ -125,8 +125,11 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
         // The WIP notice is a direct child without an ID in the .ui, so we can't hide it directly.
         // Instead, we'll overwrite its label text to be empty.
 
-        // Time limit (per-map: based on size + REDUCED_TIME modifiers)
-        int timeLimitSeconds = mapData.computeTimeoutSeconds();
+        // Time limit (per-map: based on size multiplier + BONUS_TIME/REDUCED_TIME modifiers)
+        RealmsManager rm = getRealmsManager();
+        int timeLimitSeconds = rm != null
+                ? mapData.computeTimeoutSeconds(rm.getConfig())
+                : mapData.computeTimeoutSeconds();
         int timeLimitMinutes = timeLimitSeconds / 60;
         cmd.set("#ExplorationTimeText.TextSpans",
                 Message.raw(timeLimitMinutes + " minutes to clear").color(COLOR_TEXT));
@@ -424,11 +427,7 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
      * Same formula as RealmMapTooltipBuilder.buildModifierLine().
      */
     private static String formatModifier(RealmModifier mod, double qualityMult) {
-        if (mod.type().isBinary()) {
-            return mod.type().getDisplayName();
-        }
-        int adjustedValue = (int) Math.round(mod.value() * qualityMult);
-        String text = "+" + adjustedValue + "% " + mod.type().getDisplayName();
+        String text = mod.type().formatValue(mod.value(), qualityMult);
         if (mod.locked()) {
             text += " [Locked]";
         }

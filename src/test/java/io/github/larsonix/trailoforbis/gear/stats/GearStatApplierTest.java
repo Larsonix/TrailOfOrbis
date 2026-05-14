@@ -46,6 +46,7 @@ class GearStatApplierTest {
             Map.of("max_health", 50.0),  // Percent +50% (to accumulator)
             0.0,  // No weapon base damage
             null, // No weapon item ID
+            null, // No weapon raw item ID
             false, null // Not RPG gear
         );
 
@@ -69,6 +70,7 @@ class GearStatApplierTest {
             Map.of(),
             0.0,  // No weapon base damage
             null, // No weapon item ID
+            null, // No weapon raw item ID
             false, null // Not RPG gear
         );
 
@@ -106,7 +108,7 @@ class GearStatApplierTest {
             Map.of("physical_damage", 10.0),
             Map.of("crit_chance", 5.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -126,7 +128,7 @@ class GearStatApplierTest {
             Map.of("physical_damage", 15.0),
             Map.of(),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -145,7 +147,7 @@ class GearStatApplierTest {
             Map.of(),
             Map.of("crit_chance", 10.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -165,7 +167,7 @@ class GearStatApplierTest {
             Map.of(),
             Map.of("fire_resistance", 5.0, "water_resistance", 10.0),
             0.0,
-            null,
+            null, null,
             false, null
         );
 
@@ -185,6 +187,7 @@ class GearStatApplierTest {
             Map.of(),
             150.0,  // Weapon deals 150 base damage
             null,   // No weapon item ID
+            null,   // No weapon raw item ID
             true, null    // Is RPG gear
         );
 
@@ -204,6 +207,7 @@ class GearStatApplierTest {
             Map.of(),
             200.0,  // Weapon deals 200 base damage
             null,   // No weapon item ID
+            null,   // No weapon raw item ID
             true, null    // Is RPG gear
         );
 
@@ -239,6 +243,7 @@ class GearStatApplierTest {
             Map.of(),  // Empty percent bonuses (no suffixes)
             150.0,     // Implicit damage from weapon type + level scaling
             "Weapon_Sword_Iron",  // Weapon item ID for profile lookup
+            null,      // No weapon raw item ID
             true, null       // IS RPG gear (critical flag!)
         );
 
@@ -259,12 +264,12 @@ class GearStatApplierTest {
 
         // RPG weapon with no modifiers
         GearBonuses rpgWeapon = new GearBonuses(
-            Map.of(), Map.of(), 100.0, "Weapon_Dagger_Steel", true, null
+            Map.of(), Map.of(), 100.0, "Weapon_Dagger_Steel", null, true, null
         );
 
         // Vanilla weapon (not RPG gear)
         GearBonuses vanillaWeapon = new GearBonuses(
-            Map.of(), Map.of(), 0.0, null, false, null
+            Map.of(), Map.of(), 0.0, null, null, false, null
         );
 
         applier.apply(stats, rpgWeapon);
@@ -288,6 +293,7 @@ class GearStatApplierTest {
             Map.of(),  // No percent bonuses
             0.0,       // Not a weapon
             null,      // Not a weapon
+            null,      // No weapon raw item ID
             false, null      // Not RPG gear (armor has different handling)
         );
 
@@ -307,6 +313,7 @@ class GearStatApplierTest {
             Map.of(),
             75.0,  // Implicit damage
             "Weapon_Staff_Void",  // Important for vanilla profile lookup
+            null,  // No weapon raw item ID
             true, null
         );
 
@@ -327,7 +334,7 @@ class GearStatApplierTest {
             Map.of(),  // Empty - no flat modifiers
             Map.of(),  // Empty - no percent modifiers
             250.0,     // Implicit damage scaled for level 100
-            "Weapon_Longsword_Obsidian",
+            "Weapon_Longsword_Obsidian", null,
             true, null
         );
 

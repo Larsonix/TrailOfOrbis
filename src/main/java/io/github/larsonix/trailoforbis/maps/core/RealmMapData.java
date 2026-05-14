@@ -6,6 +6,7 @@ import io.github.larsonix.trailoforbis.gear.item.CustomItemInstanceId;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.maps.codec.RealmCodecs;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifier;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import io.github.larsonix.trailoforbis.stones.ItemModifier;
@@ -584,16 +585,13 @@ public record RealmMapData(
     /**
      * Gets the timeout for this realm in seconds.
      *
-     * <p>Accounts for any time reduction modifiers.
+     * <p>Legacy method — delegates to {@link #computeTimeoutSeconds(RealmsConfig)} with
+     * default config. Prefer the config-aware overload for accurate size multipliers.
      *
      * @return Timeout in seconds
      */
     public int getTimeoutSeconds() {
-        int base = size.getBaseTimeoutSeconds();
-        int reduction = getModifierValue(RealmModifierType.REDUCED_TIME);
-        int bonusTime = getModifierValue(RealmModifierType.BONUS_TIME);
-        int adjusted = base - (base * reduction / 100) + (base * bonusTime / 100);
-        return Math.max(60, adjusted);
+        return computeTimeoutSeconds(new RealmsConfig());
     }
 
     // =========================================================================
@@ -612,7 +610,7 @@ public record RealmMapData(
      * @param config Arena scaling configuration
      * @return Computed arena radius in blocks
      */
-    public int computeArenaRadius(@Nonnull io.github.larsonix.trailoforbis.maps.config.RealmsConfig.ArenaScalingConfig config) {
+    public int computeArenaRadius(@Nonnull RealmsConfig.ArenaScalingConfig config) {
         // Cap input mobs at 500 (same MAX_MONSTERS as the spawner).
         int baseMobCount = Math.min(500, size.calculateMonsterCount(level));
 
@@ -628,42 +626,58 @@ public record RealmMapData(
      * Convenience overload with default config (for tests and backwards compat).
      */
     public int computeArenaRadius() {
-        return computeArenaRadius(new io.github.larsonix.trailoforbis.maps.config.RealmsConfig.ArenaScalingConfig());
+        return computeArenaRadius(new RealmsConfig.ArenaScalingConfig());
     }
 
     /**
      * Computes the dynamic timeout based on final mob count with degressive scaling.
      *
      * <p>Uses final mob count (including modifier bonuses) — more mobs = more time,
-     * but with diminishing returns. High-level players with hundreds of mobs don't
-     * get proportionally more time; time pressure increases.
+     * but with diminishing returns. Per-size timer multiplier from config scales the
+     * base result before map modifiers (BONUS_TIME / REDUCED_TIME) are applied.
      *
-     * <p>Formula: {@code base + (finalMobCount * perMob) / (1 + finalMobCount / softCap)}
-     * then applies REDUCED_TIME modifier, clamped to minimum.
+     * <p>Application order:
+     * <ol>
+     *   <li>Degressive formula: {@code base + (mobs * perMob) / (1 + mobs / softCap)}</li>
+     *   <li>Size timer multiplier (e.g. 1.4 for MASSIVE)</li>
+     *   <li>BONUS_TIME modifier (additive percentage)</li>
+     *   <li>REDUCED_TIME modifier (subtractive percentage)</li>
+     *   <li>Clamp to minimum</li>
+     * </ol>
      *
-     * @param config Arena scaling configuration
+     * @param config Full realms configuration (for arena scaling + size overrides)
      * @return Computed timeout in seconds
      */
-    public int computeTimeoutSeconds(@Nonnull io.github.larsonix.trailoforbis.maps.config.RealmsConfig.ArenaScalingConfig config) {
+    public int computeTimeoutSeconds(@Nonnull RealmsConfig config) {
+        RealmsConfig.ArenaScalingConfig arenaConfig = config.getArenaScalingConfig();
         int finalMobCount = calculateMonsterCount(); // Includes modifier bonuses
-        int base = config.getTimerBaseSeconds();
-        int perMob = config.getTimerSecondsPerMob();
-        int softCap = config.getTimerSoftCap();
+        int base = arenaConfig.getTimerBaseSeconds();
+        int perMob = arenaConfig.getTimerSecondsPerMob();
+        int softCap = arenaConfig.getTimerSoftCap();
 
+        // Step 1: Degressive formula
         double rawTimeout = base + (finalMobCount * (double) perMob) / (1.0 + (double) finalMobCount / softCap);
 
-        // Apply REDUCED_TIME modifier on top
-        int reduction = getModifierValue(RealmModifierType.REDUCED_TIME);
-        double afterReduction = rawTimeout * (1.0 - reduction / 100.0);
+        // Step 2: Per-size timer multiplier
+        double sizeMultiplier = config.getSizeSettings(size).getTimerMultiplier();
+        double afterSize = rawTimeout * sizeMultiplier;
 
-        return Math.max(config.getTimerMinimumSeconds(), (int) Math.round(afterReduction));
+        // Step 3: BONUS_TIME modifier (reward suffix, +10-50%)
+        int bonusTime = getModifierValue(RealmModifierType.BONUS_TIME);
+        double afterBonus = afterSize * (1.0 + bonusTime / 100.0);
+
+        // Step 4: REDUCED_TIME modifier (difficulty prefix, -10-40%)
+        int reduction = getModifierValue(RealmModifierType.REDUCED_TIME);
+        double afterReduction = afterBonus * (1.0 - reduction / 100.0);
+
+        return Math.max(arenaConfig.getTimerMinimumSeconds(), (int) Math.round(afterReduction));
     }
 
     /**
      * Convenience overload with default config (for tests and backwards compat).
      */
     public int computeTimeoutSeconds() {
-        return computeTimeoutSeconds(new io.github.larsonix.trailoforbis.maps.config.RealmsConfig.ArenaScalingConfig());
+        return computeTimeoutSeconds(new RealmsConfig());
     }
 
     /**

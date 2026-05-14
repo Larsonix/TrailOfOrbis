@@ -4,9 +4,13 @@ import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
 import io.github.larsonix.trailoforbis.mobs.archetype.MobArchetype;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
+import io.github.larsonix.trailoforbis.mobs.modifiers.StatBonus;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Immutable stat container for a scaled mob.
@@ -200,6 +204,124 @@ public record MobStats(
             ailmentThresholdMultiplier,
             ailmentEffectiveness,
             elementalStats != null ? elementalStats.copy() : null,
+            archetype
+        );
+    }
+
+    /**
+     * Applies late-game scaling multipliers to HP, damage, and armor.
+     *
+     * <p>Called after {@link #withMultiplier(double)} to add extra mob power
+     * above a configurable level threshold. Uses an accelerating power curve
+     * that matches the compound growth of player power at high levels.
+     *
+     * @param hpMultiplier    Multiplier for maxHealth (1.0 = no change)
+     * @param dmgMultiplier   Multiplier for physicalDamage (1.0 = no change)
+     * @param armorMultiplier Multiplier for armor (1.0 = no change)
+     * @return New MobStats with scaled HP, damage, and armor
+     */
+    @Nonnull
+    public MobStats withLateGameScaling(double hpMultiplier, double dmgMultiplier, double armorMultiplier) {
+        if (hpMultiplier == 1.0 && dmgMultiplier == 1.0 && armorMultiplier == 1.0) return this;
+        return new MobStats(
+            level, totalPool,
+            maxHealth * hpMultiplier,
+            physicalDamage * dmgMultiplier,
+            armor * armorMultiplier,
+            moveSpeed,
+            accuracy,
+            criticalChance,
+            criticalMultiplier,
+            armorPenetration,
+            lifeSteal,
+            trueDamage,
+            evasion,
+            knockbackResistance,
+            healthRegen,
+            ailmentThresholdMultiplier,
+            ailmentEffectiveness,
+            elementalStats != null ? elementalStats.copy() : null,
+            archetype
+        );
+    }
+
+    /**
+     * Applies mob modifier stat bonuses to this stat block.
+     *
+     * <p>Each modifier's {@link StatBonus} is applied as a multiplicative bonus
+     * on the specific stat it affects. Elemental modifiers add flat damage to the
+     * mob's ElementalStats (creating one if null). Multiple modifiers stack multiplicatively.
+     *
+     * <p>This is called AFTER {@link #withMultiplier(double)} so modifier bonuses
+     * scale on top of the classification multiplier.
+     *
+     * @param modifiers List of active modifiers on this mob
+     * @return New MobStats with modifier bonuses applied
+     */
+    @Nonnull
+    public MobStats withModifiers(@Nonnull List<ModifierType> modifiers) {
+        if (modifiers.isEmpty()) return this;
+
+        double modHp = maxHealth;
+        double modDamage = physicalDamage;
+        double modArmor = armor;
+        double modSpeed = moveSpeed;
+        double modKbResist = knockbackResistance;
+        ElementalStats modElemental = elementalStats != null ? elementalStats.copy() : null;
+
+        for (ModifierType mod : modifiers) {
+            StatBonus bonus = mod.getStatBonus();
+            if (!bonus.hasEffect()) continue;
+
+            modHp *= (1.0 + bonus.maxHpPercent());
+            modDamage *= (1.0 + bonus.damagePercent());
+            modArmor *= (1.0 + bonus.armorPercent());
+            modSpeed *= (1.0 + bonus.speedPercent());
+
+            if (bonus.knockbackResist() > 0) {
+                modKbResist = Math.min(100, modKbResist + bonus.knockbackResist() * 100);
+            }
+
+            // Elemental damage: add flat damage based on physical damage * element percent
+            for (Map.Entry<ElementType, Double> entry : bonus.elementDamagePercent().entrySet()) {
+                if (modElemental == null) {
+                    modElemental = new ElementalStats();
+                }
+                double flatElemental = physicalDamage * entry.getValue();
+                double existing = modElemental.getFlatDamage(entry.getKey());
+                modElemental.setFlatDamage(entry.getKey(), existing + flatElemental);
+            }
+
+            // Elemental resistance (Warding)
+            if (bonus.elementalResistPercent() > 0) {
+                if (modElemental == null) {
+                    modElemental = new ElementalStats();
+                }
+                for (ElementType element : ElementType.values()) {
+                    double existing = modElemental.getResistance(element);
+                    modElemental.setResistance(element, existing + bonus.elementalResistPercent() * 100);
+                }
+            }
+        }
+
+        return new MobStats(
+            level, totalPool,
+            Math.max(1, modHp),
+            Math.max(1, modDamage),
+            Math.max(0, modArmor),
+            modSpeed,
+            accuracy,
+            criticalChance,
+            criticalMultiplier,
+            armorPenetration,
+            lifeSteal,
+            trueDamage,
+            evasion,
+            modKbResist,
+            healthRegen,
+            ailmentThresholdMultiplier,
+            ailmentEffectiveness,
+            modElemental,
             archetype
         );
     }

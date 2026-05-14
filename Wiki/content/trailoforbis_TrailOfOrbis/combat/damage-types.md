@@ -44,11 +44,11 @@ See [Armor](armor-physical-defense) for the full formula and worked examples.
 
 **Elemental resistance formula :**
 ```
-effectiveResist = max(0, min(resistance, 75) - penetration)    // pen floors at 0%
+effectiveResist = max(-200, min(75, resistance - penetration))  // pen before cap, floor -200%
 elemDamage = elemDamage × (1 - effectiveResist / 100)
 ```
 
-Each element's resistance is capped at 75% reduction. Your penetration reduces their effective resistance but can't push it below 0% - excess penetration is wasted.
+Each element's resistance is capped at 75% reduction. Penetration subtracts from your raw resistance before the cap — so overcapping provides a buffer. Penetration can push resistance negative (up to -200% / 3× damage).
 
 See [Resistances](elemental-resistances) for full details.
 

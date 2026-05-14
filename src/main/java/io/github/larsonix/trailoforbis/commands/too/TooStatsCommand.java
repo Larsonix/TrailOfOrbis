@@ -198,17 +198,25 @@ public class TooStatsCommand extends OpenPlayerCommand {
 
         int playerLevel = ServiceRegistry.get(LevelingService.class)
             .map(ls -> ls.getLevel(uuid)).orElse(1);
+        RPGConfig.ArmorConfig armorCfg = configService.getRPGConfig().getArmor();
         player.sendMessage(Message.empty()
             .insert(Message.raw("  Armor : ").color(MessageColors.GRAY))
             .insert(Message.raw(NumberFormatter.smallFlat(stats.getArmor())).color(MessageColors.WHITE))
             .insert(Message.raw(" (" + NumberFormatter.percent(
-                CombatCalculator.estimateArmorReduction(stats.getArmor(), playerLevel))
+                CombatCalculator.estimateArmorReduction(stats.getArmor(), playerLevel,
+                    armorCfg.getLevelScale(), armorCfg.getBaseConstant()))
                 + " reduction vs Lv" + playerLevel + ")").color(MessageColors.GRAY)));
 
         if (stats.getFallDamageReduction() > 0) {
             player.sendMessage(Message.empty()
                 .insert(Message.raw("  Fall Resist : ").color(MessageColors.GRAY))
                 .insert(Message.raw(NumberFormatter.percent(stats.getFallDamageReduction())).color(MessageColors.SUCCESS)));
+        }
+
+        if (stats.getPhysicalResistance() > 0) {
+            player.sendMessage(Message.empty()
+                .insert(Message.raw("  Phys Resist : ").color(MessageColors.GRAY))
+                .insert(Message.raw(NumberFormatter.percent(stats.getPhysicalResistance())).color(MessageColors.WHITE)));
         }
 
         if (stats.getFireResistance() > 0 || stats.getWaterResistance() > 0 ||

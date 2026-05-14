@@ -9,6 +9,7 @@ import io.github.larsonix.trailoforbis.maps.core.RealmLayoutShape;
 import io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.core.RealmState;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.templates.RealmTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,7 +56,7 @@ class RealmInstanceTest {
             .estimatedMonsters(10)
             .build();
 
-        instance = new RealmInstance(realmId, mapData, template, ownerId);
+        instance = new RealmInstance(realmId, mapData, template, ownerId, new RealmsConfig());
     }
 
     @Nested

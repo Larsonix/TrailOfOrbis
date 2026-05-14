@@ -67,9 +67,9 @@ public class EnergyShieldHud {
 
         String html = buildHtml(initHealthW, initShieldW);
 
-        return HudBuilder.hudForPlayer(player)
+        HyUIHud hud = HudBuilder.hudForPlayer(player)
             .fromHtml(html)
-            .onRefresh(hud -> {
+            .onRefresh(h -> {
                 float newHealth = healthRatioProvider.getHealthRatio(playerId);
                 float newShield = computeShieldRatio(tracker, maxShieldProvider, playerId);
                 boolean newHasShield = newShield > 0;
@@ -77,13 +77,13 @@ public class EnergyShieldHud {
                 // Apply textures on first refresh (~50ms after creation)
                 if (!texturesApplied[0]) {
                     texturesApplied[0] = true;
-                    hud.getById(ID_BAR_BG, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_BAR_BG, GroupBuilder.class).ifPresent(g ->
                         g.withBackground(TEX_BAR_BG));
-                    hud.getById(ID_HEALTH_FILL, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_HEALTH_FILL, GroupBuilder.class).ifPresent(g ->
                         g.withBackground(TEX_HEALTH_FILL));
-                    hud.getById(ID_SHIELD_FILL, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_SHIELD_FILL, GroupBuilder.class).ifPresent(g ->
                         g.withBackground(TEX_SHIELD_FILL));
-                    hud.getById(ID_ICON, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_ICON, GroupBuilder.class).ifPresent(g ->
                         g.withBackground(newHasShield ? TEX_SHIELD_ICON : TEX_HEALTH_ICON));
                 }
 
@@ -98,24 +98,28 @@ public class EnergyShieldHud {
                 if (healthChanged) {
                     displayHealth[0] = newHealth;
                     int w = Math.max(0, Math.min(BAR_WIDTH, Math.round(BAR_WIDTH * newHealth)));
-                    hud.getById(ID_HEALTH_FILL, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_HEALTH_FILL, GroupBuilder.class).ifPresent(g ->
                         g.withAnchor(new HyUIAnchor().setLeft(0).setTop(0).setWidth(w).setHeight(BAR_HEIGHT)));
                 }
 
                 if (shieldChanged) {
                     displayShield[0] = newShield;
                     int w = Math.max(0, Math.min(BAR_WIDTH, Math.round(BAR_WIDTH * newShield)));
-                    hud.getById(ID_SHIELD_FILL, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_SHIELD_FILL, GroupBuilder.class).ifPresent(g ->
                         g.withAnchor(new HyUIAnchor().setLeft(0).setTop(0).setWidth(w).setHeight(BAR_HEIGHT)));
                 }
 
                 if (iconChanged) {
                     displayHasShield[0] = newHasShield;
-                    hud.getById(ID_ICON, GroupBuilder.class).ifPresent(g ->
+                    h.getById(ID_ICON, GroupBuilder.class).ifPresent(g ->
                         g.withBackground(newHasShield ? TEX_SHIELD_ICON : TEX_HEALTH_ICON));
                 }
             })
             .show();
+
+        // Deterministic name — prevents MCHUD accumulation across world transitions
+        hud.name = "too-energy-shield";
+        return hud;
     }
 
     private static String buildHtml(int healthWidth, int shieldWidth) {

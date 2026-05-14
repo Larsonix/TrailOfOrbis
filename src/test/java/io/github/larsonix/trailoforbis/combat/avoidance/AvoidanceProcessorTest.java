@@ -263,44 +263,6 @@ public class AvoidanceProcessorTest {
         }
     }
 
-    // ==================== Block Tests ====================
-
-    @Nested
-    @DisplayName("Block Chance")
-    class BlockTests {
-
-        @Test
-        @DisplayName("Null stats returns false")
-        void checkPassiveBlock_nullStats_returnsFalse() {
-            boolean result = processor.checkPassiveBlock(null);
-            assertFalse(result, "Null stats should not block");
-        }
-
-        @Test
-        @DisplayName("Zero passive block chance never blocks")
-        void checkPassiveBlock_zeroBlockChance_returnsFalse() {
-            ComputedStats stats = ComputedStats.builder()
-                .passiveBlockChance(0f)
-                .build();
-
-            for (int i = 0; i < 100; i++) {
-                assertFalse(processor.checkPassiveBlock(stats), "0% passive block should never succeed");
-            }
-        }
-
-        @Test
-        @DisplayName("100% passive block chance always blocks")
-        void checkPassiveBlock_hundredPercentBlockChance_returnsTrue() {
-            ComputedStats stats = ComputedStats.builder()
-                .passiveBlockChance(100f)
-                .build();
-
-            for (int i = 0; i < 100; i++) {
-                assertTrue(processor.checkPassiveBlock(stats), "100% passive block should always succeed");
-            }
-        }
-    }
-
     // ==================== Blocked Damage Estimation Tests ====================
 
     @Nested
@@ -406,6 +368,16 @@ public class AvoidanceProcessorTest {
         }
 
         @Test
+        @DisplayName("evaded factory creates evaded result")
+        void evaded_createsCorrectResult() {
+            var result = AvoidanceProcessor.AvoidanceResult.evaded();
+
+            assertTrue(result.avoided());
+            assertEquals(DamageBreakdown.AvoidanceReason.EVADED, result.reason());
+            assertEquals(0f, result.estimatedDamage());
+        }
+
+        @Test
         @DisplayName("blocked factory creates blocked result with damage")
         void blocked_createsCorrectResultWithDamage() {
             var result = AvoidanceProcessor.AvoidanceResult.blocked(150f);
@@ -432,19 +404,6 @@ public class AvoidanceProcessorTest {
             for (int i = 0; i < 100; i++) {
                 assertFalse(processor.checkDodge(stats),
                     "Negative dodge chance should never dodge");
-            }
-        }
-
-        @Test
-        @DisplayName("Negative passive block chance treated as zero")
-        void checkPassiveBlock_negativeChance_neverBlocks() {
-            ComputedStats stats = ComputedStats.builder()
-                .passiveBlockChance(-10f)
-                .build();
-
-            for (int i = 0; i < 100; i++) {
-                assertFalse(processor.checkPassiveBlock(stats),
-                    "Negative passive block chance should never block");
             }
         }
 

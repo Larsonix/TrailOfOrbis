@@ -32,6 +32,7 @@ public final class ContainerLootConfig {
     private Map<String, TierConfig> containerTiers = new LinkedHashMap<>();
     private StoneDrops stoneDrops = new StoneDrops();
     private MapDrops mapDrops = new MapDrops();
+    private ConsumableDrops consumableDrops = new ConsumableDrops();
     private ItemRemoval itemRemoval = new ItemRemoval();
     private Advanced advanced = new Advanced();
 
@@ -83,6 +84,11 @@ public final class ContainerLootConfig {
     }
 
     @Nonnull
+    public ConsumableDrops getConsumableDrops() {
+        return consumableDrops;
+    }
+
+    @Nonnull
     public ItemRemoval getItemRemoval() {
         return itemRemoval;
     }
@@ -126,6 +132,10 @@ public final class ContainerLootConfig {
 
     public void setMap_drops(MapDrops mapDrops) {
         this.mapDrops = mapDrops != null ? mapDrops : new MapDrops();
+    }
+
+    public void setConsumable_drops(ConsumableDrops consumableDrops) {
+        this.consumableDrops = consumableDrops != null ? consumableDrops : new ConsumableDrops();
     }
 
     public void setItem_removal(ItemRemoval itemRemoval) {
@@ -323,6 +333,7 @@ public final class ContainerLootConfig {
         private double rarityBonus = 0.0;
         private double mapChanceMultiplier = 1.0;
         private double stoneChanceMultiplier = 1.0;
+        private double consumableChanceMultiplier = 1.0;
         private int minGearDrops = 0;
         private int maxGearDrops = 2;
         private int minItems = 3;
@@ -348,6 +359,10 @@ public final class ContainerLootConfig {
 
         public double getStoneChanceMultiplier() {
             return stoneChanceMultiplier;
+        }
+
+        public double getConsumableChanceMultiplier() {
+            return consumableChanceMultiplier;
         }
 
         public int getMinGearDrops() {
@@ -388,6 +403,10 @@ public final class ContainerLootConfig {
 
         public void setStone_chance_multiplier(double stoneChanceMultiplier) {
             this.stoneChanceMultiplier = stoneChanceMultiplier;
+        }
+
+        public void setConsumable_chance_multiplier(double consumableChanceMultiplier) {
+            this.consumableChanceMultiplier = consumableChanceMultiplier;
         }
 
         public void setMin_gear_drops(int minGearDrops) {
@@ -520,6 +539,64 @@ public final class ContainerLootConfig {
             if (range != null && range.size() >= 2) {
                 this.levelOffsetRange = new int[]{range.get(0), range.get(1)};
             }
+        }
+    }
+
+    // =========================================================================
+    // CONSUMABLE DROPS
+    // =========================================================================
+
+    /**
+     * Consumable (food/potion) drop configuration for containers.
+     *
+     * <p>Settings here control the container-side drop chance and limits.
+     * The actual item pools are in {@code consumable-loot.yml}.
+     */
+    public static final class ConsumableDrops {
+        private boolean enabled = true;
+        private double baseChance = 0.40;
+        private int maxPerContainer = 2;
+        private double foodWeight = 0.5;
+        private double potionWeight = 0.5;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public double getBaseChance() {
+            return baseChance;
+        }
+
+        public int getMaxPerContainer() {
+            return maxPerContainer;
+        }
+
+        public double getFoodWeight() {
+            return foodWeight;
+        }
+
+        public double getPotionWeight() {
+            return potionWeight;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public void setBase_chance(double baseChance) {
+            this.baseChance = baseChance;
+        }
+
+        public void setMax_per_container(int maxPerContainer) {
+            this.maxPerContainer = Math.max(0, maxPerContainer);
+        }
+
+        public void setFood_weight(double foodWeight) {
+            this.foodWeight = foodWeight;
+        }
+
+        public void setPotion_weight(double potionWeight) {
+            this.potionWeight = potionWeight;
         }
     }
 

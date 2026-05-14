@@ -10,6 +10,7 @@ import io.github.larsonix.trailoforbis.gear.loot.DropLevelBlender;
 import io.github.larsonix.trailoforbis.gear.loot.LootGenerator;
 import io.github.larsonix.trailoforbis.gear.loot.RarityBonusCalculator;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
+import io.github.larsonix.trailoforbis.loot.consumable.ConsumableLootRegistry;
 import io.github.larsonix.trailoforbis.maps.items.RealmMapGenerator;
 import io.github.larsonix.trailoforbis.maps.reward.RewardChestManager;
 
@@ -77,6 +78,7 @@ public final class ContainerLootSystem {
      * @param config                  The container loot configuration
      * @param lootGenerator           The gear loot generator
      * @param mapGenerator            The realm map generator (nullable - map drops disabled if null)
+     * @param consumableRegistry      The consumable loot registry (nullable - consumable drops disabled if null)
      * @param conversionConfig        The vanilla conversion config for item classification
      * @param dropLevelBlender        The drop level blender
      * @param rarityBonusCalculator   Player WIND→rarity calculator (nullable for tests)
@@ -86,6 +88,7 @@ public final class ContainerLootSystem {
             @Nonnull ContainerLootConfig config,
             @Nonnull LootGenerator lootGenerator,
             @Nullable RealmMapGenerator mapGenerator,
+            @Nullable ConsumableLootRegistry consumableRegistry,
             @Nonnull VanillaConversionConfig conversionConfig,
             @Nonnull DropLevelBlender dropLevelBlender,
             @Nullable RarityBonusCalculator rarityBonusCalculator,
@@ -94,6 +97,7 @@ public final class ContainerLootSystem {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         Objects.requireNonNull(lootGenerator, "lootGenerator cannot be null");
         // mapGenerator is nullable - map drops disabled if RealmsManager not available
+        // consumableRegistry is nullable - consumable drops disabled if not available
         Objects.requireNonNull(conversionConfig, "conversionConfig cannot be null");
         Objects.requireNonNull(dropLevelBlender, "dropLevelBlender cannot be null");
         Objects.requireNonNull(rarityRoller, "rarityRoller cannot be null");
@@ -103,7 +107,7 @@ public final class ContainerLootSystem {
         this.tierClassifier = new ContainerTierClassifier(config);
         this.itemClassifier = new ItemClassifier(conversionConfig);
         this.lootGenerator = new ContainerLootGenerator(
-            config, lootGenerator, mapGenerator, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller);
+            config, lootGenerator, mapGenerator, consumableRegistry, tierClassifier, dropLevelBlender, rarityBonusCalculator, rarityRoller);
         this.replacer = new ContainerLootReplacer(
             config, this.lootGenerator, itemClassifier, tierClassifier);
 
@@ -127,6 +131,7 @@ public final class ContainerLootSystem {
      * @param realmsManager               The realms manager (for realm world detection), or null
      * @param processedContainerResType   The persistent resource type for tracking processed containers
      * @param l4eBridge                   The L4E component bridge for stale lock cleanup, or null
+     * @param itemWorldSyncService       The item sync service for custom definitions, or null
      * @return The interceptor, or null if the system is disabled
      */
     @Nullable
@@ -134,13 +139,14 @@ public final class ContainerLootSystem {
             @Nullable RewardChestManager rewardChestManager,
             @Nullable io.github.larsonix.trailoforbis.maps.RealmsManager realmsManager,
             @Nonnull ResourceType<ChunkStore, ProcessedContainerResource> processedContainerResType,
-            @Nullable io.github.larsonix.trailoforbis.compat.L4EComponentBridge l4eBridge) {
+            @Nullable io.github.larsonix.trailoforbis.compat.L4EComponentBridge l4eBridge,
+            @Nullable io.github.larsonix.trailoforbis.gear.item.ItemWorldSyncService itemWorldSyncService) {
         if (!enabled) {
             LOGGER.atInfo().log("Container loot system is disabled, not creating interceptor");
             return null;
         }
 
-        return new ContainerLootInterceptor(this, rewardChestManager, realmsManager, processedContainerResType, l4eBridge);
+        return new ContainerLootInterceptor(this, rewardChestManager, realmsManager, processedContainerResType, l4eBridge, itemWorldSyncService);
     }
 
     /**

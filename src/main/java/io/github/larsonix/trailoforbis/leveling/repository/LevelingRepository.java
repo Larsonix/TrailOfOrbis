@@ -39,11 +39,11 @@ public class LevelingRepository {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     private static final String INSERT_SQL =
-        "INSERT INTO rpg_levels (uuid, xp, created_at, last_updated) VALUES (?, ?, ?, ?)";
+        "INSERT INTO rpg_levels (uuid, xp, level, created_at, last_updated) VALUES (?, ?, ?, ?, ?)";
     private static final String UPDATE_SQL =
-        "UPDATE rpg_levels SET xp = ?, last_updated = ? WHERE uuid = ?";
+        "UPDATE rpg_levels SET xp = ?, level = ?, last_updated = ? WHERE uuid = ?";
     private static final String SELECT_SQL =
-        "SELECT xp, created_at, last_updated FROM rpg_levels WHERE uuid = ?";
+        "SELECT xp, level, created_at, last_updated FROM rpg_levels WHERE uuid = ?";
     private static final String DELETE_SQL =
         "DELETE FROM rpg_levels WHERE uuid = ?";
 
@@ -216,13 +216,15 @@ public class LevelingRepository {
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     long xp = rs.getLong("xp");
+                    int levelRaw = rs.getInt("level");
+                    Integer storedLevel = rs.wasNull() ? null : levelRaw;
                     Timestamp createdTs = rs.getTimestamp("created_at");
                     Timestamp updatedTs = rs.getTimestamp("last_updated");
 
                     Instant createdAt = createdTs != null ? createdTs.toInstant() : Instant.now();
                     Instant lastUpdated = updatedTs != null ? updatedTs.toInstant() : Instant.now();
 
-                    return new PlayerLevelData(playerId, xp, createdAt, lastUpdated);
+                    return new PlayerLevelData(playerId, xp, storedLevel, createdAt, lastUpdated);
                 }
             }
         } catch (SQLException e) {
@@ -238,8 +240,9 @@ public class LevelingRepository {
 
                 stmt.setString(1, data.uuid().toString());
                 stmt.setLong(2, data.xp());
-                stmt.setTimestamp(3, Timestamp.from(data.createdAt()));
-                stmt.setTimestamp(4, Timestamp.from(data.lastUpdated()));
+                setNullableInt(stmt, 3, data.storedLevel());
+                stmt.setTimestamp(4, Timestamp.from(data.createdAt()));
+                stmt.setTimestamp(5, Timestamp.from(data.lastUpdated()));
                 stmt.executeUpdate();
 
             } catch (SQLException e) {
@@ -257,8 +260,9 @@ public class LevelingRepository {
              PreparedStatement stmt = conn.prepareStatement(UPDATE_SQL)) {
 
             stmt.setLong(1, data.xp());
-            stmt.setTimestamp(2, Timestamp.from(data.lastUpdated()));
-            stmt.setString(3, data.uuid().toString());
+            setNullableInt(stmt, 2, data.storedLevel());
+            stmt.setTimestamp(3, Timestamp.from(data.lastUpdated()));
+            stmt.setString(4, data.uuid().toString());
 
             int rows = stmt.executeUpdate();
 
@@ -267,8 +271,9 @@ public class LevelingRepository {
                 try (PreparedStatement insertStmt = conn.prepareStatement(INSERT_SQL)) {
                     insertStmt.setString(1, data.uuid().toString());
                     insertStmt.setLong(2, data.xp());
-                    insertStmt.setTimestamp(3, Timestamp.from(data.createdAt()));
-                    insertStmt.setTimestamp(4, Timestamp.from(data.lastUpdated()));
+                    setNullableInt(insertStmt, 3, data.storedLevel());
+                    insertStmt.setTimestamp(4, Timestamp.from(data.createdAt()));
+                    insertStmt.setTimestamp(5, Timestamp.from(data.lastUpdated()));
                     insertStmt.executeUpdate();
                 }
             }
@@ -278,6 +283,15 @@ public class LevelingRepository {
         } catch (SQLException e) {
             LOGGER.at(Level.SEVERE).withCause(e).log("Failed to update leveling data for %s", data.uuid());
             return false;
+        }
+    }
+
+    private void setNullableInt(PreparedStatement stmt, int index, @Nullable Integer value)
+            throws SQLException {
+        if (value != null) {
+            stmt.setInt(index, value);
+        } else {
+            stmt.setNull(index, Types.INTEGER);
         }
     }
 

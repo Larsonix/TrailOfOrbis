@@ -699,6 +699,26 @@ public final class GearConfigLoader {
             spellbookScaleFactor = ctx.getDouble(sb, "scale_factor");
         }
 
+        // Spellbook volatility implicit — optional
+        double sbVolBaseMin = 3.0, sbVolBaseMax = 8.0, sbVolScale = 4.0;
+        if (data.containsKey("spellbook_volatility")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sv = (Map<String, Object>) data.get("spellbook_volatility");
+            sbVolBaseMin = ctx.getDouble(sv, "base_min");
+            sbVolBaseMax = ctx.getDouble(sv, "base_max");
+            sbVolScale = ctx.getDouble(sv, "scale_factor");
+        }
+
+        // Spellbook magic power implicit — optional
+        double sbMpBaseMin = 0.02, sbMpBaseMax = 0.06, sbMpScale = 3.0;
+        if (data.containsKey("spellbook_magic_power")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sm = (Map<String, Object>) data.get("spellbook_magic_power");
+            sbMpBaseMin = ctx.getDouble(sm, "base_min");
+            sbMpBaseMax = ctx.getDouble(sm, "base_max");
+            sbMpScale = ctx.getDouble(sm, "scale_factor");
+        }
+
         // Element weights — optional, defaults to 70/5 (matching loot-discovery.yml defaults)
         double physicalWeight = 70.0;
         double elementalWeightEach = 5.0;
@@ -716,7 +736,9 @@ public final class GearConfigLoader {
 
         return new ImplicitDamageConfig(enabled, baseMin, baseMax, scaleFactor, twoHandedMultiplier,
                 spellbookBaseMin, spellbookBaseMax, spellbookScaleFactor,
-                physicalWeight, elementalWeightEach);
+                physicalWeight, elementalWeightEach,
+                sbVolBaseMin, sbVolBaseMax, sbVolScale,
+                sbMpBaseMin, sbMpBaseMax, sbMpScale);
     }
 
     @SuppressWarnings("unchecked")
@@ -1072,22 +1094,26 @@ public final class GearConfigLoader {
             parseWeaponProfiles(weaponsSection, builder);
         }
 
-        // Parse armor materials section
+        // Parse armor materials section (both prefixes and suffixes)
+        Map<String, Set<String>> materialPrefixes = new HashMap<>();
         Map<String, Set<String>> materialSuffixes = new HashMap<>();
         if (data.containsKey("armor_materials")) {
             Map<String, Object> materialsSection = (Map<String, Object>) data.get("armor_materials");
+            materialPrefixes = parseArmorMaterialPrefixes(materialsSection);
             materialSuffixes = parseArmorMaterialSuffixes(materialsSection);
         }
 
-        // Parse armor slots section
+        // Parse armor slots section (both prefixes and suffixes)
+        Map<String, Set<String>> slotPrefixes = new HashMap<>();
         Map<String, Set<String>> slotSuffixes = new HashMap<>();
         if (data.containsKey("armor_slots")) {
             Map<String, Object> slotsSection = (Map<String, Object>) data.get("armor_slots");
+            slotPrefixes = parseArmorSlotPrefixes(slotsSection);
             slotSuffixes = parseArmorSlotSuffixes(slotsSection);
         }
 
-        // Combine material + slot suffixes into armor equipment types
-        buildArmorProfiles(builder, materialSuffixes, slotSuffixes);
+        // Combine material + slot modifiers into armor equipment types
+        buildArmorProfiles(builder, materialPrefixes, materialSuffixes, slotPrefixes, slotSuffixes);
 
         EquipmentStatConfig config = builder.build();
         LOGGER.at(Level.INFO).log("Loaded equipment stat config: %d equipment type profiles", config.size());
@@ -1114,6 +1140,19 @@ public final class GearConfigLoader {
     }
 
     @SuppressWarnings("unchecked")
+    private Map<String, Set<String>> parseArmorMaterialPrefixes(Map<String, Object> materialsSection) {
+        Map<String, Set<String>> result = new HashMap<>();
+        for (Map.Entry<String, Object> entry : materialsSection.entrySet()) {
+            String materialKey = entry.getKey().toLowerCase();
+            Map<String, Object> materialData = (Map<String, Object>) entry.getValue();
+
+            Set<String> basePrefixes = parseStringListToSet(materialData.get("base_prefixes"));
+            result.put(materialKey, basePrefixes);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
     private Map<String, Set<String>> parseArmorMaterialSuffixes(Map<String, Object> materialsSection) {
         Map<String, Set<String>> result = new HashMap<>();
         for (Map.Entry<String, Object> entry : materialsSection.entrySet()) {
@@ -1122,6 +1161,19 @@ public final class GearConfigLoader {
 
             Set<String> baseSuffixes = parseStringListToSet(materialData.get("base_suffixes"));
             result.put(materialKey, baseSuffixes);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Set<String>> parseArmorSlotPrefixes(Map<String, Object> slotsSection) {
+        Map<String, Set<String>> result = new HashMap<>();
+        for (Map.Entry<String, Object> entry : slotsSection.entrySet()) {
+            String slotKey = entry.getKey().toLowerCase();
+            Map<String, Object> slotData = (Map<String, Object>) entry.getValue();
+
+            Set<String> additionalPrefixes = parseStringListToSet(slotData.get("additional_prefixes"));
+            result.put(slotKey, additionalPrefixes);
         }
         return result;
     }
@@ -1141,7 +1193,9 @@ public final class GearConfigLoader {
 
     private void buildArmorProfiles(
             EquipmentStatConfig.Builder builder,
+            Map<String, Set<String>> materialPrefixes,
             Map<String, Set<String>> materialSuffixes,
+            Map<String, Set<String>> slotPrefixes,
             Map<String, Set<String>> slotSuffixes
     ) {
         // For each material/slot combination, create combined profile
@@ -1149,24 +1203,27 @@ public final class GearConfigLoader {
         String[] slots = {"head", "chest", "legs", "hands"};
 
         for (String material : materials) {
+            Set<String> basePrefixes = materialPrefixes.getOrDefault(material, Set.of());
             Set<String> baseSuffixes = materialSuffixes.getOrDefault(material, Set.of());
 
             for (String slot : slots) {
+                Set<String> additionalPrefixes = slotPrefixes.getOrDefault(slot, Set.of());
                 Set<String> additionalSuffixes = slotSuffixes.getOrDefault(slot, Set.of());
 
-                // Combine base + additional suffixes
+                // Combine base (material) + additional (slot) prefixes
+                Set<String> combinedPrefixes = new HashSet<>(basePrefixes);
+                combinedPrefixes.addAll(additionalPrefixes);
+
+                // Combine base (material) + additional (slot) suffixes
                 Set<String> combinedSuffixes = new HashSet<>(baseSuffixes);
                 combinedSuffixes.addAll(additionalSuffixes);
-
-                // Armor has no prefixes (no offensive stats)
-                Set<String> prefixes = Set.of();
 
                 // Map to EquipmentType
                 EquipmentType equipmentType = mapArmorKeyToType(material, slot);
                 if (equipmentType != null) {
-                    builder.addProfile(equipmentType, prefixes, combinedSuffixes);
-                    LOGGER.at(Level.FINE).log("Loaded armor profile: %s → %d suffixes",
-                            equipmentType, combinedSuffixes.size());
+                    builder.addProfile(equipmentType, combinedPrefixes, combinedSuffixes);
+                    LOGGER.at(Level.FINE).log("Loaded armor profile: %s → %d prefixes, %d suffixes",
+                            equipmentType, combinedPrefixes.size(), combinedSuffixes.size());
                 }
             }
         }

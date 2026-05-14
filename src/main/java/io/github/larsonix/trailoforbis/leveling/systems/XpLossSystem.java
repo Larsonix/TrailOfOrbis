@@ -1,7 +1,7 @@
 package io.github.larsonix.trailoforbis.leveling.systems;
 
 import com.hypixel.hytale.logger.HytaleLogger;
-import java.util.logging.Level;
+import com.hypixel.hytale.component.Archetype;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -46,10 +46,11 @@ public class XpLossSystem extends DeathSystems.OnDeathSystem {
     }
 
     @Override
-    @Nullable
+    @Nonnull
     public Query<EntityStore> getQuery() {
-        // Only process player deaths
-        return Player.getComponentType();
+        // Match ALL deaths, filter to players manually — same pattern as XpGainSystem.
+        // Player.getComponentType() as a query doesn't fire for plugin-registered systems.
+        return Archetype.empty();
     }
 
     @Override
@@ -59,6 +60,12 @@ public class XpLossSystem extends DeathSystems.OnDeathSystem {
         @Nonnull Store<EntityStore> store,
         @Nonnull CommandBuffer<EntityStore> commandBuffer
     ) {
+        // Only process player deaths (skip mob deaths — those go to XpGainSystem)
+        Player playerComponent = store.getComponent(ref, Player.getComponentType());
+        if (playerComponent == null) {
+            return;
+        }
+
         // Get leveling config
         LevelingConfig config = getLevelingConfig();
         if (config == null || !config.isEnabled() || !config.getXpLoss().isEnabled()) {
@@ -88,7 +95,9 @@ public class XpLossSystem extends DeathSystems.OnDeathSystem {
         // Check minimum level protection
         int currentLevel = levelingService.getLevel(playerId);
         if (currentLevel <= lossConfig.getMinLevel()) {
-            return; // Don't lose XP at or below minimum level
+            LOGGER.atInfo().log("XP loss skipped for %s: level %d <= min_level %d",
+                playerId.toString().substring(0, 8), currentLevel, lossConfig.getMinLevel());
+            return;
         }
 
         // Calculate XP loss based on PROGRESS within current level, not total XP
@@ -102,7 +111,9 @@ public class XpLossSystem extends DeathSystems.OnDeathSystem {
         long xpToLose = (long) Math.ceil(progressXp * lossPercentage);
 
         if (xpToLose <= 0) {
-            return; // No progress to lose (just leveled up or already at level threshold)
+            LOGGER.atInfo().log("XP loss skipped for %s: no progress XP at level %d (progress=%d)",
+                playerId.toString().substring(0, 8), currentLevel, progressXp);
+            return;
         }
 
         // Progress-based loss can never drop below current level's threshold,
@@ -120,14 +131,9 @@ public class XpLossSystem extends DeathSystems.OnDeathSystem {
         // Apply XP loss
         levelingService.removeXp(playerId, xpToLose, XpSource.DEATH_PENALTY);
 
-        // Debug logging
-        if (plugin.getConfigManager().getRPGConfig().isDebugMode()) {
-            LOGGER.at(Level.FINE).log(
-                "XP loss on death: %d from %s (level %d, progress %d/%d, %.0f%% penalty, was %d total, now %d)",
-                xpToLose, playerId, currentLevel, progressXp,
-                levelingService.getXpForLevel(currentLevel + 1) - xpForCurrentLevel,
-                lossPercentage * 100, currentXp, currentXp - xpToLose);
-        }
+        LOGGER.atInfo().log("XP loss on death: player=%s lost %d XP (level %d, %.0f%% of %d progress, was %d total, now %d)",
+            playerId.toString().substring(0, 8), xpToLose, currentLevel,
+            lossPercentage * 100, progressXp, currentXp, currentXp - xpToLose);
     }
 
     /**

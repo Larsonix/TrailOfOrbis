@@ -1,0 +1,90 @@
+# Hexcode Spell Damage Integration
+# Maps Hexcode damage source IDs to RPG damage types, elements, and display names.
+# When Hexcode spells deal damage via EnvironmentSource("hex_xxx"),
+# this config controls how it flows through the RPG damage pipeline.
+
+enabled: true
+
+# Maximum elemental resistance cap for spell damage (%)
+max_resistance_cap: 75
+
+# Maximum total damage amplification from Shock conditional multiplier.
+# Erode (Hexcode) runs in a separate pipeline stage — this only limits our side.
+# Set very high to effectively disable. Tune via actual gameplay testing.
+max_damage_amplification: 999.0
+
+# Multiplier applied to hex spell base damage before RPG scaling.
+# Hex spells have their own base damage that stacks with staff implicit,
+# then gets amplified by all spell scaling stats. This prevents double-scaling.
+# 1.0 = no reduction, 0.5 = halved hex base. Staff implicit is unaffected.
+spell_base_multiplier: 0.5
+
+# Maps source ID -> { type: DamageType, element: ElementType }
+# DamageType: PHYSICAL, MAGIC, FIRE, WATER, LIGHTNING, EARTH, WIND, VOID
+# ElementType: FIRE, WATER, LIGHTNING, EARTH, WIND, VOID (or null for none)
+# "default" entry used for any unmapped hex_ source
+damage_type_map:
+  hex_bolt:
+    type: MAGIC
+    element: LIGHTNING
+  hex_combust:
+    type: FIRE
+    element: FIRE
+  hex_gust:
+    type: WIND
+    element: WIND
+  hex_glaciate:
+    type: WATER
+    element: WATER
+  hex_ensnare:
+    type: EARTH
+    element: EARTH
+  hex_phase:
+    type: MAGIC
+    element: VOID
+  default:
+    type: MAGIC
+
+# Realm pedestal placement — when Hexcode is loaded, realms may spawn a pedestal
+realm_pedestal:
+  enabled: true
+  spawn_chance: 15            # % chance per realm
+  min_distance_from_spawn: 20 # blocks from spawn point
+  max_distance_from_spawn: 40 # blocks from spawn point
+  tier_by_realm_tier:         # Pedestal tier scales with realm difficulty
+    1: "Hexcode_Pedestal_Thorium"
+    2: "Hexcode_Pedestal_Fire"
+    3: "Hexcode_Pedestal_Arcane"
+    4: "Hexcode_Pedestal_Void"
+    5: "Hexcode_Pedestal_Void"
+
+# Per-glyph damage multipliers. Applied on top of spell_base_multiplier.
+# Each glyph can be tuned individually. "default" is the fallback for unmapped sources.
+# Combined formula: final_hex_base = hex_base × spell_base_multiplier × glyph_multiplier
+glyph_damage_multipliers:
+  hex_bolt: 1.0          # Standard direct damage
+  hex_combust: 0.8       # Also applies 5s Burn, lower instant to compensate
+  hex_gust: 0.6          # Utility/knockback spell, low direct damage
+  hex_glaciate: 0.9      # Ice pillar, moderate damage
+  hex_ensnare: 0.7       # Zone control with sustained spike damage
+  hex_phase: 1.1         # Void element (rare), crush damage on restore
+  default: 1.0
+
+# Maximum mana cost reduction from RPG stats (%).
+# Prevents manaCostReduction from making spells completely free.
+# Balance via source values in skill tree and gear modifiers rather than hard-capping.
+max_mana_cost_reduction: 90
+
+# Spell echo: chance to re-fire a hex spell after casting (keystone ability).
+echo_cooldown_ms: 5000       # Minimum time between spell echoes (ms)
+echo_damage_percent: 100     # Echo deals this % of original damage
+
+# Display names for death recap / combat log
+spell_display_names:
+  hex_bolt: "Lightning Bolt"
+  hex_combust: "Combustion"
+  hex_gust: "Gust"
+  hex_glaciate: "Glaciate"
+  hex_ensnare: "Ensnare"
+  hex_phase: "Phase Crush"
+  default: "Hex Spell"

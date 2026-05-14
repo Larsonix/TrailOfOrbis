@@ -1,23 +1,26 @@
 package io.github.larsonix.trailoforbis.compat;
 
-import com.hypixel.hytale.component.ComponentAccessor;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.ModelParticle;
 import com.hypixel.hytale.protocol.Vector3f;
 import com.hypixel.hytale.protocol.packets.entities.SpawnModelParticles;
-import com.hypixel.hytale.server.core.inventory.InventoryComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+// Direct Hexcode imports — this class is only loaded when Hexcode is present
+// (initialized behind HexcodeCompat.isLoaded() gate in TrailOfOrbis.java)
+import com.riprod.hexcode.core.common.hexcaster.component.HexcasterComponent;
+import com.riprod.hexcode.state.HexState;
+import com.riprod.hexcode.core.state.casting.component.HexcasterCastingComponent;
+import com.riprod.hexcode.core.common.hexstaff.component.HexStaffAsset;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,11 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Sends {@code SpawnModelParticles} packets to the Casting_Anchor entity
  * when a player enters CASTING mode with an RPG staff.
  *
- * <p>The Casting_Anchor entity's Model IS created with particles by Hexcode's
- * RootSpawner, but the entity tracker's model sync doesn't reliably deliver
- * particles to the client for dynamically spawned entities. This injector
- * bypasses that by sending an explicit {@code SpawnModelParticles} packet
- * directly to the Casting_Anchor's network ID.
+ * <p>Uses direct Hexcode imports (compileOnly). This class is ONLY loaded when
+ * Hexcode is present — its initialization is gated behind {@code HexcodeCompat.isLoaded()}.
  *
  * <p>Called from the world tick via polling — checks hex state each tick
  * and sends particles once on CASTING entry.
@@ -39,14 +39,7 @@ public final class CastingAuraInjector {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    // Reflection handles (resolved once)
     private static volatile boolean initialized = false;
-    @Nullable private static ComponentType<EntityStore, ?> hexcasterComponentType;
-    @Nullable private static Method getStateMethod;
-    @Nullable private static Object castingState; // HexState.CASTING
-    @Nullable private static Method getCastingCompMethod; // buffer.getComponent(ref, HexcasterCastingComponent.type)
-    @Nullable private static ComponentType<EntityStore, ?> castingCompType;
-    @Nullable private static Method getCastingRootRefMethod;
 
     // Per-player tracking: true = already sent particles for current CASTING session
     private static final Map<UUID, Boolean> sentParticles = new ConcurrentHashMap<>();
@@ -71,56 +64,18 @@ public final class CastingAuraInjector {
     private CastingAuraInjector() {}
 
     /**
-     * Initialize reflection handles. Call once after HexcodeCompat.initialize().
+     * Initialize. Call once after HexcodeCompat.initialize().
+     * With direct imports, no reflection needed — just mark as ready.
      */
     public static void initialize() {
         if (initialized || !HexcodeCompat.isLoaded()) return;
-
-        try {
-            // HexcasterComponent
-            Class<?> hexcasterClass = Class.forName(
-                    "com.riprod.hexcode.core.common.hexcaster.component.HexcasterComponent");
-            Method getCompType = hexcasterClass.getMethod("getComponentType");
-            @SuppressWarnings("unchecked")
-            ComponentType<EntityStore, ?> compType =
-                    (ComponentType<EntityStore, ?>) getCompType.invoke(null);
-            hexcasterComponentType = compType;
-            getStateMethod = hexcasterClass.getMethod("getState");
-
-            // HexState.CASTING (ordinal 1)
-            Class<?> hexStateClass = Class.forName("com.riprod.hexcode.state.HexState");
-            Object[] states = hexStateClass.getEnumConstants();
-            if (states != null && states.length > 1) {
-                castingState = states[1]; // CASTING
-            }
-
-            // HexcasterCastingComponent
-            Class<?> castingCompClass = Class.forName(
-                    "com.riprod.hexcode.core.state.casting.component.HexcasterCastingComponent");
-            Method getCastingType = castingCompClass.getMethod("getComponentType");
-            @SuppressWarnings("unchecked")
-            ComponentType<EntityStore, ?> cType =
-                    (ComponentType<EntityStore, ?>) getCastingType.invoke(null);
-            castingCompType = cType;
-            getCastingRootRefMethod = castingCompClass.getMethod("getCastingRootRef");
-
-            initialized = true;
-            LOGGER.atInfo().log("[CastingAuraInjector] Initialized — will inject particles for RPG casting");
-
-        } catch (Exception e) {
-            LOGGER.atWarning().log("[CastingAuraInjector] Failed to initialize: %s", e.getMessage());
-            initialized = true; // Don't retry
-        }
+        initialized = true;
+        LOGGER.atInfo().log("[CastingAuraInjector] Initialized (direct API, zero reflection)");
     }
 
     /**
      * Call every tick for each player. Checks hex state and sends particles
      * to the Casting_Anchor entity on CASTING entry.
-     *
-     * @param store The entity store
-     * @param playerRef The player's entity ref
-     * @param playerUuid The player's UUID
-     * @param playerPacketRef The PlayerRef for sending packets
      */
     public static void tick(
             @Nonnull Store<EntityStore> store,
@@ -128,15 +83,15 @@ public final class CastingAuraInjector {
             @Nonnull UUID playerUuid,
             @Nonnull PlayerRef playerPacketRef) {
 
-        if (!initialized || hexcasterComponentType == null || castingState == null) return;
+        if (!initialized) return;
 
         try {
-            // Check hex state
-            Object hexcaster = store.getComponent(playerRef, hexcasterComponentType);
+            // Check hex state via direct API (no reflection)
+            HexcasterComponent hexcaster = store.getComponent(playerRef, HexcasterComponent.getComponentType());
             if (hexcaster == null) return;
 
-            Object currentState = getStateMethod.invoke(hexcaster);
-            if (currentState != castingState) {
+            HexState currentState = hexcaster.getState();
+            if (currentState != HexState.CASTING) {
                 // Not casting — clear tracking so next CASTING entry triggers particles
                 sentParticles.remove(playerUuid);
                 return;
@@ -148,21 +103,23 @@ public final class CastingAuraInjector {
             }
 
             // Check if main hand is an RPG item (skip for vanilla Hexcode items that work fine)
-            ItemStack mainHand = InventoryComponent.getItemInHand(store, playerRef);
+            // Bypass InventoryComponent.getItemInHand() — it delegates to Inventory.getItemInHand()
+            // which returns tool items when _usingToolsItem is set. Read the hotbar directly.
+            Player casterPlayer = store.getComponent(playerRef,
+                    Player.getComponentType());
+            ItemStack mainHand = (casterPlayer != null && casterPlayer.getInventory() != null)
+                ? casterPlayer.getInventory().getActiveHotbarItem() : null;
             if (mainHand == null || mainHand.isEmpty() || mainHand.getItem() == null) return;
             String itemId = mainHand.getItem().getId();
             if (!itemId.startsWith("rpg_gear_")) return;
 
-            // Get the CastingAnchor entity ref from HexcasterCastingComponent
-            if (castingCompType == null || getCastingRootRefMethod == null) return;
-            Object castingComp = store.getComponent(playerRef, castingCompType);
+            // Get the CastingAnchor entity ref via direct API (no reflection)
+            HexcasterCastingComponent castingComp = store.getComponent(playerRef,
+                    HexcasterCastingComponent.getComponentType());
             if (castingComp == null) return;
 
-            Object rootRefObj = getCastingRootRefMethod.invoke(castingComp);
-            if (!(rootRefObj instanceof Ref<?> rootRef) || !rootRef.isValid()) return;
-
-            @SuppressWarnings("unchecked")
-            Ref<EntityStore> castingRootRef = (Ref<EntityStore>) rootRef;
+            Ref<EntityStore> castingRootRef = castingComp.getCastingRootRef();
+            if (castingRootRef == null || !castingRootRef.isValid()) return;
 
             // Get the Casting_Anchor entity's NetworkId
             NetworkId networkId = store.getComponent(castingRootRef, NetworkId.getComponentType());
@@ -190,23 +147,15 @@ public final class CastingAuraInjector {
     @Nonnull
     private static ModelParticle[] resolveParticles(@Nonnull String itemId) {
         try {
-            // Try to get the HexStaffAsset and its CastingAuraParticles
-            Class<?> hexStaffAssetClass = Class.forName(
-                    "com.riprod.hexcode.core.common.hexstaff.component.HexStaffAsset");
-            Method getAssetMap = hexStaffAssetClass.getMethod("getAssetMap");
-            Object assetMap = getAssetMap.invoke(null);
-            Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
-            Object asset = getAsset.invoke(assetMap, itemId);
-
+            // Direct API: no reflection needed for HexStaffAsset access
+            HexStaffAsset asset = HexStaffAsset.getAssetMap().getAsset(itemId);
             if (asset != null) {
-                Method getParticles = asset.getClass().getMethod("getCastingAuraParticles");
-                Object configParticles = getParticles.invoke(asset);
-                if (configParticles instanceof Object[] arr && arr.length > 0) {
-                    // Convert config ModelParticle[] to protocol ModelParticle[]
-                    ModelParticle[] result = new ModelParticle[arr.length];
-                    for (int i = 0; i < arr.length; i++) {
-                        Method toPacket = arr[i].getClass().getMethod("toPacket");
-                        result[i] = (ModelParticle) toPacket.invoke(arr[i]);
+                com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle[] configParticles =
+                        asset.getCastingAuraParticles();
+                if (configParticles != null && configParticles.length > 0) {
+                    ModelParticle[] result = new ModelParticle[configParticles.length];
+                    for (int i = 0; i < configParticles.length; i++) {
+                        result[i] = configParticles[i].toPacket();
                     }
                     return result;
                 }

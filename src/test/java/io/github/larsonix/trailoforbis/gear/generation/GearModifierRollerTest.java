@@ -147,16 +147,16 @@ class GearModifierRollerTest {
     class RerollTypesTests {
 
         @Test
-        @DisplayName("rerollTypes keeps prefix/suffix count the same")
-        void rerollTypes_keepsPrefixSuffixCount() {
+        @DisplayName("rerollTypes preserves total modifier count but may redistribute")
+        void rerollTypes_preservesTotalCount() {
             GearModifier prefix = createUnlockedModifier("sharp", ModifierType.PREFIX, 50.0);
             GearModifier suffix = createUnlockedModifier("of_the_whale", ModifierType.SUFFIX, 30.0);
             GearData gear = createGearWithModifiers(List.of(prefix), List.of(suffix));
 
             GearData result = roller.rerollTypes(gear, "weapon", new Random());
 
-            assertEquals(1, result.prefixes().size(), "Prefix count should remain the same");
-            assertEquals(1, result.suffixes().size(), "Suffix count should remain the same");
+            assertEquals(2, result.modifierCount(),
+                "Total modifier count should remain the same");
         }
 
         @Test
@@ -181,10 +181,12 @@ class GearModifierRollerTest {
             GearData gear = createGearWithModifiers(List.of(unlocked), List.of());
 
             // Run multiple times to see if we get a different modifier
+            // The single modifier may redistribute to either prefix or suffix
             Set<String> seenIds = new HashSet<>();
             for (int i = 0; i < 20; i++) {
                 GearData result = roller.rerollTypes(gear, "weapon", new Random());
-                seenIds.add(result.prefixes().get(0).id());
+                assertEquals(1, result.modifierCount(), "Total count should stay 1");
+                result.allModifiers().forEach(m -> seenIds.add(m.id()));
             }
 
             assertTrue(seenIds.size() > 1 || seenIds.contains("sharp"),

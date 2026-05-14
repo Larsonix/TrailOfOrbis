@@ -52,6 +52,29 @@ public final class StatsApplicationSystem {
     /** Unique modifier key for RPG attribute bonuses */
     private static final String RPG_MODIFIER_ID = "rpg_attribute_bonus";
 
+    /**
+     * Asymptotic cap for movement speed (hyperbolic diminishing returns).
+     * Formula: effective = raw * cap / (raw + cap)
+     * 0 = disabled (linear, no curve). Positive = asymptotic ceiling.
+     */
+    private static float moveSpeedCap = 100.0f;
+
+    /**
+     * Configures the movement speed diminishing returns curve.
+     *
+     * @param cap Asymptotic ceiling for effective movement speed percent.
+     *            0 = disabled (raw value used as-is).
+     */
+    public static void configureMoveSpeed(float cap) {
+        moveSpeedCap = Math.max(0f, cap);
+        LOGGER.atInfo().log("Movement speed cap configured: %.1f (0=disabled)", moveSpeedCap);
+    }
+
+    /** Returns the configured move speed cap. */
+    public static float getMoveSpeedCap() {
+        return moveSpeedCap;
+    }
+
     private StatsApplicationSystem() {
         // Utility class - no instantiation
     }
@@ -457,8 +480,12 @@ public final class StatsApplicationSystem {
         float baseClimb = VanillaStatReader.getBaseClimbSpeed(playerUuid);
         float baseClimbLateral = VanillaStatReader.getBaseClimbSpeedLateral(playerUuid);
 
-        // Calculate multipliers from RPG stats
-        float speedMultiplier = 1.0f + (stats.getMovementSpeedPercent() / 100.0f);
+        // Calculate multipliers from RPG stats (with hyperbolic diminishing returns)
+        float rawPercent = stats.getMovementSpeedPercent();
+        float effectivePercent = (moveSpeedCap > 0 && rawPercent > 0)
+                ? rawPercent * moveSpeedCap / (rawPercent + moveSpeedCap)
+                : rawPercent;
+        float speedMultiplier = 1.0f + (effectivePercent / 100.0f);
         float sprintBonusMultiplier = 1.0f + (stats.getSprintSpeedBonus() / 100.0f);
         float jumpMultiplier = 1.0f + (stats.getJumpForceBonus() / 100.0f);
         float climbMultiplier = 1.0f + (stats.getClimbSpeedBonus() / 100.0f);
@@ -491,8 +518,8 @@ public final class StatsApplicationSystem {
         // Sync changes to client
         movementManager.update(playerRef.getPacketHandler());
 
-        LOGGER.atFine().log("[MOVEMENT] SUCCESS - Applied to %s: speedMult=%.3f, sprintMult=%.3f, finalSprint=%.3f",
-            playerUuid, speedMultiplier, sprintBonusMultiplier, settings.forwardSprintSpeedMultiplier);
+        LOGGER.atFine().log("[MOVEMENT] SUCCESS - Applied to %s: raw=%.1f%%, effective=%.1f%% (cap=%.0f), speedMult=%.3f, sprintMult=%.3f, finalSprint=%.3f",
+            playerUuid, rawPercent, effectivePercent, moveSpeedCap, speedMultiplier, sprintBonusMultiplier, settings.forwardSprintSpeedMultiplier);
     }
 
     /**

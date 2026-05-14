@@ -145,6 +145,9 @@ public class SkillNodeDetailHud {
                 .fromHtml(html)
                 .show();
 
+            // Deterministic name — prevents MCHUD accumulation across world transitions
+            hyuiHud.name = "too-skill-node";
+
             // Register with manager (old HUD already removed above)
             hudManager.registerHud(playerUuid, node.getId(), hyuiHud);
 

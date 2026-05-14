@@ -17,6 +17,7 @@ public class LevelingConfig {
     private XpLossConfig xpLoss = new XpLossConfig();
     private UiConfig ui = new UiConfig();
     private CelebrationConfig celebration = new CelebrationConfig();
+    private MigrationConfig migration = new MigrationConfig();
 
     // ==================== Getters and Setters ====================
 
@@ -76,6 +77,14 @@ public class LevelingConfig {
 
     public void setCelebration(CelebrationConfig celebration) {
         this.celebration = celebration;
+    }
+
+    public MigrationConfig getMigration() {
+        return migration;
+    }
+
+    public void setMigration(MigrationConfig migration) {
+        this.migration = migration;
     }
 
     // ==================== Validation ====================
@@ -315,6 +324,7 @@ public class LevelingConfig {
      */
     public static class XpGainConfig {
         private boolean enabled = true;
+        private double globalXpMultiplier = 1.2;
         private double xpPerMobLevel = 5.0;
         private double poolMultiplier = 0.1;
         private LevelGapConfig levelGap = new LevelGapConfig();
@@ -326,6 +336,19 @@ public class LevelingConfig {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public double getGlobalXpMultiplier() {
+            return globalXpMultiplier;
+        }
+
+        public void setGlobalXpMultiplier(double globalXpMultiplier) {
+            this.globalXpMultiplier = globalXpMultiplier;
+        }
+
+        // YAML snake_case setter
+        public void setGlobal_xp_multiplier(double globalXpMultiplier) {
+            this.globalXpMultiplier = globalXpMultiplier;
         }
 
         public double getXpPerMobLevel() {
@@ -821,6 +844,170 @@ public class LevelingConfig {
         // YAML snake_case setter
         public void setEmote_id(String emoteId) {
             this.emoteId = emoteId;
+        }
+    }
+
+    /**
+     * Configuration for XP curve migration protection.
+     *
+     * <p>When the effort curve changes between versions, existing players might lose
+     * levels because the same XP maps to a lower level under the new curve. This
+     * config defines the PREVIOUS curve so the plugin can detect and prevent level loss.
+     *
+     * <p>Only needed for the initial migration from versions that didn't store the
+     * level column. After all players have connected once, set {@code enabled: false}.
+     */
+    public static class MigrationConfig {
+        private boolean enabled = false;
+        private MigrationEffortConfig previousEffort = new MigrationEffortConfig();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public MigrationEffortConfig getPreviousEffort() {
+            return previousEffort;
+        }
+
+        public void setPreviousEffort(MigrationEffortConfig previousEffort) {
+            this.previousEffort = previousEffort;
+        }
+
+        // YAML snake_case setter
+        public void setPrevious_effort(MigrationEffortConfig previousEffort) {
+            this.previousEffort = previousEffort;
+        }
+    }
+
+    /**
+     * Previous effort curve parameters for migration.
+     *
+     * <p>Curve params are required. Estimator params are optional — if omitted,
+     * current config values are used (correct when only the curve changed).
+     */
+    public static class MigrationEffortConfig {
+        private double baseMobs = 3.0;
+        private double targetMobs = 150.0;
+        private int targetLevel = 100;
+
+        // Optional estimator param overrides (null = use current values)
+        private Double xpPerMobLevel = null;
+        private Double poolMultiplier = null;
+        private Double pointsPerLevel = null;
+        private Boolean progressiveScalingEnabled = null;
+        private Integer softCapLevel = null;
+        private Double minScalingFactor = null;
+
+        public double getBaseMobs() {
+            return baseMobs;
+        }
+
+        public void setBaseMobs(double baseMobs) {
+            this.baseMobs = baseMobs;
+        }
+
+        public void setBase_mobs(double baseMobs) {
+            this.baseMobs = baseMobs;
+        }
+
+        public double getTargetMobs() {
+            return targetMobs;
+        }
+
+        public void setTargetMobs(double targetMobs) {
+            this.targetMobs = targetMobs;
+        }
+
+        public void setTarget_mobs(double targetMobs) {
+            this.targetMobs = targetMobs;
+        }
+
+        public int getTargetLevel() {
+            return targetLevel;
+        }
+
+        public void setTargetLevel(int targetLevel) {
+            this.targetLevel = targetLevel;
+        }
+
+        public void setTarget_level(int targetLevel) {
+            this.targetLevel = targetLevel;
+        }
+
+        public Double getXpPerMobLevel() {
+            return xpPerMobLevel;
+        }
+
+        public void setXpPerMobLevel(Double v) {
+            this.xpPerMobLevel = v;
+        }
+
+        public void setXp_per_mob_level(Double v) {
+            this.xpPerMobLevel = v;
+        }
+
+        public Double getPoolMultiplier() {
+            return poolMultiplier;
+        }
+
+        public void setPoolMultiplier(Double v) {
+            this.poolMultiplier = v;
+        }
+
+        public void setPool_multiplier(Double v) {
+            this.poolMultiplier = v;
+        }
+
+        public Double getPointsPerLevel() {
+            return pointsPerLevel;
+        }
+
+        public void setPointsPerLevel(Double v) {
+            this.pointsPerLevel = v;
+        }
+
+        public void setPoints_per_level(Double v) {
+            this.pointsPerLevel = v;
+        }
+
+        public Boolean getProgressiveScalingEnabled() {
+            return progressiveScalingEnabled;
+        }
+
+        public void setProgressiveScalingEnabled(Boolean v) {
+            this.progressiveScalingEnabled = v;
+        }
+
+        public void setProgressive_scaling_enabled(Boolean v) {
+            this.progressiveScalingEnabled = v;
+        }
+
+        public Integer getSoftCapLevel() {
+            return softCapLevel;
+        }
+
+        public void setSoftCapLevel(Integer v) {
+            this.softCapLevel = v;
+        }
+
+        public void setSoft_cap_level(Integer v) {
+            this.softCapLevel = v;
+        }
+
+        public Double getMinScalingFactor() {
+            return minScalingFactor;
+        }
+
+        public void setMinScalingFactor(Double v) {
+            this.minScalingFactor = v;
+        }
+
+        public void setMin_scaling_factor(Double v) {
+            this.minScalingFactor = v;
         }
     }
 }

@@ -1,6 +1,9 @@
 package io.github.larsonix.trailoforbis.lootfilter.model;
 
 import io.github.larsonix.trailoforbis.gear.model.*;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
+import io.github.larsonix.trailoforbis.maps.core.RealmLayoutSize;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -210,33 +213,35 @@ class FilterConditionTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ArmorMaterialCondition
+    // ArmorImplicitCondition
     // ═══════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("ArmorMaterialCondition")
-    class ArmorMaterialTests {
+    @DisplayName("ArmorImplicitCondition")
+    class ArmorImplicitTests {
 
         @Test
-        @DisplayName("matches specified materials")
-        void matchesMaterials() {
-            var condition = new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.LEATHER));
-            assertTrue(condition.matches(gearWithRarity(GearRarity.RARE), EquipmentType.LEATHER_CHEST));
-            assertTrue(condition.matches(gearWithRarity(GearRarity.RARE), EquipmentType.LEATHER_HEAD));
+        @DisplayName("matches specified defense types")
+        void matchesDefenseTypes() {
+            var condition = new FilterCondition.ArmorImplicitCondition(Set.of("evasion"));
+            var evasionGear = GearData.builder().level(10).rarity(GearRarity.RARE).quality(50)
+                    .armorImplicit(ArmorImplicit.of("evasion", 10, 20, 15)).build();
+            assertTrue(condition.matches(evasionGear, EquipmentType.LEATHER_CHEST));
         }
 
         @Test
-        @DisplayName("rejects non-matching materials")
-        void rejectsOtherMaterials() {
-            var condition = new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.LEATHER));
-            assertFalse(condition.matches(gearWithRarity(GearRarity.RARE), EquipmentType.PLATE_CHEST));
-            assertFalse(condition.matches(gearWithRarity(GearRarity.RARE), EquipmentType.CLOTH_HEAD));
+        @DisplayName("rejects non-matching defense types")
+        void rejectsOtherDefenseTypes() {
+            var condition = new FilterCondition.ArmorImplicitCondition(Set.of("evasion"));
+            var armorGear = GearData.builder().level(10).rarity(GearRarity.RARE).quality(50)
+                    .armorImplicit(ArmorImplicit.of("armor", 10, 20, 15)).build();
+            assertFalse(condition.matches(armorGear, EquipmentType.PLATE_CHEST));
         }
 
         @Test
-        @DisplayName("rejects non-armor equipment")
-        void rejectsNonArmor() {
-            var condition = new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.PLATE));
+        @DisplayName("rejects items without armor implicit")
+        void rejectsNoImplicit() {
+            var condition = new FilterCondition.ArmorImplicitCondition(Set.of("armor"));
             assertFalse(condition.matches(gearWithRarity(GearRarity.RARE), EquipmentType.SWORD));
         }
     }
@@ -553,7 +558,7 @@ class FilterConditionTest {
         assertEquals(ConditionType.MAX_RARITY, new FilterCondition.MaxRarity(GearRarity.COMMON).type());
         assertEquals(ConditionType.EQUIPMENT_SLOT, new FilterCondition.EquipmentSlotCondition(Set.of("weapon")).type());
         assertEquals(ConditionType.WEAPON_TYPE, new FilterCondition.WeaponTypeCondition(Set.of(WeaponType.SWORD)).type());
-        assertEquals(ConditionType.ARMOR_MATERIAL, new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.PLATE)).type());
+        assertEquals(ConditionType.ARMOR_IMPLICIT, new FilterCondition.ArmorImplicitCondition(Set.of("armor")).type());
         assertEquals(ConditionType.ITEM_LEVEL_RANGE, new FilterCondition.ItemLevelRange(1, 10).type());
         assertEquals(ConditionType.QUALITY_RANGE, new FilterCondition.QualityRange(1, 100).type());
         assertEquals(ConditionType.REQUIRED_MODIFIERS, new FilterCondition.RequiredModifiers(Set.of("x"), 1).type());
@@ -561,6 +566,9 @@ class FilterConditionTest {
         assertEquals(ConditionType.IMPLICIT_CONDITION, new FilterCondition.ImplicitCondition(0.5, Set.of()).type());
         assertEquals(ConditionType.MIN_MODIFIER_COUNT, new FilterCondition.MinModifierCount(1).type());
         assertEquals(ConditionType.CORRUPTION_STATE, new FilterCondition.CorruptionStateCondition(CorruptionFilter.EITHER).type());
+        assertEquals(ConditionType.MAP_BIOME, new FilterCondition.BiomeCondition(Set.of(RealmBiomeType.FOREST)).type());
+        assertEquals(ConditionType.MAP_SIZE, new FilterCondition.MapSizeCondition(Set.of(RealmLayoutSize.LARGE)).type());
+        assertEquals(ConditionType.MAP_MODIFIER, new FilterCondition.MapModifierCondition(Set.of(RealmModifierType.ITEM_QUANTITY), 1).type());
     }
 
     @Test
@@ -571,14 +579,17 @@ class FilterConditionTest {
                 new FilterCondition.MaxRarity(GearRarity.EPIC),
                 new FilterCondition.EquipmentSlotCondition(Set.of("weapon")),
                 new FilterCondition.WeaponTypeCondition(Set.of(WeaponType.SWORD)),
-                new FilterCondition.ArmorMaterialCondition(Set.of(ArmorMaterial.PLATE)),
+                new FilterCondition.ArmorImplicitCondition(Set.of("armor")),
                 new FilterCondition.ItemLevelRange(1, 50),
                 new FilterCondition.QualityRange(50, 100),
                 new FilterCondition.RequiredModifiers(Set.of("sharp"), 1),
                 new FilterCondition.ModifierValueRange("sharp", 0, 10),
                 new FilterCondition.ImplicitCondition(0.5, Set.of("physical_damage")),
                 new FilterCondition.MinModifierCount(3),
-                new FilterCondition.CorruptionStateCondition(CorruptionFilter.CORRUPTED_ONLY)
+                new FilterCondition.CorruptionStateCondition(CorruptionFilter.CORRUPTED_ONLY),
+                new FilterCondition.BiomeCondition(Set.of(RealmBiomeType.FOREST)),
+                new FilterCondition.MapSizeCondition(Set.of(RealmLayoutSize.LARGE)),
+                new FilterCondition.MapModifierCondition(Set.of(RealmModifierType.ITEM_QUANTITY), 1)
         );
 
         for (FilterCondition c : conditions) {

@@ -88,7 +88,7 @@ public class XpBarHud {
 
         String html = buildHtml(level, progress);
 
-        return HudBuilder.hudForPlayer(player)
+        HyUIHud hud = HudBuilder.hudForPlayer(player)
             .fromHtml(html)
             // NO withRefreshRate() — HyUI's ScheduledExecutorService runs on its own
             // thread and queues world.execute() tasks that race with world transitions.
@@ -96,7 +96,7 @@ public class XpBarHud {
             // queuing a stale safeAdd(), which then sends Set commands referencing
             // elements cleared by JoinWorld(clearWorld=true) → client crash.
             // All updates are event-driven via XpBarHudManager.notifyXpChanged().
-            .onRefresh(hud -> {
+            .onRefresh(h -> {
                 int currentLevel = levelingService.getLevel(playerId);
                 float currentProgress = levelingService.getLevelProgress(playerId);
 
@@ -109,17 +109,26 @@ public class XpBarHud {
 
                 if (levelChanged) {
                     displayLevel[0] = currentLevel;
-                    hud.getById(ID_LEVEL_LABEL, LabelBuilder.class).ifPresent(label ->
+                    h.getById(ID_LEVEL_LABEL, LabelBuilder.class).ifPresent(label ->
                         label.withText("Lv." + currentLevel));
                 }
 
                 if (progressChanged || levelChanged) {
                     displayProgress[0] = currentProgress;
-                    hud.getById(ID_PROGRESS_BAR, ProgressBarBuilder.class).ifPresent(bar ->
+                    h.getById(ID_PROGRESS_BAR, ProgressBarBuilder.class).ifPresent(bar ->
                         bar.withValue(currentProgress));
                 }
             })
             .show();
+
+        // Deterministic name — prevents MCHUD accumulation across world transitions.
+        // HudBuilder.show() generates random "HYUIHUD<uuid>" names. Without a fixed name,
+        // each world transition orphans the old entry in MultipleCustomUIHud.customHuds
+        // (discardStale cancels refresh but doesn't remove from MCHUD). With a fixed name,
+        // MultipleCustomUIHud.add() replaces the existing entry (Clear+Append) instead of
+        // creating a new one (AppendInline).
+        hud.name = "too-xp-bar";
+        return hud;
     }
 
     // ═══════════════════════════════════════════════════════════════════

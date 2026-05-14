@@ -45,7 +45,7 @@ public enum RealmBiomeType {
             Set.of("Rock_Stone", "Rock_Basalt", "Rock_Slate")),
     BEACH("Beach", "Realm_Beach", 16445670, "Realm_Map_Beach",
             Set.of("Soil_Sand_White", "Soil_Sand_Red", "Rock_Sandstone", "Rock_Stone")),
-    JUNGLE("Jungle", "Realm_Jungle", 25600, null,
+    JUNGLE("Jungle", "Realm_Jungle", 25600, "Realm_Map_Jungle",
             Set.of("Soil_Grass_Full", "Soil_Mud", "Rock_Stone")),
 
     // Underground / themed biomes
@@ -197,11 +197,12 @@ public enum RealmBiomeType {
     // STATIC UTILITIES
     // ═══════════════════════════════════════════════════════════════════
 
-    /** Returns a random non-corrupted combat biome (for realm map generation) */
+    /** Returns a random non-corrupted combat biome (for realm map generation).
+     *  Excludes SWAMP and MOUNTAINS (temporarily disabled) and CORRUPTED. */
     @Nonnull
     public static RealmBiomeType randomNonCorrupted(@Nonnull Random random) {
         RealmBiomeType[] combatBiomes = {
-                FOREST, DESERT, VOLCANO, TUNDRA, SWAMP, MOUNTAINS,
+                FOREST, DESERT, VOLCANO, TUNDRA,
                 BEACH, JUNGLE, CAVERNS, FROZEN_CRYPTS, SAND_TOMBS, VOID
         };
         return combatBiomes[random.nextInt(combatBiomes.length)];

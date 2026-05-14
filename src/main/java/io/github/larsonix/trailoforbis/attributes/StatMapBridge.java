@@ -9,10 +9,18 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntitySta
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.config.ConfigManager;
 import io.github.larsonix.trailoforbis.systems.VanillaStatReader;
 
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+
 import javax.annotation.Nonnull;
-import java.lang.reflect.Method;
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
@@ -23,9 +31,8 @@ import java.util.UUID;
  * stats from EntityStatMap — without this bridge, stats computed by ToO
  * (like maxMana from WATER attribute) are invisible to Hexcode.
  *
- * <p><b>Phase 1:</b> Bridges maxMana only.
- * <p><b>Phase 2 (future):</b> Will also bridge Hexcode-specific stats
- * (Volatility, Magic_Power, MagicCharges) once those are added to ComputedStats.
+ * <p>Bridges maxMana (from WATER attribute) plus Hexcode-specific stats:
+ * Volatility, Magic_Power, and MagicCharges (via reflection-resolved indices).
  *
  * <p><b>Thread safety:</b> All methods must be called from the world thread.
  * The caller (stats application callback) handles this via {@code world.execute()}.
@@ -55,8 +62,20 @@ public final class StatMapBridge {
     private static volatile int hexMagicChargesIndex = Integer.MIN_VALUE;
     private static volatile boolean hexIndicesResolved = false;
 
+    /** ConfigManager for lazy config access (survives /rpg reload). */
+    private static volatile ConfigManager configManager;
+
     private StatMapBridge() {
         // Utility class
+    }
+
+    /**
+     * Sets the config manager for lazy config lookups (stat caps, etc.).
+     * Uses ConfigManager instead of direct config reference so /rpg reload
+     * picks up changes without re-wiring dependencies.
+     */
+    public static void setConfigManager(@Nullable ConfigManager cfgMgr) {
+        configManager = cfgMgr;
     }
 
     /**
@@ -75,9 +94,12 @@ public final class StatMapBridge {
      *
      * <p><b>MUST be called on the world thread.</b>
      *
-     * <p>Currently bridges:
+     * <p>Bridges:
      * <ul>
      *   <li>maxMana → Mana stat (MAX, ADDITIVE) with key "rpg_max_mana"</li>
+     *   <li>volatilityMax → Volatility (MAX, ADDITIVE) with key "rpg_volatility"</li>
+     *   <li>magicPower → Magic_Power (MAX, ADDITIVE) with key "rpg_magic_power"</li>
+     *   <li>magicCharges → MagicCharges (MAX, ADDITIVE) with key "rpg_magic_charges"</li>
      * </ul>
      *
      * <p>Mana regen is NOT bridged because Hytale's regen system uses interval-based
@@ -182,6 +204,99 @@ public final class StatMapBridge {
                 playerId, manaBonus, stats.getMaxMana(), baseMana);
     }
 
+    // ==================== Weapon Mechanic Stat Correction ====================
+
+    /**
+     * Forces the client to re-receive current weapon-mechanic stat values.
+     *
+     * <p>Called by {@code ItemSyncCoordinator} after every equipment sync flush.
+     * The client re-applies {@code weapon.statModifiers} on each UpdateItems packet,
+     * resetting SignatureEnergy/Ammo/SignatureCharges to their modifier values.
+     * This method immediately force-sends the server's actual current values using
+     * {@code Predictable.SELF}, which unconditionally queues an {@code EntityStatUpdate}
+     * (see decompiled {@code EntityStatMap.setStatValue()} line 195).
+     *
+     * @param statMap The player's entity stat map
+     * @param player The player (for inventory access)
+     */
+    public static void correctWeaponMechanicStats(
+            @Nonnull EntityStatMap statMap,
+            @Nonnull Player player) {
+
+        @SuppressWarnings("deprecation")
+        Inventory inventory = player.getInventory();
+        if (inventory == null) return;
+
+        // Correct stats declared by the held weapon (SignatureEnergy, SignatureCharges, Ammo)
+        ItemStack itemInHand = inventory.getItemInHand();
+        correctStatsForWeapon(statMap, itemInHand);
+
+        // Correct stats declared by the utility item (if weapon allows it)
+        correctStatsForUtility(statMap, inventory, itemInHand);
+    }
+
+    /**
+     * Force-sends current values for all stats declared in the weapon's statModifiers.
+     */
+    private static void correctStatsForWeapon(
+            @Nonnull EntityStatMap statMap,
+            @Nullable ItemStack itemStack) {
+
+        if (ItemStack.isEmpty(itemStack)) return;
+
+        Item item = itemStack.getItem();
+        if (item == null) return;
+
+        ItemWeapon weapon = item.getWeapon();
+        if (weapon == null) return;
+
+        Int2ObjectMap<StaticModifier[]> mods = weapon.getStatModifiers();
+        if (mods == null || mods.isEmpty()) return;
+
+        for (int statIndex : mods.keySet()) {
+            EntityStatValue esv = statMap.get(statIndex);
+            if (esv == null) continue;
+            statMap.setStatValue(EntityStatMap.Predictable.SELF, statIndex, esv.get());
+        }
+    }
+
+    /**
+     * Force-sends current values for stats declared in the utility item's statModifiers.
+     * Only applies if the weapon allows a utility slot (one-handed / compatible).
+     */
+    private static void correctStatsForUtility(
+            @Nonnull EntityStatMap statMap,
+            @Nonnull Inventory inventory,
+            @Nullable ItemStack weaponStack) {
+
+        // Only process utility if weapon allows it (compatible = one-handed)
+        if (!ItemStack.isEmpty(weaponStack)) {
+            Item weaponItem = weaponStack.getItem();
+            if (weaponItem != null && weaponItem.getUtility() != null
+                    && !weaponItem.getUtility().isCompatible()) {
+                return; // Two-handed weapon — utility slot is disabled
+            }
+        }
+
+        ItemStack utilityStack = inventory.getUtilityItem();
+        if (ItemStack.isEmpty(utilityStack)) return;
+
+        Item utilityItem = utilityStack.getItem();
+        if (utilityItem == null) return;
+
+        com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility utility = utilityItem.getUtility();
+        if (utility == null) return;
+
+        Int2ObjectMap<StaticModifier[]> mods = utility.getStatModifiers();
+        if (mods == null || mods.isEmpty()) return;
+
+        for (int statIndex : mods.keySet()) {
+            EntityStatValue esv = statMap.get(statIndex);
+            if (esv == null) continue;
+            statMap.setStatValue(EntityStatMap.Predictable.SELF, statIndex, esv.get());
+        }
+    }
+
     // ==================== Hexcode Stat Bridging ====================
 
     /**
@@ -202,6 +317,7 @@ public final class StatMapBridge {
             @Nonnull ComputedStats stats,
             @Nonnull UUID playerId
     ) {
+        // Stats are pre-capped in AttributeCalculator — apply directly
         applyHexcodeStat(statMap, hexVolatilityIndex, VOLATILITY_MODIFIER_ID,
                 stats.getVolatilityMax(), playerId, "Volatility");
         applyHexcodeStat(statMap, hexMagicPowerIndex, MAGIC_POWER_MODIFIER_ID,
@@ -265,51 +381,34 @@ public final class StatMapBridge {
      * <p>Call this once during initialization (after all plugins have started)
      * or lazily on first use.
      */
+    /**
+     * Resolves Hexcode stat indices via the HexcodeBridge (direct API, no reflection).
+     * Falls back gracefully if Hexcode is not loaded.
+     */
     public static void resolveHexcodeStatIndices() {
         if (hexIndicesResolved) {
             return;
         }
 
         try {
-            // Try to load HexcodeEntityStatTypes via reflection
-            Class<?> hexStatTypes = Class.forName(
-                    "com.riprod.hexcode.core.common.stats.HexcodeEntityStatTypes"
-            );
+            var manager = io.github.larsonix.trailoforbis.compat.HexcodeCompatManager.get();
+            if (manager.isLoaded()) {
+                var bridge = manager.bridge();
+                bridge.resolveStatIndices();
+                hexVolatilityIndex = bridge.getVolatilityStatIndex();
+                hexMagicPowerIndex = bridge.getMagicPowerStatIndex();
+                hexMagicChargesIndex = bridge.getMagicChargesStatIndex();
 
-            // Resolve each stat index
-            hexVolatilityIndex = invokeStatGetter(hexStatTypes, "getVolatility");
-            hexMagicPowerIndex = invokeStatGetter(hexStatTypes, "getMagicPower");
-            hexMagicChargesIndex = invokeStatGetter(hexStatTypes, "getMagicCharges");
-
-            LOGGER.atInfo().log("[StatMapBridge] Hexcode stat indices resolved: Volatility=%d, MagicPower=%d, MagicCharges=%d",
-                    hexVolatilityIndex, hexMagicPowerIndex, hexMagicChargesIndex);
-
-        } catch (ClassNotFoundException e) {
-            // Hexcode not loaded — expected when running without it
-            LOGGER.atInfo().log("[StatMapBridge] Hexcode not detected, magic stat bridging disabled");
-        } catch (Exception e) {
-            LOGGER.atWarning().withCause(e).log("[StatMapBridge] Failed to resolve Hexcode stat indices");
+                LOGGER.atInfo().log("[StatMapBridge] Hexcode stat indices resolved via bridge: Volatility=%d, MagicPower=%d, MagicCharges=%d",
+                        hexVolatilityIndex, hexMagicPowerIndex, hexMagicChargesIndex);
+            } else {
+                LOGGER.atInfo().log("[StatMapBridge] Hexcode not loaded, magic stat bridging disabled");
+            }
+        } catch (IllegalStateException e) {
+            LOGGER.atInfo().log("[StatMapBridge] HexcodeCompatManager not initialized, magic stat bridging disabled");
         }
 
         hexIndicesResolved = true;
-    }
-
-    /**
-     * Invokes a static getter on the Hexcode stat types class via reflection.
-     *
-     * @return The stat index, or {@code Integer.MIN_VALUE} if resolution failed
-     */
-    private static int invokeStatGetter(@Nonnull Class<?> clazz, @Nonnull String methodName) {
-        try {
-            Method method = clazz.getMethod(methodName);
-            Object result = method.invoke(null);
-            if (result instanceof Integer idx) {
-                return idx;
-            }
-        } catch (Exception e) {
-            LOGGER.atWarning().log("[StatMapBridge] Failed to invoke %s: %s", methodName, e.getMessage());
-        }
-        return Integer.MIN_VALUE;
     }
 
     // ==================== Hexcode Index Accessors ====================

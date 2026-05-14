@@ -1,0 +1,196 @@
+# =============================================================================
+# Monster Modifier Configuration
+# =============================================================================
+# Adds unique modifiers to Elite and Boss mobs that change how they fight.
+# Modifiers are fully random (any mod on any mob) and level-gated.
+#
+# Design doc: docs/design/MonsterModifierDesign.md
+
+enabled: true
+
+# ---------------------------------------------------------------------------
+# Modifier Count Per Tier
+# ---------------------------------------------------------------------------
+modifier_count:
+  elite: 1
+  boss: 2
+  elite_boss: 3
+
+# ---------------------------------------------------------------------------
+# Level Gating — minimum mob level for each complexity tier
+# ---------------------------------------------------------------------------
+level_gates:
+  tier_1: 1     # Stat modifiers (Hardened, Vigorous, Fierce, Swift, Resolute)
+  tier_2: 10    # Elemental + Enraged
+  tier_3: 25    # Tactical counters + auras
+  tier_4: 40    # Complex behavioral + death triggers
+
+# ---------------------------------------------------------------------------
+# Reward Scaling — per modifier count (IIQ = item quantity, IIR = item rarity)
+# ---------------------------------------------------------------------------
+reward_scaling:
+  1: { iiq: 2.0, iir: 1.5 }
+  2: { iiq: 4.0, iir: 3.0 }
+  3: { iiq: 7.0, iir: 5.0 }
+
+# ---------------------------------------------------------------------------
+# Exclusion Rules — pairs that cannot coexist on the same mob
+# ---------------------------------------------------------------------------
+exclusions:
+  - [hardened, warding]
+  - [evasive, frost_aura]
+
+# ---------------------------------------------------------------------------
+# Visual Settings
+# ---------------------------------------------------------------------------
+visuals:
+  elite_scale: 1.15
+  boss_scale: 1.30
+  elite_boss_scale: 1.40
+  nameplate_prefix_elite: "\u2605 "
+  nameplate_prefix_boss: "\u2605\u2605 "
+  nameplate_prefix_elite_boss: "\u2605\u2605\u2605 "
+
+# ---------------------------------------------------------------------------
+# Individual Modifier Settings
+# ---------------------------------------------------------------------------
+modifiers:
+  # --- Category A: Stat-Based (Tier 1) ---
+  hardened:
+    armor_bonus_percent: 0.50
+    tint_bottom: "#8B7355"
+    tint_top: "#A0926B"
+
+  vigorous:
+    hp_bonus_percent: 0.50
+    tint_bottom: "#2D5A27"
+    tint_top: "#4A8B3F"
+
+  fierce:
+    damage_bonus_percent: 0.35
+    tint_bottom: "#8B2500"
+    tint_top: "#CC3300"
+
+  swift:
+    speed_bonus_percent: 0.40
+    tint_bottom: "#88CCFF"
+    tint_top: "#CCECFF"
+
+  resolute:
+    knockback_multiplier: 0.0
+    tint_bottom: "#3A3A3A"
+    tint_top: "#5A5A5A"
+
+  # --- Category B: Elemental (Tier 2) ---
+  blazing:
+    element: FIRE
+    element_damage_percent: 0.30
+    ailment_chance_bonus: 0.20
+    trail_damage_percent: 0.05
+    trail_duration_seconds: 3.0
+    tint_bottom: "#FF4400"
+    tint_top: "#FFAA00"
+
+  frozen:
+    element: WATER
+    element_damage_percent: 0.30
+    ailment_chance_bonus: 0.20
+    aura_radius: 4.0
+    slow_percent: 0.15
+    tint_bottom: "#44AADD"
+    tint_top: "#CCECFF"
+
+  thunderous:
+    element: LIGHTNING
+    element_damage_percent: 0.30
+    ailment_chance_bonus: 0.20
+    strike_cooldown_seconds: 8.0
+    strike_telegraph_seconds: 1.5
+    strike_damage_percent: 0.50
+    tint_bottom: "#DDAA00"
+    tint_top: "#FFFF44"
+
+  venomous:
+    element: VOID
+    element_damage_percent: 0.30
+    ailment_chance_bonus: 0.20
+    death_cloud_duration_seconds: 5.0
+    death_cloud_dps_percent: 0.10
+    tint_bottom: "#225522"
+    tint_top: "#66AA44"
+
+  # --- Category C: Tactical Counter (Tier 3) ---
+  reflective:
+    reflect_percent: 0.15
+    tint_bottom: "#888888"
+    tint_top: "#CCCCCC"
+
+  warding:
+    elemental_resist_bonus: 0.50
+    tint_bottom: "#442266"
+    tint_top: "#7744AA"
+
+  evasive:
+    dodge_chance: 0.25
+    tint_bottom: "#445566"
+    tint_top: "#778899"
+
+  # --- Category D: Behavioral (Tier 2/4) ---
+  enraged:
+    hp_threshold: 0.40
+    damage_bonus: 0.30
+    speed_bonus: 0.30
+    scale_increase: 0.10
+    tint_bottom: "#CC0000"
+    tint_top: "#FF2200"
+
+  regenerating:
+    heal_percent_per_second: 0.02
+    idle_delay_seconds: 4.0
+    tint_bottom: "#22CC22"
+    tint_top: "#88FF88"
+
+  shadow_step:
+    cooldown_seconds: 8.0
+    frontal_arc_degrees: 90
+    tint_bottom: "#1A0033"
+    tint_top: "#330066"
+
+  summoner:
+    threshold_1_hp: 0.60
+    threshold_2_hp: 0.30
+    summon_count: 2
+    max_summons: 4
+    summon_level_offset: -5
+    tint_bottom: "#888822"
+    tint_top: "#CCCC44"
+
+  # --- Category E: Aura/Area (Tier 3/4) ---
+  pack_leader:
+    damage_bonus: 0.20
+    speed_bonus: 0.15
+    aura_radius: 12.0
+    tint_bottom: "#AA8800"
+    tint_top: "#FFCC44"
+
+  frost_aura:
+    slow_percent: 0.20
+    aura_radius: 6.0
+    tint_bottom: "#3388BB"
+    tint_top: "#AADDEE"
+
+  rallying:
+    hp_bonus_percent: 0.30
+    damage_bonus: 0.25
+    buff_duration_seconds: 20.0
+    buff_radius: 15.0
+    tint_bottom: "#660000"
+    tint_top: "#AA2222"
+
+  # --- Category F: Death Trigger (Tier 4) ---
+  volatile:
+    charge_delay_seconds: 2.0
+    explosion_damage_percent: 0.80
+    explosion_radius: 5.0
+    tint_bottom: "#FF6600"
+    tint_top: "#FFCC00"

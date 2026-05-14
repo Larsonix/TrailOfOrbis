@@ -24,6 +24,7 @@ import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.components.RealmMobComponent;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
+import com.hypixel.hytale.server.core.universe.world.World;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -241,7 +242,7 @@ public class CombatAilmentApplicator {
             return AilmentSummary.EMPTY;
         }
 
-        // Get defender UUID (only players for now)
+        // Get defender UUID (players only — NPC ailment tracking not implemented)
         UUID defenderUuid = entityResolver.getDefenderUuid(index, archetypeChunk, store);
         if (defenderUuid == null) {
             return AilmentSummary.EMPTY;
@@ -305,10 +306,10 @@ public class CombatAilmentApplicator {
                     AilmentType type = appliedState.type();
 
                     // Add/update ECS component for DOT-type ailments (drives tick systems)
-                    if (commandBuffer != null && (type == AilmentType.BURN || type == AilmentType.POISON)) {
+                    if (type == AilmentType.BURN || type == AilmentType.POISON) {
                         Ref<EntityStore> defenderRef = archetypeChunk.getReferenceTo(index);
                         if (defenderRef != null && defenderRef.isValid()) {
-                            addDotComponent(commandBuffer, defenderRef, store, appliedState);
+                            addDotComponent(defenderRef, store, appliedState);
                         }
                     }
                     LOGGER.at(Level.FINE).log("Applied %s to %s (%.1f %s dmg -> %.1f magnitude, %.1fs)",
@@ -410,9 +411,15 @@ public class CombatAilmentApplicator {
      *
      * <p>For Burn: creates or refreshes {@link RpgBurnComponent}.
      * For Poison: creates or adds stack to {@link RpgPoisonComponent}.
+     *
+     * <p><b>Deferral strategy:</b> New component additions use {@code world.execute()} instead of
+     * {@code commandBuffer.addComponent()} because the command buffer's queued lambdas can be
+     * consumed mid-tick by Hytale's HitAnimation handler (via {@code forEachChunk → consume}),
+     * which crashes with {@code IllegalStateException: Store is currently processing} when
+     * damage originates from an ECS tick (e.g., Hexcode spell constructs). In-place mutations
+     * on existing components are safe (no archetype change).
      */
     private void addDotComponent(
-            @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull Ref<EntityStore> defenderRef,
             @Nonnull Store<EntityStore> store,
             @Nonnull AilmentState ailmentState) {
@@ -423,12 +430,23 @@ public class CombatAilmentApplicator {
             RpgBurnComponent existing = store.getComponent(defenderRef, RpgBurnComponent.TYPE);
             if (existing != null) {
                 // Refresh existing burn (non-stacking: takes stronger DPS)
+                // In-place mutation — safe, no archetype change
                 existing.refresh(ailmentState.magnitude(), ailmentState.remainingDuration(), ailmentState.sourceUuid());
             } else {
-                // New burn
+                // New burn — defer to world.execute to avoid Store processing lock
                 RpgBurnComponent burn = new RpgBurnComponent(
                     ailmentState.magnitude(), ailmentState.remainingDuration(), ailmentState.sourceUuid());
-                commandBuffer.addComponent(defenderRef, RpgBurnComponent.TYPE, burn);
+                World world = store.getExternalData().getWorld();
+                world.execute(() -> {
+                    if (!defenderRef.isValid()) return;
+                    // Re-check: another hit in the same tick may have added the component
+                    RpgBurnComponent raceBurn = store.getComponent(defenderRef, RpgBurnComponent.TYPE);
+                    if (raceBurn != null) {
+                        raceBurn.refresh(burn.getDps(), burn.getRemainingDuration(), burn.getSourceUuid());
+                    } else {
+                        store.addComponent(defenderRef, RpgBurnComponent.TYPE, burn);
+                    }
+                });
             }
         } else if (ailmentState.type() == AilmentType.POISON) {
             if (RpgPoisonComponent.TYPE == null) return;
@@ -436,16 +454,29 @@ public class CombatAilmentApplicator {
             RpgPoisonComponent existing = store.getComponent(defenderRef, RpgPoisonComponent.TYPE);
             if (existing != null) {
                 // Add stack to existing poison
+                // In-place mutation — safe, no archetype change
                 existing.addStack(
                     ailmentState.magnitude(), ailmentState.remainingDuration(),
                     ailmentState.sourceUuid(), 10);
             } else {
-                // New poison component with first stack
+                // New poison — defer to world.execute to avoid Store processing lock
                 RpgPoisonComponent poison = new RpgPoisonComponent();
                 poison.addStack(
                     ailmentState.magnitude(), ailmentState.remainingDuration(),
                     ailmentState.sourceUuid(), 10);
-                commandBuffer.addComponent(defenderRef, RpgPoisonComponent.TYPE, poison);
+                World world = store.getExternalData().getWorld();
+                world.execute(() -> {
+                    if (!defenderRef.isValid()) return;
+                    // Re-check: another hit in the same tick may have added the component
+                    RpgPoisonComponent racePoison = store.getComponent(defenderRef, RpgPoisonComponent.TYPE);
+                    if (racePoison != null) {
+                        racePoison.addStack(
+                            poison.getTotalDps(), ailmentState.remainingDuration(),
+                            poison.getPrimarySourceUuid(), 10);
+                    } else {
+                        store.addComponent(defenderRef, RpgPoisonComponent.TYPE, poison);
+                    }
+                });
             }
         }
     }

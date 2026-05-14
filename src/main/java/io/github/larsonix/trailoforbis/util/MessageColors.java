@@ -64,6 +64,9 @@ public final class MessageColors {
     /** XP Gain - bright cyan/turquoise for experience points */
     public static final String XP_GAIN = "#00FFCC";
 
+    /** XP Loss - soft red for death penalty XP loss */
+    public static final String XP_LOSS = "#FF6B6B";
+
     /** Level Up - bright gold for level up notifications */
     public static final String LEVEL_UP = "#FFD700";
 

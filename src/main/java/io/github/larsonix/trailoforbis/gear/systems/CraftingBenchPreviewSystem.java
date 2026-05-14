@@ -31,11 +31,19 @@ import java.util.UUID;
 /**
  * Hybrid system that activates crafting preview tooltips using two triggers:
  *
- * <h2>1. UseBlockEvent.Post (ECS — immediate definitions)</h2>
- * <p>Fires when a player clicks a bench block. The window doesn't exist yet
- * at this point, but we have the block type ID and can identify bench blocks.
- * Sends modified item definitions + translations immediately — so recipe
- * outputs show custom text from the first moment the bench renders.
+ * <h2>1. UseBlockEvent.Pre (ECS — definitions before page)</h2>
+ * <p>Fires when a player clicks a bench block, BEFORE the bench page opens.
+ * {@code UseBlockInteraction.doInteraction()} dispatches Pre synchronously,
+ * then calls {@code context.execute(rootInteraction)} which sends page/window
+ * packets via {@code PageManager.setPageWithWindows()}. By handling Pre,
+ * our {@code UpdateItems} + {@code UpdateTranslations} packets enter the
+ * output buffer BEFORE the page packets — so the client has our modified
+ * definitions when it renders recipe outputs.
+ *
+ * <p>Using Post instead causes BasicCrafting benches (Workbench) to render
+ * recipes with vanilla definitions because the page packet arrives first.
+ * DiagramCrafting benches (Armory) were unaffected because they render
+ * recipes lazily on category click.
  *
  * <h2>2. InventoryChangeEvent (handler — close callback + safety)</h2>
  * <p>Fires when the player first interacts with items inside the bench.
@@ -49,7 +57,7 @@ import java.util.UUID;
  *
  * @see CraftingPreviewService
  */
-public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, UseBlockEvent.Post> {
+public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, UseBlockEvent.Pre> {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
@@ -66,7 +74,7 @@ public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, U
     );
 
     public CraftingBenchPreviewSystem() {
-        super(UseBlockEvent.Post.class);
+        super(UseBlockEvent.Pre.class);
     }
 
     @Nonnull
@@ -76,7 +84,7 @@ public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, U
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // PHASE 1: UseBlockEvent.Post — immediate definition send
+    // PHASE 1: UseBlockEvent.Pre — definitions before bench page
     // ═══════════════════════════════════════════════════════════════════
 
     @Override
@@ -85,7 +93,10 @@ public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, U
             @Nonnull ArchetypeChunk<EntityStore> chunk,
             @Nonnull Store<EntityStore> store,
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
-            @Nonnull UseBlockEvent.Post event) {
+            @Nonnull UseBlockEvent.Pre event) {
+
+        // Skip if another handler already cancelled (e.g. container interceptor)
+        if (event.isCancelled()) return;
 
         // Filter: only bench blocks
         String blockId = event.getBlockType().getId();
@@ -107,9 +118,9 @@ public class CraftingBenchPreviewSystem extends EntityEventSystem<EntityStore, U
                 .map(ls -> ls.getLevel(playerId))
                 .orElse(1);
 
-        // Send definitions + translations immediately — window doesn't exist yet
-        // but the client receives these packets BEFORE the bench page renders,
-        // so recipe outputs already show custom text.
+        // Send definitions + translations in Pre — packets enter the output buffer
+        // BEFORE the page/window packets from context.execute(rootInteraction),
+        // ensuring the client has our definitions when it renders recipe outputs.
         boolean sent = previewService.onBenchOpen(playerId, playerRef, playerLevel);
         if (sent) {
             LOGGER.atFine().log("Crafting preview sent for %s on bench open (block=%s)",

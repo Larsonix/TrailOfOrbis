@@ -269,6 +269,22 @@ public class ProcessedContainerResource implements Resource<ChunkStore> {
     }
 
     /**
+     * Removes a specific player's processed entry for a container.
+     *
+     * <p>Used for defensive re-processing when a container was externally cleared
+     * (e.g., by L4E's monitoring system) after we already processed it.
+     *
+     * @param x Block X coordinate
+     * @param y Block Y coordinate
+     * @param z Block Z coordinate
+     * @param playerId The player's UUID
+     * @return true if an entry was removed
+     */
+    public boolean removeForPlayer(int x, int y, int z, @Nonnull UUID playerId) {
+        return processed.remove(playerKey(x, y, z, playerId)) != null;
+    }
+
+    /**
      * Clears all tracked containers (e.g., admin reset-all command).
      */
     public void clear() {

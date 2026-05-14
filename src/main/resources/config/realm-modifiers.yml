@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════════════════════════
 # Configuration for modifier generation on Realm Maps.
 #
-# Modifier values now scale with map level using LevelScaling.
+# Modifier values scale with map level using LevelScaling.
 # Formula: effectiveLevel = (multiplier - 1.0) * transitionLevel
 #          scaled = base + effectiveLevel * scale_per_level
 #
@@ -19,6 +19,10 @@
 # Quality scaling: all modifier values are multiplied by
 # qualityMultiplier = 0.5 + quality/100.0 (same as gear).
 # Quality 1 = 0.51x, Quality 50 = 1.0x, Quality 101 = 1.51x.
+#
+# Optional max_cap: hard ceiling for scaled values. Prevents
+# modifiers like reduced-healing from exceeding 100% at high levels.
+# Set to -1 or omit for no cap.
 
 # ═══════════════════════════════════════════════════════════════════
 # Modifier Counts by Rarity (Separate Prefix/Suffix)
@@ -102,60 +106,70 @@ suffix-weights:
 # ═══════════════════════════════════════════════════════════════════
 # Numeric modifiers use base_min/base_max + scale_per_level.
 # Binary modifiers (min == max) use flat min/max, no scaling.
+# Optional max_cap sets a hard ceiling on scaled values.
 #
 # Scaling targets (with default LevelScaling config):
-#   Level 10 map:  small modifier values (gentle)
-#   Level 100 map: moderate values (approaching old maximums)
-#   Level 500+ map: near-maximum values
+#   Level 1:   gentle — barely noticeable
+#   Level 50:  moderate — meaningful challenge
+#   Level 100: impactful — rewarding and dangerous
+#   Level 500: near-cap — extreme endgame
 
 modifier-settings:
   # ---- PREFIX MODIFIERS (Difficulty) ----
 
   # +X% Monster Damage
-  # Level 10: ~8-17%, Level 100: ~42-55%, Level 500+: ~108-121%
+  # L1: 3-10%, L50: 25-32%, L100: 38-45%, L500: 95-102%
   monster-damage:
     base_min: 3
-    base_max: 15
-    scale_per_level: 1.5
+    base_max: 10
+    scale_per_level: 0.70
     enabled: true
 
   # +X% Monster Life
-  # Level 10: ~13-25%, Level 100: ~60-105%, Level 500+: ~200-250%
+  # L1: 5-15%, L50: 40-50%, L100: 59-69%, L500: 150-160%
   monster-health:
     base_min: 5
-    base_max: 20
-    scale_per_level: 2.0
+    base_max: 15
+    scale_per_level: 1.10
     enabled: true
 
   # +X% Monster Speed
+  # L1: 2-5%, L50: 10-13%, L100: 14-17%, L500: 34-37% (cap 40)
   monster-speed:
     base_min: 2
-    base_max: 8
-    scale_per_level: 0.6
+    base_max: 5
+    scale_per_level: 0.24
+    max_cap: 40
     enabled: true
 
   # +X% Monster Attack Speed
+  # L1: 2-6%, L50: 12-16%, L100: 17-21%, L500: 42-46% (cap 50)
   monster-attack-speed:
-    base_min: 3
-    base_max: 10
-    scale_per_level: 0.8
+    base_min: 2
+    base_max: 6
+    scale_per_level: 0.30
+    max_cap: 50
     enabled: true
 
   # +X% Reduced Time
+  # L1: 3-8%, L50: 11-16%, L100: 15-20%, L500: 35-40% (cap 50)
   reduced-time:
+    base_min: 3
+    base_max: 8
+    scale_per_level: 0.24
+    max_cap: 50
+    enabled: true
+
+  # +X% Reduced Healing
+  # L1: 5-10%, L50: 18-23%, L100: 25-30%, L500: 58-63% (cap 65)
+  reduced-healing:
     base_min: 5
     base_max: 10
-    scale_per_level: 0.6
+    scale_per_level: 0.40
+    max_cap: 65
     enabled: true
 
-  # +X% Reduced Healing (display-only, effect deferred)
-  reduced-healing:
-    base_min: 10
-    base_max: 20
-    scale_per_level: 0.8
-    enabled: true
-
-  # No Regeneration - binary modifier (no scaling, display-only)
+  # No Regeneration - binary modifier (no scaling)
   no-regeneration:
     min: 1
     max: 1
@@ -166,112 +180,125 @@ modifier-settings:
   # ---- SUFFIX MODIFIERS (Reward) ----
 
   # +X% Item Quantity
+  # L1: 2-5%, L50: 10-13%, L100: 14-17%, L500: 34-37%
   item-quantity:
     base_min: 2
-    base_max: 10
-    scale_per_level: 0.8
+    base_max: 5
+    scale_per_level: 0.24
     enabled: true
 
   # +X% Item Rarity
+  # L1: 2-5%, L50: 8-11%, L100: 12-15%, L500: 28-31%
   item-rarity:
     base_min: 2
-    base_max: 8
-    scale_per_level: 0.6
+    base_max: 5
+    scale_per_level: 0.20
     enabled: true
 
-  # +X% Experience (display-only, effect deferred)
+  # +X% Experience
+  # L1: 3-6%, L50: 11-14%, L100: 15-18%, L500: 35-38%
   experience-bonus:
     base_min: 3
-    base_max: 12
-    scale_per_level: 0.8
+    base_max: 6
+    scale_per_level: 0.24
     enabled: true
 
-  # +X% Stone Drops (display-only, effect deferred)
+  # +X% Stone Drops
+  # L1: 2-4%, L50: 6-8%, L100: 8-10%, L500: 18-20%
   stone-drop-bonus:
     base_min: 2
-    base_max: 6
-    scale_per_level: 0.5
+    base_max: 4
+    scale_per_level: 0.12
     enabled: true
 
   # +X% Monster Count
+  # L1: 3-6%, L50: 11-14%, L100: 15-18%, L500: 35-38%
   extra-monsters:
     base_min: 3
-    base_max: 10
-    scale_per_level: 0.8
+    base_max: 6
+    scale_per_level: 0.24
     enabled: true
 
   # +X% Elite Chance
+  # L1: 2-4%, L50: 6-8%, L100: 8-10%, L500: 18-20% (cap 25)
   elite-chance:
     base_min: 2
-    base_max: 6
-    scale_per_level: 0.5
+    base_max: 4
+    scale_per_level: 0.12
+    max_cap: 25
     enabled: true
 
-  # ---- NEW PREFIX MODIFIERS — Elemental ----
+  # ---- PREFIX MODIFIERS — Elemental ----
 
   # Monsters deal +X% bonus Fire damage
+  # L1: 5-12%, L50: 18-25%, L100: 25-32%, L500: 58-65%
   monsters-extra-fire:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
   # Monsters deal +X% bonus Water damage
   monsters-extra-water:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
   # Monsters deal +X% bonus Lightning damage
   monsters-extra-lightning:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
   # Monsters deal +X% bonus Earth damage
   monsters-extra-earth:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
   # Monsters deal +X% bonus Wind damage
   monsters-extra-wind:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
   # Monsters deal +X% bonus Void damage
   monsters-extra-void:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
     enabled: true
 
-  # ---- NEW PREFIX MODIFIERS — Mechanical ----
+  # ---- PREFIX MODIFIERS — Mechanical ----
 
   # Players take +X% increased damage from all sources
+  # L1: 3-8%, L50: 12-17%, L100: 18-23%, L500: 43-48% (cap 50)
   player-vulnerability:
-    base_min: 8
-    base_max: 20
-    scale_per_level: 0.6
+    base_min: 3
+    base_max: 8
+    scale_per_level: 0.30
+    max_cap: 50
     enabled: true
 
   # Block damage reduction is X% less effective
+  # L1: 5-12%, L50: 18-25%, L100: 25-32%, L500: 58-65% (cap 65)
   reduced-block:
-    base_min: 15
-    base_max: 35
-    scale_per_level: 0.8
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.40
+    max_cap: 65
     enabled: true
 
   # Monsters have +X% armor (physical resistance)
+  # L1: 5-12%, L50: 24-31%, L100: 35-42%, L500: 84-91%
   armored-monsters:
-    base_min: 15
-    base_max: 40
-    scale_per_level: 1.2
+    base_min: 5
+    base_max: 12
+    scale_per_level: 0.60
     enabled: true
 
   # Monsters cannot be affected by ailments (binary)
@@ -281,33 +308,41 @@ modifier-settings:
     enabled: true
 
   # Monsters regenerate X% max HP per second
+  # L1: 1-2%, L50: 2-4%, L100: 3-4%, L500: 6-7% (cap 8)
   life-regen-monsters:
     base_min: 1
     base_max: 2
-    scale_per_level: 0.05
+    scale_per_level: 0.04
+    max_cap: 8
     enabled: true
 
-  # ---- NEW SUFFIX MODIFIERS — Rewards ----
+  # ---- SUFFIX MODIFIERS — Rewards ----
 
   # Gear quality rolls boosted by +X
+  # L1: 2-5, L50: 10-13, L100: 14-17, L500: 34-37 (cap 35)
   gear-quality-bonus:
-    base_min: 5
-    base_max: 15
-    scale_per_level: 0.5
+    base_min: 2
+    base_max: 5
+    scale_per_level: 0.24
+    max_cap: 35
     enabled: true
 
   # Gear drops at +X levels higher
+  # L1: 1-2, L50: 4-5, L100: 6-7, L500: 14-15 (cap 15)
   drop-level-bonus:
-    base_min: 2
-    base_max: 5
-    scale_per_level: 0.15
+    base_min: 1
+    base_max: 2
+    scale_per_level: 0.10
+    max_cap: 15
     enabled: true
 
   # X% chance for bonus realm map on completion
+  # L1: 2-5%, L50: 7-10%, L100: 10-13%, L500: 23-26% (cap 20)
   map-discovery:
-    base_min: 3
-    base_max: 10
-    scale_per_level: 0.3
+    base_min: 2
+    base_max: 5
+    scale_per_level: 0.16
+    max_cap: 20
     enabled: true
 
   # Stones drop at +1 rarity tier (binary)
@@ -317,10 +352,12 @@ modifier-settings:
     enabled: true
 
   # Time limit increased by X%
+  # L1: 5-10%, L50: 14-19%, L100: 20-25%, L500: 45-50% (cap 50)
   bonus-time:
-    base_min: 10
-    base_max: 25
-    scale_per_level: 0.5
+    base_min: 5
+    base_max: 10
+    scale_per_level: 0.30
+    max_cap: 50
     enabled: true
     incompatible-with:
       - reduced-time

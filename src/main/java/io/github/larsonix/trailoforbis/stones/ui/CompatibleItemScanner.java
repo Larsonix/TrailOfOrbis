@@ -228,6 +228,13 @@ public class CompatibleItemScanner {
             if (baseItem == Item.UNKNOWN) {
                 return null;
             }
+            // Also verify the actual item stack resolves — catches rpg_gear_* IDs
+            // that exist on the server but whose custom definition wasn't synced
+            // to the client (e.g., after world transitions or sync failures).
+            Item actualItem = itemStack.getItem();
+            if (actualItem == null || actualItem == Item.UNKNOWN) {
+                return null;
+            }
             return gearOpt.get();
         }
 

@@ -10,6 +10,109 @@ published: true
 
 # Changelog
 
+## 1.0.9
+
+### Skill Tree
+- **Branches Got a Second Pass.** All 6 main branches, 8 octant branches, and 12 bridge chains reworked again with proper cluster themes
+- **New Octant Keystones.** Soul Siphon, Colossus, Storm Runner, Momentum, plus retuned drawbacks across the board
+- **Bridge Payoffs Buffed.** Cross-element investments were too weak, all 12 synergies and Void-adjacent nodes brought up
+
+### Combat
+- **Crit Chance Goes Past 100% Now.** 150% crit chance = guaranteed crit + 50% chance for a double crit. Stack that crit
+- **Critical Damage Reduction.** New defensive stat, only comes from gear and skill tree bonuses
+- **Resistance Penetration Reworked.** Pen applies before the 75% cap and can push mobs into negative resistance, so your penetration stats actually do something now
+- **Dodge and Evasion are Separate.** Two distinct stats, displayed independently everywhere
+- **Mobs Can Actually Block Now.** Mobs blocking was just for show before, now it reduces the damage they take
+- **AoE Spells No Longer Freeze the Server.** Hex AoE or projectiles hitting a large amount of targets would freeze the server
+- **DOT Damage Fixed (Again).** Burn and poison DOTs from hex constructs could crash the server or get silently blocked. Both fixed
+- **Flat Elemental Damage Fixed.** Was getting lost in the pipeline, correctly applies now
+- **Thorns Work.** Thorns damage and health recovery apply on all healing paths now
+- **Combat Feedback Rewritten.** "physDmg%" is now "Physical Damage", armor math is correct, ailment thresholds show roll-vs-threshold, crit colors make sense
+- **Offhand Stats Work With Non-RPG Items.** Holding a torch, food, or blocks was suppressing your offhand gear stats entirely
+- **Armor and Accuracy Percent Bonuses Apply.** Were just not being applied in the stat pipeline, fixed
+
+### Mobs
+- **Monster Modifiers.** Some mobs now spawn with special abilities, stuff like Pack Leader, Blazing Trail, Rallying Cry, Venomous Cloud
+- **Modified Mobs Drop Better Loot.** Each modifier increases the mob's item quantity and rarity
+- **Late-Game Mobs Hit Harder.** Mobs past level 120 scale armor faster
+- **Elites Give More XP.** 2x multiplier instead of 1.5x
+
+### Leveling
+- **You Lose XP When You Die.** Can't drop a level though
+- **XP Curve Adjusted.** Plus a realm XP exploit has been fixed
+- **Party XP Notifications Work.** You see what your party earns now and the party HUD shows the correct level
+- **Your Level is Protected.** If the XP curve changes in an update, your level won't drop
+
+### Loot
+- **Potions, Food, Maps, and Stones Drop in Map Chests.** Not just gear anymore
+- **Victory Chest Stones Scale With Level.** 1 stone from level 1-9, +1 per 10 levels
+- **Victory Chest Maps are Always Identified.** No mystery maps from your rewards
+- **Loot Chests Disappear on Map End.** Win or lose
+- **Loot Filter Supports Maps.** Filter realm maps by biome, size, and modifiers
+- **No "Unique" Drops anymore** It's not an implemented mechanic yet
+- **Chests Don't Empty on Reopen.** If you opened a chest but didn't take anything, it would be empty next time. Fixed
+
+### Stones
+- **2 New Uncommon Stones.** Alterverse Splinter (rerolls suffixes) and Alterverse Fragment (rerolls prefixes)
+- **Alterverse Shard Shuffles Types.** Rerolls now randomly redistribute between prefixes and suffixes instead of keeping the old split
+- **Bulk Identify.** Sneak-click a Lorekeeper's Scroll to identify everything at once
+- **Stone Rerolls Can't Give Wrong Mods.** Rerolling armor could give you weapon modifiers, uses the correct pool now
+
+### Weapons
+- **Weapon Tracking Completely Rewritten.** The game could lose track of which weapon you were actually holding, will not happen anymore
+- **Switching Weapons Always Updates Your Stats Now.** Even swapping between two Iron Swords with different elements properly recalculates everything like it should
+
+### Hexcode Compatibility
+- **Hex Spells Scale With Your RPG Stats.** Your casting power, magic damage, and elemental bonuses feed directly into hex spell damage now
+- **Hexcode v0.7.0 Support.** Spell echo actually works now, plus updated for the latest Hexcode - No imbuement support yet
+- **Per-Glyph Damage Tuning.** Each hex glyph (bolt, combust, gust...) has its own damage multiplier so they can be balanced individually in the settings
+- **Mana Cost Reduction Works on Hex Spells.** Your mana cost reduction applies to Hexcode now
+- **Damage Glyphs Scale Mana Cost Now.**
+- **Glaciate, ensnare etc... Damage Fixed.**
+- **Glaciate Construct Damage Fixed Too.** The ice construct was doing about 10x damage
+- **Spellbook Implicits are Diverse Now.** Spellbooks randomly roll one of three implicit types now : mana regen, volatility, or magic power
+- **Magic Weapons Roll Hex Stats.** Staves, wands, and spellbooks can now roll volatility, magic power, draw accuracy, and cast speed as modifiers
+- **Hex Damage Can't Be Abused Anymore.** Two-layer volatility and mana cost scaling : go big or go home
+- **Zero Reflection.** The entire Hexcode compatibility layer was rewritten to direct imports
+
+### RPG Items
+- **Hexcode Staff Stats Don't Double-Stack Anymore.** Staff JSON stats were stacking on top of RPG-computed stats, the same bug vanilla weapons had. Now properly suppressed too
+- **Crafting Preview Works Everywhere.** Workbenches, pocket crafting, inventory, all of them
+- **Elemental Resistances Roll on All Armor.** Were cloth-only, every material can roll them now
+- **Unique Rarity Removed From Drops.** Uniques are hand-placed, they won't roll from loot
+- **Transmog Skin List Fixed.** Wrong skins at the workbench, was using vanilla quality instead of RPG rarity -> still not fully working
+
+### Balance
+- **Armor and Evasion Scaling Rebalanced.** Gear implicits and formulas adjusted, you have more defenses at same level
+- **Movement Speed Caps.** Diminishing returns on movement speed so you can't stack infinite speed, tunable in the settings
+
+### UI & HUDs
+- **Stats Page Shows Way More Stats.** Keystones, magic, cast speed, physical resistance, all that good stuff
+- **HUDs Actually Stay This Time.** Yeah, 1.0.7 said "forever". Different problem, was caused by PartyPro, cost 4 days of debugging, properly fixed now
+- **Energy Shield Absorbs Damage Again.** Was not initialized, just sitting there doing nothing sometimes
+- **Signature Ability HUD Restored.** The weapon ability indicator was missing for RPG weapons
+- **Death Recap Works.** Was completely broken, initialization bug
+- **Crafting Preview Works From Inventory.** Only worked on placed crafting benches before
+- **Stat Tooltips Fixed.** Armor and accuracy breakdowns show the right numbers now
+
+### Realms
+- **Portal Management.** You can close portals in the UI now and can't infinitely reopen them anymore
+- **Jungle Map Added.** New realm map visual - still problem with map models being inverted
+- **Realm Crash Recovery.** If the server crashes while you're in a realm, it remembers where you were and your loot
+- **Realm Modifier Names Rewritten.** 14 vague names replaced with clear ones, "Superior Gear" is now "Gear Quality" and so on
+- **Realm Modifiers Softened.** Lower base values, gentler scaling, max caps on map modifiers
+- **Completion at 90%.** Down from 95%, you don't need to hunt the last mob anymore
+- **No Suffocation on Realm Spawn.** Could spawn inside blocks, now you're teleported to a safe place everytime
+- **Swamp Biome Temporarily Disabled.** Was crashing remote players, will be back
+
+### Stability
+- **Several Server Crashes Fixed.** Container interactions, portal UI, stone UI, ECS timing issues
+- **Memory Leaks Fixed.** Playing for a long time no longer eats all the server memory
+- **Client Connection Hang Fixed.** Mob modifier system could freeze your connection on join, fixed
+- **Way Less Stutter.** Item sync reworked with batching, loot drops and gear switches don't hitch anymore
+- **Skill Sanctum Safe for Visitors.** Teleporting to a friend in the sanctum was dropping you into the void
+- **Config Updates Automatically.** When you update the mod, new config values are added without losing your edits
+
 ## 1.0.7
 
 ### Skill Tree

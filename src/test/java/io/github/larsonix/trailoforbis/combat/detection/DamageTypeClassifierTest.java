@@ -300,6 +300,74 @@ public class DamageTypeClassifierTest {
         }
     }
 
+    // ==================== RPG DOT Cause Identification ====================
+
+    @Nested
+    @DisplayName("RPG DOT Cause Identification")
+    class RpgDotCauseTests {
+
+        @Test
+        @DisplayName("Rpg_Burn_Dot is recognized as DOT cause")
+        void isRpgDotCause_burnDot_returnsTrue() {
+            assertTrue(DamageTypeClassifier.isRpgDotCause("Rpg_Burn_Dot"));
+        }
+
+        @Test
+        @DisplayName("Rpg_Poison_Dot is recognized as DOT cause")
+        void isRpgDotCause_poisonDot_returnsTrue() {
+            assertTrue(DamageTypeClassifier.isRpgDotCause("Rpg_Poison_Dot"));
+        }
+
+        @Test
+        @DisplayName("Physical is NOT a DOT cause")
+        void isRpgDotCause_physical_returnsFalse() {
+            assertFalse(DamageTypeClassifier.isRpgDotCause("Physical"));
+        }
+
+        @Test
+        @DisplayName("hex_bolt is NOT a DOT cause")
+        void isRpgDotCause_hexBolt_returnsFalse() {
+            assertFalse(DamageTypeClassifier.isRpgDotCause("hex_bolt"));
+        }
+
+        @Test
+        @DisplayName("null is NOT a DOT cause")
+        void isRpgDotCause_null_returnsFalse() {
+            assertFalse(DamageTypeClassifier.isRpgDotCause(null));
+        }
+
+        @Test
+        @DisplayName("Empty string is NOT a DOT cause")
+        void isRpgDotCause_empty_returnsFalse() {
+            assertFalse(DamageTypeClassifier.isRpgDotCause(""));
+        }
+
+        @Test
+        @DisplayName("Case-sensitive: rpg_burn_dot (lowercase) is NOT recognized")
+        void isRpgDotCause_lowercase_returnsFalse() {
+            // Our constants are "Rpg_Burn_Dot" not "rpg_burn_dot"
+            assertFalse(DamageTypeClassifier.isRpgDotCause("rpg_burn_dot"));
+        }
+
+        @Test
+        @DisplayName("isDOTDamage recognizes Rpg_Burn_Dot cause")
+        void isDOTDamage_rpgBurnDot_returnsTrue() {
+            mockGetDamageCause(damageCause);
+            when(damageCause.getId()).thenReturn("Rpg_Burn_Dot");
+
+            assertTrue(classifier.isDOTDamage(damage));
+        }
+
+        @Test
+        @DisplayName("isDOTDamage recognizes Rpg_Poison_Dot cause")
+        void isDOTDamage_rpgPoisonDot_returnsTrue() {
+            mockGetDamageCause(damageCause);
+            when(damageCause.getId()).thenReturn("Rpg_Poison_Dot");
+
+            assertTrue(classifier.isDOTDamage(damage));
+        }
+    }
+
     // ==================== Physical Resistance Applicability ====================
 
     @Nested

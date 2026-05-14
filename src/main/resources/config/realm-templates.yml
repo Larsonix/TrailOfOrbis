@@ -1,0 +1,35 @@
+# Realm Template Configuration
+# Per-biome spawn/exit locations and spawn Y levels.
+# Missing keys fall back to computed defaults (Y=64, spawn at origin, exit at +5x).
+#
+# spawn-y: Base Y coordinate for player spawn and exit portal (integer)
+# exit-offset-x: X offset from origin for exit portal (default: 5)
+# exit-offset-z: Z offset from origin for exit portal (default: 0)
+
+templates:
+  forest:
+    spawn-y: 64
+  desert:
+    spawn-y: 64
+  tundra:
+    spawn-y: 64
+  volcano:
+    spawn-y: 64
+  jungle:
+    spawn-y: 64
+  swamp:
+    spawn-y: 64
+  beach:
+    spawn-y: 64
+  mountains:
+    spawn-y: 64
+  caverns:
+    spawn-y: 64
+  frozen_crypts:
+    spawn-y: 64
+  sand_tombs:
+    spawn-y: 64
+  corrupted:
+    spawn-y: 64
+  void:
+    spawn-y: 64

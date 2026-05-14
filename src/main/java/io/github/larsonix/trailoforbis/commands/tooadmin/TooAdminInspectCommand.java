@@ -161,6 +161,22 @@ public final class TooAdminInspectCommand extends AbstractPlayerCommand {
                 .insert(Message.raw("  Spell Damage : ").color(MessageColors.GRAY))
                 .insert(Message.raw(NumberFormatter.signedPercent(stats.getSpellDamagePercent())).color(MessageColors.WHITE)));
 
+            // Hex magic stats (only show when Hexcode is loaded and player has magic stats)
+            if (io.github.larsonix.trailoforbis.compat.HexcodeCompat.isLoaded()) {
+                if (stats.getVolatilityMax() > 0 || stats.getMagicPower() > 0) {
+                    sender.sendMessage(Message.empty()
+                        .insert(Message.raw("  Volatility : ").color(MessageColors.GRAY))
+                        .insert(Message.raw(NumberFormatter.flat(stats.getVolatilityMax())).color(MessageColors.LIGHT_BLUE))
+                        .insert(Message.raw("  Magic Power : ").color(MessageColors.GRAY))
+                        .insert(Message.raw(NumberFormatter.signedPercent(stats.getMagicPower() * 100f)).color(MessageColors.LIGHT_BLUE)));
+                    sender.sendMessage(Message.empty()
+                        .insert(Message.raw("  Charges : ").color(MessageColors.GRAY))
+                        .insert(Message.raw(String.valueOf(stats.getMagicCharges())).color(MessageColors.LIGHT_BLUE))
+                        .insert(Message.raw("  Cast Speed : ").color(MessageColors.GRAY))
+                        .insert(Message.raw(NumberFormatter.signedPercent(stats.getCastSpeed())).color(MessageColors.WHITE)));
+                }
+            }
+
             sender.sendMessage(Message.empty()
                 .insert(Message.raw("  Crit Chance : ").color(MessageColors.GRAY))
                 .insert(Message.raw(NumberFormatter.percent(stats.getCriticalChance())).color(MessageColors.WARNING)));

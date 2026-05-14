@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
+import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.event.EventRegistry;
@@ -10,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.maps.RealmsManager;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -63,8 +65,39 @@ public class HudLifecycleManager {
 
     private final List<PersistentHud> providers = new ArrayList<>();
 
-    /** Last processed readyId per player — deduplicates rapid PlayerReadyEvent sequences. */
-    private final Map<UUID, Integer> lastReadyIds = new ConcurrentHashMap<>();
+    /** Periodic safety net — detects and restores missing HUDs. */
+    @Nullable private HudHealthChecker healthChecker;
+
+    /**
+     * Tracks the last world name where HUDs were successfully restored per player.
+     * Used to deduplicate the second {@code ClientReady} packet that Hytale sends
+     * ~30 seconds after each world transition on remote connections. Without this,
+     * every second ClientReady would trigger redundant discard+restore cycles.
+     */
+    private final Map<UUID, String> lastRestoredWorld = new ConcurrentHashMap<>();
+
+    /**
+     * MCHUD names of non-persistent HUDs that must be removed after world transitions.
+     *
+     * <p>Context-specific HUDs (realm combat, victory, defeat, sanctum skill points, etc.)
+     * are discarded from our tracking maps during transitions but NOT from the server-side
+     * {@code MultipleCustomUIHud.customHuds} HashMap (can't send packets during transitions).
+     * Hytale rebuilds the MCHUD via {@code show()} after {@code JoinWorld(clearWorld=true)},
+     * re-rendering orphaned entries — causing stale HUDs to reappear in the wrong world.
+     *
+     * <p>After restoring persistent HUDs, we remove these entries by their deterministic
+     * names. {@code hideCustomHud()} is a safe no-op if the name doesn't exist. Context
+     * handlers (realm, sanctum) re-add their HUDs via NORMAL-priority tasks that execute
+     * BEFORE this LATE-priority cleanup on the world thread — FIFO ordering guarantees
+     * new entries survive.
+     */
+    private static final String[] NON_PERSISTENT_HUD_NAMES = {
+        "too-realm-combat",
+        "too-realm-victory",
+        "too-realm-defeat",
+        "too-skill-points",
+        "too-skill-node"
+    };
 
     // ═══════════════════════════════════════════════════════════════════
     // REGISTRATION
@@ -98,6 +131,22 @@ public class HudLifecycleManager {
         LOGGER.atInfo().log("HudLifecycleManager registered with %d providers", providers.size());
     }
 
+    /**
+     * Starts the periodic HUD health checker (safety net for disappeared HUDs).
+     *
+     * <p>Call AFTER all providers are registered and event listeners are set up.
+     * The checker runs on a daemon thread, performs zero-cost map lookups to detect
+     * missing HUDs, and defers actual restoration to the world thread.
+     *
+     * @param intervalSeconds seconds between health checks (e.g. 5)
+     * @param realmsManager   the realms manager for realm combat HUD checks (nullable)
+     */
+    public void startHealthChecker(int intervalSeconds, @Nullable RealmsManager realmsManager) {
+        var realmHudManager = realmsManager != null ? realmsManager.getHudManager() : null;
+        healthChecker = new HudHealthChecker(providers, realmsManager, realmHudManager, 8);
+        healthChecker.start(intervalSeconds);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // DRAIN (called from DrainPlayerFromWorldEvent handler)
     // ═══════════════════════════════════════════════════════════════════
@@ -109,6 +158,7 @@ public class HudLifecycleManager {
      * tracking maps and cancels refresh tasks without sending packets.
      */
     public void discardAll(@Nonnull UUID playerId) {
+        lastRestoredWorld.remove(playerId);
         for (PersistentHud hud : providers) {
             try {
                 hud.discardStale(playerId);
@@ -181,7 +231,8 @@ public class HudLifecycleManager {
      * the client is still connected.
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
-        lastReadyIds.remove(playerId);
+        lastRestoredWorld.remove(playerId);
+        if (healthChecker != null) healthChecker.onDisconnect(playerId);
         for (PersistentHud hud : providers) {
             try {
                 hud.removeOnDisconnect(playerId);
@@ -200,6 +251,10 @@ public class HudLifecycleManager {
      * Removes all HUDs for all players during plugin shutdown.
      */
     public void shutdown() {
+        if (healthChecker != null) {
+            healthChecker.shutdown();
+            healthChecker = null;
+        }
         for (PersistentHud hud : providers) {
             try {
                 hud.shutdown();
@@ -226,17 +281,6 @@ public class HudLifecycleManager {
             return;
         }
 
-        // Dedup: PlayerReadyEvent.getReadyId() increments monotonically per player.
-        // Reject stale events from rapid transitions (enter realm → immediately exit).
-        int readyId = event.getReadyId();
-        Integer lastId = lastReadyIds.get(playerId);
-        if (lastId != null && readyId <= lastId) {
-            LOGGER.atFine().log("Skipping stale PlayerReadyEvent for %s (readyId=%d, last=%d)",
-                playerId.toString().substring(0, 8), readyId, lastId);
-            return;
-        }
-        lastReadyIds.put(playerId, readyId);
-
         final UUID pid = playerId;
         final World w = world;
 
@@ -256,8 +300,87 @@ public class HudLifecycleManager {
         // this discard, activeHuds retains stale entries from the old world, isActive()
         // returns true, and restoreAll skips all providers → invisible HUDs.
         world.execute(() -> {
+            String worldName = w.getName();
+
+            // Dedup: Hytale sends TWO ClientReady packets per world transition. The
+            // second arrives ~30s later on remote connections. Without this guard, the
+            // second event destroys all active HUDs and creates new ones with different
+            // random names (HYUIHUD<uuid>). The old HUDs are orphaned inside
+            // MultipleCustomUIHud — never removed, never updated, accumulating across
+            // transitions. Skip if already restored in this world AND all HUDs are active.
+            if (worldName != null && worldName.equals(lastRestoredWorld.get(pid))) {
+                boolean allActive = true;
+                for (PersistentHud hud : providers) {
+                    if (!hud.isActive(pid)) {
+                        allActive = false;
+                        break;
+                    }
+                }
+                if (allActive) {
+                    LOGGER.atFine().log("Skipping redundant HUD restore for %s (already restored in %s)",
+                        pid.toString().substring(0, 8), worldName);
+                    return;
+                }
+            }
+
             discardAll(pid);
             restoreAll(pid, w, player);
+
+            // Remove orphaned non-persistent HUDs from MCHUD. During transitions,
+            // discardStale() removes from tracking but NOT from MCHUD (can't send
+            // packets mid-transition). Hytale's show() rebuilds all MCHUD entries
+            // after JoinWorld(clearWorld=true), re-rendering orphans. We remove
+            // them here by deterministic name. This covers ALL transition paths
+            // (portal, command, drain, death, realm close, sanctum exit — everything).
+            // hideCustomHud() is a safe no-op if the name doesn't exist.
+            removeOrphanedNonPersistentHuds(pid, player);
+
+            // Notify health checker that event-driven path succeeded — sets cooldown
+            if (healthChecker != null) healthChecker.notifyRestored(pid);
+
+            // Track for dedup
+            if (worldName != null) {
+                lastRestoredWorld.put(pid, worldName);
+            }
+
+            // Verify all HUDs were created — diagnostic for remaining issues
+            for (PersistentHud hud : providers) {
+                if (!hud.isActive(pid)) {
+                    LOGGER.atWarning().log("HUD '%s' NOT active for player %s after restoreAll",
+                        hud.hudName(), pid.toString().substring(0, 8));
+                }
+            }
         });
+    }
+
+    /**
+     * Removes orphaned non-persistent HUD entries from the MCHUD.
+     *
+     * <p>Must be called on the world thread AFTER {@link #restoreAll}. Uses the
+     * deterministic HUD names to call {@code hideCustomHud()} which sends a
+     * {@code Remove} command targeting the MCHUD's DOM group for each name.
+     *
+     * <p>Safe in all contexts:
+     * <ul>
+     *   <li>If the entry doesn't exist, {@code hideCustomHud} is a no-op</li>
+     *   <li>If a context handler (realm, sanctum) just created the HUD at NORMAL
+     *       priority, it uses a NESTED {@code world.execute()} so the actual creation
+     *       fires AFTER this cleanup — the entry doesn't exist yet at cleanup time</li>
+     *   <li>If the entry is genuinely orphaned (player left realm/sanctum), it's removed</li>
+     * </ul>
+     */
+    private void removeOrphanedNonPersistentHuds(@Nonnull UUID playerId, @Nullable Player player) {
+        if (player == null) return;
+
+        PlayerRef freshRef = Universe.get().getPlayer(playerId);
+        if (freshRef == null) return;
+
+        for (String name : NON_PERSISTENT_HUD_NAMES) {
+            try {
+                MultiHudWrapper.hideCustomHud(player, freshRef, name);
+            } catch (Exception ignored) {
+                // Safe to ignore — entry may not exist or player may be mid-transition
+            }
+        }
     }
 }

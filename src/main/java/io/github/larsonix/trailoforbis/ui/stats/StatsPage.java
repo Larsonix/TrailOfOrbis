@@ -154,16 +154,21 @@ public class StatsPage {
             // Compute Build Summary for Overview tab
             RPGConfig.CombatConfig.EvasionConfig evasionCfg = null;
             MobStatPoolConfig poolConfig = null;
+            float armorLevelScale = CombatCalculator.DEFAULT_ARMOR_LEVEL_SCALE;
+            float armorBaseConstant = CombatCalculator.DEFAULT_ARMOR_BASE_CONSTANT;
             try {
                 RPGConfig rpgConfig = configService.getRPGConfig();
                 if (rpgConfig != null) {
                     evasionCfg = rpgConfig.getCombat().getEvasion();
+                    armorLevelScale = rpgConfig.getArmor().getLevelScale();
+                    armorBaseConstant = rpgConfig.getArmor().getBaseConstant();
                 }
                 poolConfig = configService.getMobStatPoolConfig();
             } catch (Exception ignored) {
                 // Non-critical — EHP will omit evasion avoidance
             }
-            BuildSummary buildSummary = BuildSummaryCalculator.compute(stats, level, evasionCfg, poolConfig);
+            BuildSummary buildSummary = BuildSummaryCalculator.compute(stats, level, evasionCfg, poolConfig,
+                    armorLevelScale, armorBaseConstant);
 
             // Build HTML with initial height from default tab
             String html = buildHtml(data, stats, breakdown, attrs, level, levelProgress, xpInLevel, xpForLevel, buildSummary);
@@ -681,6 +686,9 @@ public class StatsPage {
         // ── RESISTANCES (compact, always shown) ──
         rows.add(new StatRow(null, null, null, false, false)); // Spacer
         rows.add(new StatRow("RESISTANCES", null, null, false, true));
+        if (stats.getPhysicalResistance() != 0) {
+            rows.add(new StatRow("Physical", RPGStyles.formatValue(stats.getPhysicalResistance(), true), null, true, false));
+        }
         rows.add(new StatRow("Fire", RPGStyles.formatValue(stats.getFireResistance(), true), null, stats.getFireResistance() != 0, false, RPGStyles.ELEMENT_FIRE));
         rows.add(new StatRow("Water", RPGStyles.formatValue(stats.getWaterResistance(), true), null, stats.getWaterResistance() != 0, false, RPGStyles.ELEMENT_WATER));
         rows.add(new StatRow("Lightning", RPGStyles.formatValue(stats.getLightningResistance(), true), null, stats.getLightningResistance() != 0, false, RPGStyles.ELEMENT_LIGHTNING));
@@ -1064,9 +1072,11 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("All Damage %", RPGStyles.formatValue(stats.getAllDamagePercent(), true), null, stats.getAllDamagePercent() != 0, false), stats.getAllDamagePercent());
         addSection(rows, "ATTACK TYPES", section, false);
 
-        // ── ATTACK SPEED (hide if 0) ──
+        // ── ATTACK SPEED (hide if all zero) ──
         section = new ArrayList<>();
         addRowIfNonZero(section, new StatRow("Attack Speed", RPGStyles.formatValue(stats.getAttackSpeedPercent(), true), null, stats.getAttackSpeedPercent() != 0, false), stats.getAttackSpeedPercent());
+        addRowIfNonZero(section, new StatRow("Cast Speed", RPGStyles.formatValue(stats.getCastSpeed(), true), null, stats.getCastSpeed() != 0, false), stats.getCastSpeed());
+        addRowIfNonZero(section, new StatRow("Draw Accuracy", RPGStyles.formatValue(stats.getDrawAccuracy(), true), null, stats.getDrawAccuracy() != 0, false), stats.getDrawAccuracy());
         addSection(rows, "ATTACK SPEED", section, false);
 
         // ── ELEMENTAL DAMAGE (hide section if all zero; within section, hide zero elements) ──
@@ -1115,6 +1125,7 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("True Damage", RPGStyles.formatFlat(stats.getTrueDamage()), "flat", stats.getTrueDamage() > 0, false), stats.getTrueDamage());
         addRowIfNonZero(section, new StatRow("True Damage %", RPGStyles.formatValue(stats.getTrueDamagePercent(), true), null, stats.getTrueDamagePercent() != 0, false), stats.getTrueDamagePercent());
         addRowIfNonZero(section, new StatRow("% Hit as True Damage", RPGStyles.formatValue(stats.getPercentHitAsTrueDamage(), true), null, stats.getPercentHitAsTrueDamage() != 0, false), stats.getPercentHitAsTrueDamage());
+        addRowIfNonZero(section, new StatRow("Void to True Dmg", RPGStyles.formatValue(stats.getVoidToTrueDamagePercent(), true), null, stats.getVoidToTrueDamagePercent() != 0, false, RPGStyles.ELEMENT_VOID), stats.getVoidToTrueDamagePercent());
         addSection(rows, "TRUE DAMAGE", section, false);
 
         // ── SUSTAIN (hide if all zero) ──
@@ -1138,9 +1149,11 @@ public class StatsPage {
         addSection(rows, "PENETRATION", section, false);
 
         // ── ACCURACY (hide if all zero) ──
+        // Accuracy is consolidated: getAccuracy() already includes percent bonus.
+        // Show percent as secondary detail (like armor shows reduction %), not as a separate row.
         section = new ArrayList<>();
-        addRowIfNonZero(section, new StatRow("Accuracy", RPGStyles.formatFlat(stats.getAccuracy()), "flat", stats.getAccuracy() > 0, false), stats.getAccuracy());
-        addRowIfNonZero(section, new StatRow("Accuracy %", RPGStyles.formatValue(stats.getAccuracyPercent(), true), null, stats.getAccuracyPercent() != 0, false), stats.getAccuracyPercent());
+        addRowIfNonZero(section, new StatRow("Accuracy", RPGStyles.formatFlat(stats.getAccuracy()),
+            formatPercent(stats.getAccuracyPercent()), stats.getAccuracy() > 0, false), stats.getAccuracy());
         addSection(rows, "ACCURACY", section, false);
 
         // ── STATUS EFFECTS (hide if all zero) ──
@@ -1184,6 +1197,23 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("Projectile Gravity", RPGStyles.formatValue(stats.getProjectileGravityPercent(), true), null, stats.getProjectileGravityPercent() != 0, false), stats.getProjectileGravityPercent());
         addSection(rows, "PROJECTILE", section, false);
 
+        // ── KEYSTONE EFFECTS (hide if all zero) ──
+        section = new ArrayList<>();
+        addRowIfNonZero(section, new StatRow("Detonate DoT on Crit", RPGStyles.formatValue(stats.getDetonateDotOnCrit(), true), null, stats.getDetonateDotOnCrit() > 0, false), stats.getDetonateDotOnCrit());
+        addRowIfNonZero(section, new StatRow("Consecutive Hit Bonus", RPGStyles.formatValue(stats.getConsecutiveHitBonus(), true), null, stats.getConsecutiveHitBonus() > 0, false), stats.getConsecutiveHitBonus());
+        addRowIfNonZero(section, new StatRow("Spell Echo Chance", RPGStyles.formatValue(stats.getSpellEchoChance(), true), null, stats.getSpellEchoChance() > 0, false), stats.getSpellEchoChance());
+        addRowIfNonZero(section, new StatRow("Block Counter Damage", RPGStyles.formatValue(stats.getBlockCounterDamage(), true), null, stats.getBlockCounterDamage() > 0, false), stats.getBlockCounterDamage());
+        addSection(rows, "KEYSTONE EFFECTS", section, false);
+
+        // ── MAGIC (hide if all zero — Hexcode integration) ──
+        section = new ArrayList<>();
+        addRowIfNonZero(section, new StatRow("Magic Power", RPGStyles.formatFlat(stats.getMagicPower()), null, stats.getMagicPower() > 0, false), stats.getMagicPower());
+        if (stats.getMagicCharges() > 0) {
+            section.add(new StatRow("Magic Charges", "+" + stats.getMagicCharges(), null, true, false));
+        }
+        addRowIfNonZero(section, new StatRow("Volatility Cap", RPGStyles.formatFlat(stats.getVolatilityMax()), null, stats.getVolatilityMax() > 0, false), stats.getVolatilityMax());
+        addSection(rows, "MAGIC", section, false);
+
         // ── Breakdown tooltips (all existing — hidden rows naturally skip rendering) ──
         putBreakdownTooltip(tooltips, "Physical Damage", breakdown, ComputedStats::getPhysicalDamage);
         putBreakdownTooltip(tooltips, "Physical Damage %", breakdown, ComputedStats::getPhysicalDamagePercent);
@@ -1196,6 +1226,8 @@ public class StatsPage {
         putBreakdownTooltip(tooltips, "Projectile Damage %", breakdown, ComputedStats::getProjectileDamagePercent);
         putBreakdownTooltip(tooltips, "All Damage %", breakdown, ComputedStats::getAllDamagePercent);
         putBreakdownTooltip(tooltips, "Attack Speed", breakdown, ComputedStats::getAttackSpeedPercent);
+        putBreakdownTooltip(tooltips, "Cast Speed", breakdown, ComputedStats::getCastSpeed);
+        putBreakdownTooltip(tooltips, "Draw Accuracy", breakdown, ComputedStats::getDrawAccuracy);
         putBreakdownTooltip(tooltips, "Life Steal", breakdown, ComputedStats::getLifeSteal);
         putBreakdownTooltip(tooltips, "Life Leech", breakdown, ComputedStats::getLifeLeech);
         putBreakdownTooltip(tooltips, "Mana Leech", breakdown, ComputedStats::getManaLeech);
@@ -1208,8 +1240,8 @@ public class StatsPage {
         putBreakdownTooltip(tooltips, "Earth Penetration", breakdown, ComputedStats::getEarthPenetration);
         putBreakdownTooltip(tooltips, "Wind Penetration", breakdown, ComputedStats::getWindPenetration);
         putBreakdownTooltip(tooltips, "Void Penetration", breakdown, ComputedStats::getVoidPenetration);
-        putBreakdownTooltip(tooltips, "Accuracy", breakdown, ComputedStats::getAccuracy);
-        putBreakdownTooltip(tooltips, "Accuracy %", breakdown, ComputedStats::getAccuracyPercent);
+        putResourceBreakdownTooltip(tooltips, "Accuracy", breakdown, stats,
+            ComputedStats::getAccuracy, ComputedStats::getAccuracyPercent, "accuracy");
         putBreakdownTooltip(tooltips, "Fire Damage", breakdown, ComputedStats::getFireDamage);
         putBreakdownTooltip(tooltips, "Water Damage", breakdown, ComputedStats::getWaterDamage);
         putBreakdownTooltip(tooltips, "Lightning Damage", breakdown, ComputedStats::getLightningDamage);
@@ -1249,6 +1281,13 @@ public class StatsPage {
         putBreakdownTooltip(tooltips, "Void Conversion", breakdown, ComputedStats::getVoidConversion);
         putBreakdownTooltip(tooltips, "Projectile Speed", breakdown, ComputedStats::getProjectileSpeedPercent);
         putBreakdownTooltip(tooltips, "Projectile Gravity", breakdown, ComputedStats::getProjectileGravityPercent);
+        putBreakdownTooltip(tooltips, "Void to True Dmg", breakdown, ComputedStats::getVoidToTrueDamagePercent);
+        putBreakdownTooltip(tooltips, "Detonate DoT on Crit", breakdown, ComputedStats::getDetonateDotOnCrit);
+        putBreakdownTooltip(tooltips, "Consecutive Hit Bonus", breakdown, ComputedStats::getConsecutiveHitBonus);
+        putBreakdownTooltip(tooltips, "Spell Echo Chance", breakdown, ComputedStats::getSpellEchoChance);
+        putBreakdownTooltip(tooltips, "Block Counter Damage", breakdown, ComputedStats::getBlockCounterDamage);
+        putBreakdownTooltip(tooltips, "Magic Power", breakdown, ComputedStats::getMagicPower);
+        putBreakdownTooltip(tooltips, "Volatility Cap", breakdown, ComputedStats::getVolatilityMax);
 
         return buildStatRows(rows, tooltips);
     }
@@ -1256,7 +1295,7 @@ public class StatsPage {
     /**
      * Builds the Defense tab content with SURVIVABILITY headline and section-level zero-hiding.
      *
-     * <p>8 sections. SURVIVABILITY and ELEMENTAL RESISTANCES are always visible.
+     * <p>8 sections. SURVIVABILITY and RESISTANCES are always visible.
      * Other sections hide entirely when all their rows are zero.
      */
     @Nonnull
@@ -1302,15 +1341,16 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("Stamina Drain Reduce", RPGStyles.formatFlat(stats.getStaminaDrainReduction()), "flat", stats.getStaminaDrainReduction() > 0, false), stats.getStaminaDrainReduction());
         addSection(rows, "BLOCK & SHIELD", section, false);
 
-        // ── ELEMENTAL RESISTANCES (always show — 0% resistance is meaningful) ──
+        // ── RESISTANCES (always show — 0% resistance is meaningful) ──
         section = new ArrayList<>();
+        section.add(new StatRow("Physical Resistance", RPGStyles.formatValue(stats.getPhysicalResistance(), true), null, stats.getPhysicalResistance() != 0, false));
         section.add(new StatRow("Fire Resistance", RPGStyles.formatValue(stats.getFireResistance(), true), null, stats.getFireResistance() != 0, false, RPGStyles.ELEMENT_FIRE));
         section.add(new StatRow("Water Resistance", RPGStyles.formatValue(stats.getWaterResistance(), true), null, stats.getWaterResistance() != 0, false, RPGStyles.ELEMENT_WATER));
         section.add(new StatRow("Lightning Resistance", RPGStyles.formatValue(stats.getLightningResistance(), true), null, stats.getLightningResistance() != 0, false, RPGStyles.ELEMENT_LIGHTNING));
         section.add(new StatRow("Earth Resistance", RPGStyles.formatValue(stats.getEarthResistance(), true), null, stats.getEarthResistance() != 0, false, RPGStyles.ELEMENT_EARTH));
         section.add(new StatRow("Wind Resistance", RPGStyles.formatValue(stats.getWindResistance(), true), null, stats.getWindResistance() != 0, false, RPGStyles.ELEMENT_WIND));
         section.add(new StatRow("Void Resistance", RPGStyles.formatValue(stats.getVoidResistance(), true), null, stats.getVoidResistance() != 0, false, RPGStyles.ELEMENT_VOID));
-        addSection(rows, "ELEMENTAL RESISTANCES", section, true);
+        addSection(rows, "RESISTANCES", section, true);
 
         // ── DAMAGE TAKEN (hide if all zero) ──
         section = new ArrayList<>();
@@ -1332,6 +1372,9 @@ public class StatsPage {
         addRowIfNonZero(section, new StatRow("Knockback Resistance", RPGStyles.formatValue(stats.getKnockbackResistance(), true), null, stats.getKnockbackResistance() > 0, false), stats.getKnockbackResistance());
         addRowIfNonZero(section, new StatRow("Fall Damage Reduction", RPGStyles.formatValue(stats.getFallDamageReduction(), true), null, stats.getFallDamageReduction() > 0, false), stats.getFallDamageReduction());
         addRowIfNonZero(section, new StatRow("Mana as Dmg Buffer", RPGStyles.formatValue(stats.getManaAsDamageBuffer(), true), null, stats.getManaAsDamageBuffer() > 0, false), stats.getManaAsDamageBuffer());
+        addRowIfNonZero(section, new StatRow("ES Regen on DoT", RPGStyles.formatValue(stats.getShieldRegenOnDot(), true), null, stats.getShieldRegenOnDot() > 0, false), stats.getShieldRegenOnDot());
+        addRowIfNonZero(section, new StatRow("Ailment Immunity", RPGStyles.formatValue(stats.getImmunityOnAilment(), true), null, stats.getImmunityOnAilment() > 0, false), stats.getImmunityOnAilment());
+        addRowIfNonZero(section, new StatRow("Evasion to Armor", RPGStyles.formatValue(stats.getEvasionToArmor(), true), null, stats.getEvasionToArmor() > 0, false), stats.getEvasionToArmor());
         addSection(rows, "SPECIAL DEFENSES", section, false);
 
         // ── STATUS THRESHOLDS (hide if all zero) ──
@@ -1346,7 +1389,9 @@ public class StatsPage {
             ComputedStats::getMaxHealth, ComputedStats::getMaxHealthPercent, "maxHealth");
         putResourceBreakdownTooltip(tooltips, "Energy Shield", breakdown, stats,
             ComputedStats::getEnergyShield, ComputedStats::getEnergyShieldPercent, "energyShield");
-        putBreakdownTooltip(tooltips, "Armor", breakdown, ComputedStats::getArmor);
+        putResourceBreakdownTooltip(tooltips, "Armor", breakdown, stats,
+            ComputedStats::getArmor, ComputedStats::getArmorPercent, "armor");
+        putBreakdownTooltip(tooltips, "Physical Resistance", breakdown, ComputedStats::getPhysicalResistance);
         putBreakdownTooltip(tooltips, "Evasion", breakdown, ComputedStats::getEvasion);
         putBreakdownTooltip(tooltips, "Dodge Chance", breakdown, ComputedStats::getDodgeChance);
         putBreakdownTooltip(tooltips, "Parry Chance", breakdown, ComputedStats::getParryChance);
@@ -1372,6 +1417,9 @@ public class StatsPage {
         putBreakdownTooltip(tooltips, "Knockback Resistance", breakdown, ComputedStats::getKnockbackResistance);
         putBreakdownTooltip(tooltips, "Fall Damage Reduction", breakdown, ComputedStats::getFallDamageReduction);
         putBreakdownTooltip(tooltips, "Mana as Dmg Buffer", breakdown, ComputedStats::getManaAsDamageBuffer);
+        putBreakdownTooltip(tooltips, "ES Regen on DoT", breakdown, ComputedStats::getShieldRegenOnDot);
+        putBreakdownTooltip(tooltips, "Ailment Immunity", breakdown, ComputedStats::getImmunityOnAilment);
+        putBreakdownTooltip(tooltips, "Evasion to Armor", breakdown, ComputedStats::getEvasionToArmor);
         putBreakdownTooltip(tooltips, "Burn Threshold", breakdown, ComputedStats::getBurnThreshold);
         putBreakdownTooltip(tooltips, "Freeze Threshold", breakdown, ComputedStats::getFreezeThreshold);
         putBreakdownTooltip(tooltips, "Shock Threshold", breakdown, ComputedStats::getShockThreshold);
@@ -1472,13 +1520,21 @@ public class StatsPage {
     }
 
     /**
-     * Formats armor reduction percentage.
+     * Formats armor reduction percentage using configured formula constants.
      */
     @Nullable
     private String formatArmorReduction(float armor, int level) {
         if (armor <= 0) return null;
-        float reduction = CombatCalculator.estimateArmorReduction(armor, level);
-        return NumberFormatter.percent(reduction) + " reduction";
+        try {
+            RPGConfig.ArmorConfig armorConfig = ServiceRegistry.require(ConfigService.class)
+                    .getRPGConfig().getArmor();
+            float reduction = CombatCalculator.estimateArmorReduction(
+                    armor, level, armorConfig.getLevelScale(), armorConfig.getBaseConstant());
+            return NumberFormatter.percent(reduction) + " reduction";
+        } catch (Exception e) {
+            float reduction = CombatCalculator.estimateArmorReduction(armor, level);
+            return NumberFormatter.percent(reduction) + " reduction";
+        }
     }
 
     /**
@@ -1591,10 +1647,10 @@ public class StatsPage {
      * <p>Shows the full formula: {@code Final = (base + flat) × (1 + percent/100) × multiplier}
      * with per-source contributions for each layer (Flat, Increased%, More×).
      *
-     * <p>Only used for the 10 resource stats that go through
+     * <p>Used for all 13 resource stats that go through
      * {@code ComputedStats.consolidateResourcePercents()}: maxHealth, maxMana,
-     * maxStamina, maxOxygen, maxSignatureEnergy, energyShield, healthRegen,
-     * staminaRegen, manaRegen, energyShieldRegen.
+     * maxStamina, maxOxygen, maxSignatureEnergy, armor, energyShield, accuracy,
+     * healthRegen, staminaRegen, manaRegen, energyShieldRegen.
      *
      * @param flatGetter    Extracts the raw flat field (e.g., {@code ComputedStats::getMaxHealth})
      * @param pctGetter     Extracts the percent accumulator (e.g., {@code ComputedStats::getMaxHealthPercent})

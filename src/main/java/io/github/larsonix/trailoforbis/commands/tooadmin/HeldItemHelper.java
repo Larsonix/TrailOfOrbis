@@ -27,7 +27,7 @@ public final class HeldItemHelper {
         if (inventory == null) {
             return null;
         }
-        return inventory.getItemInHand();
+        return inventory.getActiveHotbarItem();
     }
 
     public static void setHeldItem(PlayerRef player, Store<EntityStore> store, Ref<EntityStore> ref, ItemStack newItem) {

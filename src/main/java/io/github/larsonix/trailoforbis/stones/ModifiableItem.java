@@ -104,6 +104,42 @@ public interface ModifiableItem {
     }
 
     /**
+     * Checks if this item has any unlocked prefix modifiers.
+     *
+     * @return true if at least one prefix is unlocked
+     */
+    default boolean hasUnlockedPrefixes() {
+        return modifiers().stream().anyMatch(m -> !m.isLocked() && "PREFIX".equals(m.typeLabel()));
+    }
+
+    /**
+     * Checks if this item has any unlocked suffix modifiers.
+     *
+     * @return true if at least one suffix is unlocked
+     */
+    default boolean hasUnlockedSuffixes() {
+        return modifiers().stream().anyMatch(m -> !m.isLocked() && "SUFFIX".equals(m.typeLabel()));
+    }
+
+    /**
+     * Gets the count of unlocked prefix modifiers.
+     *
+     * @return Number of unlocked prefixes
+     */
+    default int unlockedPrefixCount() {
+        return (int) modifiers().stream().filter(m -> !m.isLocked() && "PREFIX".equals(m.typeLabel())).count();
+    }
+
+    /**
+     * Gets the count of unlocked suffix modifiers.
+     *
+     * @return Number of unlocked suffixes
+     */
+    default int unlockedSuffixCount() {
+        return (int) modifiers().stream().filter(m -> !m.isLocked() && "SUFFIX".equals(m.typeLabel())).count();
+    }
+
+    /**
      * Gets the map quantity bonus (for realm maps).
      *
      * <p>This is a map-specific property that doesn't apply to gear.

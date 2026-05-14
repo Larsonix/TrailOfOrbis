@@ -15,7 +15,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.combat.DamageBreakdown;
+import io.github.larsonix.trailoforbis.combat.format.CombatDetailFormatter;
 import io.github.larsonix.trailoforbis.combat.DamageTrace;
+import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.combat.indicators.color.CombatTextColorManager;
 import io.github.larsonix.trailoforbis.combat.deathrecap.CombatSnapshot;
 import io.github.larsonix.trailoforbis.combat.detection.DamageTypeClassifier;
@@ -56,6 +58,17 @@ public class CombatIndicatorService {
     private final CombatFeedbackGhostManager ghostManager;
 
     /**
+     * Per-tick dedup for DamageInfo screen flash packets.
+     * When a player takes damage from 40 mobs simultaneously (AoE reflected back),
+     * they only see ONE red flash — the other 39 packets are redundant.
+     * Tracks UUID → last flash timestamp (millis). A flash within 50ms of the
+     * previous one for the same UUID is skipped.
+     */
+    private final java.util.Map<java.util.UUID, Long> lastFlashTime = new java.util.HashMap<>();
+    /** Minimum interval between screen flash packets for the same defender (ms). */
+    private static final long FLASH_DEDUP_INTERVAL_MS = 50;
+
+    /**
      * Creates a new CombatIndicatorService.
      *
      * @param entityResolver The entity resolver for attacker lookups
@@ -82,11 +95,12 @@ public class CombatIndicatorService {
         boolean isCrit,
         boolean isBlocked,
         boolean isDodged,
+        boolean isEvaded,
         boolean isParried,
         boolean isMissed
     ) {
         public static CombatTextParams forDamage(boolean isCrit) {
-            return new CombatTextParams(isCrit, false, false, false, false);
+            return new CombatTextParams(isCrit, false, false, false, false, false);
         }
 
         public static CombatTextParams forAvoidance(@Nonnull DamageBreakdown.AvoidanceReason reason) {
@@ -94,6 +108,7 @@ public class CombatIndicatorService {
                 false,
                 reason == DamageBreakdown.AvoidanceReason.BLOCKED,
                 reason == DamageBreakdown.AvoidanceReason.DODGED,
+                reason == DamageBreakdown.AvoidanceReason.EVADED,
                 reason == DamageBreakdown.AvoidanceReason.PARRIED,
                 reason == DamageBreakdown.AvoidanceReason.MISSED
             );
@@ -139,6 +154,7 @@ public class CombatIndicatorService {
                 breakdown.wasCritical(),
                 breakdown.wasBlocked(),
                 breakdown.wasDodged(),
+                breakdown.wasEvaded(),
                 wasParried,
                 breakdown.wasMissed()
             ),
@@ -186,6 +202,7 @@ public class CombatIndicatorService {
                 breakdown.wasCritical(),
                 breakdown.wasBlocked(),
                 breakdown.wasDodged(),
+                breakdown.wasEvaded(),
                 wasParried,
                 breakdown.wasMissed()
             ),
@@ -256,6 +273,19 @@ public class CombatIndicatorService {
         if (defender == null) {
             return;
         }
+
+        // Time-window dedup: skip redundant screen flash for the same defender.
+        // AoE spells hitting 40 targets that reflect damage would send 40 flash packets
+        // to the same player — they only see one flash anyway.
+        java.util.UUID defenderUuid = defender.getUuid();
+        long now = System.currentTimeMillis();
+        Long lastFlash = lastFlashTime.get(defenderUuid);
+        if (lastFlash != null && (now - lastFlash) < FLASH_DEDUP_INTERVAL_MS) {
+            LOGGER.at(Level.FINE).log("INDICATOR SKIPPED for defender %s: within %dms dedup window",
+                defender.getUsername(), FLASH_DEDUP_INTERVAL_MS);
+            return;
+        }
+        lastFlashTime.put(defenderUuid, now);
 
         // Check if damage is below the minimum threshold (% of max HP) to trigger alert
         float actualMaxHP = 100f;
@@ -347,6 +377,8 @@ public class CombatIndicatorService {
         String damageText;
         if (params.isMissed()) {
             damageText = "Miss";
+        } else if (params.isEvaded()) {
+            damageText = "Evaded";
         } else if (params.isDodged()) {
             damageText = "Dodged";
         } else if (params.isBlocked()) {
@@ -368,8 +400,8 @@ public class CombatIndicatorService {
 
         entityViewer.queueUpdate(defenderRef, combatTextUpdate);
 
-        String statusLabel = params.isMissed() ? " (MISSED)" : params.isDodged() ? " (DODGED)" :
-            params.isBlocked() ? " (BLOCKED)" : params.isParried() ? " (PARRIED)" : "";
+        String statusLabel = params.isMissed() ? " (MISSED)" : params.isEvaded() ? " (EVADED)" :
+            params.isDodged() ? " (DODGED)" : params.isBlocked() ? " (BLOCKED)" : params.isParried() ? " (PARRIED)" : "";
         String critLabel = params.isCrit() ? " (CRIT!)" : "";
         LOGGER.at(Level.FINE).log("COMBAT TEXT queued for attacker %s: %s%s%s",
             attacker.getUsername(), combatTextUpdate.text, critLabel, statusLabel);
@@ -401,6 +433,7 @@ public class CombatIndicatorService {
     ) {
         String text = switch (reason) {
             case DODGED -> "Dodged";
+            case EVADED -> "Evaded";
             case BLOCKED -> "Blocked";
             case PARRIED -> "Parried";
             case MISSED -> "Miss";
@@ -526,7 +559,7 @@ public class CombatIndicatorService {
             return;
         }
 
-        Message message = CombatLogFormatter.formatDamageDealt(trace, targetName, targetLevel, targetClass);
+        Message message = CombatDetailFormatter.formatDamageDealt(trace, targetName, targetLevel, targetClass);
         attacker.sendMessage(message);
     }
 
@@ -611,7 +644,7 @@ public class CombatIndicatorService {
             return;
         }
 
-        Message message = CombatLogFormatter.formatDamageReceived(trace, snapshot);
+        Message message = CombatDetailFormatter.formatDamageReceived(trace, snapshot);
         defender.sendMessage(message);
     }
 
@@ -645,13 +678,83 @@ public class CombatIndicatorService {
         }
 
         // Use the formatter for avoidance message
-        Message message = CombatLogFormatter.formatAvoidance(
+        Message message = CombatDetailFormatter.formatAvoidance(
             reason,
             attackerInfo.name(),
             attackerInfo.level(),
             attackerInfo.mobClass(),
             estimatedDamage,
             avoidanceStats);
+        defender.sendMessage(message);
+    }
+
+    /**
+     * Sends a compact DOT tick detail message to the defender if they have combat detail enabled.
+     *
+     * @param store The entity store
+     * @param defenderRef The defender entity reference
+     * @param ailmentName Display name (e.g., "Burn", "Poison")
+     * @param element The DOT element (FIRE, VOID, etc.)
+     * @param sourceName The source mob/entity name
+     * @param baseDPS Pre-resistance tick damage
+     * @param shockAmpPercent Shock amplification applied
+     * @param resistPercent Effective resistance reduction
+     * @param finalTickDamage Actual damage dealt
+     */
+    public void sendDOTDetailChat(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> defenderRef,
+        @Nonnull String ailmentName,
+        @Nullable ElementType element,
+        @Nonnull String sourceName,
+        float baseDPS,
+        float shockAmpPercent,
+        float resistPercent,
+        float finalTickDamage
+    ) {
+        PlayerRef defender = store.getComponent(defenderRef, PlayerRef.getComponentType());
+        if (defender == null || !defender.isValid()) {
+            return;
+        }
+
+        if (!plugin.isCombatDetailEnabled(defender.getUuid())) {
+            return;
+        }
+
+        Message message = CombatDetailFormatter.formatDOTDamage(
+            ailmentName, element, sourceName, baseDPS, shockAmpPercent, resistPercent, finalTickDamage);
+        defender.sendMessage(message);
+    }
+
+    /**
+     * Sends a compact environmental damage detail message to the defender if they have combat detail enabled.
+     *
+     * @param store The entity store
+     * @param defenderRef The defender entity reference
+     * @param causeName Display name (e.g., "Fall Damage", "Lava")
+     * @param damage The damage dealt
+     * @param resistPercent Resistance applied
+     * @param element The element type (FIRE for lava, null for fall)
+     */
+    public void sendEnvironmentalDetailChat(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> defenderRef,
+        @Nonnull String causeName,
+        float damage,
+        float resistPercent,
+        @Nullable ElementType element
+    ) {
+        PlayerRef defender = store.getComponent(defenderRef, PlayerRef.getComponentType());
+        if (defender == null || !defender.isValid()) {
+            return;
+        }
+
+        if (!plugin.isCombatDetailEnabled(defender.getUuid())) {
+            return;
+        }
+
+        Message message = CombatDetailFormatter.formatEnvironmentalDamage(
+            causeName, damage, resistPercent, element);
         defender.sendMessage(message);
     }
 }

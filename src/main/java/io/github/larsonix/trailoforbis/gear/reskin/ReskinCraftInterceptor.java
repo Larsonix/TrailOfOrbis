@@ -160,7 +160,9 @@ public final class ReskinCraftInterceptor extends EntityEventSystem<EntityStore,
 
         String customItemId = newInstanceId.toItemId();
         try {
-            itemRegistry.createAndRegisterSync(newBaseItem, customItemId);
+            // Pass the RPG rarity so the reskin ResourceType matches the correct
+            // workbench recipe group based on rarity, not the new skin's vanilla quality.
+            itemRegistry.createAndRegisterSync(newBaseItem, customItemId, cachedGearData.rarity());
         } catch (Exception e) {
             LOGGER.atSevere().withCause(e).log("Failed to register reskin item: %s", customItemId);
             return;

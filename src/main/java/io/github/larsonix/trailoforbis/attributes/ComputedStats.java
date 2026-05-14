@@ -953,7 +953,11 @@ public final class ComputedStats {
                 getSignatureEnergyMaxPercent());
 
         // Defense
+        consolidateResource("armor", this::getArmor, this::setArmor, getArmorPercent());
         consolidateResource("energyShield", this::getEnergyShield, this::setEnergyShield, getEnergyShieldPercent());
+
+        // Accuracy: AvoidanceProcessor reads getAccuracy() directly
+        consolidateResource("accuracy", this::getAccuracy, this::setAccuracy, getAccuracyPercent());
 
         // Regen rates: base × (1 + percent/100) × multiplierProduct
         consolidateResource("healthRegen", this::getHealthRegen, this::setHealthRegen, getHealthRegenPercent());
@@ -1342,6 +1346,16 @@ public final class ComputedStats {
     /** Sets the vanilla item ID of the equipped weapon. */
     public void setWeaponItemId(String itemId) {
         offensive.setWeaponItemId(itemId);
+    }
+
+    /** Gets the raw item definition ID (rpg_gear_* or vanilla). Unique per generated item. */
+    public String getWeaponRawItemId() {
+        return offensive.getWeaponRawItemId();
+    }
+
+    /** Sets the raw item definition ID of the equipped weapon. */
+    public void setWeaponRawItemId(String rawItemId) {
+        offensive.setWeaponRawItemId(rawItemId);
     }
 
     /** Sets whether the player is holding RPG-generated gear. */
@@ -1740,6 +1754,7 @@ public final class ComputedStats {
             .castSpeed(offensive.getCastSpeed())
             .weaponBaseDamage(offensive.getWeaponBaseDamage())
             .weaponItemId(offensive.getWeaponItemId())
+            .weaponRawItemId(offensive.getWeaponRawItemId())
             .holdingRpgGear(offensive.isHoldingRpgGear())
             .weaponSpellElement(offensive.getWeaponSpellElement())
             // Defensive
@@ -2602,6 +2617,11 @@ public final class ComputedStats {
 
         public Builder weaponItemId(String value) {
             offensive.weaponItemId(value);
+            return this;
+        }
+
+        public Builder weaponRawItemId(String value) {
+            offensive.weaponRawItemId(value);
             return this;
         }
 

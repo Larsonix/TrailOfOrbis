@@ -48,7 +48,7 @@ public final class GemSocketValidator {
             if (item == null || item.isEmpty() || item == excludeGear) continue;
             GearUtils.getGearData(item).ifPresent(gear -> gear.supportGems().forEach(gem -> usedIds.add(gem.gemId())));
         }
-        ItemStack weapon = inventory.getItemInHand();
+        ItemStack weapon = inventory.getActiveHotbarItem();
         if (weapon != null && !weapon.isEmpty() && weapon != excludeGear) {
             GearUtils.getGearData(weapon).ifPresent(gear -> gear.supportGems().forEach(gem -> usedIds.add(gem.gemId())));
         }

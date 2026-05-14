@@ -29,6 +29,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Centralized service for syncing custom item definitions to nearby players.
@@ -41,16 +44,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Sync item definitions when items SPAWN into the world, not when picked up.
  * This ensures any player who picks up the item already has the definition.
  *
- * <h2>Usage</h2>
- * <pre>{@code
- * // When dropping loot
- * List<ItemStack> drops = generateDrops();
- * itemWorldSyncService.syncItemsToNearbyPlayers(store, position, drops);
- * spawnItemEntities(drops);
- *
- * // When an item entity spawns
- * itemWorldSyncService.syncItemToNearbyPlayers(store, position, itemStack);
- * }</pre>
+ * <h2>Batch Sync (Loot Drops)</h2>
+ * <p>When multiple items drop at once (mob loot), definitions are batched per-player:
+ * all items are pre-parsed once, then sent in a single {@code UpdateTranslations} +
+ * {@code UpdateItems} packet pair per player. This reduces packet count from
+ * O(items × players × 2) to O(players × 2).
  *
  * <h2>Thread Safety</h2>
  * <p>All public methods are thread-safe using concurrent collections.
@@ -65,6 +63,9 @@ public final class ItemWorldSyncService {
     /** Default range to sync items to nearby players (in blocks). */
     public static final double DEFAULT_SYNC_RANGE = 64.0;
 
+    /** How long recently batch-synced item IDs are remembered (seconds). */
+    private static final long BATCH_SYNCED_EXPIRY_SECONDS = 5;
+
     private final ItemSyncService itemSyncService;
     private final CustomItemSyncService customItemSyncService;
     private final ItemRegistryService itemRegistryService;
@@ -74,17 +75,21 @@ public final class ItemWorldSyncService {
     /**
      * Cache to track which items have been synced to which players.
      * Key: player UUID, Value: Set of custom item IDs already synced for world drops
-     *
-     * <p>This prevents redundant syncs when items are in range of multiple sync calls.
      */
     private final Map<UUID, Set<String>> worldDropSyncCache = new ConcurrentHashMap<>();
 
     /**
+     * Item IDs that were recently batch-synced via {@link #syncItemsToNearbyPlayers}.
+     * Used by {@code ItemEntitySpawnSyncSystem} to skip redundant deserialization
+     * and range checks for items that were already synced to all nearby players.
+     */
+    private final Set<String> recentlyBatchSyncedIds = ConcurrentHashMap.newKeySet();
+
+    /** Scheduler for cleaning up expired batch-synced IDs. */
+    private final ScheduledExecutorService cleanupScheduler;
+
+    /**
      * Creates an ItemWorldSyncService with default sync range.
-     *
-     * @param itemSyncService The gear item sync service
-     * @param customItemSyncService The custom item sync service
-     * @param itemRegistryService The item registry service for server-side registration
      */
     public ItemWorldSyncService(
             @Nonnull ItemSyncService itemSyncService,
@@ -95,11 +100,6 @@ public final class ItemWorldSyncService {
 
     /**
      * Creates an ItemWorldSyncService with custom sync range.
-     *
-     * @param itemSyncService The gear item sync service
-     * @param customItemSyncService The custom item sync service
-     * @param itemRegistryService The item registry service for server-side registration
-     * @param syncRange The range in blocks to sync items to players
      */
     public ItemWorldSyncService(
             @Nonnull ItemSyncService itemSyncService,
@@ -111,6 +111,11 @@ public final class ItemWorldSyncService {
         this.itemRegistryService = itemRegistryService; // May be null
         this.syncRange = syncRange;
         this.syncRangeSquared = syncRange * syncRange;
+        this.cleanupScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "ItemWorldSync-Cleanup");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     // =========================================================================
@@ -118,10 +123,14 @@ public final class ItemWorldSyncService {
     // =========================================================================
 
     /**
-     * Syncs all custom items in a list to ALL nearby players.
+     * Syncs all custom items in a list to ALL nearby players using batched packets.
      *
      * <p>This method should be called BEFORE spawning item entities to ensure
      * players have the definitions when the pickup notification fires.
+     *
+     * <p>Optimization: items are pre-parsed once (not per-player), server-side
+     * registration happens once per item, and definitions are sent in batched
+     * packets (2 per player instead of 2 per item per player).
      *
      * @param store The entity store for player lookups
      * @param position The position to check for nearby players
@@ -140,7 +149,7 @@ public final class ItemWorldSyncService {
             return 0;
         }
 
-        // Find all players within range
+        // Find all players within range (ONCE, not per-item)
         List<PlayerRef> nearbyPlayers = findPlayersInRange(store, position);
         if (nearbyPlayers.isEmpty()) {
             LOGGER.atFine().log("No players within %.0f blocks of (%.0f, %.0f, %.0f)",
@@ -148,19 +157,108 @@ public final class ItemWorldSyncService {
             return 0;
         }
 
-        int totalSynced = 0;
+        // ── Phase 1: Pre-parse all items ONCE ──
+        // Separate gear items (batch-syncable) from non-gear custom items
+        List<ParsedGearItem> gearItems = new ArrayList<>();
+        List<ItemStack> nonGearCustomItems = new ArrayList<>();
 
-        // Sync each item to each nearby player
-        for (PlayerRef playerRef : nearbyPlayers) {
-            for (ItemStack item : items) {
-                if (syncItemToPlayer(playerRef, item)) {
-                    totalSynced++;
-                }
+        for (ItemStack item : items) {
+            if (item == null || item.isEmpty()) continue;
+
+            Optional<GearData> gearOpt = GearUtils.readGearData(item);
+            if (gearOpt.isPresent() && gearOpt.get().hasInstanceId()) {
+                gearItems.add(new ParsedGearItem(item, gearOpt.get()));
+                continue;
+            }
+
+            // Check non-gear custom items (gems, maps) — these are rare in loot
+            if (isNonGearCustomItem(item)) {
+                nonGearCustomItems.add(item);
             }
         }
 
+        if (gearItems.isEmpty() && nonGearCustomItems.isEmpty()) {
+            return 0;
+        }
+
+        // ── Phase 2: Server-side registration ONCE per item ──
+        // GearGenerator already registers during generation, so these are almost always no-ops.
+        // But we must ensure registration before syncing to any player.
+        for (ParsedGearItem parsed : gearItems) {
+            ensureServerSideRegistration(parsed.itemStack, parsed.gearData);
+        }
+
+        // ── Phase 3: Batch sync to each nearby player ──
+        int totalSynced = 0;
+
+        for (PlayerRef playerRef : nearbyPlayers) {
+            UUID playerId = playerRef.getUuid();
+
+            try {
+                // Gear items: collect those not yet cached for this player
+                List<ItemStack> uncachedGearForPlayer = new ArrayList<>();
+                List<String> uncachedGearIds = new ArrayList<>();
+
+                for (ParsedGearItem parsed : gearItems) {
+                    String itemId = parsed.gearData.getItemId();
+                    if (!isAlreadySyncedForWorldDrop(playerId, itemId)) {
+                        uncachedGearForPlayer.add(parsed.itemStack);
+                        uncachedGearIds.add(itemId);
+                    }
+                }
+
+                // Batch sync gear items (2 packets total: 1 UpdateTranslations + 1 UpdateItems)
+                int gearSynced = 0;
+                if (!uncachedGearForPlayer.isEmpty()) {
+                    gearSynced = itemSyncService.syncAllItems(playerRef, uncachedGearForPlayer);
+
+                    // Mark ALL items as synced in the world drop cache, regardless of whether
+                    // syncAllItems sent packets (hash dedup may have skipped some, but the
+                    // player already has those definitions from a prior sync)
+                    for (String itemId : uncachedGearIds) {
+                        markSyncedForWorldDrop(playerId, itemId);
+                    }
+                }
+
+                // Non-gear custom items: sync individually (very low volume, not worth batching)
+                int customSynced = 0;
+                for (ItemStack customItem : nonGearCustomItems) {
+                    if (syncItemToPlayer(playerRef, customItem)) {
+                        customSynced++;
+                    }
+                }
+
+                int playerTotal = gearSynced + customSynced;
+                totalSynced += playerTotal;
+
+                LOGGER.atFine().log("[WorldDropSync] Player %s: %d gear batched (%d sent), %d custom — %d total",
+                    playerId.toString().substring(0, 8),
+                    uncachedGearForPlayer.size(), gearSynced,
+                    customSynced, playerTotal);
+
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log(
+                    "[WorldDropSync] Failed to batch-sync items to player %s",
+                    playerId.toString().substring(0, 8));
+            }
+        }
+
+        // ── Phase 4: Mark items as recently batch-synced ──
+        // ItemEntitySpawnSyncSystem checks this to skip redundant deserialization
+        Set<String> batchedIds = new HashSet<>();
+        for (ParsedGearItem parsed : gearItems) {
+            batchedIds.add(parsed.gearData.getItemId());
+        }
+        if (!batchedIds.isEmpty()) {
+            recentlyBatchSyncedIds.addAll(batchedIds);
+            // Schedule cleanup after expiry
+            cleanupScheduler.schedule(() -> {
+                recentlyBatchSyncedIds.removeAll(batchedIds);
+            }, BATCH_SYNCED_EXPIRY_SECONDS, TimeUnit.SECONDS);
+        }
+
         if (totalSynced > 0) {
-            LOGGER.atInfo().log("Pre-synced %d item(s) to %d nearby player(s) at (%.0f, %.0f, %.0f)",
+            LOGGER.atFine().log("[WorldDropSync] Batch-synced %d item(s) to %d nearby player(s) at (%.0f, %.0f, %.0f)",
                 totalSynced, nearbyPlayers.size(), position.x, position.y, position.z);
         }
 
@@ -168,14 +266,10 @@ public final class ItemWorldSyncService {
     }
 
     /**
-     * Syncs items to a specific list of players.
+     * Syncs items to a specific list of players using batched packets.
      *
      * <p>Use this when you already know which players should receive the sync
      * (e.g., killer + party members).
-     *
-     * @param players The players to sync to
-     * @param items The items to sync
-     * @return Total number of items synced
      */
     public int syncItemsToPlayers(
             @Nonnull Collection<PlayerRef> players,
@@ -187,10 +281,48 @@ public final class ItemWorldSyncService {
             return 0;
         }
 
+        // Pre-parse gear items once
+        List<ParsedGearItem> gearItems = new ArrayList<>();
+        List<ItemStack> nonGearCustomItems = new ArrayList<>();
+
+        for (ItemStack item : items) {
+            if (item == null || item.isEmpty()) continue;
+
+            Optional<GearData> gearOpt = GearUtils.readGearData(item);
+            if (gearOpt.isPresent() && gearOpt.get().hasInstanceId()) {
+                gearItems.add(new ParsedGearItem(item, gearOpt.get()));
+                continue;
+            }
+            if (isNonGearCustomItem(item)) {
+                nonGearCustomItems.add(item);
+            }
+        }
+
+        // Server-side registration once per item
+        for (ParsedGearItem parsed : gearItems) {
+            ensureServerSideRegistration(parsed.itemStack, parsed.gearData);
+        }
+
         int totalSynced = 0;
         for (PlayerRef playerRef : players) {
-            for (ItemStack item : items) {
-                if (syncItemToPlayer(playerRef, item)) {
+            UUID playerId = playerRef.getUuid();
+
+            // Gear batch sync
+            List<ItemStack> uncached = new ArrayList<>();
+            for (ParsedGearItem parsed : gearItems) {
+                String itemId = parsed.gearData.getItemId();
+                if (!isAlreadySyncedForWorldDrop(playerId, itemId)) {
+                    uncached.add(parsed.itemStack);
+                    markSyncedForWorldDrop(playerId, itemId);
+                }
+            }
+            if (!uncached.isEmpty()) {
+                totalSynced += itemSyncService.syncAllItems(playerRef, uncached);
+            }
+
+            // Non-gear individual sync
+            for (ItemStack customItem : nonGearCustomItems) {
+                if (syncItemToPlayer(playerRef, customItem)) {
                     totalSynced++;
                 }
             }
@@ -206,11 +338,6 @@ public final class ItemWorldSyncService {
      * Syncs a single item to all nearby players.
      *
      * <p>Use this for items dropped from non-mob sources (player drops, containers, etc.)
-     *
-     * @param store The entity store for player lookups
-     * @param position The position to check for nearby players
-     * @param item The item to sync
-     * @return Number of players the item was synced to
      */
     public int syncItemToNearbyPlayers(
             @Nonnull Store<EntityStore> store,
@@ -236,13 +363,6 @@ public final class ItemWorldSyncService {
 
     /**
      * Syncs a single item to a specific player with idempotency.
-     *
-     * <p>This method checks if the item was already synced via world drop
-     * cache to avoid redundant syncs.
-     *
-     * @param playerRef The player to sync to
-     * @param item The item to sync
-     * @return true if the item was synced, false if skipped (already synced or not custom)
      */
     public boolean syncItemToPlayer(@Nonnull PlayerRef playerRef, @Nonnull ItemStack item) {
         Objects.requireNonNull(playerRef, "playerRef cannot be null");
@@ -289,15 +409,29 @@ public final class ItemWorldSyncService {
     }
 
     // =========================================================================
+    // BATCH SYNC SKIP SET
+    // =========================================================================
+
+    /**
+     * Checks if an item was recently batch-synced to all nearby players.
+     *
+     * <p>Used by {@code ItemEntitySpawnSyncSystem} to skip expensive
+     * deserialization and range checks for items that were already synced
+     * by {@link #syncItemsToNearbyPlayers} in the same tick.
+     *
+     * @param itemId The item ID to check (e.g., "rpg_gear_xxx")
+     * @return true if this item was recently batch-synced
+     */
+    public boolean wasRecentlyBatchSynced(@Nonnull String itemId) {
+        return recentlyBatchSyncedIds.contains(itemId);
+    }
+
+    // =========================================================================
     // INTERNAL SYNC METHODS
     // =========================================================================
 
     /**
      * Syncs a gear item to a player with caching.
-     *
-     * <p>CRITICAL: This method registers the item server-side BEFORE syncing
-     * to the client. This ensures {@code itemStack.getItem()} returns our
-     * custom Item when {@code notifyPickupItem()} fires.
      */
     private boolean syncGearItem(
             @Nonnull PlayerRef playerRef,
@@ -313,29 +447,19 @@ public final class ItemWorldSyncService {
         }
 
         // CRITICAL: Register item server-side FIRST
-        // This ensures Item.getAssetMap().getAsset(itemId) returns our custom Item
-        // when notifyPickupItem() calls itemStack.getItem()
         ensureServerSideRegistration(item, gearData);
 
         // Sync the item definition to client
         boolean synced = itemSyncService.syncItem(playerRef, item, gearData);
         if (synced) {
             markSyncedForWorldDrop(playerId, itemId);
-            LOGGER.atInfo().log("World-synced gear %s to player %s", itemId, playerId);
+            LOGGER.atFine().log("World-synced gear %s to player %s", itemId, playerId);
         }
         return synced;
     }
 
     /**
      * Ensures a gear item is registered in Hytale's server-side asset map.
-     *
-     * <p>This is CRITICAL for pickup notifications. When a player picks up an item,
-     * Hytale calls {@code itemStack.getItem().getTranslationKey()}. If our custom
-     * item isn't registered, it returns {@code Item.UNKNOWN} and the notification
-     * shows the wrong name/color.
-     *
-     * @param item The ItemStack containing the gear (used to get base item ID from metadata)
-     * @param gearData The gear data (used to get custom item ID)
      */
     private void ensureServerSideRegistration(@Nonnull ItemStack item, @Nonnull GearData gearData) {
         if (itemRegistryService == null || !itemRegistryService.isInitialized()) {
@@ -347,15 +471,13 @@ public final class ItemWorldSyncService {
             return;
         }
 
-        // Skip if already registered
         if (itemRegistryService.isRegistered(customId)) {
+            itemRegistryService.reinjectReskinResourceType(customId, gearData.rarity());
             return;
         }
 
-        // Get the base item ID from ItemStack metadata
         String baseItemId = GearUtils.getBaseItemId(item);
         if (baseItemId == null) {
-            // Fallback to current itemId (shouldn't happen for properly created gear)
             baseItemId = item.getItemId();
         }
 
@@ -367,9 +489,8 @@ public final class ItemWorldSyncService {
             return;
         }
 
-        // Register in server-side asset map
         try {
-            itemRegistryService.createAndRegisterSync(baseItem, customId);
+            itemRegistryService.createAndRegisterSync(baseItem, customId, gearData.rarity());
             LOGGER.atInfo().log("Server-side registered gear %s (base: %s)", customId, baseItemId);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to register gear %s", customId);
@@ -377,7 +498,7 @@ public final class ItemWorldSyncService {
     }
 
     /**
-     * Syncs a custom item (stone/map) to a player with caching.
+     * Syncs a custom item (gem/map) to a player with caching.
      */
     private boolean syncCustomItem(
             @Nonnull PlayerRef playerRef,
@@ -390,12 +511,10 @@ public final class ItemWorldSyncService {
             return false;
         }
 
-        // Check world drop cache
         if (isAlreadySyncedForWorldDrop(playerId, itemId)) {
             return false;
         }
 
-        // Sync the item
         boolean synced = customItemSyncService.syncItem(playerRef, customData);
         if (synced) {
             markSyncedForWorldDrop(playerId, itemId);
@@ -404,17 +523,29 @@ public final class ItemWorldSyncService {
         return synced;
     }
 
+    /**
+     * Checks if an item is a non-gear custom item (gem or map) that needs sync.
+     */
+    private boolean isNonGearCustomItem(@Nonnull ItemStack item) {
+        // Check gem
+        Optional<GemData> gemOpt = GemUtils.readGemData(item);
+        if (gemOpt.isPresent()) {
+            return true;
+        }
+
+        // Check realm map
+        if (RealmMapUtils.isMapAnyMethod(item)) {
+            var mapOpt = RealmMapUtils.readMapDataWithFallback(item);
+            return mapOpt.isPresent() && mapOpt.get().hasInstanceId();
+        }
+
+        return false;
+    }
+
     // =========================================================================
     // PLAYER QUERIES
     // =========================================================================
 
-    /**
-     * Finds all players within sync range of a position.
-     *
-     * @param store The entity store
-     * @param position The center position
-     * @return List of player refs within range
-     */
     @Nonnull
     public List<PlayerRef> findPlayersInRange(
             @Nonnull Store<EntityStore> store,
@@ -424,20 +555,17 @@ public final class ItemWorldSyncService {
 
         List<PlayerRef> result = new ArrayList<>();
 
-        // Get the world from the store
         World world = getWorldFromStore(store);
         if (world == null) {
             return result;
         }
 
-        // Iterate through all players in the world
         for (PlayerRef playerRef : world.getPlayerRefs()) {
             Ref<EntityStore> entityRef = playerRef.getReference();
             if (entityRef == null || !entityRef.isValid()) {
                 continue;
             }
 
-            // Get player position
             TransformComponent transform = store.getComponent(entityRef, TransformComponent.getComponentType());
             if (transform == null) {
                 continue;
@@ -452,13 +580,6 @@ public final class ItemWorldSyncService {
         return result;
     }
 
-    /**
-     * Finds all players within sync range of a position (using World directly).
-     *
-     * @param world The world to search
-     * @param position The center position
-     * @return List of player refs within range
-     */
     @Nonnull
     public List<PlayerRef> findPlayersInRange(
             @Nonnull World world,
@@ -489,9 +610,6 @@ public final class ItemWorldSyncService {
         return result;
     }
 
-    /**
-     * Checks if two positions are within sync range.
-     */
     private boolean isWithinRange(@Nonnull Vector3d pos1, @Nonnull Vector3d pos2) {
         double dx = pos1.x - pos2.x;
         double dy = pos1.y - pos2.y;
@@ -500,69 +618,69 @@ public final class ItemWorldSyncService {
     }
 
     /**
-     * Gets the World from an EntityStore.
+     * Cache of Store→World mappings. Avoids iterating all worlds on every call.
+     * Uses identity comparison (same Store object = same world). Entries are
+     * naturally bounded by the number of active worlds (typically 1-10).
      */
+    private final Map<Store<EntityStore>, World> storeToWorldCache = new ConcurrentHashMap<>();
+
     @Nullable
     private World getWorldFromStore(@Nonnull Store<EntityStore> store) {
-        // Try to get from Universe
+        // Check cache first (O(1) vs O(worlds))
+        World cached = storeToWorldCache.get(store);
+        if (cached != null && cached.isAlive()) {
+            return cached;
+        }
+
         Universe universe = Universe.get();
         if (universe == null) {
             return null;
         }
 
-        // Find a world that uses this store
         for (World world : universe.getWorlds().values()) {
             if (world.getEntityStore().getStore() == store) {
+                storeToWorldCache.put(store, world);
                 return world;
             }
         }
 
-        // Fallback: just return the first world (most common case is single world)
-        LOGGER.atWarning().log("getWorldFromStore: No world matched store, falling back to first world (%d worlds checked)",
+        LOGGER.atWarning().log("getWorldFromStore: No world matched store (%d worlds checked)",
                 universe.getWorlds().size());
-        Collection<World> worlds = universe.getWorlds().values();
-        return worlds.isEmpty() ? null : worlds.iterator().next();
+        return null;
     }
 
     // =========================================================================
     // WORLD DROP SYNC CACHE
     // =========================================================================
 
-    /**
-     * Checks if an item was already synced for a world drop to a player.
-     */
     private boolean isAlreadySyncedForWorldDrop(@Nonnull UUID playerId, @Nonnull String itemId) {
         Set<String> synced = worldDropSyncCache.get(playerId);
         return synced != null && synced.contains(itemId);
     }
 
-    /**
-     * Marks an item as synced for a world drop to a player.
-     */
     private void markSyncedForWorldDrop(@Nonnull UUID playerId, @Nonnull String itemId) {
         worldDropSyncCache
             .computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet())
             .add(itemId);
     }
 
-    /**
-     * Clears the world drop sync cache for a player.
-     *
-     * <p>Call when a player disconnects.
-     *
-     * @param playerId The player's UUID
-     */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
         worldDropSyncCache.remove(playerId);
     }
 
-    /**
-     * Clears all caches.
-     *
-     * <p>Call during shutdown.
-     */
     public void shutdown() {
         worldDropSyncCache.clear();
+        recentlyBatchSyncedIds.clear();
+        storeToWorldCache.clear();
+        cleanupScheduler.shutdown();
+        try {
+            if (!cleanupScheduler.awaitTermination(2, TimeUnit.SECONDS)) {
+                cleanupScheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            cleanupScheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
         LOGGER.atInfo().log("ItemWorldSyncService shut down");
     }
 
@@ -583,4 +701,13 @@ public final class ItemWorldSyncService {
     public CustomItemSyncService getCustomItemSyncService() {
         return customItemSyncService;
     }
+
+    // =========================================================================
+    // INNER TYPES
+    // =========================================================================
+
+    /**
+     * Pre-parsed gear item — avoids redundant GearData deserialization across players.
+     */
+    private record ParsedGearItem(@Nonnull ItemStack itemStack, @Nonnull GearData gearData) {}
 }

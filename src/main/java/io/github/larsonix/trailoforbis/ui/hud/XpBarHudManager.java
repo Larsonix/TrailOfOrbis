@@ -56,9 +56,17 @@ public class XpBarHudManager implements PersistentHud {
     @Nullable
     private LevelingEvents.XpGainListener xpGainListener;
 
+    /** Registered XP loss listener (stored for cleanup). */
+    @Nullable
+    private LevelingEvents.XpLossListener xpLossListener;
+
     /** Registered level-up listener (stored for cleanup). */
     @Nullable
     private LevelingEvents.LevelUpListener levelUpListener;
+
+    /** Registered level-down listener (stored for cleanup). */
+    @Nullable
+    private LevelingEvents.LevelDownListener levelDownListener;
 
     // ═══════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -101,17 +109,15 @@ public class XpBarHudManager implements PersistentHud {
             HyUIHud hud = XpBarHud.create(playerRef, store, levelingService);
             activeHuds.put(playerId, hud);
 
-            // Direct MultiHud registration — bypasses HyUI safeAdd()'s internal
-            // getReference() check which returns null during early world transitions.
-            // The event Player is guaranteed valid at PlayerReadyEvent time.
-            // HyUI's deferred safeAdd() still runs next tick as a harmless redundant rebuild.
-            if (player != null) {
-                MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
-            }
+            // HudBuilder.show() inside create() schedules a deferred safeAdd() which
+            // registers the HUD via MultiHudWrapper. With the MHUD shim injected,
+            // PartyPro also uses MultiHudWrapper instead of the destructive direct path.
+            // If safeAdd() fails (getReference() null during transitions), the
+            // HudHealthChecker verification pass catches the gap at ~13s.
 
             if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
-            LOGGER.atInfo().log("Showed XP bar HUD for player %s (direct=%b)",
-                playerId.toString().substring(0, 8), player != null);
+            LOGGER.atInfo().log("Showed XP bar HUD for player %s",
+                playerId.toString().substring(0, 8));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to show XP bar HUD for player %s",
                 playerId.toString().substring(0, 8));
@@ -167,10 +173,14 @@ public class XpBarHudManager implements PersistentHud {
      */
     public void registerEventListeners(@Nonnull LevelingService service) {
         xpGainListener = (playerId, amount, source, totalXp) -> notifyXpChanged(playerId);
+        xpLossListener = (playerId, amount, source, totalXp) -> notifyXpChanged(playerId);
         levelUpListener = (playerId, newLevel, oldLevel, totalXp) -> notifyXpChanged(playerId);
+        levelDownListener = (playerId, newLevel, oldLevel, totalXp) -> notifyXpChanged(playerId);
 
         service.registerXpGainListener(xpGainListener);
+        service.registerXpLossListener(xpLossListener);
         service.registerLevelUpListener(levelUpListener);
+        service.registerLevelDownListener(levelDownListener);
         LOGGER.atInfo().log("Registered XP bar event listeners on leveling service");
     }
 
@@ -184,9 +194,17 @@ public class XpBarHudManager implements PersistentHud {
             service.unregisterXpGainListener(xpGainListener);
             xpGainListener = null;
         }
+        if (xpLossListener != null) {
+            service.unregisterXpLossListener(xpLossListener);
+            xpLossListener = null;
+        }
         if (levelUpListener != null) {
             service.unregisterLevelUpListener(levelUpListener);
             levelUpListener = null;
+        }
+        if (levelDownListener != null) {
+            service.unregisterLevelDownListener(levelDownListener);
+            levelDownListener = null;
         }
         LOGGER.atInfo().log("Unregistered XP bar event listeners");
     }
@@ -245,9 +263,10 @@ public class XpBarHudManager implements PersistentHud {
      *
      * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
      * early-returns when {@code getStore()} returns null during transitions, skipping
-     * both {@code hideCustomHud} and {@code refreshTask.cancel()}. No MHUD cleanup
-     * needed: {@code JoinWorld(clearWorld=true)} clears the wrapper, and {@code restoreAll()}
-     * creates a fresh one.
+     * both {@code hideCustomHud} and {@code refreshTask.cancel()}. No explicit MCHUD
+     * removal needed: each HUD uses a deterministic name (e.g. "too-xp-bar"), so the
+     * next {@code restoreAll()} calls {@code MultipleCustomUIHud.add()} with the same
+     * key, replacing the orphaned entry (Clear+Append) instead of accumulating.
      *
      * @param playerId The player's UUID
      */
@@ -300,6 +319,12 @@ public class XpBarHudManager implements PersistentHud {
     @Override
     public boolean isActive(@Nonnull UUID playerId) {
         return hasHud(playerId);
+    }
+
+    @Nullable
+    @Override
+    public HyUIHud getActiveHud(@Nonnull UUID playerId) {
+        return activeHuds.get(playerId);
     }
 
     @Override

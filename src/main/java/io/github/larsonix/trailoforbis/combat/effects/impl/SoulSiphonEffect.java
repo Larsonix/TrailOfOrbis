@@ -9,29 +9,25 @@ import io.github.larsonix.trailoforbis.combat.effects.KeystoneCombatEffect;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Warlock KS1: Soul Siphon — Spell Vampire.
+ * Warlock KS1: Soul Siphon — Spell Crit Kill Sustain.
  *
- * <p>Mechanics:
+ * <p>On Spell Crit Kill (a spell that crits AND kills):
  * <ul>
- *   <li>Spell kills fully restore mana</li>
- *   <li>Spell critical hits restore 8% of damage dealt as HP</li>
- *   <li>Overkill damage on spell kills charges next spell (+50% of overkill as bonus damage)</li>
+ *   <li>Restore 100% of the spell's Mana cost</li>
+ *   <li>Heal 8% of the damage dealt</li>
  * </ul>
+ *
+ * <p>Both rewards share the same trigger — one event, two payoffs.
+ * Mana restore is capped at full mana (no overfill).
  */
 public class SoulSiphonEffect extends KeystoneCombatEffect {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    /** Fraction of crit damage restored as HP. */
-    private static final float CRIT_HEAL_FRACTION = 0.08f;
-    /** Fraction of overkill damage stored as bonus for next spell. */
-    private static final float OVERKILL_CARRY_FRACTION = 0.50f;
-
-    /** Per-player stored overkill charge for next spell. */
-    private final ConcurrentHashMap<UUID, Float> overkillCharge = new ConcurrentHashMap<>();
+    /** Fraction of crit kill damage restored as HP. */
+    private static final float CRIT_KILL_HEAL_FRACTION = 0.08f;
 
     public SoulSiphonEffect() {
         super("warlock_keystone_1");
@@ -44,66 +40,52 @@ public class SoulSiphonEffect extends KeystoneCombatEffect {
     }
 
     @Override
-    public float onPostCalculation(@Nonnull CombatEffectContext ctx) {
-        if (ctx.attackerUuid() == null || ctx.attackType() != AttackType.SPELL) return ctx.rpgDamage();
-
-        // Apply stored overkill charge to this spell
-        Float charge = overkillCharge.remove(ctx.attackerUuid());
-        if (charge != null && charge > 0) {
-            LOGGER.atFine().log("Soul Siphon: overkill charge consumed — +%.1f bonus damage", charge);
-            return ctx.rpgDamage() + charge;
-        }
-        return ctx.rpgDamage();
-    }
-
-    @Override
-    public float onRecovery(@Nonnull CombatEffectContext ctx) {
-        if (ctx.attackerUuid() == null || !ctx.hasAttackerStats()) return 0f;
-        if (ctx.attackType() != AttackType.SPELL) return 0f;
-
-        // Spell crit heal: 8% of damage dealt as HP recovery
-        if (ctx.wasCrit()) {
-            float healAmount = ctx.rpgDamage() * CRIT_HEAL_FRACTION;
-            LOGGER.atFine().log("Soul Siphon: spell crit heal — %.1f (8%% of %.1f)", healAmount, ctx.rpgDamage());
-            return healAmount;
-        }
-
-        return 0f;
-    }
-
-    @Override
     public void onKill(@Nonnull UUID attackerId, @Nonnull UUID targetId,
                        float overkillDamage, @Nonnull CombatEffectContext ctx) {
+        // Only triggers on spell crit kills
         if (ctx.attackType() != AttackType.SPELL) return;
+        if (!ctx.wasCrit()) return;
 
-        // Full mana restore on spell kill
-        if (ctx.attackerRef() != null && ctx.attackerRef().isValid()) {
-            try {
-                EntityStatMap atkStatMap = ctx.store().getComponent(ctx.attackerRef(), EntityStatMap.getComponentType());
-                if (atkStatMap != null) {
-                    int manaIdx = DefaultEntityStatTypes.getMana();
-                    var manaStat = atkStatMap.get(manaIdx);
-                    if (manaStat != null) {
-                        float maxMana = manaStat.getMax();
-                        atkStatMap.setStatValue(EntityStatMap.Predictable.SELF, manaIdx, maxMana);
-                        LOGGER.atFine().log("Soul Siphon: spell kill — mana fully restored (%.0f)", maxMana);
+        if (ctx.attackerRef() == null || !ctx.attackerRef().isValid()) return;
+
+        try {
+            EntityStatMap statMap = ctx.store().getComponent(ctx.attackerRef(),
+                EntityStatMap.getComponentType());
+            if (statMap == null) return;
+
+            // 1. Restore mana to full
+            int manaIdx = DefaultEntityStatTypes.getMana();
+            var manaStat = statMap.get(manaIdx);
+            if (manaStat != null) {
+                float maxMana = manaStat.getMax();
+                statMap.setStatValue(EntityStatMap.Predictable.SELF, manaIdx, maxMana);
+                LOGGER.atFine().log("Soul Siphon: spell crit kill — mana fully restored (%.0f)", maxMana);
+            }
+
+            // 2. Heal 8% of damage dealt
+            int healthIdx = DefaultEntityStatTypes.getHealth();
+            var healthStat = statMap.get(healthIdx);
+            if (healthStat != null) {
+                float healAmount = ctx.rpgDamage() * CRIT_KILL_HEAL_FRACTION;
+
+                // Apply Health Recovery multiplier
+                if (ctx.attackerStats() != null) {
+                    float recoveryPct = ctx.attackerStats().getHealthRecoveryPercent();
+                    if (recoveryPct != 0) {
+                        healAmount *= (1.0f + recoveryPct / 100.0f);
                     }
                 }
-            } catch (Exception e) {
-                LOGGER.atFine().log("Soul Siphon: could not restore mana — %s", e.getMessage());
+
+                float curHp = healthStat.get();
+                float maxHp = healthStat.getMax();
+                float newHp = Math.min(curHp + healAmount, maxHp);
+                statMap.setStatValue(EntityStatMap.Predictable.SELF, healthIdx, newHp);
+
+                LOGGER.atFine().log("Soul Siphon: spell crit kill heal — %.1f (8%% of %.1f). HP: %.0f -> %.0f",
+                    healAmount, ctx.rpgDamage(), curHp, newHp);
             }
+        } catch (Exception e) {
+            LOGGER.atFine().log("Soul Siphon: could not apply crit kill rewards — %s", e.getMessage());
         }
-
-        // Store overkill charge for next spell (50% of overkill damage)
-        if (overkillDamage > 0) {
-            float charge = overkillDamage * OVERKILL_CARRY_FRACTION;
-            overkillCharge.put(attackerId, charge);
-            LOGGER.atFine().log("Soul Siphon: overkill %.1f → stored %.1f charge for next spell", overkillDamage, charge);
-        }
-    }
-
-    @Override
-    public void cleanup(@Nonnull UUID playerId) {
-        overkillCharge.remove(playerId);
     }
 }

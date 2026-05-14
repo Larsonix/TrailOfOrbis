@@ -78,6 +78,11 @@ public class EnergyShieldHudManager implements PersistentHud {
             HyUIHud hud = EnergyShieldHud.create(
                 playerRef, shieldTracker, this::getMaxShield, this::getHealthRatio);
             activeHuds.put(playerId, hud);
+
+            // HudBuilder.show() inside create() schedules a deferred safeAdd().
+            // With the MHUD shim injected, PartyPro uses MultiHudWrapper correctly.
+            // HudHealthChecker catches any safeAdd() failures at ~13s.
+
             if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
             LOGGER.atInfo().log("Showed health+shield HUD for player %s",
                 playerId.toString().substring(0, 8));
@@ -208,7 +213,8 @@ public class EnergyShieldHudManager implements PersistentHud {
      *
      * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
      * early-returns when {@code getStore()} returns null during transitions, skipping
-     * {@code refreshTask.cancel()}.
+     * {@code refreshTask.cancel()}. No explicit MCHUD removal needed: deterministic
+     * names ("too-energy-shield") ensure the next restore replaces the orphaned entry.
      */
     public void discardStaleHud(@Nonnull UUID playerId) {
         HyUIHud hud = activeHuds.remove(playerId);
@@ -274,6 +280,12 @@ public class EnergyShieldHudManager implements PersistentHud {
         return hasHud(playerId);
     }
 
+    @Nullable
+    @Override
+    public HyUIHud getActiveHud(@Nonnull UUID playerId) {
+        return activeHuds.get(playerId);
+    }
+
     @Override
     public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
                         @Nonnull Store<EntityStore> store) {
@@ -284,19 +296,11 @@ public class EnergyShieldHudManager implements PersistentHud {
     public void restore(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
                         @Nonnull Store<EntityStore> store, @Nullable Player player) {
         if (player != null) {
-            // Event Player available — bypass getReference() null check.
-            // The event Player is guaranteed valid at PlayerReadyEvent time.
             if (player.getGameMode() == GameMode.Creative) {
                 return;
             }
+            // showHud() now handles direct MultiHud registration internally
             showHud(playerId, playerRef, player);
-
-            // Direct MultiHud registration — bypasses HyUI safeAdd()'s internal
-            // getReference() check which returns null during early world transitions.
-            HyUIHud hud = activeHuds.get(playerId);
-            if (hud != null) {
-                MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
-            }
             return;
         }
 

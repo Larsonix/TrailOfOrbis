@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.stones.handler;
 
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifier;
@@ -27,14 +28,27 @@ import java.util.*;
 public class RealmMapStoneHandler implements ItemTypeHandler<RealmMapData> {
 
     private final RealmModifierRoller roller;
+    @Nullable
+    private final RealmsConfig realmsConfig;
 
     /**
-     * Creates a realm map stone handler.
+     * Creates a realm map stone handler without config (fallback: utility biome filter only).
      *
      * @param roller The realm modifier roller for modifier operations
      */
     public RealmMapStoneHandler(@Nonnull RealmModifierRoller roller) {
+        this(roller, null);
+    }
+
+    /**
+     * Creates a realm map stone handler with full biome authorization.
+     *
+     * @param roller The realm modifier roller for modifier operations
+     * @param realmsConfig The realms config for biome filtering (null = utility filter only)
+     */
+    public RealmMapStoneHandler(@Nonnull RealmModifierRoller roller, @Nullable RealmsConfig realmsConfig) {
         this.roller = Objects.requireNonNull(roller, "roller cannot be null");
+        this.realmsConfig = realmsConfig;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -104,11 +118,31 @@ public class RealmMapStoneHandler implements ItemTypeHandler<RealmMapData> {
     @Override
     @Nonnull
     public StoneActionResult rerollTypes(@Nonnull RealmMapData item, @Nonnull Random random) {
-        RollResult rerolled = roller.rerollTypesSplit(
-            item.prefixes(), item.suffixes(), random, item.level());
+        RollResult rerolled = roller.rerollTypesRedistributed(
+            item.prefixes(), item.suffixes(), random, item.level(), item.rarity());
         RealmMapData result = item.withPrefixes(rerolled.prefixes())
                                    .withSuffixes(rerolled.suffixes());
         return StoneActionResult.success(result, "Modifiers rerolled.");
+    }
+
+    @Override
+    @Nonnull
+    public StoneActionResult rerollPrefixTypes(@Nonnull RealmMapData item, @Nonnull Random random) {
+        RollResult rerolled = roller.rerollTypesSplit(
+            item.prefixes(), item.suffixes(), random, item.level());
+        // Only apply prefix changes, keep original suffixes
+        RealmMapData result = item.withPrefixes(rerolled.prefixes());
+        return StoneActionResult.success(result, "Prefixes rerolled.");
+    }
+
+    @Override
+    @Nonnull
+    public StoneActionResult rerollSuffixTypes(@Nonnull RealmMapData item, @Nonnull Random random) {
+        RollResult rerolled = roller.rerollTypesSplit(
+            item.prefixes(), item.suffixes(), random, item.level());
+        // Only apply suffix changes, keep original prefixes
+        RealmMapData result = item.withSuffixes(rerolled.suffixes());
+        return StoneActionResult.success(result, "Suffixes rerolled.");
     }
 
     @Override
@@ -312,17 +346,28 @@ public class RealmMapStoneHandler implements ItemTypeHandler<RealmMapData> {
     @Override
     @Nonnull
     public StoneActionResult changeBiome(@Nonnull RealmMapData item, @Nonnull Random random) {
-        RealmBiomeType[] allBiomes = RealmBiomeType.values();
-        if (allBiomes.length <= 1) {
-            return StoneActionResult.failure("No alternative biomes available.");
-        }
-
-        // Remove current biome from choices
+        // Build eligible biome pool — mirrors RealmMapGenerator.rollBiome() authorization
         RealmBiomeType currentBiome = item.biome();
-        List<RealmBiomeType> choices = new ArrayList<>();
-        for (RealmBiomeType b : allBiomes) {
-            if (b != currentBiome) {
-                choices.add(b);
+        List<RealmBiomeType> choices;
+
+        if (realmsConfig != null) {
+            // Full authorization: config-enabled + level-eligible biomes only
+            int mapLevel = item.level();
+            choices = new ArrayList<>();
+            for (RealmBiomeType b : realmsConfig.getEnabledBiomes()) {
+                if (b == currentBiome) continue;
+                int minLevel = realmsConfig.getBiomeSettings(b).getMinLevel();
+                if (mapLevel >= minLevel) {
+                    choices.add(b);
+                }
+            }
+        } else {
+            // Fallback (no config): exclude utility biomes at minimum
+            choices = new ArrayList<>();
+            for (RealmBiomeType b : RealmBiomeType.values()) {
+                if (b != currentBiome && !b.isUtilityBiome()) {
+                    choices.add(b);
+                }
             }
         }
 

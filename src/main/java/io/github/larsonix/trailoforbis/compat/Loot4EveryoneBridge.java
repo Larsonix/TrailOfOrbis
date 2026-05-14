@@ -178,6 +178,15 @@ public final class Loot4EveryoneBridge {
             }
 
             Store<EntityStore> store = world.getEntityStore().getStore();
+
+            // Guard: player must be in THIS world's store (they may have disconnected
+            // and reconnected into a different world during realm completion)
+            if (entityRef.getStore() != store) {
+                LOGGER.at(Level.FINE).log("Player %s not in realm world — skipping L4E loot preset (will populate on chest open)",
+                    playerId.toString().substring(0, 8));
+                return false;
+            }
+
             Object playerLoot = store.getComponent(entityRef,
                 (ComponentType<EntityStore, ?>) playerLootComponentType);
             if (playerLoot == null) {

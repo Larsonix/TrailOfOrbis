@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,6 +77,18 @@ public final class PlayerWorldCache {
             return null;
         }
         return findPlayerRef(playerId, world);
+    }
+
+    /**
+     * Returns an immutable snapshot of all player→world mappings.
+     *
+     * <p>Thread-safe — ConcurrentHashMap iteration is weakly consistent.
+     * Used by {@code HudHealthChecker} to iterate all online players without
+     * holding any locks.
+     */
+    @Nonnull
+    public static Map<UUID, World> snapshot() {
+        return Map.copyOf(CACHE);
     }
 
     public static int size() {

@@ -72,6 +72,9 @@ public final class DamageTrace {
     private final float critChance;
     private final float critMultiplierRaw;
     private final boolean wasCritical;
+    private final int critTier;
+    private final float critMultiplierBeforeReduction;
+    private final float critReductionPercent;
     private final float critMultiplierApplied;
     private final float physAfterCrit;
     private final EnumMap<ElementType, Float> elemAfterCrit;
@@ -205,6 +208,9 @@ public final class DamageTrace {
         this.critChance = b.critChance;
         this.critMultiplierRaw = b.critMultiplierRaw;
         this.wasCritical = b.wasCritical;
+        this.critTier = b.critTier;
+        this.critMultiplierBeforeReduction = b.critMultiplierBeforeReduction;
+        this.critReductionPercent = b.critReductionPercent;
         this.critMultiplierApplied = b.critMultiplierApplied;
         this.physAfterCrit = b.physAfterCrit;
         this.elemAfterCrit = b.elemAfterCrit;
@@ -268,6 +274,9 @@ public final class DamageTrace {
     public float critChance() { return critChance; }
     public float critMultiplierRaw() { return critMultiplierRaw; }
     public boolean wasCritical() { return wasCritical; }
+    public int critTier() { return critTier; }
+    public float critMultiplierBeforeReduction() { return critMultiplierBeforeReduction; }
+    public float critReductionPercent() { return critReductionPercent; }
     public float critMultiplierApplied() { return critMultiplierApplied; }
     public float physAfterCrit() { return physAfterCrit; }
     @Nonnull public EnumMap<ElementType, Float> elemAfterCrit() { return elemAfterCrit; }
@@ -528,6 +537,9 @@ public final class DamageTrace {
         float critChance;
         float critMultiplierRaw;
         boolean wasCritical;
+        int critTier;
+        float critMultiplierBeforeReduction = 1.0f;
+        float critReductionPercent;
         float critMultiplierApplied = 1.0f;
         float physAfterCrit;
         final EnumMap<ElementType, Float> elemAfterCrit = newElemMap();
@@ -602,6 +614,9 @@ public final class DamageTrace {
         public Builder critChance(float v) { critChance = v; return this; }
         public Builder critMultiplierRaw(float v) { critMultiplierRaw = v; return this; }
         public Builder wasCritical(boolean v) { wasCritical = v; return this; }
+        public Builder critTier(int v) { critTier = v; return this; }
+        public Builder critMultiplierBeforeReduction(float v) { critMultiplierBeforeReduction = v; return this; }
+        public Builder critReductionPercent(float v) { critReductionPercent = v; return this; }
         public Builder critMultiplierApplied(float v) { critMultiplierApplied = v; return this; }
         public Builder physAfterCrit(float v) { physAfterCrit = v; return this; }
         public Builder elemAfterCrit(ElementType t, float v) { elemAfterCrit.put(t, v); return this; }

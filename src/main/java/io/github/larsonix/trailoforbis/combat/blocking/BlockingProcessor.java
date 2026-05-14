@@ -24,9 +24,8 @@ import java.util.logging.Level;
  * Processes active blocking mechanics (shield blocking).
  *
  * <p>Active blocking occurs when a player holds a shield and blocks (right-click hold).
- * This is distinct from passive blocking which is a random proc independent of player action.
  *
- * <p>Integration point: Called from {@code AvoidanceProcessor} BEFORE passive block checks.
+ * <p>Integration point: Called from {@code AvoidanceProcessor} early in the damage pipeline.
  * If active blocking is detected and succeeds, the damage is reduced according to RPG stats.
  *
  * <p>Stat usage:

@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.combat.deathrecap;
 
 import com.hypixel.hytale.server.core.Message;
 import io.github.larsonix.trailoforbis.combat.DamageType;
+import io.github.larsonix.trailoforbis.combat.format.CombatFormatConstants;
 import io.github.larsonix.trailoforbis.util.MessageColors;
 
 import javax.annotation.Nonnull;
@@ -37,7 +38,7 @@ public final class DeathMessageBuilder {
      */
     @Nullable
     public static Message buildDecedentMessage(@Nonnull CombatSnapshot snapshot, boolean contextual) {
-        String attackerName = DeathRecapFormatter.formatAttackerName(snapshot);
+        String attackerName = CombatFormatConstants.formatAttackerName(snapshot);
 
         if (!contextual) {
             return Message.raw("Killed by " + attackerName).color(MessageColors.ERROR);
@@ -79,7 +80,9 @@ public final class DeathMessageBuilder {
         String verb = getKillerVerb(snapshot.damageType(), snapshot.wasCritical());
         String suffix = "";
         if (snapshot.wasCritical()) {
-            suffix = " - Critical Strike!";
+            suffix = snapshot.critTier() > 1
+                ? " - Critical Strike T" + snapshot.critTier() + "!"
+                : " - Critical Strike!";
         }
 
         return Message.raw("You " + verb + " " + targetName + suffix).color(MessageColors.SUCCESS);

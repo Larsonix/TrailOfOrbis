@@ -9,6 +9,7 @@ import io.github.larsonix.trailoforbis.gear.generation.ModifierPool;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.maps.config.RealmModifierConfig;
+import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierRoller;
 import io.github.larsonix.trailoforbis.stones.handler.GearStoneHandler;
@@ -44,6 +45,8 @@ public class StoneActionRegistry {
     private final Map<Class<? extends ModifiableItem>, ItemTypeHandler<?>> handlers = new HashMap<>();
     private final RealmModifierRoller realmModifierRoller;
     @Nullable
+    private final RealmsConfig realmsConfig;
+    @Nullable
     private final GearModifierRoller gearModifierRoller;
     @Nullable
     private final ImplicitDamageCalculator implicitDamageCalculator;
@@ -68,6 +71,7 @@ public class StoneActionRegistry {
      */
     public StoneActionRegistry(@Nonnull RealmModifierConfig modifierConfig) {
         this.realmModifierRoller = new RealmModifierRoller(modifierConfig);
+        this.realmsConfig = null;
         this.gearModifierRoller = null;
         this.implicitDamageCalculator = null;
         this.implicitDefenseCalculator = null;
@@ -82,6 +86,7 @@ public class StoneActionRegistry {
      */
     public StoneActionRegistry(@Nonnull RealmModifierRoller roller) {
         this.realmModifierRoller = Objects.requireNonNull(roller, "Realm roller cannot be null");
+        this.realmsConfig = null;
         this.gearModifierRoller = null;
         this.implicitDamageCalculator = null;
         this.implicitDefenseCalculator = null;
@@ -93,16 +98,19 @@ public class StoneActionRegistry {
      * Creates a new registry with both realm and gear configuration.
      *
      * @param realmModifierConfig Configuration for realm modifier generation
+     * @param realmsConfig Configuration for biome authorization (enabled biomes, level gates)
      * @param gearModifierConfig Configuration for gear modifiers
      * @param gearBalanceConfig Configuration for gear balance
      * @param equipmentStatConfig Configuration for equipment stat restrictions
      */
     public StoneActionRegistry(
             @Nonnull RealmModifierConfig realmModifierConfig,
+            @Nullable RealmsConfig realmsConfig,
             @Nonnull ModifierConfig gearModifierConfig,
             @Nonnull GearBalanceConfig gearBalanceConfig,
             @Nonnull io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig equipmentStatConfig) {
         this.realmModifierRoller = new RealmModifierRoller(realmModifierConfig);
+        this.realmsConfig = realmsConfig;
         ModifierPool modifierPool = new ModifierPool(gearModifierConfig, gearBalanceConfig, equipmentStatConfig);
         this.gearModifierRoller = new GearModifierRoller(modifierPool, gearModifierConfig, gearBalanceConfig);
         this.implicitDamageCalculator = new ImplicitDamageCalculator(gearBalanceConfig);
@@ -112,19 +120,37 @@ public class StoneActionRegistry {
     }
 
     /**
+     * Creates a new registry with both realm and gear configuration (no biome authorization).
+     *
+     * @param realmModifierConfig Configuration for realm modifier generation
+     * @param gearModifierConfig Configuration for gear modifiers
+     * @param gearBalanceConfig Configuration for gear balance
+     * @param equipmentStatConfig Configuration for equipment stat restrictions
+     * @deprecated Use constructor with RealmsConfig for biome authorization
+     */
+    @Deprecated
+    public StoneActionRegistry(
+            @Nonnull RealmModifierConfig realmModifierConfig,
+            @Nonnull ModifierConfig gearModifierConfig,
+            @Nonnull GearBalanceConfig gearBalanceConfig,
+            @Nonnull io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig equipmentStatConfig) {
+        this(realmModifierConfig, null, gearModifierConfig, gearBalanceConfig, equipmentStatConfig);
+    }
+
+    /**
      * Creates a new registry with both realm and gear configuration.
      *
      * @param realmModifierConfig Configuration for realm modifier generation
      * @param gearModifierConfig Configuration for gear modifiers
      * @param gearBalanceConfig Configuration for gear balance
-     * @deprecated Use constructor with EquipmentStatConfig instead
+     * @deprecated Use constructor with RealmsConfig for biome authorization
      */
     @Deprecated
     public StoneActionRegistry(
             @Nonnull RealmModifierConfig realmModifierConfig,
             @Nonnull ModifierConfig gearModifierConfig,
             @Nonnull GearBalanceConfig gearBalanceConfig) {
-        this(realmModifierConfig, gearModifierConfig, gearBalanceConfig,
+        this(realmModifierConfig, null, gearModifierConfig, gearBalanceConfig,
                 io.github.larsonix.trailoforbis.gear.config.EquipmentStatConfig.unrestricted());
     }
 
@@ -138,6 +164,7 @@ public class StoneActionRegistry {
             @Nonnull RealmModifierRoller realmRoller,
             @Nonnull GearModifierRoller gearRoller) {
         this.realmModifierRoller = Objects.requireNonNull(realmRoller, "Realm roller cannot be null");
+        this.realmsConfig = null;
         this.gearModifierRoller = Objects.requireNonNull(gearRoller, "Gear roller cannot be null");
         this.implicitDamageCalculator = null;
         this.implicitDefenseCalculator = null;
@@ -157,6 +184,7 @@ public class StoneActionRegistry {
             @Nonnull GearModifierRoller gearRoller,
             @Nonnull ImplicitDamageCalculator implicitCalculator) {
         this.realmModifierRoller = Objects.requireNonNull(realmRoller, "Realm roller cannot be null");
+        this.realmsConfig = null;
         this.gearModifierRoller = Objects.requireNonNull(gearRoller, "Gear roller cannot be null");
         this.implicitDamageCalculator = Objects.requireNonNull(implicitCalculator, "Implicit calculator cannot be null");
         this.implicitDefenseCalculator = null;
@@ -172,7 +200,7 @@ public class StoneActionRegistry {
      * Registers item type handlers for polymorphic dispatch.
      */
     private void initHandlers() {
-        handlers.put(RealmMapData.class, new RealmMapStoneHandler(realmModifierRoller));
+        handlers.put(RealmMapData.class, new RealmMapStoneHandler(realmModifierRoller, realmsConfig));
         if (gearModifierRoller != null) {
             handlers.put(GearData.class, new GearStoneHandler(gearModifierRoller, implicitDamageCalculator, implicitDefenseCalculator));
         }
@@ -205,6 +233,8 @@ public class StoneActionRegistry {
         actions.put(StoneType.GAIAS_CALIBRATION, createGaiasCalibrationAction());
         actions.put(StoneType.EMBER_OF_TUNING, createEmberOfTuningAction());
         actions.put(StoneType.ALTERVERSE_SHARD, createAlterverseShardAction());
+        actions.put(StoneType.ALTERVERSE_SPLINTER, createAlterverseSplinterAction());
+        actions.put(StoneType.ALTERVERSE_FRAGMENT, createAlterverseFragmentAction());
         actions.put(StoneType.ORBISIAN_BLESSING, createOrbisianBlessingAction());
         actions.put(StoneType.ETHEREAL_CALIBRATION, createEtherealCalibrationAction());
 
@@ -375,6 +405,64 @@ public class StoneActionRegistry {
                 if (item.modifiers().isEmpty()) return StoneActionResult.noModifiers();
                 if (!item.hasUnlockedModifiers()) return StoneActionResult.noUnlockedModifiers();
                 return dispatch(item, (h, i) -> h.rerollTypes(i, random));
+            }
+        };
+    }
+
+    /**
+     * Alterverse Splinter - Rerolls all unlocked PREFIX modifiers only.
+     *
+     * <p>Suffixes are preserved unchanged. Locked prefixes are preserved.
+     */
+    private StoneAction createAlterverseSplinterAction() {
+        return new StoneAction() {
+            @Override
+            public boolean canApply(@Nonnull ModifiableItem item) {
+                return !item.modifiers().isEmpty() && item.hasUnlockedPrefixes();
+            }
+
+            @Override
+            @Nonnull
+            public String getCannotApplyReason(@Nonnull ModifiableItem item) {
+                if (item.modifiers().isEmpty()) return "Item has no modifiers.";
+                return "No unlocked prefixes to reroll.";
+            }
+
+            @Override
+            @Nonnull
+            public StoneActionResult execute(@Nonnull ModifiableItem item, @Nonnull Random random) {
+                if (item.modifiers().isEmpty()) return StoneActionResult.noModifiers();
+                if (!item.hasUnlockedPrefixes()) return StoneActionResult.failure("No unlocked prefixes to reroll.");
+                return dispatch(item, (h, i) -> h.rerollPrefixTypes(i, random));
+            }
+        };
+    }
+
+    /**
+     * Alterverse Fragment - Rerolls all unlocked SUFFIX modifiers only.
+     *
+     * <p>Prefixes are preserved unchanged. Locked suffixes are preserved.
+     */
+    private StoneAction createAlterverseFragmentAction() {
+        return new StoneAction() {
+            @Override
+            public boolean canApply(@Nonnull ModifiableItem item) {
+                return !item.modifiers().isEmpty() && item.hasUnlockedSuffixes();
+            }
+
+            @Override
+            @Nonnull
+            public String getCannotApplyReason(@Nonnull ModifiableItem item) {
+                if (item.modifiers().isEmpty()) return "Item has no modifiers.";
+                return "No unlocked suffixes to reroll.";
+            }
+
+            @Override
+            @Nonnull
+            public StoneActionResult execute(@Nonnull ModifiableItem item, @Nonnull Random random) {
+                if (item.modifiers().isEmpty()) return StoneActionResult.noModifiers();
+                if (!item.hasUnlockedSuffixes()) return StoneActionResult.failure("No unlocked suffixes to reroll.");
+                return dispatch(item, (h, i) -> h.rerollSuffixTypes(i, random));
             }
         };
     }

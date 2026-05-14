@@ -157,24 +157,24 @@ weapons:
 
   staff:
     # Spell damage focused - all elemental welcome
-    # Prefixes: 15 (spell + elemental + ailment + hex)
-    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
-    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, nullifying, swift, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect]
-    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+    # Prefixes: 17 (spell + elemental + ailment + hex offensive)
+    # Suffixes: 25 (mana + DoT + conditional + conversion + hex sustain)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, nullifying, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect, hex_volatility, hex_magic_power, hex_draw_accuracy_flat]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction, hex_volatility_percent, hex_draw_accuracy, hex_cast_speed]
 
   wand:
     # Fast casting, mana efficiency
-    # Prefixes: 13 (spell + elemental + hex)
-    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
-    prefixes: [arcane, empowered, blazing, frozen, shocking, swift, precise, elemental, chaotic, nullifying, hex_spell_damage, hex_spell_crit, hex_status_effect]
-    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+    # Prefixes: 15 (spell + elemental + hex offensive)
+    # Suffixes: 25 (mana + DoT + conditional + conversion + hex sustain)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, precise, elemental, chaotic, nullifying, hex_spell_damage, hex_spell_crit, hex_status_effect, hex_volatility, hex_magic_power, hex_draw_accuracy_flat]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction, hex_volatility_percent, hex_draw_accuracy, hex_cast_speed]
 
   spellbook:
     # Mana-focused, all elements
-    # Prefixes: 15 (spell + elemental + hex)
-    # Suffixes: 22 (mana + DoT + conditional + conversion + hex)
-    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, swift, nullifying, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect]
-    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction]
+    # Prefixes: 17 (spell + elemental + hex offensive)
+    # Suffixes: 25 (mana + DoT + conditional + conversion + hex sustain)
+    prefixes: [arcane, empowered, blazing, frozen, shocking, chaotic, elemental, earthen, gusting, nullifying, igniting, hex_spell_damage, hex_spell_crit, hex_status_effect, hex_volatility, hex_magic_power, hex_draw_accuracy_flat]
+    suffixes: [of_the_sage, of_wisdom, of_the_arcane, of_efficiency, siphoning, of_hypothermia, of_galvanization, of_incineration, of_frostburn, of_amplification, of_scorching, of_frostbite, of_voltage, of_flame_infusion, of_frost_infusion, of_storm_infusion, of_earth_infusion, of_gale_infusion, of_void_infusion, hex_max_mana, hex_mana_regen, hex_mana_cost_reduction, hex_volatility_percent, hex_draw_accuracy, hex_cast_speed]
 
   # ---------------------------------------------------------------------------
   # OFFHAND - Shield
@@ -223,8 +223,15 @@ armor_materials:
   # ---------------------------------------------------------------------------
   leather:
     # Crit defense (resilient) is now a PREFIX (active damage mitigation)
+    # Elemental resistances available on all armor materials
     base_prefixes:
       - resilient
+      - fireproof
+      - frostward
+      - insulated
+      - voidward
+      - stoneward
+      - windward
     base_suffixes:
       - of_evasion
       - of_the_shadow
@@ -242,9 +249,16 @@ armor_materials:
   # ---------------------------------------------------------------------------
   plate:
     # Block mechanics (ironclad, enduring) are now PREFIXES (active damage mitigation)
+    # Elemental resistances available on all armor materials
     base_prefixes:
       - ironclad
       - enduring
+      - fireproof
+      - frostward
+      - insulated
+      - voidward
+      - stoneward
+      - windward
     base_suffixes:
       - of_the_whale
       - of_vitality
@@ -258,7 +272,14 @@ armor_materials:
   # WOOD - Hybrid (primitive/druid)
   # ---------------------------------------------------------------------------
   wood:
-    base_prefixes: []
+    # Elemental resistances available on all armor materials
+    base_prefixes:
+      - fireproof
+      - frostward
+      - insulated
+      - voidward
+      - stoneward
+      - windward
     base_suffixes:
       - of_vitality
       - of_regeneration
@@ -368,10 +389,10 @@ armor_slots:
 # - dart:       4 prefixes + 8 suffixes = 12 total ✓
 # - kunai:      5 prefixes + 8 suffixes = 13 total ✓
 #
-# MAGIC WEAPONS: 13-15 prefixes, 22 suffixes (includes hex modifiers)
-# - staff:      15 prefixes + 22 suffixes = 37 total ✓
-# - wand:       13 prefixes + 22 suffixes = 35 total ✓
-# - spellbook:  15 prefixes + 22 suffixes = 37 total ✓
+# MAGIC WEAPONS: 15-17 prefixes, 25 suffixes (hex stats split across prefix/suffix)
+# - staff:      17 prefixes + 25 suffixes = 42 total ✓  (no attack speed)
+# - wand:       15 prefixes + 25 suffixes = 40 total ✓  (no attack speed)
+# - spellbook:  17 prefixes + 25 suffixes = 42 total ✓  (no attack speed)
 #
 # SHIELD:
 # - shield:     6 prefixes + 7 suffixes = 13 total ✓
@@ -379,9 +400,11 @@ armor_slots:
 #
 # ARMOR (material pools + slot bonuses):
 # - cloth head:    6 + 0 prefixes = 6, 6 + 2 = 8 suffixes ✓
-# - leather legs:  1 + 6 prefixes = 7, 8 + 2 = 10 suffixes ✓
-# - plate chest:   2 + 0 prefixes = 2, 7 + 3 = 10 suffixes ✓
-# - hands (any):   13 prefixes + material suffixes + 4 = varies ✓
+# - leather head:  7 + 0 prefixes = 7, 10 + 2 = 12 suffixes ✓
+# - leather legs:  7 + 6 prefixes = 13, 10 + 4 = 14 suffixes ✓
+# - plate chest:   8 + 0 prefixes = 8, 7 + 3 = 10 suffixes ✓
+# - wood head:     6 + 0 prefixes = 6, 8 + 2 = 10 suffixes ✓
+# - hands (any):   material prefixes + 13 slot prefixes = varies ✓
 #   (accuracy moved to suffix, added of_accuracy/of_focus)
 #
 # =============================================================================

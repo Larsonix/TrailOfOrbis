@@ -51,15 +51,15 @@ progressive_scaling:
   # Lower values = faster ramp to full difficulty
   # Higher values = longer "easy" period for new players
   # Default: 30 (extended from 20 for smoother early-game curve)
-  soft_cap_level: 50
+  soft_cap_level: 100
 
   # Minimum scaling factor at level 1
   # 0.1 = level 1 mobs have 10% of their calculated power (~13 HP, 4-5 shot)
   # 0.15 = level 1 mobs have 15% of their calculated power (easier early game)
   # 0.3 = level 1 mobs have 30% of their calculated power
   # 0.5 = level 1 mobs have 50% of their calculated power
-  # Default: 0.1
-  min_scaling_factor: 0.1
+  # Default: 0.15
+  min_scaling_factor: 0.15
 
 # -----------------------------------------------------------------------------
 # POOL GENERATION

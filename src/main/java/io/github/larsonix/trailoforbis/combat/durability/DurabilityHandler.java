@@ -111,7 +111,7 @@ public class DurabilityHandler {
             return;
         }
 
-        ItemStack itemInHand = inventory.getItemInHand();
+        ItemStack itemInHand = inventory.getActiveHotbarItem();
         if (itemInHand == null || itemInHand.isEmpty() || itemInHand.isBroken()) {
             return;
         }

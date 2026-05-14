@@ -475,19 +475,24 @@ public class StonePickerPage {
         builder.getById("item-grid", ItemGridBuilder.class).ifPresent(grid -> {
             int count = Math.min(compatibleItems.size(), MAX_ITEMS);
             for (int i = 0; i < count; i++) {
-                CompatibleItemScanner.ScannedItem item = compatibleItems.get(i);
+                try {
+                    CompatibleItemScanner.ScannedItem item = compatibleItems.get(i);
 
-                ItemGridSlot slot = new ItemGridSlot(
-                    new ItemStack(item.itemStack().getItemId(), 1)
-                );
-                slot.setActivatable(true);
+                    ItemGridSlot slot = new ItemGridSlot(
+                        new ItemStack(item.itemStack().getItemId(), 1)
+                    );
+                    slot.setActivatable(true);
 
-                // Dim non-selected slots to highlight the chosen item
-                if (selectedIndex >= 0 && i != selectedIndex) {
-                    slot.setItemIncompatible(true);
+                    // Dim non-selected slots to highlight the chosen item
+                    if (selectedIndex >= 0 && i != selectedIndex) {
+                        slot.setItemIncompatible(true);
+                    }
+
+                    grid.addSlot(slot);
+                } catch (Exception e) {
+                    LOGGER.atWarning().withCause(e).log(
+                        "Failed to add item slot %d to stone picker grid — skipping", i);
                 }
-
-                grid.addSlot(slot);
             }
         });
     }
@@ -941,6 +946,8 @@ public class StonePickerPage {
             case GAIAS_CALIBRATION -> "Rerolls all " + modCount + " modifier values";
             case EMBER_OF_TUNING -> "Rerolls one random modifier value";
             case ALTERVERSE_SHARD -> "Rerolls " + item.data().unlockedModifierCount() + " unlocked modifiers";
+            case ALTERVERSE_SPLINTER -> "Rerolls " + item.data().unlockedPrefixCount() + " unlocked prefix(es)";
+            case ALTERVERSE_FRAGMENT -> "Rerolls " + item.data().unlockedSuffixCount() + " unlocked suffix(es)";
             case ORBISIAN_BLESSING -> "Rerolls quality (currently " + item.data().quality() + "%)";
             case GAIAS_GIFT -> "Adds a new random modifier";
             case PURGING_EMBER -> "Removes " + item.data().unlockedModifierCount() + " unlocked modifiers";

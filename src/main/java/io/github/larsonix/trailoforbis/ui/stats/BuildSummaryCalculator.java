@@ -31,13 +31,7 @@ public final class BuildSummaryCalculator {
     }
 
     /**
-     * Computes the full build summary from player stats and config.
-     *
-     * @param stats      The player's computed stats
-     * @param level      The player's current level (for evasion reference accuracy)
-     * @param evasionCfg The evasion config (for hit chance formula)
-     * @param poolConfig The mob stat pool config (for reference accuracy at level)
-     * @return A complete build summary with breakdowns for tooltip display
+     * Computes the full build summary using default armor formula constants.
      */
     @Nonnull
     public static BuildSummary compute(
@@ -46,8 +40,33 @@ public final class BuildSummaryCalculator {
             @Nullable RPGConfig.CombatConfig.EvasionConfig evasionCfg,
             @Nullable MobStatPoolConfig poolConfig
     ) {
+        return compute(stats, level, evasionCfg, poolConfig,
+                CombatCalculator.DEFAULT_ARMOR_LEVEL_SCALE, CombatCalculator.DEFAULT_ARMOR_BASE_CONSTANT);
+    }
+
+    /**
+     * Computes the full build summary from player stats and config.
+     *
+     * @param stats      The player's computed stats
+     * @param level      The player's current level (for evasion reference accuracy)
+     * @param evasionCfg The evasion config (for hit chance formula)
+     * @param poolConfig The mob stat pool config (for reference accuracy at level)
+     * @param armorLevelScale The armor formula level scale from config
+     * @param armorBaseConstant The armor formula base constant from config
+     * @return A complete build summary with breakdowns for tooltip display
+     */
+    @Nonnull
+    public static BuildSummary compute(
+            @Nonnull ComputedStats stats,
+            int level,
+            @Nullable RPGConfig.CombatConfig.EvasionConfig evasionCfg,
+            @Nullable MobStatPoolConfig poolConfig,
+            float armorLevelScale,
+            float armorBaseConstant
+    ) {
         DamageEstimate damageDetail = computeAvgDamage(stats);
-        EHPBreakdownDetail ehpDetail = computeEffectiveHP(stats, level, evasionCfg, poolConfig);
+        EHPBreakdownDetail ehpDetail = computeEffectiveHP(stats, level, evasionCfg, poolConfig,
+                armorLevelScale, armorBaseConstant);
 
         return new BuildSummary(
                 damageDetail.avgDamagePerHit(),
@@ -86,7 +105,7 @@ public final class BuildSummaryCalculator {
      * <p>Formula:
      * <ol>
      *   <li>rawHP = maxHealth + energyShield</li>
-     *   <li>armorMit = armor / (armor + 9*level + 50), capped at 90% ({@link CombatCalculator#estimateArmorReduction})</li>
+     *   <li>armorMit = armor / (armor + levelScale*level + baseConstant), capped at 90%</li>
      *   <li>ehpFromArmor = rawHP / (1 - armorMit)</li>
      *   <li>avoidance = 1 - (1-dodge)(1-evasion)(1-block)(1-parry), clamped [0, 0.95]</li>
      *   <li>effectiveHP = ehpFromArmor / (1 - avoidance)</li>
@@ -97,7 +116,9 @@ public final class BuildSummaryCalculator {
             @Nonnull ComputedStats stats,
             int level,
             @Nullable RPGConfig.CombatConfig.EvasionConfig evasionCfg,
-            @Nullable MobStatPoolConfig poolConfig
+            @Nullable MobStatPoolConfig poolConfig,
+            float armorLevelScale,
+            float armorBaseConstant
     ) {
         float maxHealth = stats.getMaxHealth();
         float energyShield = stats.getEnergyShield();
@@ -105,7 +126,7 @@ public final class BuildSummaryCalculator {
 
         // Armor mitigation — uses canonical level-scaled formula from CombatCalculator
         float armor = stats.getArmor();
-        float armorMit = CombatCalculator.estimateArmorReduction(armor, level) / 100f;
+        float armorMit = CombatCalculator.estimateArmorReduction(armor, level, armorLevelScale, armorBaseConstant) / 100f;
         float ehpFromArmor = rawHP / (1f - armorMit);
 
         // Avoidance layers

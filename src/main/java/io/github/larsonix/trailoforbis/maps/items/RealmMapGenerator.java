@@ -77,6 +77,7 @@ public final class RealmMapGenerator {
         weights.put(GearRarity.EPIC, 5.0);
         weights.put(GearRarity.LEGENDARY, 0.9);
         weights.put(GearRarity.MYTHIC, 0.1);
+        weights.put(GearRarity.UNIQUE, 0.0);  // UNIQUE maps don't drop naturally
         BASE_RARITY_WEIGHTS = Collections.unmodifiableMap(weights);
     }
 
@@ -360,7 +361,7 @@ public final class RealmMapGenerator {
 
         for (int i = 0; i < rarities.length; i++) {
             GearRarity rarity = rarities[i];
-            double baseWeight = BASE_RARITY_WEIGHTS.getOrDefault(rarity, 1.0);
+            double baseWeight = BASE_RARITY_WEIGHTS.getOrDefault(rarity, 0.0);
 
             // Position factor: 0 for COMMON, 1 for MYTHIC
             double positionFactor = (double) i / (rarities.length - 1);

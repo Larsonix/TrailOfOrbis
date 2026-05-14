@@ -32,9 +32,9 @@ class LootFilterEnumsTest {
     class ConditionTypeTests {
 
         @Test
-        @DisplayName("has exactly 12 values")
-        void hasTwelveValues() {
-            assertEquals(12, ConditionType.values().length);
+        @DisplayName("has exactly 15 values")
+        void hasFifteenValues() {
+            assertEquals(15, ConditionType.values().length);
         }
 
         @ParameterizedTest

@@ -4,7 +4,6 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 
 import javax.annotation.Nonnull;
-import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -127,9 +126,9 @@ public class PartyHudSync implements PartyChangeListener {
     }
 
     @Override
-    public void onPartyDisbanded(UUID partyId, List<UUID> formerMembers) {
-        for (UUID memberId : formerMembers) {
-            clearPlayer(memberId);
-        }
+    public void onPartyDisbanded(UUID partyId) {
+        // PartyPro API does not provide the former member list on disband.
+        // Each member will have their HUD cleared individually via onMemberLeft
+        // or on disconnect via clearPlayer().
     }
 }

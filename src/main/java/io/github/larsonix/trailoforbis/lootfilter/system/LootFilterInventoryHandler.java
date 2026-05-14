@@ -29,6 +29,8 @@ import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.lootfilter.LootFilterManager;
 import io.github.larsonix.trailoforbis.lootfilter.feedback.BlockFeedbackService;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterAction;
+import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
+import io.github.larsonix.trailoforbis.maps.items.RealmMapUtils;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;
@@ -167,7 +169,6 @@ public final class LootFilterInventoryHandler {
                              SlotTransaction slot, UUID playerId) {
         ItemStack itemStack = slot.getSlotAfter();
         if (itemStack == null || itemStack.isEmpty()) return;
-        if (!GearUtils.isRpgGear(itemStack)) return;
 
         // Skip in-place modifications (durability, metadata, etc.)
         // If the slot had the same item ID before, this is NOT a new pickup
@@ -178,7 +179,11 @@ public final class LootFilterInventoryHandler {
             return;
         }
 
-        evaluateAndEject(player, container, slot, itemStack, playerId);
+        if (GearUtils.isRpgGear(itemStack)) {
+            evaluateAndEject(player, container, slot, itemStack, playerId);
+        } else if (RealmMapUtils.isRealmMap(itemStack)) {
+            evaluateAndEjectMap(player, container, slot, itemStack, playerId);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -211,6 +216,34 @@ public final class LootFilterInventoryHandler {
             LOGGER.atFine().log("Blocked pickup for %s: %s Lv%d (Q%d)",
                     playerId.toString().substring(0, 8),
                     gearData.rarity().name(), gearData.level(), gearData.quality());
+        }
+    }
+
+    private void evaluateAndEjectMap(Player player, ItemContainer container,
+                                     SlotTransaction slot, ItemStack itemStack, UUID playerId) {
+        // Fast path: rejection stamp still valid for this player
+        if (hasValidRejectionStamp(itemStack, playerId)) {
+            ejectItem(container, slot.getSlot(), itemStack, player, playerId);
+            LOGGER.atFine().log("Re-rejected stamped map for %s", playerId.toString().substring(0, 8));
+            return;
+        }
+
+        // Read map data
+        Optional<RealmMapData> mapOpt = RealmMapUtils.readMapData(itemStack);
+        if (mapOpt.isEmpty()) return;
+        RealmMapData mapData = mapOpt.get();
+
+        FilterAction action = filterManager.evaluateMap(playerId, mapData);
+
+        if (action == FilterAction.BLOCK) {
+            ItemStack stamped = stampRejection(itemStack, playerId);
+            ejectItem(container, slot.getSlot(), stamped, player, playerId);
+            // Reuse gear feedback with a synthesized GearData for display
+            feedbackService.onMapBlocked(playerId, mapData, getPlayerRef(player));
+
+            LOGGER.atFine().log("Blocked map pickup for %s: %s Lv%d (Q%d)",
+                    playerId.toString().substring(0, 8),
+                    mapData.rarity().name(), mapData.level(), mapData.quality());
         }
     }
 

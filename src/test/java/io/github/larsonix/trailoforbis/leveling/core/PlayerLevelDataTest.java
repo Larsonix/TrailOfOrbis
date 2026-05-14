@@ -56,20 +56,20 @@ class PlayerLevelDataTest {
         @DisplayName("Should reject null createdAt")
         void shouldRejectNullCreatedAt() {
             assertThrows(IllegalArgumentException.class, () ->
-                new PlayerLevelData(testPlayer, 0, null, Instant.now()));
+                new PlayerLevelData(testPlayer, 0, null, null, Instant.now()));
         }
 
         @Test
         @DisplayName("Should reject null lastUpdated")
         void shouldRejectNullLastUpdated() {
             assertThrows(IllegalArgumentException.class, () ->
-                new PlayerLevelData(testPlayer, 0, Instant.now(), null));
+                new PlayerLevelData(testPlayer, 0, null, Instant.now(), null));
         }
 
         @Test
         @DisplayName("Should clamp negative XP to 0")
         void shouldClampNegativeXpToZero() {
-            PlayerLevelData data = new PlayerLevelData(testPlayer, -100, Instant.now(), Instant.now());
+            PlayerLevelData data = new PlayerLevelData(testPlayer, -100, null, Instant.now(), Instant.now());
 
             assertEquals(0, data.xp());
         }
@@ -194,7 +194,7 @@ class PlayerLevelDataTest {
         @DisplayName("hasBeenModified should return true after modification")
         void hasBeenModifiedShouldReturnTrueAfterModification() {
             Instant originalTime = Instant.now().minusSeconds(1);
-            PlayerLevelData data = new PlayerLevelData(testPlayer, 100, originalTime, originalTime);
+            PlayerLevelData data = new PlayerLevelData(testPlayer, 100, null, originalTime, originalTime);
             PlayerLevelData updated = data.withXp(200);
 
             assertTrue(updated.hasBeenModified());
@@ -209,7 +209,7 @@ class PlayerLevelDataTest {
 
             assertNotEquals(data1, data2); // Different XP values
 
-            PlayerLevelData sameData = new PlayerLevelData(testPlayer, 100, data1.createdAt(), data1.lastUpdated());
+            PlayerLevelData sameData = new PlayerLevelData(testPlayer, 100, null, data1.createdAt(), data1.lastUpdated());
             assertEquals(data1, sameData); // Same UUID and XP
         }
 

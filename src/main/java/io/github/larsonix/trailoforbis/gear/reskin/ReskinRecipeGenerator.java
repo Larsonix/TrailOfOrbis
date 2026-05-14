@@ -97,7 +97,7 @@ public final class ReskinRecipeGenerator {
                     for (Map.Entry<String, List<DiscoveredItem>> entry : categories.entrySet()) {
                         String category = entry.getKey();
                         List<DiscoveredItem> items = entry.getValue();
-                        if (items.size() < 2) {
+                        if (items.isEmpty()) {
                             continue;
                         }
                         if (items.size() > MAX_RECIPES_PER_GROUP) {
@@ -115,7 +115,7 @@ public final class ReskinRecipeGenerator {
                     for (List<DiscoveredItem> categoryItems : categories.values()) {
                         allItemsInGroup.addAll(categoryItems);
                     }
-                    if (allItemsInGroup.size() < 2) {
+                    if (allItemsInGroup.isEmpty()) {
                         continue;
                     }
                     if (allItemsInGroup.size() > MAX_RECIPES_PER_GROUP) {
@@ -131,7 +131,7 @@ public final class ReskinRecipeGenerator {
         }
 
         if (allRecipes.isEmpty()) {
-            LOGGER.atInfo().log("No reskin recipes generated (no groups with 2+ items)");
+            LOGGER.atInfo().log("No reskin recipes generated (no non-empty groups)");
             return 0;
         }
 

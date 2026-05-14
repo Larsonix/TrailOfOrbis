@@ -42,9 +42,26 @@ class GearRarityTest {
     }
 
     @Test
-    @DisplayName("All rarities have positive drop weight")
-    void allRarities_havePositiveDropWeight() {
+    @DisplayName("All rarities have non-negative drop weight")
+    void allRarities_haveNonNegativeDropWeight() {
         for (GearRarity rarity : GearRarity.values()) {
+            assertTrue(rarity.getDropWeight() >= 0,
+                rarity + " should have non-negative drop weight");
+        }
+    }
+
+    @Test
+    @DisplayName("UNIQUE has zero drop weight (disabled from natural drops)")
+    void unique_hasZeroDropWeight() {
+        assertEquals(0.0, GearRarity.UNIQUE.getDropWeight(),
+            "UNIQUE should have zero drop weight — reserved for hand-placed items");
+    }
+
+    @Test
+    @DisplayName("Natural rarities (COMMON through MYTHIC) have positive drop weight")
+    void naturalRarities_havePositiveDropWeight() {
+        for (GearRarity rarity : GearRarity.values()) {
+            if (rarity == GearRarity.UNIQUE) continue;
             assertTrue(rarity.getDropWeight() > 0,
                 rarity + " should have positive drop weight");
         }

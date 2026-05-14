@@ -188,8 +188,7 @@ public class RealmRewardService {
             @Nonnull RealmInstance realm) {
 
         // Check if victory reward system is configured
-        // Generator is required; distributor is optional when chest manager is available
-        if (victoryRewardGenerator == null || (victoryRewardDistributor == null && rewardChestManager == null)) {
+        if (victoryRewardGenerator == null || victoryRewardDistributor == null) {
             LOGGER.atFine().log("Victory reward system not configured - skipping item generation for %s",
                 playerId.toString().substring(0, 8));
             return;
@@ -213,20 +212,16 @@ public class RealmRewardService {
             return;
         }
 
-        // Store rewards for the physical chest if the chest manager is available
+        // Store rewards for the physical reward chest (primary delivery path)
         if (rewardChestManager != null) {
             rewardChestManager.storeRewards(realm.getRealmId(), playerId, rewards);
             LOGGER.atInfo().log("Victory rewards for %s: stored %d items for reward chest",
                 playerId.toString().substring(0, 8),
                 rewards.totalCount());
-            return;
-        }
-
-        // Fallback: distribute directly to player inventory
-        if (victoryRewardDistributor != null) {
+        } else {
+            // Fallback: deliver directly to inventory when chest system is disabled
             VictoryRewardDistributor.DistributionResult distribution =
                 victoryRewardDistributor.distribute(playerRef, rewards);
-
             LOGGER.atInfo().log("Victory rewards for %s: generated %d items, delivered %d, overflow %d",
                 playerId.toString().substring(0, 8),
                 rewards.totalCount(),

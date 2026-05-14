@@ -124,7 +124,6 @@ public class RealmHudManager {
 
         // Defer HUD creation to next tick - player may not be fully in world yet
         world.execute(() -> {
-            // Get fresh PlayerRef after deferral - should now be valid in this world
             PlayerRef freshPlayerRef = Universe.get().getPlayer(playerId);
             if (freshPlayerRef == null) {
                 LOGGER.atWarning().log("Cannot show combat HUD - player %s not found after deferral",
@@ -138,13 +137,14 @@ public class RealmHudManager {
                 HyUIHud hud = RealmCombatHud.create(freshPlayerRef, realm, store);
 
                 // Direct MultiHud registration — bypasses safeAdd()'s getReference()
-                // null check that can fail during world transitions. With synchronous
-                // registration, we can track the HUD immediately (no second world.execute deferral).
+                // null check that can fail during realm transitions.
+                // resetHasBuilt() neutralizes the deferred safeAdd() from .show().
                 Ref<EntityStore> entityRef = freshPlayerRef.getReference();
                 if (entityRef != null && entityRef.isValid()) {
                     Player resolvedPlayer = store.getComponent(entityRef, Player.getComponentType());
                     if (resolvedPlayer != null) {
                         MultiHudWrapper.setCustomHud(resolvedPlayer, freshPlayerRef, hud.name, hud);
+                        HudRefreshHelper.resetHasBuilt(hud);
                     }
                 }
 
@@ -158,6 +158,44 @@ public class RealmHudManager {
                     playerId.toString().substring(0, 8));
             }
         });
+    }
+
+    /**
+     * Shows the combat HUD synchronously on the world thread (no nested world.execute).
+     *
+     * <p>Used by {@link io.github.larsonix.trailoforbis.ui.hud.HudHealthChecker} when
+     * the caller is already on the realm world thread and the player is fully loaded
+     * (8-13s after transition). Uses direct {@code MultiHudWrapper.setCustomHud()} +
+     * {@code resetHasBuilt()} to guarantee synchronous registration.
+     */
+    public void showCombatHudDirect(
+            @Nonnull UUID playerId,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull Player player,
+            @Nonnull RealmInstance realm) {
+
+        discardHud(playerId, combatHuds, "combat");
+        discardHud(playerId, victoryHuds, "victory");
+        discardHud(playerId, defeatHuds, "defeat");
+
+        World world = realm.getWorld();
+        if (world == null || !world.isAlive()) return;
+
+        Store<EntityStore> store = world.getEntityStore().getStore();
+
+        try {
+            HyUIHud hud = RealmCombatHud.create(playerRef, realm, store);
+            MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
+            HudRefreshHelper.resetHasBuilt(hud);
+            combatHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
+            LOGGER.atInfo().log("Showed combat HUD (direct) for player %s in realm %s",
+                playerId.toString().substring(0, 8),
+                realm.getRealmId().toString().substring(0, 8));
+        } catch (Exception e) {
+            LOGGER.atSevere().withCause(e).log("Failed to show combat HUD (direct) for player %s",
+                playerId.toString().substring(0, 8));
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -307,7 +345,8 @@ public class RealmHudManager {
      *
      * <p>Cancels the refresh task directly via reflection. HyUI's {@code hud.remove()}
      * early-returns when {@code getStore()} returns null during transitions, skipping
-     * {@code refreshTask.cancel()}.
+     * {@code refreshTask.cancel()}. No explicit MCHUD removal needed: deterministic
+     * names (e.g. "too-realm-combat") ensure the next show replaces the orphaned entry.
      */
     private void discardHud(
             @Nonnull UUID playerId,
@@ -443,6 +482,12 @@ public class RealmHudManager {
     /** Checks if a player has an active combat HUD. */
     public boolean hasCombatHud(@Nonnull UUID playerId) {
         return combatHuds.containsKey(playerId);
+    }
+
+    /** Gets the active combat HUD for a player, or null. */
+    @Nullable
+    public HyUIHud getCombatHud(@Nonnull UUID playerId) {
+        return combatHuds.get(playerId);
     }
 
     /** Checks if a player has an active victory HUD. */

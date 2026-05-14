@@ -49,6 +49,13 @@ public class RealmTemplateRegistry {
     private static final Vector3f DEFAULT_SPAWN_ROTATION = new Vector3f(0, 0, 0);
 
     /**
+     * Template config for per-biome spawn/exit locations.
+     * Set externally after config loading; null means use defaults.
+     */
+    @javax.annotation.Nullable
+    private io.github.larsonix.trailoforbis.maps.config.RealmTemplateConfig templateConfig;
+
+    /**
      * Maps biome+size key to template name.
      */
     private final Map<String, String> templateNameMap = new ConcurrentHashMap<>();
@@ -326,10 +333,19 @@ public class RealmTemplateRegistry {
      * Gets configured spawn location or generates a default.
      */
     @Nonnull
+    /**
+     * Sets the template configuration for per-biome overrides.
+     *
+     * @param config The template config (or null for defaults)
+     */
+    public void setTemplateConfig(@javax.annotation.Nullable io.github.larsonix.trailoforbis.maps.config.RealmTemplateConfig config) {
+        this.templateConfig = config;
+    }
+
     private Transform getConfiguredSpawnLocation(String templateName, RealmBiomeType biome, RealmLayoutSize size) {
-        // TODO: Load from realm-templates.yml if configured
-        // Use biome-appropriate base Y: Mountains is elevated (Y=74), others at Y=64
-        double spawnY = getBaseYForBiome(biome);
+        double spawnY = templateConfig != null
+            ? templateConfig.getSpawnY(biome)
+            : getBaseYForBiome(biome);
         return new Transform(
             new Vector3d(0, spawnY, 0),
             DEFAULT_SPAWN_ROTATION
@@ -341,7 +357,13 @@ public class RealmTemplateRegistry {
      */
     @Nonnull
     private Transform getConfiguredExitLocation(String templateName, RealmBiomeType biome, RealmLayoutSize size) {
-        // TODO: Load from realm-templates.yml if configured
+        if (templateConfig != null) {
+            var tmpl = templateConfig.getTemplate(biome);
+            return new Transform(
+                new Vector3d(tmpl.exitOffsetX(), tmpl.spawnY(), tmpl.exitOffsetZ()),
+                DEFAULT_SPAWN_ROTATION
+            );
+        }
         double spawnY = getBaseYForBiome(biome);
         return new Transform(
             new Vector3d(5, spawnY, 0),
@@ -361,8 +383,8 @@ public class RealmTemplateRegistry {
      */
     @Nonnull
     private List<MonsterSpawnPoint> getConfiguredSpawnPoints(String templateName, RealmBiomeType biome, RealmLayoutSize size) {
-        // TODO: Load from realm-templates.yml if configured
-        // For now, generate spawn points dynamically based on arena size
+        // Spawn points are generated dynamically based on arena size.
+        // Config-driven spawn points can be added here in the future.
         return generateSpawnPointsForSize(size);
     }
 

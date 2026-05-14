@@ -68,7 +68,7 @@ public final class VictoryRewardDistributor {
      * Result of distributing rewards to a player.
      *
      * @param delivered Number of items successfully added to inventory
-     * @param overflow Number of items that couldn't fit (dropped or queued)
+     * @param overflow Number of items that couldn't fit
      */
     public record DistributionResult(int delivered, int overflow) {
         public int total() {
@@ -152,8 +152,7 @@ public final class VictoryRewardDistributor {
                 LOGGER.atFine().log("Item overflow for player %s: %s",
                     playerId.toString().substring(0, 8), item.getItemId());
 
-                // TODO: Could drop at player's feet or queue for later
-                // For now, we just log it as lost
+                // Overflow: item logged as lost (fallback path only — primary delivery uses reward chest)
             }
         }
 

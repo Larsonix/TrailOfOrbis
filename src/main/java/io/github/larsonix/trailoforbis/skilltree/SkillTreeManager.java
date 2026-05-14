@@ -715,6 +715,7 @@ public class SkillTreeManager implements SkillTreeService {
     public void cleanupPlayer(@Nonnull UUID playerId) {
         Objects.requireNonNull(playerId, "playerId cannot be null");
         playerLocks.remove(playerId);
+        repository.evict(playerId);
     }
 
     // ==================== Event Listener Registration ====================

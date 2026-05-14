@@ -1,0 +1,149 @@
+# Consumable Loot Configuration
+# Controls food and potion drops from containers.
+# Uses the shared GearRarity system — player WIND stat (IIR) and
+# container tier bonuses affect which tier drops.
+
+enabled: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FOOD TIERS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Curated lists of food items per rarity tier.
+# min_level: minimum player level for this tier to appear
+# stack: [min, max] items per drop
+
+food_tiers:
+  common:
+    min_level: 1
+    items:
+      - { id: "Food_Beef_Raw", stack: [2, 4] }
+      - { id: "Food_Chicken_Raw", stack: [2, 4] }
+      - { id: "Food_Pork_Raw", stack: [2, 4] }
+      - { id: "Food_Wildmeat_Raw", stack: [2, 4] }
+      - { id: "Food_Fish_Raw", stack: [2, 4] }
+      - { id: "Food_Egg", stack: [2, 4] }
+      - { id: "Food_Bread", stack: [2, 3] }
+      - { id: "Food_Popcorn", stack: [2, 3] }
+
+  uncommon:
+    min_level: 5
+    items:
+      - { id: "Food_Fish_Grilled", stack: [2, 3] }
+      - { id: "Food_Fish_Raw_Uncommon", stack: [1, 2] }
+      - { id: "Food_Vegetable_Cooked", stack: [2, 3] }
+      - { id: "Food_Wildmeat_Cooked", stack: [2, 3] }
+      - { id: "Food_Cheese", stack: [2, 3] }
+
+  rare:
+    min_level: 15
+    items:
+      - { id: "Food_Kebab_Fruit", stack: [1, 2] }
+      - { id: "Food_Kebab_Meat", stack: [1, 2] }
+      - { id: "Food_Kebab_Mushroom", stack: [1, 2] }
+      - { id: "Food_Kebab_Vegetable", stack: [1, 2] }
+      - { id: "Food_Salad_Berry", stack: [1, 2] }
+      - { id: "Food_Salad_Caesar", stack: [1, 2] }
+      - { id: "Food_Salad_Mushroom", stack: [1, 2] }
+      - { id: "Food_Fish_Raw_Rare", stack: [1, 2] }
+
+  epic:
+    min_level: 30
+    items:
+      - { id: "Food_Pie_Apple", stack: [1, 1] }
+      - { id: "Food_Pie_Meat", stack: [1, 1] }
+      - { id: "Food_Pie_Pumpkin", stack: [1, 1] }
+      - { id: "Food_Fish_Raw_Epic", stack: [1, 1] }
+      - { id: "Food_Candy_Cane", stack: [1, 2] }
+
+  legendary:
+    min_level: 50
+    items:
+      - { id: "Food_Fish_Raw_Legendary", stack: [1, 1] }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POTION TIERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+potion_tiers:
+  common:
+    min_level: 1
+    items:
+      - { id: "Potion_Health_Small", stack: [2, 3] }
+      - { id: "Potion_Mana_Small", stack: [2, 3] }
+      - { id: "Potion_Stamina_Small", stack: [2, 3] }
+      - { id: "Potion_Health_Lesser", stack: [1, 2] }
+      - { id: "Potion_Stamina_Lesser", stack: [1, 2] }
+
+  uncommon:
+    min_level: 5
+    items:
+      - { id: "Potion_Health", stack: [1, 2] }
+      - { id: "Potion_Mana", stack: [1, 2] }
+      - { id: "Potion_Stamina", stack: [1, 2] }
+      - { id: "Potion_Regen_Health_Small", stack: [1, 2] }
+      - { id: "Potion_Regen_Mana_Small", stack: [1, 2] }
+      - { id: "Potion_Regen_Stamina_Small", stack: [1, 2] }
+      - { id: "Potion_Antidote", stack: [1, 2] }
+
+  rare:
+    min_level: 15
+    items:
+      - { id: "Potion_Health_Large", stack: [1, 2] }
+      - { id: "Potion_Mana_Large", stack: [1, 2] }
+      - { id: "Potion_Stamina_Large", stack: [1, 2] }
+      - { id: "Potion_Regen_Health", stack: [1, 1] }
+      - { id: "Potion_Regen_Mana", stack: [1, 1] }
+      - { id: "Potion_Regen_Stamina", stack: [1, 1] }
+      - { id: "Potion_Purify", stack: [1, 1] }
+
+  epic:
+    min_level: 30
+    items:
+      - { id: "Potion_Health_Greater", stack: [1, 1] }
+      - { id: "Potion_Stamina_Greater", stack: [1, 1] }
+      - { id: "Potion_Regen_Health_Large", stack: [1, 1] }
+      - { id: "Potion_Regen_Mana_Large", stack: [1, 1] }
+      - { id: "Potion_Regen_Stamina_Large", stack: [1, 1] }
+
+  legendary:
+    min_level: 50
+    items:
+      - { id: "Potion_Signature_Greater", stack: [1, 1] }
+      - { id: "Potion_Signature_Lesser", stack: [1, 1] }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EXCLUDED ITEMS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Items that should never drop as loot, even if listed in tiers above.
+
+excluded_items:
+  - "Template_Food"
+  - "Potion_Template"
+  - "Potion_Empty"
+  - "Potion_Empty_Small"
+  - "Potion_Empty_Large"
+  - "Potion_Poison"
+  - "Potion_Poison_Large"
+  - "Potion_Poison_Minor"
+  - "Potion_Morph_Dog"
+  - "Potion_Morph_Frog"
+  - "Potion_Morph_Mouse"
+  - "Potion_Morph_Pigeon"
+  - "Halloween_Basket_Pumpkin"
+  - "Halloween_Basket_Straw"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTAINER DROPS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Settings for consumable drops from containers.
+# Tier multipliers are configured per container tier in container-loot.yml.
+
+container_drops:
+  enabled: true
+  # Base chance per roll to get a consumable (0.40 = 40%)
+  base_chance: 0.40
+  # Maximum consumable rolls per container
+  max_per_container: 2
+  # Weight distribution: food vs potion (relative, not percentages)
+  food_weight: 0.5
+  potion_weight: 0.5

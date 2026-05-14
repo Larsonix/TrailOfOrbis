@@ -13,6 +13,8 @@ import io.github.larsonix.trailoforbis.combat.blocking.BlockResult;
 import io.github.larsonix.trailoforbis.combat.blocking.BlockingProcessor;
 import io.github.larsonix.trailoforbis.config.ConfigManager;
 import io.github.larsonix.trailoforbis.config.RPGConfig;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.ModifierType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -48,7 +50,7 @@ public class AvoidanceProcessor {
      * @param evasion           Defender evasion rating
      * @param accuracy          Attacker accuracy rating
      * @param hitChance         Calculated hit chance (PoE formula)
-     * @param passiveBlockChance Passive block % from stats
+     * @param passiveBlockChance Block chance % from stats (feeds active block chance)
      * @param wasActiveBlock    Whether defender was holding shield
      * @param activeBlockChance Active block % (0 if not blocking)
      * @param blockDamageReduction Block damage reduction % (0.0-1.0)
@@ -100,6 +102,10 @@ public class AvoidanceProcessor {
             return new AvoidanceResult(true, DamageBreakdown.AvoidanceReason.DODGED, 0f);
         }
 
+        public static AvoidanceResult evaded() {
+            return new AvoidanceResult(true, DamageBreakdown.AvoidanceReason.EVADED, 0f);
+        }
+
         public static AvoidanceResult blocked(float estimatedDamage) {
             return new AvoidanceResult(true, DamageBreakdown.AvoidanceReason.BLOCKED, estimatedDamage);
         }
@@ -120,7 +126,7 @@ public class AvoidanceProcessor {
     }
 
     /**
-     * Checks all avoidance mechanics in order: dodge, evasion, active block, passive block.
+     * Checks all avoidance mechanics in order: dodge, evasion, active block.
      *
      * @param damage The damage event
      * @param defenderStats The defender's computed stats (may be null)
@@ -142,7 +148,7 @@ public class AvoidanceProcessor {
     }
 
     /**
-     * Checks all avoidance mechanics in order: dodge, evasion, active block, passive block.
+     * Checks all avoidance mechanics in order: dodge, evasion, active block.
      *
      * <p>This overload accepts store and defenderRef for active blocking detection,
      * which requires access to the defender's DamageDataComponent.
@@ -232,11 +238,26 @@ public class AvoidanceProcessor {
         // 2. Evasion check (PoE-inspired formula)
         if (evasion > 0) {
             if (checkEvasion(evasion, accuracy)) {
-                LOGGER.at(Level.FINE).log("Dodged: %.1f evasion vs %.1f accuracy",
+                LOGGER.at(Level.FINE).log("Evaded: %.1f evasion vs %.1f accuracy",
                     evasion, accuracy);
                 AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,
                     passiveBlockChance, false, 0, 0, 0, parryChance);
-                return new AvoidanceCheckResult(Optional.of(AvoidanceResult.dodged()), stats);
+                return new AvoidanceCheckResult(Optional.of(AvoidanceResult.evaded()), stats);
+            }
+        }
+
+        // 2b. Mob Evasive modifier check (defender is a mob with Evasive, melee attacks only)
+        if (store != null && defenderRef != null && defenderRef.isValid()
+                && damage.getSource() instanceof Damage.EntitySource) {
+            MobModifierComponent mobMods = store.getComponent(defenderRef, MobModifierComponent.getComponentType());
+            if (mobMods != null && mobMods.hasModifier(ModifierType.EVASIVE)) {
+                float evasiveDodge = (float) ModifierType.EVASIVE.getStatBonus().evasionChance();
+                if (evasiveDodge > 0 && ThreadLocalRandom.current().nextFloat() < evasiveDodge) {
+                    LOGGER.at(Level.FINE).log("Mob Evasive dodge: %.0f%% chance", evasiveDodge * 100);
+                    AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,
+                        passiveBlockChance, false, 0, 0, 0, parryChance);
+                    return new AvoidanceCheckResult(Optional.of(AvoidanceResult.dodged()), stats);
+                }
             }
         }
 
@@ -270,12 +291,9 @@ public class AvoidanceProcessor {
                         passiveBlockChance, true, activeBlockChance, blockDamageReduction, blockStaminaCost, parryChance);
                     return new AvoidanceCheckResult(Optional.of(AvoidanceResult.blocked(estimatedDamage)), stats);
                 }
-                // Block roll failed - continue to passive block check
+                // Block roll failed — hit connects
             }
         }
-
-        // 3b. Passive block removed — passive_block_chance now feeds block_chance
-        // (perfect block when actively blocking). No passive avoidance from blocking.
 
         // Hit connected — still return full stats
         AvoidanceDetail stats = new AvoidanceDetail(dodgeChance, evasion, accuracy, hitChance,
@@ -315,25 +333,6 @@ public class AvoidanceProcessor {
 
         float chanceToHit = calculateHitChance(accuracy, evasion);
         return ThreadLocalRandom.current().nextFloat() > chanceToHit;
-    }
-
-    /**
-     * Checks if the attack is passively blocked via passive block chance.
-     * This is a random proc, distinct from active shield blocking.
-     *
-     * @param defenderStats The defender's stats
-     * @return true if the attack is passively blocked
-     */
-    public boolean checkPassiveBlock(@Nullable ComputedStats defenderStats) {
-        if (defenderStats == null) {
-            return false;
-        }
-
-        float passiveBlockChance = defenderStats.getPassiveBlockChance();
-        if (passiveBlockChance > 0 && ThreadLocalRandom.current().nextFloat() * 100f < passiveBlockChance) {
-            return true;
-        }
-        return false;
     }
 
     /**

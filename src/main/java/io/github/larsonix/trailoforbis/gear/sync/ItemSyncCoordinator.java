@@ -7,6 +7,9 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+
+import io.github.larsonix.trailoforbis.attributes.StatMapBridge;
 import io.github.larsonix.trailoforbis.gear.GearManager;
 import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.tooltip.CraftingPreviewService;
@@ -192,12 +195,6 @@ public class ItemSyncCoordinator {
 
         state.allGearDirty = true;
         scheduleFlush(playerId);
-
-        LOGGER.atFine().log("[DIAG] markStatsDirty called for %s (caller: %s)",
-            playerId.toString().substring(0, 8),
-            Thread.currentThread().getStackTrace().length > 3
-                ? Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName()
-                : "unknown");
     }
 
     /**
@@ -565,20 +562,55 @@ public class ItemSyncCoordinator {
             Inventory inventory = player.getInventory();
             if (inventory == null) return;
 
-            List<ItemStack> allItems = GearManager.collectAllInventoryItems(inventory);
             int totalSynced = 0;
 
             // ── Gear sync ──
             if (gearDirty) {
-                // Stats changed — evaluate ALL gear. Hash dedup skips unchanged items.
-                totalSynced += itemSyncService.syncAllItems(playerRef, allItems);
+                // Stats changed — requirement colors may have flipped.
+                // Phase 1 (immediate): sync equipment items — these are the tooltips
+                // the player sees during active gameplay (equipped armor, held weapons).
+                List<ItemStack> equipmentItems = GearUtils.collectEquipmentItems(inventory);
+                totalSynced += itemSyncService.syncAllItems(playerRef, equipmentItems);
+
+                // Phase 2 (deferred): sync storage + backpack items on the next tick.
+                // These tooltips only matter when the player opens inventory and hovers.
+                // Deferring reduces the immediate world-thread stall during combat.
+                World world = state.world;
+                if (world != null && world.isAlive()) {
+                    world.execute(() -> {
+                        // Re-validate player is still connected and valid
+                        PlayerRef deferredRef = state.playerRef;
+                        Player deferredPlayer = state.player;
+                        if (deferredRef == null || deferredPlayer == null) return;
+                        var deferredEntityRef = deferredRef.getReference();
+                        if (deferredEntityRef == null || !deferredEntityRef.isValid()) return;
+                        if (suppressedPlayers.contains(playerId) || sanctumPlayers.contains(playerId)) return;
+
+                        @SuppressWarnings("deprecation")
+                        Inventory deferredInv = deferredPlayer.getInventory();
+                        if (deferredInv == null) return;
+
+                        state.currentlyFlushing = true;
+                        try {
+                            List<ItemStack> storageItems = GearUtils.collectStorageItems(deferredInv);
+                            int storageSynced = itemSyncService.syncAllItems(deferredRef, storageItems);
+                            if (storageSynced > 0) {
+                                LOGGER.atFine().log("Deferred-flushed %d storage items for player %s",
+                                    storageSynced, playerId.toString().substring(0, 8));
+                            }
+                        } finally {
+                            state.currentlyFlushing = false;
+                        }
+                    });
+                }
             } else if (!dirtyGear.isEmpty()) {
-                // Only specific items changed — filter to dirty set
+                // Only specific items changed — filter across ALL containers.
+                // Use fast item ID read (zero deserialization) instead of full GearData parse.
+                List<ItemStack> allItems = GearUtils.collectAllInventoryItems(inventory);
                 List<ItemStack> dirtyItems = new ArrayList<>();
                 for (ItemStack item : allItems) {
-                    Optional<io.github.larsonix.trailoforbis.gear.model.GearData> gearData =
-                        GearUtils.readGearData(item);
-                    if (gearData.isPresent() && dirtyGear.contains(gearData.get().getItemId())) {
+                    String itemId = GearUtils.readItemIdFast(item);
+                    if (itemId != null && dirtyGear.contains(itemId)) {
                         dirtyItems.add(item);
                     }
                 }
@@ -587,10 +619,27 @@ public class ItemSyncCoordinator {
                 }
             }
 
+            // ── Weapon mechanic stat correction ──
+            // UpdateItems causes the client to re-apply weapon.statModifiers, resetting
+            // SignatureEnergy/Ammo/SignatureCharges to their modifier values. Force-send
+            // the server's actual current values to prevent signature attack softlock.
+            if (totalSynced > 0) {
+                try {
+                    var store = state.world.getEntityStore().getStore();
+                    EntityStatMap statMap = store.getComponent(ref, EntityStatMap.getComponentType());
+                    if (statMap != null) {
+                        StatMapBridge.correctWeaponMechanicStats(statMap, player);
+                    }
+                } catch (Exception e) {
+                    LOGGER.atFine().log("Stat correction skipped for %s: %s",
+                        playerId.toString().substring(0, 8), e.getMessage());
+                }
+            }
+
             if (totalSynced > 0) {
                 LOGGER.atFine().log("Flushed %d gear items for player %s [%s]",
                     totalSynced, playerId.toString().substring(0, 8),
-                    gearDirty ? "ALL (stats changed)" : dirtyGear.size() + " specific");
+                    gearDirty ? "equipment (stats changed, storage deferred)" : dirtyGear.size() + " specific");
             }
 
             // ── Crafting preview sync (level-up while bench open) ──

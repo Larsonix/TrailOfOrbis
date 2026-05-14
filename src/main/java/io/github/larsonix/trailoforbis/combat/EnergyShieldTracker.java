@@ -151,7 +151,7 @@ public class EnergyShieldTracker {
      * @param dt Delta time in seconds
      */
     public void tickRegen(@Nonnull UUID uuid, float maxShield, float regenPerSecond, long playerRegenDelayMs, float dt) {
-        if (maxShield <= 0 || regenPerSecond <= 0) {
+        if (maxShield <= 0) {
             shields.remove(uuid);
             return;
         }
@@ -167,6 +167,11 @@ public class EnergyShieldTracker {
                 return current != state.currentShield()
                     ? new ShieldState(maxShield, state.lastHitTimeMs())
                     : state;
+            }
+
+            // No regen rate — keep shield state alive but don't regenerate
+            if (regenPerSecond <= 0) {
+                return state;
             }
 
             long timeSinceHit = System.currentTimeMillis() - state.lastHitTimeMs();

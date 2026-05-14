@@ -32,6 +32,7 @@ import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.gateway.GatewayUpgradeManager;
 import io.github.larsonix.trailoforbis.maps.gateway.GatewayUpgradePage;
+import io.github.larsonix.trailoforbis.maps.ui.RealmActivePortalPage;
 import io.github.larsonix.trailoforbis.maps.ui.RealmMapSummonPage;
 import io.github.larsonix.trailoforbis.util.MessageColors;
 import io.github.larsonix.trailoforbis.maps.api.RealmsService.ValidationResult;
@@ -111,7 +112,7 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
             return null;
         }
 
-        ItemStack inHand = playerComponent.getInventory().getItemInHand();
+        ItemStack inHand = playerComponent.getInventory().getActiveHotbarItem();
         World world = store.getExternalData().getWorld();
 
         // Check if held item is a realm map — show the portal summon UI
@@ -267,10 +268,11 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
                     var realmOpt = plugin.getRealmsManager().getRealm(realmIdOpt.get());
                     if (realmOpt.isPresent()) {
                         var realm = realmOpt.get();
-                        var mapData = realm.getMapData();
-                        // Show realm info using the summon UI template
-                        return new io.github.larsonix.trailoforbis.maps.ui.RealmMapSummonPage(
-                            playerRef, config, mapData, (byte) -1, portalPos);
+                        boolean isOwner = realm.getOwnerId().equals(playerRef.getUuid());
+
+                        // Show active portal info page (with Close button for owner)
+                        return new RealmActivePortalPage(
+                            playerRef, config, realm, isOwner);
                     }
                 }
             }
@@ -307,12 +309,18 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
                 LOGGER.atFine().log("Showing gateway upgrade UI at (%d,%d,%d) tier %d",
                     targetBlock.x, targetBlock.y, targetBlock.z, currentTier);
 
-                Store<EntityStore> entityStore = ref.getStore();
-                GatewayUpgradePage page = new GatewayUpgradePage(
-                    playerRef, worldUuid,
-                    targetBlock.x, targetBlock.y, targetBlock.z,
-                    currentTier);
-                page.open(entityStore);
+                // Defer page.open() to world.execute() — opening a HyUI page inside tryCreate()
+                // causes "Simulation and server tick are not in sync" because tryCreate() runs
+                // inside the interaction chain tick.
+                final int bx = targetBlock.x, by = targetBlock.y, bz = targetBlock.z;
+                final int tier = currentTier;
+                final UUID wUuid = worldUuid;
+                world.execute(() -> {
+                    Store<EntityStore> deferredStore = world.getEntityStore().getStore();
+                    GatewayUpgradePage page = new GatewayUpgradePage(
+                        playerRef, wUuid, bx, by, bz, tier);
+                    page.open(deferredStore);
+                });
                 return null;
             }
         }

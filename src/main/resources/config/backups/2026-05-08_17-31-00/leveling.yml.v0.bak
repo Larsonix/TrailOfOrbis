@@ -1,0 +1,288 @@
+# =============================================================================
+# Leveling & Experience Configuration
+# =============================================================================
+# Controls the player progression system: XP gain, level requirements,
+# death penalties, and UI settings.
+#
+# OVERVIEW:
+# ---------
+# Players gain XP primarily from killing mobs. The XP required to level up
+# increases exponentially, creating a satisfying progression curve that
+# slows down at higher levels.
+#
+# =============================================================================
+
+# Master switch for the entire leveling system
+enabled: true
+
+# -----------------------------------------------------------------------------
+# LEVEL FORMULA
+# -----------------------------------------------------------------------------
+# Controls how much XP is required to reach each level.
+#
+# Two formula types are supported:
+#
+# "effort" (default) — Defines how many mobs to kill per level, then derives
+#   XP requirements from estimated mob XP rewards. If mob XP rates change
+#   (via xp_gain, mob-stat-pool, or LevelScaling configs), XP requirements
+#   auto-adjust to maintain the intended kills-per-level experience.
+#
+#   EXAMPLE (base_mobs=3, target_mobs=150, target_level=100):
+#     Level 1:   ~3 mobs to level up
+#     Level 10:  ~21 mobs to level up
+#     Level 50:  ~93 mobs to level up
+#     Level 100: ~150 mobs to level up
+#
+# "exponential" (legacy) — Direct XP formula: xp = base_xp * (level-1)^exponent
+
+formula:
+  # Formula type: "effort" (default) or "exponential" (legacy)
+  type: effort
+
+  # Maximum achievable level
+  # Default: 1000000
+  max_level: 1000000
+
+  # Effort curve: power-law growth for mobs-per-level
+  # Want harder endgame? Increase target_mobs.
+  # Want easier early game? Decrease base_mobs.
+  effort:
+    base_mobs: 3          # mobs per level at level 1
+    target_mobs: 150      # mobs per level at target_level
+    target_level: 100     # reference level for the curve
+
+  # Legacy exponential formula (only used when type: exponential)
+  base_xp: 50.0
+  exponent: 2.2
+
+# -----------------------------------------------------------------------------
+# XP GAIN FROM MOB KILLS
+# -----------------------------------------------------------------------------
+# Controls how much XP players receive when killing mobs.
+#
+# FORMULA:
+#   base_xp = mob_level * xp_per_mob_level
+#   pool_bonus = mob_stat_pool * pool_multiplier
+#   class_mult = xp multiplier from mob-classification.yml (MYTHIC=25x, etc.)
+#   tier_mult = boss_multiplier OR elite_multiplier OR 1.0
+#
+#   total_xp = max(1, (base_xp + pool_bonus) * class_mult * tier_mult)
+#
+# EXAMPLE (Level 10 ELITE mob with 300 stat pool):
+#   base_xp = 10 * 5.0 = 50
+#   pool_bonus = 300 * 0.1 = 30
+#   class_mult = 2.5 (ELITE from mob-classification.yml)
+#   tier_mult = 1.5 (elite_multiplier)
+#
+#   total_xp = (50 + 30) * 2.5 * 1.5 = 300 XP
+
+xp_gain:
+  # Enable/disable XP gain from mob kills
+  # Default: true
+  enabled: true
+
+  # Base XP per mob level
+  # Higher values = more XP from high-level mobs
+  # Default: 5.0
+  xp_per_mob_level: 5.0
+
+  # XP multiplier for mob stat pool
+  # Rewards killing stronger mobs (high stat pool = more XP)
+  # Default: 0.1 (10% of stat pool as bonus XP)
+  pool_multiplier: 0.1
+
+  # NOTE: Boss/elite XP multipliers are in mob-classification.yml (xp_multipliers section),
+  # NOT here. The old boss_multiplier/elite_multiplier fields were dead code and have been removed.
+
+  # ── LEVEL GAP PENALTY ──
+  # Reduces XP when mob level is far above or below the player's level.
+  # Uses an asymmetric smooth curve (PoE-style rational function):
+  #   - Downward (mob too low): steep falloff, 1% floor — prevents trivial farming
+  #   - Upward (mob too high): gentle falloff, 5% floor — rewards challenge
+  #
+  # Safe zone = safe_zone_base + (safe_zone_percent × player_level)
+  # Within the safe zone, full XP is granted. Beyond it, XP degrades smoothly.
+  #
+  # EXAMPLES at player level 50 (safe zone = 25):
+  #   Mob Lv25 (edge of safe zone):  100% XP
+  #   Mob Lv15 (10 below edge):       ~60% XP
+  #   Mob Lv0  (25 below edge):        ~5% XP
+  #   Mob Lv85 (10 above edge):       ~85% XP
+  #   Mob Lv105 (30 above edge):      ~42% XP
+  level_gap:
+    enabled: true
+    safe_zone_base: 20         # Flat safe zone (levels)
+    safe_zone_percent: 0.10    # + 10% of player level
+    # Downward: mob level too low (aggressive — trivial content shouldn't reward)
+    downward_falloff_factor: 0.5   # Falloff range = 0.5 × safe zone
+    downward_exponent: 2.5         # Curve steepness (higher = steeper)
+    downward_floor: 0.01           # Minimum 1% XP
+    # Upward: mob level too high (gentle — difficulty is already the gate)
+    upward_falloff_factor: 1.0     # Falloff range = 1.0 × safe zone
+    upward_exponent: 1.5           # Gentler curve
+    upward_floor: 0.05             # Minimum 5% XP
+
+# -----------------------------------------------------------------------------
+# XP LOSS ON DEATH
+# -----------------------------------------------------------------------------
+# Optionally penalize players for dying by losing XP.
+# This adds risk/reward to combat and exploration.
+#
+# FORMULA:
+#   xp_lost = current_xp * percentage
+#
+# Players cannot lose levels or drop below min_level.
+
+xp_loss:
+  # Enable/disable XP loss on death
+  # Default: true (death penalty enabled)
+  enabled: true
+
+  # Percentage of current XP lost on death
+  # 0.10 = 10% XP loss
+  # 0.25 = 25% XP loss (harsh)
+  # 0.50 = 50% XP loss (very harsh)
+  # Default: 0.50 (50%)
+  percentage: 0.50
+
+  # Minimum level protection
+  # Players at or below this level don't lose XP on death
+  # Protects new players from frustration
+  # Default: 20
+  min_level: 20
+
+# -----------------------------------------------------------------------------
+# UI SETTINGS
+# -----------------------------------------------------------------------------
+# Controls visual feedback for the leveling system.
+
+ui:
+  # Show XP bar on screen
+  # Displays current XP progress toward next level
+  # Default: true
+  show_xp_bar: true
+
+  # Show level up notification
+  # Displays a message when player levels up
+  # Default: true
+  show_level_up_notification: true
+
+  # Show XP gain notifications
+  # Displays floating text when XP is gained
+  # Default: true
+  show_xp_gain_notification: true
+
+# -----------------------------------------------------------------------------
+# LEVEL-UP CELEBRATION
+# -----------------------------------------------------------------------------
+# Controls the visual and audio feedback when a player levels up.
+# Each milestone tier (normal, minor, major, huge) gets progressively
+# more dramatic feedback.
+
+celebration:
+  # Fullscreen banner (center-screen title text)
+  banner:
+    enabled: true
+    normal:
+      duration: 2.5
+      fade_in: 0.5
+      fade_out: 1.0
+    minor:
+      duration: 3.0
+      fade_in: 0.5
+      fade_out: 1.0
+    major:
+      duration: 4.0
+      fade_in: 1.0
+      fade_out: 1.5
+    huge:
+      duration: 5.0
+      fade_in: 1.0
+      fade_out: 1.5
+
+  # Sound effects (vanilla Hytale sound event IDs)
+  sound:
+    enabled: true
+    normal: "SFX_Discovery_Z1_Short"
+    minor: "SFX_Discovery_Z1_Medium"
+    major: "SFX_Discovery_Z3_Medium"
+    huge: "SFX_Chest_Legendary_FirstOpen_Player"
+
+  # Chat breakdown message
+  chat:
+    enabled: true
+    show_totals: true      # Show "(14 available)" after point gains
+    show_borders: true     # Show decorative ═══ header/footer
+
+  # Emote celebration (player character performs an emote animation)
+  # Set emote_id to a valid emote ID to trigger on level-up.
+  # Leave empty to disable. Use /emote in-game to see available IDs.
+  emote:
+    emote_id: ""
+
+  # Milestone intervals (which levels get extra flair)
+  milestones:
+    minor: 10     # Every 10th level
+    major: 50     # Every 50th level
+    huge: 250     # Every 250th level
+
+# -----------------------------------------------------------------------------
+# BALANCE PRESETS
+# -----------------------------------------------------------------------------
+#
+# CASUAL (Slow, rewarding progression):
+#   base_xp: 20
+#   exponent: 1.5
+#   xp_per_mob_level: 8.0
+#   xp_loss.enabled: false
+#
+# DEFAULT (Balanced with death penalty):
+#   base_xp: 50
+#   exponent: 2.2
+#   xp_per_mob_level: 5.0
+#   xp_loss.enabled: true
+#   xp_loss.percentage: 0.50
+#   xp_loss.min_level: 20
+#
+# HARDCORE (Fast but punishing):
+#   base_xp: 35
+#   exponent: 2.0
+#   xp_per_mob_level: 3.0
+#   xp_loss.enabled: true
+#   xp_loss.percentage: 0.25
+#
+# MMO-STYLE (Very long progression):
+#   base_xp: 50
+#   exponent: 2.2
+#   xp_per_mob_level: 10.0
+#   max_level: 100
+#
+# -----------------------------------------------------------------------------
+# XP GAIN EXAMPLES
+# -----------------------------------------------------------------------------
+#
+# With default settings (xp_per_mob_level=5, pool_multiplier=0.1):
+#
+# Low-tier mob (Level 5, 75 pool):
+#   base = 5 * 5 = 25
+#   pool = 75 * 0.1 = 7.5
+#   total = 32 XP
+#
+# Mid-tier mob (Level 25, 400 pool):
+#   base = 25 * 5 = 125
+#   pool = 400 * 0.1 = 40
+#   total = 165 XP
+#
+# High-tier ELITE (Level 50, 800 pool):
+#   base = 50 * 5 = 250
+#   pool = 800 * 0.1 = 80
+#   class_mult = 2.5 (ELITE)
+#   elite_mult = 1.5
+#   total = (250 + 80) * 2.5 * 1.5 = 1,237 XP
+#
+# MYTHIC boss (Level 100, 2000 pool):
+#   base = 100 * 5 = 500
+#   pool = 2000 * 0.1 = 200
+#   class_mult = 25.0 (MYTHIC)
+#   boss_mult = 3.0
+#   total = (500 + 200) * 25 * 3 = 52,500 XP

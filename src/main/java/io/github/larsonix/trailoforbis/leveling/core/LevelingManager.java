@@ -9,7 +9,10 @@ import io.github.larsonix.trailoforbis.leveling.repository.LevelingRepository;
 import io.github.larsonix.trailoforbis.leveling.xp.XpSource;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -34,20 +37,33 @@ public class LevelingManager implements LevelingService {
 
     private final LevelingRepository repository;
     private final LevelFormula formula;
+    private final @Nullable LevelFormula previousFormula;
     private final LevelingConfig config;
     private final LevelingEventDispatcher eventDispatcher;
 
     // Per-player locks to prevent race conditions
     private final Map<UUID, ReentrantLock> playerLocks = new ConcurrentHashMap<>();
 
-    /** Creates a new LevelingManager. */
+    // Players whose XP was adjusted during level protection (for notifications)
+    private final Set<UUID> adjustedPlayers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /**
+     * Creates a new LevelingManager.
+     *
+     * @param repository      The leveling data repository
+     * @param formula         The current XP-to-level formula
+     * @param previousFormula The previous formula for one-time bootstrap migration (nullable)
+     * @param config          The leveling configuration
+     */
     public LevelingManager(
         @Nonnull LevelingRepository repository,
         @Nonnull LevelFormula formula,
+        @Nullable LevelFormula previousFormula,
         @Nonnull LevelingConfig config
     ) {
         this.repository = repository;
         this.formula = formula;
+        this.previousFormula = previousFormula;
         this.config = config;
         this.eventDispatcher = new LevelingEventDispatcher();
     }
@@ -56,10 +72,17 @@ public class LevelingManager implements LevelingService {
     // PLAYER LIFECYCLE
     // ═══════════════════════════════════════════════════════════════════
 
-    /** Loads or creates player data. Call on player join. */
+    /** Loads or creates player data. Call on player join. Runs level protection migration. */
     @Nonnull
     public PlayerLevelData loadPlayer(@Nonnull UUID playerId) {
-        return repository.loadOrCreate(playerId);
+        ReentrantLock lock = getPlayerLock(playerId);
+        lock.lock();
+        try {
+            PlayerLevelData data = repository.loadOrCreate(playerId);
+            return protectLevel(data);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /** Unloads player data from cache. Call on player quit. */
@@ -75,6 +98,7 @@ public class LevelingManager implements LevelingService {
         }
         repository.evict(playerId);
         playerLocks.remove(playerId);
+        adjustedPlayers.remove(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -102,11 +126,11 @@ public class LevelingManager implements LevelingService {
             PlayerLevelData data = repository.getOrDefault(playerId);
             int oldLevel = formula.getLevelForXp(data.xp());
 
-            // Update XP
+            // Update XP and stamp level
             PlayerLevelData newData = data.withXpDelta(amount);
-            repository.save(newData);
-
             int newLevel = formula.getLevelForXp(newData.xp());
+            newData = newData.withStoredLevel(newLevel);
+            repository.save(newData);
 
             // Fire XP gain event
             eventDispatcher.dispatchXpGain(playerId, amount, source, newData.xp());
@@ -138,15 +162,23 @@ public class LevelingManager implements LevelingService {
 
             // Calculate actual loss (can't go below 0)
             long actualLoss = Math.min(amount, data.xp());
+
+            // Defense-in-depth: death penalty can never drop a player below their current level
+            if (source.isLossSource()) {
+                long levelFloor = formula.getXpForLevel(oldLevel);
+                long maxLoss = Math.max(0, data.xp() - levelFloor);
+                actualLoss = Math.min(actualLoss, maxLoss);
+            }
+
             if (actualLoss == 0) {
                 return;
             }
 
-            // Update XP
+            // Update XP and stamp level
             PlayerLevelData newData = data.withXpDelta(-actualLoss);
-            repository.save(newData);
-
             int newLevel = formula.getLevelForXp(newData.xp());
+            newData = newData.withStoredLevel(newLevel);
+            repository.save(newData);
 
             // Fire XP loss event
             eventDispatcher.dispatchXpLoss(playerId, actualLoss, source, newData.xp());
@@ -169,11 +201,11 @@ public class LevelingManager implements LevelingService {
             PlayerLevelData data = repository.getOrDefault(playerId);
             int oldLevel = formula.getLevelForXp(data.xp());
 
-            // Update XP (withXp clamps to >= 0)
+            // Update XP (withXp clamps to >= 0) and stamp level
             PlayerLevelData newData = data.withXp(amount);
-            repository.save(newData);
-
             int newLevel = formula.getLevelForXp(newData.xp());
+            newData = newData.withStoredLevel(newLevel);
+            repository.save(newData);
 
             // Fire level change events if needed
             if (newLevel > oldLevel) {
@@ -299,7 +331,21 @@ public class LevelingManager implements LevelingService {
         eventDispatcher.clearAll();
         repository.shutdown();
         playerLocks.clear();
+        adjustedPlayers.clear();
         LOGGER.at(Level.INFO).log("LevelingManager shutdown complete");
+    }
+
+    /**
+     * Checks whether this player's XP was adjusted during level protection on load.
+     *
+     * <p>Returns true at most once per player per session (clears the flag).
+     * Used by PlayerJoinListener to show a one-time notification.
+     *
+     * @param playerId The player's UUID
+     * @return true if XP was bumped to preserve their level
+     */
+    public boolean wasXpAdjusted(@Nonnull UUID playerId) {
+        return adjustedPlayers.remove(playerId);
     }
 
     /** Gets the repository for direct access (advanced use). */
@@ -327,5 +373,75 @@ public class LevelingManager implements LevelingService {
     @Nonnull
     private ReentrantLock getPlayerLock(@Nonnull UUID playerId) {
         return playerLocks.computeIfAbsent(playerId, k -> new ReentrantLock());
+    }
+
+    /**
+     * Protects a player's level from XP curve changes.
+     *
+     * <p>Two layers of protection:
+     * <ol>
+     *   <li><b>Bootstrap</b>: If {@code storedLevel} is null (pre-migration player),
+     *       uses {@code previousFormula} to compute what their level WAS. If the old
+     *       level exceeds the new level, bumps XP to preserve it.</li>
+     *   <li><b>Ongoing</b>: If {@code storedLevel > currentLevel}, bumps XP to match
+     *       the stored level. Handles all future curve changes automatically.</li>
+     * </ol>
+     *
+     * <p>Always stamps the current derived level on the data before returning.
+     *
+     * @param data The loaded player data
+     * @return The (possibly adjusted) player data with level stamped
+     */
+    @Nonnull
+    private PlayerLevelData protectLevel(@Nonnull PlayerLevelData data) {
+        int currentLevel = formula.getLevelForXp(data.xp());
+
+        if (data.storedLevel() == null) {
+            // Pre-migration player — use old formula to detect level loss
+            if (previousFormula != null && data.xp() > 0) {
+                int oldLevel = Math.min(previousFormula.getLevelForXp(data.xp()), formula.getMaxLevel());
+                if (oldLevel > currentLevel) {
+                    long requiredXp = formula.getXpForLevel(oldLevel);
+                    LOGGER.atInfo().log(
+                        "XP curve migration: %s was level %d (old curve), derived %d (new curve). "
+                        + "Bumping XP %d -> %d to preserve level.",
+                        data.uuid(), oldLevel, currentLevel, data.xp(), requiredXp);
+                    data = data.withXp(requiredXp).withStoredLevel(oldLevel);
+                    repository.save(data);
+                    adjustedPlayers.add(data.uuid());
+                    return data;
+                }
+            }
+            // No adjustment needed — just stamp the current level
+            data = data.withStoredLevel(currentLevel);
+            repository.save(data);
+            return data;
+        }
+
+        // Clamp stored level to current maxLevel (handles maxLevel reductions between versions)
+        int storedLevel = data.storedLevel();
+        int clampedLevel = Math.min(storedLevel, formula.getMaxLevel());
+        boolean wasClamped = clampedLevel != storedLevel;
+
+        // Ongoing protection: stored level > current derived level
+        if (clampedLevel > currentLevel) {
+            long requiredXp = formula.getXpForLevel(clampedLevel);
+            LOGGER.atInfo().log(
+                "XP curve protection: %s stored level %d > derived level %d. "
+                + "Bumping XP %d -> %d.",
+                data.uuid(), clampedLevel, currentLevel, data.xp(), requiredXp);
+            data = data.withXp(requiredXp).withStoredLevel(clampedLevel);
+            repository.save(data);
+            adjustedPlayers.add(data.uuid());
+            return data;
+        }
+
+        // Level increased naturally (e.g., curve got easier) or storedLevel was clamped — update
+        if (currentLevel > clampedLevel || wasClamped) {
+            data = data.withStoredLevel(currentLevel);
+            repository.save(data);
+        }
+
+        return data;
     }
 }

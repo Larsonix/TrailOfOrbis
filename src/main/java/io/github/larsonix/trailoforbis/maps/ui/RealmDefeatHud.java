@@ -54,9 +54,13 @@ public class RealmDefeatHud {
         UUID playerId = player.getUuid();
         String html = buildHtml(realm, playerId);
 
-        return HudBuilder.hudForPlayer(player)
+        HyUIHud hud = HudBuilder.hudForPlayer(player)
             .fromHtml(html)
             .show();
+
+        // Deterministic name — prevents MCHUD accumulation across world transitions
+        hud.name = "too-realm-defeat";
+        return hud;
     }
 
     /**

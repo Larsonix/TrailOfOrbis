@@ -13,6 +13,13 @@ import io.github.larsonix.trailoforbis.gear.model.WeaponImplicit;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.stones.StoneActionResult;
 
+import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.ItemArmorSlot;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon;
+import com.hypixel.hytale.server.core.asset.type.itemsound.config.ItemSoundSet;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -31,7 +38,7 @@ import java.util.Random;
  */
 public class GearStoneHandler implements ItemTypeHandler<GearData> {
 
-    private static final String FALLBACK_SLOT = "weapon";
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     private final GearModifierRoller roller;
     @Nullable
@@ -79,6 +86,22 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
         var ctx = resolveContext(item);
         GearData result = roller.rerollTypes(item, ctx.slot(), ctx.equipmentType(), random);
         return StoneActionResult.success(result, "Modifiers rerolled.");
+    }
+
+    @Override
+    @Nonnull
+    public StoneActionResult rerollPrefixTypes(@Nonnull GearData item, @Nonnull Random random) {
+        var ctx = resolveContext(item);
+        GearData result = roller.rerollPrefixTypes(item, ctx.slot(), ctx.equipmentType(), random);
+        return StoneActionResult.success(result, "Prefixes rerolled.");
+    }
+
+    @Override
+    @Nonnull
+    public StoneActionResult rerollSuffixTypes(@Nonnull GearData item, @Nonnull Random random) {
+        var ctx = resolveContext(item);
+        GearData result = roller.rerollSuffixTypes(item, ctx.slot(), ctx.equipmentType(), random);
+        return StoneActionResult.success(result, "Suffixes rerolled.");
     }
 
     @Override
@@ -345,17 +368,6 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     }
 
     /**
-     * Resolves the equipment type from the item's base ID for modifier filtering.
-     *
-     * <p>This ensures stones only roll modifiers that are allowed for the specific
-     * equipment type (e.g., spellbooks only get magic modifiers, not physical).
-     */
-    @Nullable
-    private EquipmentType resolveEquipmentType(@Nonnull GearData item) {
-        return resolveContext(item).equipmentType;
-    }
-
-    /**
      * Resolves the modifier pool slot string from the item's base ID.
      *
      * <p>This ensures stones roll modifiers from the correct pool:
@@ -367,16 +379,65 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
     }
 
     /**
-     * Resolves both slot and equipment type from the item's base ID in a single pass.
-     * Avoids redundant WeaponType/ArmorMaterial lookups when both are needed.
+     * Resolves both slot and equipment type from the item's base ID.
+     *
+     * <p>Uses a three-layer resolution strategy (matching the generation path):
+     * <ol>
+     *   <li><b>Name-based</b>: Fast keyword matching on baseItemId
+     *       ({@link WeaponType#fromItemId}, {@link ArmorMaterial#fromItemId})</li>
+     *   <li><b>Hytale asset API</b>: Definitive lookup via {@code Item.getArmor()}/
+     *       {@code Item.getWeapon()} — catches non-standard names (modded/special items)</li>
+     *   <li><b>Implicit-based</b>: Uses the item's own implicit data to infer category
+     *       — handles legacy items without baseItemId</li>
+     * </ol>
+     *
+     * <p>The last-resort fallback uses an armor-safe default ("chest" slot with
+     * {@code UNKNOWN_ARMOR}), never the weapon pool — weapon modifiers on armor
+     * is far worse than slightly-wrong armor modifiers.
      */
     @Nonnull
     private ModifierContext resolveContext(@Nonnull GearData item) {
         String baseItemId = item.baseItemId();
-        if (baseItemId == null || baseItemId.isEmpty()) {
-            return new ModifierContext(FALLBACK_SLOT, null);
+
+        if (baseItemId != null && !baseItemId.isEmpty()) {
+            // Layer 1: Name-based resolution (fast, handles standard Weapon_*/Armor_* naming)
+            ModifierContext fromName = resolveFromName(baseItemId);
+            if (fromName != null) {
+                return fromName;
+            }
+
+            // Layer 2: Hytale asset API (definitive, handles ALL items including modded)
+            ModifierContext fromAsset = resolveFromHytaleAsset(baseItemId);
+            if (fromAsset != null) {
+                LOGGER.atInfo().log("Stone modifier context resolved via asset API for '%s' → %s/%s",
+                        baseItemId, fromAsset.slot(), fromAsset.equipmentType());
+                return fromAsset;
+            }
         }
 
+        // Layer 3: Implicit-based inference (handles legacy items without baseItemId)
+        ModifierContext fromImplicits = resolveFromImplicits(item, baseItemId);
+        if (fromImplicits != null) {
+            LOGGER.atWarning().log(
+                    "Stone modifier context resolved via implicit inference for baseItemId='%s' → %s/%s. "
+                    + "Item may be legacy (pre-baseItemId) or have a non-standard ID.",
+                    baseItemId, fromImplicits.slot(), fromImplicits.equipmentType());
+            return fromImplicits;
+        }
+
+        // Last resort: armor-safe default (weapon modifiers on armor is far worse)
+        LOGGER.atWarning().log(
+                "Stone modifier context unresolvable for baseItemId='%s'. "
+                + "Using armor-safe fallback (chest/UNKNOWN_ARMOR). Item may need re-generation.",
+                baseItemId);
+        return new ModifierContext("chest", EquipmentType.UNKNOWN_ARMOR);
+    }
+
+    /**
+     * Layer 1: Fast name-based resolution from item ID patterns.
+     */
+    @Nullable
+    private ModifierContext resolveFromName(@Nonnull String baseItemId) {
         // Weapons (covers spellbooks, shields, staves, bows, etc.)
         Optional<WeaponType> weaponType = WeaponType.fromItemId(baseItemId);
         if (weaponType.isPresent()) {
@@ -384,7 +445,7 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
             return new ModifierContext(equipType.getSlot(), equipType);
         }
 
-        // Armor
+        // Armor (requires "Armor_" prefix)
         Optional<ArmorMaterial> material = ArmorMaterial.fromItemId(baseItemId);
         if (material.isPresent()) {
             ArmorSlot armorSlot = deriveArmorSlot(baseItemId);
@@ -394,7 +455,121 @@ public class GearStoneHandler implements ItemTypeHandler<GearData> {
             }
         }
 
-        return new ModifierContext(FALLBACK_SLOT, null);
+        return null;
+    }
+
+    /**
+     * Layer 2: Definitive resolution using Hytale's Item asset system.
+     *
+     * <p>Reads the actual item definition to determine weapon/armor status.
+     * Works for ALL items regardless of naming convention (modded items included).
+     * Mirrors {@code EquipmentTypeResolver.resolveFromHytaleAsset()}.
+     */
+    @Nullable
+    private ModifierContext resolveFromHytaleAsset(@Nonnull String baseItemId) {
+        try {
+            Item item = Item.getAssetMap().getAsset(baseItemId);
+            if (item == null || item == Item.UNKNOWN) {
+                return null;
+            }
+
+            // Check weapon
+            ItemWeapon weapon = item.getWeapon();
+            if (weapon != null) {
+                Optional<WeaponType> weaponType = WeaponType.fromItemId(baseItemId);
+                if (weaponType.isPresent() && weaponType.get() != WeaponType.UNKNOWN) {
+                    EquipmentType equipType = EquipmentType.resolve(weaponType.get(), null, null);
+                    return new ModifierContext(equipType.getSlot(), equipType);
+                }
+                return new ModifierContext("weapon", EquipmentType.UNKNOWN_WEAPON);
+            }
+
+            // Check armor
+            ItemArmor armor = item.getArmor();
+            if (armor != null) {
+                ArmorSlot slot = hytaleSlotToArmorSlot(armor.getArmorSlot());
+                ArmorMaterial material = resolveArmorMaterial(item, baseItemId);
+                EquipmentType equipType = EquipmentType.resolve(null, material, slot);
+                return new ModifierContext(slot.getSlotName(), equipType);
+            }
+
+            // Check shield
+            if (baseItemId.toLowerCase().contains("shield")) {
+                return new ModifierContext("shield", EquipmentType.SHIELD);
+            }
+
+        } catch (Exception e) {
+            LOGGER.atFine().log("Asset resolution failed for '%s': %s", baseItemId, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Layer 3: Infer equipment category from the item's own implicit data.
+     *
+     * <p>Handles legacy items without baseItemId by using the implicit's type
+     * to determine whether this is a weapon or armor piece.
+     */
+    @Nullable
+    private ModifierContext resolveFromImplicits(@Nonnull GearData item, @Nullable String baseItemId) {
+        // Weapon implicit → this is a weapon
+        if (item.hasWeaponImplicit()) {
+            if (baseItemId != null) {
+                Optional<WeaponType> wt = WeaponType.fromItemId(baseItemId);
+                if (wt.isPresent()) {
+                    EquipmentType equipType = EquipmentType.resolve(wt.get(), null, null);
+                    return new ModifierContext(equipType.getSlot(), equipType);
+                }
+            }
+            return new ModifierContext("weapon", EquipmentType.UNKNOWN_WEAPON);
+        }
+
+        // Armor implicit → this is armor
+        if (item.hasArmorImplicit()) {
+            // Try to derive the armor slot from the implicit's defense type
+            String defenseType = item.armorImplicit().defenseType();
+            if ("block_chance".equals(defenseType)) {
+                return new ModifierContext("shield", EquipmentType.SHIELD);
+            }
+            // Can't determine exact slot from implicit alone — use chest as broadest
+            return new ModifierContext("chest", EquipmentType.UNKNOWN_ARMOR);
+        }
+
+        return null;
+    }
+
+    /**
+     * Converts Hytale's ItemArmorSlot enum to our ArmorSlot.
+     */
+    @Nonnull
+    private ArmorSlot hytaleSlotToArmorSlot(@Nonnull ItemArmorSlot hytaleSlot) {
+        return switch (hytaleSlot) {
+            case Head -> ArmorSlot.HEAD;
+            case Chest -> ArmorSlot.CHEST;
+            case Legs -> ArmorSlot.LEGS;
+            case Hands -> ArmorSlot.HANDS;
+        };
+    }
+
+    /**
+     * Resolves armor material using ItemSoundSet first, then name fallback.
+     * Same approach as {@code EquipmentTypeResolver.resolveArmorMaterial()}.
+     */
+    @Nonnull
+    private ArmorMaterial resolveArmorMaterial(@Nonnull Item item, @Nonnull String itemId) {
+        try {
+            int soundSetIndex = item.getItemSoundSetIndex();
+            ItemSoundSet soundSet = ItemSoundSet.getAssetMap().getAsset(soundSetIndex);
+            if (soundSet != null) {
+                Optional<ArmorMaterial> fromSoundSet = ArmorMaterial.fromSoundSetId(soundSet.getId());
+                if (fromSoundSet.isPresent()) {
+                    return fromSoundSet.get();
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.atFine().log("SoundSet lookup failed for '%s': %s", itemId, e.getMessage());
+        }
+        return ArmorMaterial.fromItemIdOrSpecial(itemId);
     }
 
     /** Holds resolved slot + equipment type for modifier operations. */

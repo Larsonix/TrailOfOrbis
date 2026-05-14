@@ -8,7 +8,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
@@ -19,8 +18,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.util.NotificationUtil;
-import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
@@ -29,10 +26,11 @@ import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.database.models.PlayerData;
-import io.github.larsonix.trailoforbis.util.MessageColors;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.leveling.config.LevelingConfig;
 import io.github.larsonix.trailoforbis.leveling.xp.MobStatsXpCalculator;
+import io.github.larsonix.trailoforbis.leveling.xp.XpDistributionService;
+import io.github.larsonix.trailoforbis.leveling.xp.XpRecipientModifier;
 import io.github.larsonix.trailoforbis.leveling.xp.XpSource;
 import io.github.larsonix.trailoforbis.mobs.MobScalingManager;
 import io.github.larsonix.trailoforbis.mobs.classification.MobClassificationService;
@@ -93,28 +91,27 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         @Nonnull Store<EntityStore> store,
         @Nonnull CommandBuffer<EntityStore> commandBuffer
     ) {
-        // ALWAYS log entry to trace system activation
-        LOGGER.at(Level.INFO).log("onComponentAdded TRIGGERED for entity ref=%s", ref);
+        LOGGER.at(Level.FINE).log("onComponentAdded TRIGGERED for entity ref=%s", ref);
 
         // Get leveling config
         LevelingConfig config = getLevelingConfig();
         if (config == null) {
-            LOGGER.at(Level.INFO).log("SKIP: LevelingConfig is null");
+            LOGGER.at(Level.FINE).log("SKIP: LevelingConfig is null");
             return;
         }
         if (!config.isEnabled()) {
-            LOGGER.at(Level.INFO).log("SKIP: Leveling is disabled");
+            LOGGER.at(Level.FINE).log("SKIP: Leveling is disabled");
             return;
         }
         if (!config.getXpGain().isEnabled()) {
-            LOGGER.at(Level.INFO).log("SKIP: XP gain is disabled");
+            LOGGER.at(Level.FINE).log("SKIP: XP gain is disabled");
             return;
         }
 
         // Skip if this is a player death (handled by XpLossSystem)
         Player playerComponent = store.getComponent(ref, Player.getComponentType());
         if (playerComponent != null) {
-            LOGGER.at(Level.INFO).log("SKIP: Entity is a player (handled by XpLossSystem)");
+            LOGGER.at(Level.FINE).log("SKIP: Entity is a player (handled by XpLossSystem)");
             return;
         }
 
@@ -137,11 +134,11 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
                 Damage.Source src = deathDmg.getSource();
                 srcInfo = src != null ? src.getClass().getName() : "source=null";
             }
-            LOGGER.at(Level.INFO).log("SKIP: No player attacker found (src=%s)", srcInfo);
+            LOGGER.at(Level.FINE).log("SKIP: No player attacker found (src=%s)", srcInfo);
             return;
         }
         UUID attackerUuid = attackerRef.getUuid();
-        LOGGER.at(Level.INFO).log("Attacker UUID: %s", attackerUuid);
+        LOGGER.at(Level.FINE).log("Attacker UUID: %s", attackerUuid);
 
         // Get mob scaling component (may be null for unscaled/chunk-loaded mobs)
         MobScalingComponent mobScaling = store.getComponent(ref, MobScalingComponent.getComponentType());
@@ -149,7 +146,7 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         // Calculate XP
         MobStatsXpCalculator calculator = getXpCalculator();
         if (calculator == null) {
-            LOGGER.at(Level.INFO).log("SKIP: XpCalculator is null");
+            LOGGER.at(Level.FINE).log("SKIP: XpCalculator is null");
             return;
         }
 
@@ -178,51 +175,55 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
             }
         }
 
-        // Apply level-gap penalty (only for scaled mobs with known level)
-        if (mobLevel >= 0) {
-            xp = applyLevelGapPenalty(attackerUuid, mobLevel, xp, config);
-        }
-
-        // Apply experienceGainPercent multiplier from player stats
-        xp = applyExperienceGainBonus(attackerUuid, xp);
-
-        // Apply realm EXPERIENCE_BONUS modifier
+        // Apply realm EXPERIENCE_BONUS modifier (world-level, same for all party members)
         xp = applyRealmExperienceBonus(attackerUuid, xp);
 
         // Grant XP to the player (party-aware: distributes to party if applicable)
         LevelingService levelingService = getLevelingService();
         if (levelingService == null) {
-            LOGGER.at(Level.INFO).log("SKIP: LevelingService is null");
+            LOGGER.at(Level.FINE).log("SKIP: LevelingService is null");
             return;
         }
 
-        // Party XP distribution: if player is in a party, split XP among members.
-        // If no party mod or solo, grants full XP to killer directly.
-        Optional<io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager> partyOpt =
-            ServiceRegistry.get(io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager.class);
-        boolean distributed = false;
-        if (partyOpt.isPresent()) {
-            distributed = partyOpt.get().distributeXp(attackerUuid, xp);
-        }
-        if (!distributed) {
-            levelingService.addXp(attackerUuid, xp, XpSource.MOB_KILL);
-        }
-        LOGGER.at(Level.INFO).log("SUCCESS: %s %d XP to %s from %s mob",
-            distributed ? "Distributed" : "Granted", xp, attackerUuid, mobInfo);
+        // Build per-player modifier: level-gap penalty and XP gain bonus are applied
+        // per-recipient (not once for the killer) so each player's XP reflects their
+        // own level distance to the mob and their own experienceGainPercent stat.
+        // The 3-arg apply() receives groupMaxLevel from XpDistributionService for
+        // anti-boosting (when enabled); -1 means use the player's own level.
+        final int finalMobLevel = mobLevel;
+        final LevelingConfig finalConfig = config;
+        XpRecipientModifier perPlayer = new XpRecipientModifier() {
+            @Override
+            public long apply(@Nonnull UUID recipientId, long share) {
+                return apply(recipientId, share, -1);
+            }
 
-        // Send XP gain notification to player (killer always sees their XP)
-        if (config.getUi().isShowXpGainNotification()) {
-            sendXpGainMessage(attackerRef, xp);
-        }
-    }
+            @Override
+            public long apply(@Nonnull UUID recipientId, long share, int groupMaxLevel) {
+                long result = share;
+                if (finalMobLevel >= 0) {
+                    result = applyLevelGapPenalty(recipientId, finalMobLevel, result,
+                        finalConfig, groupMaxLevel);
+                }
+                result = applyExperienceGainBonus(recipientId, result);
+                return result;
+            }
+        };
 
-    /** Sends an XP gain notification toast to the player. */
-    private void sendXpGainMessage(@Nonnull PlayerRef playerRef, long xp) {
-        NotificationUtil.sendNotification(
-            playerRef.getPacketHandler(),
-            Message.raw("+" + xp + " XP").color(MessageColors.XP_GAIN),
-            NotificationStyle.Default
-        );
+        // Get mob death position for proximity-based sharing
+        TransformComponent mobTransform = store.getComponent(ref, TransformComponent.getComponentType());
+        Vector3d mobPosition = mobTransform != null ? mobTransform.getPosition() : new Vector3d(0, 0, 0);
+
+        // Distribute XP via the unified distribution service (handles both party and proximity modes)
+        XpDistributionService distService = plugin.getXpDistributionService();
+        if (distService != null) {
+            distService.distribute(attackerUuid, xp, perPlayer, mobPosition, store);
+        } else {
+            // Fallback: no distribution service — grant directly to killer
+            long finalXp = Math.max(1, perPlayer.apply(attackerUuid, xp));
+            levelingService.addXp(attackerUuid, finalXp, XpSource.MOB_KILL);
+        }
+        LOGGER.at(Level.FINE).log("XP: %d raw to %s from %s mob", xp, attackerUuid, mobInfo);
     }
 
     /**
@@ -238,7 +239,7 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
      * @return The XP after applying the level-gap penalty
      */
     private long applyLevelGapPenalty(@Nonnull UUID playerUuid, int mobLevel, long rawXp,
-                                       @Nonnull LevelingConfig config) {
+                                       @Nonnull LevelingConfig config, int groupMaxLevel) {
         LevelingConfig.LevelGapConfig gapConfig = config.getXpGain().getLevelGap();
         if (!gapConfig.isEnabled()) {
             return rawXp;
@@ -251,16 +252,13 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
 
         int playerLevel = levelingService.getLevel(playerUuid);
 
-        // Anti-boosting: use highest party member level for gap calculation
-        Optional<io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager> partyOpt =
-            ServiceRegistry.get(io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager.class);
-        if (partyOpt.isPresent()) {
-            int partyMaxLevel = partyOpt.get().getHighestPartyMemberLevel(playerUuid);
-            if (partyMaxLevel > playerLevel) {
-                LOGGER.at(Level.FINE).log("[LevelGap] Anti-boosting: party max %d > killer %d",
-                    partyMaxLevel, playerLevel);
-                playerLevel = partyMaxLevel;
-            }
+        // Anti-boosting: if the distribution service pre-computed a group max level
+        // and it's higher than this player's level, use it for the gap calculation.
+        // This is only active when anti_boosting.enabled=true in party.yml (default: false).
+        if (groupMaxLevel > 0 && groupMaxLevel > playerLevel) {
+            LOGGER.at(Level.FINE).log("[LevelGap] Anti-boosting: group max %d > player %d",
+                groupMaxLevel, playerLevel);
+            playerLevel = groupMaxLevel;
         }
 
         int safeZone = gapConfig.getSafeZoneBase() + (int) (gapConfig.getSafeZonePercent() * playerLevel);
@@ -393,7 +391,7 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
                 if (attitude != Attitude.HOSTILE && attitude != Attitude.NEUTRAL) {
                     // Truly passive mob (FRIENDLY, REVERED, IGNORE) - give only 1-5 XP
                     long xp = ThreadLocalRandom.current().nextLong(1, 6); // 1-5 inclusive
-                    LOGGER.at(Level.INFO).log("Passive mob (attitude=%s) -> XP=%d", attitude, xp);
+                    LOGGER.at(Level.FINE).log("Passive mob (attitude=%s) -> XP=%d", attitude, xp);
                     return xp;
                 }
             }
@@ -431,7 +429,7 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
         // Calculate XP using the raw stats method
         long xp = calculator.calculateXpFromRawStats(maxHealth, distanceFromOrigin, classification);
 
-        LOGGER.at(Level.INFO).log("Raw stats: maxHealth=%.0f, dist=%.0f, class=%s -> XP=%d",
+        LOGGER.at(Level.FINE).log("Raw stats: maxHealth=%.0f, dist=%.0f, class=%s -> XP=%d",
             maxHealth, distanceFromOrigin, classification, xp);
 
         return xp;
@@ -453,21 +451,21 @@ public class XpGainSystem extends DeathSystems.OnDeathSystem {
 
         Damage.Source source = deathInfo.getSource();
 
-        LOGGER.atInfo().log("[XpGain-SRC] Death source class=%s", source.getClass().getName());
+        LOGGER.at(Level.FINE).log("[XpGain-SRC] Death source class=%s", source.getClass().getName());
 
         // Standard path: EntitySource (melee, ranged, projectile, or hex rewritten by
         // HexDamageAttributionSystem in FilterDamageGroup before death)
         if (source instanceof Damage.EntitySource entitySource) {
             Ref<EntityStore> sourceRef = entitySource.getRef();
             if (!sourceRef.isValid()) {
-                LOGGER.atInfo().log("[XpGain-SRC] EntitySource ref INVALID");
+                LOGGER.at(Level.FINE).log("[XpGain-SRC] EntitySource ref INVALID");
                 return null;
             }
             Player attackerPlayer = store.getComponent(sourceRef, Player.getComponentType());
             if (attackerPlayer != null) {
                 return store.getComponent(sourceRef, PlayerRef.getComponentType());
             }
-            LOGGER.atInfo().log("[XpGain-SRC] EntitySource ref valid but NOT a player entity");
+            LOGGER.at(Level.FINE).log("[XpGain-SRC] EntitySource ref valid but NOT a player entity");
         }
 
         return null;

@@ -120,22 +120,27 @@ class RealmModifierTest {
         @Test
         @DisplayName("Should return 0 for minimum value")
         void minValueIs0() {
-            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, 10, false);
+            int min = RealmModifierType.MONSTER_DAMAGE.getMinValue();
+            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, min, false);
             assertEquals(0.0f, mod.getValuePercentile(), 0.01f);
         }
 
         @Test
         @DisplayName("Should return 1 for maximum value")
         void maxValueIs1() {
-            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, 100, false);
+            int max = RealmModifierType.MONSTER_DAMAGE.getMaxValue();
+            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, max, false);
             assertEquals(1.0f, mod.getValuePercentile(), 0.01f);
         }
 
         @Test
         @DisplayName("Should return 0.5 for middle value")
         void middleValueIsHalf() {
-            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, 55, false);
-            assertEquals(0.5f, mod.getValuePercentile(), 0.01f);
+            int min = RealmModifierType.MONSTER_DAMAGE.getMinValue();
+            int max = RealmModifierType.MONSTER_DAMAGE.getMaxValue();
+            int mid = (min + max) / 2;
+            RealmModifier mod = new RealmModifier(RealmModifierType.MONSTER_DAMAGE, mid, false);
+            assertEquals(0.5f, mod.getValuePercentile(), 0.02f);
         }
     }
 

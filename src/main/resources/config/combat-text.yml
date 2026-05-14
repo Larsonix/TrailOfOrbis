@@ -123,6 +123,14 @@ avoidance:
       - { type: SCALE, startAt: 0.0, endAt: 0.1, startScale: 0.8, endScale: 1.0 }
       - { type: POSITION, startAt: 0.0, endAt: 1.0, positionOffsetY: -40.0 }
       - { type: OPACITY, startAt: 0.3, endAt: 1.0, startOpacity: 1.0, endOpacity: 0.0 }
+  evaded:
+    color: "#99CCAA"
+    fontSize: 54.0
+    duration: 0.6
+    animations:
+      - { type: SCALE, startAt: 0.0, endAt: 0.1, startScale: 0.8, endScale: 1.0 }
+      - { type: POSITION, startAt: 0.0, endAt: 1.0, positionOffsetY: -40.0 }
+      - { type: OPACITY, startAt: 0.3, endAt: 1.0, startOpacity: 1.0, endOpacity: 0.0 }
   blocked:
     color: "#CCCCCC"
     fontSize: 58.0

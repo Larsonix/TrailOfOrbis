@@ -1,13 +1,17 @@
 package io.github.larsonix.trailoforbis.maps.reward;
 
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 import io.github.larsonix.trailoforbis.maps.templates.RealmTemplateRegistry;
 import io.github.larsonix.trailoforbis.util.TerrainUtils;
@@ -27,8 +31,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * (per-player instanced loot).
  *
  * <p>All state is in-memory only (no persistence) since realms are temporary.
- * When a realm closes, unclaimed rewards are delivered directly to inventory
- * as a fallback.
+ * Unclaimed rewards are delivered directly to inventory when a player exits
+ * a completed realm without looting the chest.
  *
  * <h2>L4E Compatibility</h2>
  * <p>When Loot4Everyone is detected at runtime, this manager defers chest
@@ -88,9 +92,9 @@ public class RewardChestManager {
     /**
      * Creates a new RewardChestManager.
      *
-     * <p>Reward delivery happens exclusively through the physical reward chest.
-     * If a realm closes before the player loots the chest, unclaimed items are
-     * discarded — the chest IS the reward mechanism.
+     * <p>Reward delivery is primarily through the physical reward chest.
+     * If a player exits before looting the chest, unclaimed items are delivered
+     * directly to their inventory at exit time.
      */
     public RewardChestManager() {
     }
@@ -133,6 +137,36 @@ public class RewardChestManager {
             items.size(),
             playerId.toString().substring(0, 8),
             realmId.toString().substring(0, 8));
+    }
+
+    /**
+     * Returns unclaimed reward items for a player in a realm.
+     *
+     * @param realmId  The realm ID
+     * @param playerId The player UUID
+     * @return Unclaimed items, or empty list if none
+     */
+    @Nonnull
+    public List<ItemStack> getUnclaimedRewards(@Nonnull UUID realmId, @Nonnull UUID playerId) {
+        Map<UUID, List<ItemStack>> realmRewards = rewardsByRealm.get(realmId);
+        if (realmRewards == null) {
+            return List.of();
+        }
+        List<ItemStack> items = realmRewards.get(playerId);
+        return items != null ? List.copyOf(items) : List.of();
+    }
+
+    /**
+     * Removes a player's rewards from storage after delivery.
+     *
+     * @param realmId  The realm ID
+     * @param playerId The player UUID
+     */
+    public void removePlayerRewards(@Nonnull UUID realmId, @Nonnull UUID playerId) {
+        Map<UUID, List<ItemStack>> realmRewards = rewardsByRealm.get(realmId);
+        if (realmRewards != null) {
+            realmRewards.remove(playerId);
+        }
     }
 
     /**
@@ -327,15 +361,15 @@ public class RewardChestManager {
     /**
      * Cleans up all state for a realm.
      *
-     * <p>Called when a realm closes. Any rewards not yet claimed from the
-     * physical chest are discarded — the chest is the reward mechanism.
+     * <p>Called when a realm closes. Unclaimed rewards should have been
+     * delivered at exit time; any remaining storage is cleared here.
      *
      * @param realmId The realm ID
      */
     public void cleanup(@Nonnull UUID realmId) {
         Objects.requireNonNull(realmId, "realmId cannot be null");
 
-        // Discard unclaimed rewards — player had the chest, chose not to loot
+        // Clear remaining reward storage (unclaimed rewards delivered at exit time)
         Map<UUID, List<ItemStack>> realmRewards = rewardsByRealm.remove(realmId);
         if (realmRewards != null && !realmRewards.isEmpty()) {
             int totalItems = realmRewards.values().stream().mapToInt(List::size).sum();
@@ -599,6 +633,19 @@ public class RewardChestManager {
                     ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
                 if (chunk == null) {
                     return;
+                }
+
+                // Clear the container's inventory BEFORE destroying the block.
+                // Without this, Hytale's ItemContainerState.onDestroy() calls
+                // dropAllItemStacks() and spawns all items as vanilla entities.
+                Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(pos.x, pos.y, pos.z);
+                if (blockRef != null && blockRef.isValid()) {
+                    Store<ChunkStore> chunkStoreStore = world.getChunkStore().getStore();
+                    ItemContainerBlock container = chunkStoreStore.getComponent(blockRef,
+                        ItemContainerBlock.getComponentType());
+                    if (container != null) {
+                        container.getItemContainer().clear();
+                    }
                 }
 
                 BlockType airType = BlockType.getAssetMap().getAsset("hytale:air");

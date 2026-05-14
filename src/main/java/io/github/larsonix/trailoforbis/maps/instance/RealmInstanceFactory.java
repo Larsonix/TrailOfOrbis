@@ -149,7 +149,7 @@ public class RealmInstanceFactory {
         UUID realmId = UUID.randomUUID();
 
         // Create instance
-        RealmInstance realm = new RealmInstance(realmId, mapData, template, ownerId);
+        RealmInstance realm = new RealmInstance(realmId, mapData, template, ownerId, config);
 
         LOGGER.atInfo().log("Creating realm %s for player %s (biome: %s, level: %d, arena: %d, tier: %s)",
             realmId, ownerId, mapData.biome(), mapData.level(), arenaRadius, tierTemplateName);
@@ -173,8 +173,8 @@ public class RealmInstanceFactory {
                 String worldName = "realm-" + realmId;
                 realm.setWorld(world, worldName);
 
-                                // Timer computed from mob count (arenaConfig/arenaRadius already computed above)
-                int timeoutSeconds = mapData.computeTimeoutSeconds(arenaConfig);
+                                // Timer computed from mob count + size multiplier + map modifiers
+                int timeoutSeconds = mapData.computeTimeoutSeconds(config);
 
                 // Initialize portal world and disable vanilla timer
                 initializePortalWorldAndDisableVanillaTimer(world, timeoutSeconds);
@@ -222,50 +222,30 @@ public class RealmInstanceFactory {
                                 SpawnZoneClearer.DEFAULT_CLEAR_RADIUS, maxScanY);
                         }
 
-                        // Override world spawn point to actual terrain height at (0,0).
-                        // Two strategies depending on biome type:
-                        int groundY;
+                        // Find a safe spawn position with multi-column clearance
+                        // checking and spiral search fallback. Replaces the old
+                        // single-column findGroundLevel() call that could place
+                        // players inside blocks clipping their hitbox.
+                        Vector3d safeSpawn;
                         if (biome.isCeilingBiome()) {
                             // Ceiling biomes: generic terrain check (Soil_*/Rock_*).
-                            // The scan starts near floor level (baseY+1), so floating
-                            // decorative props aren't a concern. Biome-aware check is
-                            // too restrictive here — cave floors can have blocks not in
-                            // the biome whitelist (mossy variants, crystals, etc.).
-                            // NO heightmap fallback — heightmap returns ceiling, not floor.
-                            groundY = io.github.larsonix.trailoforbis.util.TerrainUtils
-                                .findGroundLevel(world, 0, 0, maxScanY);
+                            // Biome-aware check is too restrictive — cave floors can
+                            // have blocks not in the biome whitelist.
+                            safeSpawn = io.github.larsonix.trailoforbis.util.TerrainUtils
+                                .findSafeSpawnPosition(world, 0, 0, maxScanY, 8);
                         } else {
-                            // Surface biomes: biome-aware check to skip decorative props
-                            // (Rock_Stone_Mossy, crystals) that float above real terrain.
-                            groundY = io.github.larsonix.trailoforbis.util.TerrainUtils
-                                .findGroundLevel(world, 0, 0, maxScanY, terrainMaterials);
-
-                            // Heightmap fallback: if biome-aware scan found nothing,
-                            // use Hytale's precomputed heightmap as last resort. May land
-                            // on a tree canopy, but better than spawning inside terrain.
-                            if (groundY == io.github.larsonix.trailoforbis.util.TerrainUtils.FALLBACK_GROUND_Y) {
-                                var chunk = world.getChunkIfInMemory(
-                                    ChunkUtil.indexChunkFromBlock(0, 0));
-                                if (chunk != null) {
-                                    int heightmapY = chunk.getHeight(0, 0);
-                                    if (heightmapY > 0) {
-                                        groundY = heightmapY + 1;
-                                        LOGGER.atWarning().log(
-                                            "Spawn ground detection returned fallback for realm %s "
-                                            + "(biome=%s, maxScanY=%d). Heightmap fallback Y=%d",
-                                            realmId, biome, maxScanY, groundY);
-                                    }
-                                }
-                            }
+                            // Surface biomes: biome-aware check to skip decorative
+                            // props. Spiral search subsumes the old heightmap fallback.
+                            safeSpawn = io.github.larsonix.trailoforbis.util.TerrainUtils
+                                .findSafeSpawnPosition(world, 0, 0, maxScanY, terrainMaterials, 8);
                         }
 
-                        Transform spawnTransform = new Transform(
-                            new Vector3d(0, groundY + 0.5, 0), new Vector3f(0, 0, 0));
+                        Transform spawnTransform = new Transform(safeSpawn, new Vector3f(0, 0, 0));
                         world.getWorldConfig().setSpawnProvider(
                             new com.hypixel.hytale.server.core.universe.world.spawn
                                 .IndividualSpawnProvider(spawnTransform));
-                        LOGGER.atInfo().log("Realm %s spawn set to Y=%d (biome=%s, baseY=%d, maxScanY=%d)",
-                            realmId, groundY, biome, baseY, maxScanY);
+                        LOGGER.atInfo().log("Realm %s spawn set to (%.1f, %.1f, %.1f) (biome=%s, baseY=%d, maxScanY=%d)",
+                            realmId, safeSpawn.x, safeSpawn.y, safeSpawn.z, biome, baseY, maxScanY);
 
                         // Transition to READY (all arena chunks guaranteed loaded)
                         realm.transitionTo(RealmState.READY);
@@ -527,7 +507,7 @@ public class RealmInstanceFactory {
 
         RealmTemplate template = templateRegistry.getOrCreateTemplate(mapData.biome(), mapData.size());
         UUID realmId = UUID.randomUUID();
-        RealmInstance realm = new RealmInstance(realmId, mapData, template, ownerId);
+        RealmInstance realm = new RealmInstance(realmId, mapData, template, ownerId, config);
 
         if (onRealmCreated != null) {
             onRealmCreated.accept(realm);
@@ -544,7 +524,7 @@ public class RealmInstanceFactory {
                 realm.setWorld(world, worldName);
 
                 // Initialize portal world and disable vanilla spawns (same as main path)
-                int timeoutSeconds = mapData.computeTimeoutSeconds(config.getArenaScalingConfig());
+                int timeoutSeconds = mapData.computeTimeoutSeconds(config);
                 initializePortalWorldAndDisableVanillaTimer(world, timeoutSeconds);
 
                 removalHandler.configureWorldRemoval(realm, config.getCompletionGracePeriodSeconds());

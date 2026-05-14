@@ -549,7 +549,7 @@ public class StatsCombinerTest {
     class OctantKeystoneStats {
 
         @Test
-        @DisplayName("HP_SCALING_DAMAGE: bonus physDmg% = (maxHP/100) × stat")
+        @DisplayName("HP_SCALING_DAMAGE: bonus physDmg% = (maxHP/50) × stat")
         void hpScalingDamage_addsPhysDmgPercentFromMaxHp() {
             ComputedStats base = ComputedStats.builder()
                 .maxHealth(500f)
@@ -562,8 +562,8 @@ public class StatsCombinerTest {
 
             ComputedStats result = combiner.combine(base, mods);
 
-            assertEquals(12.5f, result.getPhysicalDamagePercent(), 0.1f,
-                "bonus = (500/100) × 0.5 = 2.5 → 10 + 2.5 = 12.5");
+            assertEquals(15.0f, result.getPhysicalDamagePercent(), 0.1f,
+                "bonus = (500/50) × 0.5 = 5.0 → 10 + 5.0 = 15.0");
         }
 
         @Test
@@ -679,8 +679,8 @@ public class StatsCombinerTest {
             ComputedStats result = combiner.combine(base, mods);
 
             assertEquals(500f, result.getMaxHealth(), 0.1f);
-            assertEquals(5.0f, result.getPhysicalDamagePercent(), 0.1f,
-                "(500/100) × 1.0 = 5.0 (uses post-processed maxHP)");
+            assertEquals(10.0f, result.getPhysicalDamagePercent(), 0.1f,
+                "(500/50) × 1.0 = 10.0 (uses post-processed maxHP)");
         }
     }
 

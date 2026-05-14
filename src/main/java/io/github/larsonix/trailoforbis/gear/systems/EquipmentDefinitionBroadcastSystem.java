@@ -14,6 +14,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.ItemBase;
 import com.hypixel.hytale.protocol.UpdateType;
 import com.hypixel.hytale.protocol.packets.assets.UpdateItems;
+import com.hypixel.hytale.protocol.packets.assets.UpdateTranslations;
 import com.hypixel.hytale.server.core.entity.EntityUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
@@ -25,6 +26,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.gear.item.ItemDefinitionBuilder;
+import io.github.larsonix.trailoforbis.gear.item.ItemDisplayNameService;
 import io.github.larsonix.trailoforbis.gear.item.TranslationSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
@@ -59,27 +61,32 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>New viewer:</b> A player just entered view range
  *       ({@code newlyVisibleTo} is not empty) — send definitions to them.</li>
  *   <li><b>Equipment changed:</b> The observed player's equipped RPG gear
- *       changed since last tick — send updated definitions to all viewers.</li>
+ *       changed since last tick — send updated definitions to all viewers
+ *       after a cooldown period to coalesce rapid changes.</li>
  * </ol>
  *
- * <p>Since {@code UpdateItems} is sent immediately via
- * {@code writeNoCache()}, and {@code LegacyEquipment} only queues updates
- * for later delivery by {@code SendPackets}, TCP ordering guarantees the
- * definitions arrive before the Equipment packet that references them.
- *
  * <h2>Performance</h2>
- * <p>Runs every tick but early-exits when:
- * <ul>
- *   <li>Entity is not a Player (NPC/mob — no RPG gear)</li>
- *   <li>No new viewers AND equipment hasn't changed</li>
- *   <li>Player has no RPG gear equipped</li>
- * </ul>
- * <p>Per-viewer dedup prevents redundant sends: each viewer tracks which
- * item IDs they've already received.
+ * <p>Throttled via per-player cooldown ({@link #BROADCAST_COOLDOWN_TICKS}).
+ * Rapid hotbar scrolling accumulates a pending flag instead of broadcasting
+ * every tick. Remote viewers receive name-only translations (no full tooltip
+ * computation) — they only need the 3D model to render, not stat tooltips.
+ * Translations are batched into a single packet per viewer.
  */
 public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSystem<EntityStore> {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /**
+     * Cooldown between broadcasts for the same observed player (nanoseconds).
+     * 200ms coalesces rapid hotbar scrolling into a single broadcast.
+     *
+     * <p>Uses wall-clock time instead of tick counting because
+     * {@code EntityTickingSystem.tick()} is called once PER ENTITY per game tick,
+     * not once per game tick. A tick-based counter with N players advances N times
+     * per game tick, making the effective cooldown {@code 200ms / N_players}.
+     * Wall-clock time is independent of player count.
+     */
+    private static final long BROADCAST_COOLDOWN_NANOS = 200_000_000L; // 200ms
 
     private final ComponentType<EntityStore, EntityTrackerSystems.Visible> visibleType;
     private final ComponentType<EntityStore, PlayerRef> playerRefType;
@@ -88,24 +95,42 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
 
     private final ItemDefinitionBuilder definitionBuilder;
     private final TranslationSyncService translationService;
+    private final ItemDisplayNameService displayNameService;
 
     /**
      * Per observed player: the set of rpg_gear_* IDs they had equipped last tick.
-     * Used to detect equipment changes without consuming Hytale's own flag.
+     * Used for LIGHTWEIGHT change detection — just string IDs, no GearData deserialization.
      */
-    private final ConcurrentHashMap<UUID, Set<String>> lastKnownGear = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Set<String>> lastKnownGearIds = new ConcurrentHashMap<>();
 
     /**
      * Per viewer: the set of rpg_gear_* IDs whose definitions have been sent.
-     * Prevents redundant UpdateItems packets.
+     * Cumulative within a world session (never wiped — client keeps definitions).
+     * Cleared on world join (syncOnPlayerJoin) and disconnect (onPlayerDisconnect).
      */
     private final ConcurrentHashMap<UUID, Set<String>> viewerSentCache = new ConcurrentHashMap<>();
 
+    /**
+     * Per observed player: cached built definitions for their equipped gear.
+     * Avoids rebuilding unchanged item definitions on every broadcast.
+     * Invalidated only when the equipped gear ID set changes.
+     */
+    private final ConcurrentHashMap<UUID, Map<String, ItemBase>> definitionCache = new ConcurrentHashMap<>();
+
+    /**
+     * Per observed player: cooldown state for throttling broadcasts during rapid
+     * equipment changes (e.g., hotbar scrolling).
+     */
+    private final ConcurrentHashMap<UUID, BroadcastCooldown> cooldowns = new ConcurrentHashMap<>();
+
+
     public EquipmentDefinitionBroadcastSystem(
             @Nonnull ItemDefinitionBuilder definitionBuilder,
-            @Nonnull TranslationSyncService translationService) {
+            @Nonnull TranslationSyncService translationService,
+            @Nonnull ItemDisplayNameService displayNameService) {
         this.definitionBuilder = definitionBuilder;
         this.translationService = translationService;
+        this.displayNameService = displayNameService;
         this.visibleType = EntityTrackerSystems.Visible.getComponentType();
         this.playerRefType = PlayerRef.getComponentType();
         this.query = Query.and(visibleType, playerRefType);
@@ -148,7 +173,6 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
 
         // Only process Player entities (not NPCs/mobs).
-        // Use instanceof directly — avoids unsafe cast to LivingEntity.
         if (!(EntityUtils.getEntity(index, archetypeChunk) instanceof Player player)) {
             return;
         }
@@ -164,36 +188,75 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
         }
         UUID observedId = observedPlayerRef.getUuid();
 
-        // Collect currently equipped RPG gear
-        List<EquippedGear> equippedGear = collectEquippedRpgGear(player);
-        Set<String> currentIds = new HashSet<>(equippedGear.size());
-        for (EquippedGear gear : equippedGear) {
-            currentIds.add(gear.itemId);
-        }
+        // ── LIGHTWEIGHT change detection (no GearData deserialization) ──
+        // Only read item ID strings from equipped slots. This runs every tick
+        // for every player, so it must be as cheap as possible.
+        Set<String> currentIds = collectEquippedRpgItemIds(player);
 
         // Detect equipment change since last tick
-        Set<String> previousIds = lastKnownGear.put(observedId, currentIds);
+        Set<String> previousIds = lastKnownGearIds.put(observedId, currentIds);
         boolean gearChanged = previousIds == null || !previousIds.equals(currentIds);
+        boolean hasNewViewers = !visible.newlyVisibleTo.isEmpty();
 
-        // Determine which viewers need the definitions
+        // Handle cooldown for gear changes
+        BroadcastCooldown cooldown = cooldowns.computeIfAbsent(observedId, k -> new BroadcastCooldown());
+
+        if (gearChanged) {
+            cooldown.pendingGearChange = true;
+            // Invalidate cached definitions for items that changed
+            Map<String, ItemBase> cached = definitionCache.get(observedId);
+            if (cached != null && previousIds != null) {
+                // Remove definitions for items no longer equipped
+                for (String oldId : previousIds) {
+                    if (!currentIds.contains(oldId)) {
+                        cached.remove(oldId);
+                    }
+                }
+            }
+        }
+
+        // Determine what to broadcast this tick (wall-clock cooldown)
+        long now = System.nanoTime();
+        boolean cooldownExpired = cooldown.pendingGearChange
+                && (now - cooldown.lastBroadcastNanos >= BROADCAST_COOLDOWN_NANOS);
+
+        if (!cooldownExpired && !hasNewViewers) {
+            return; // Nothing to do this tick
+        }
+
+        if (currentIds.isEmpty()) {
+            if (cooldownExpired) {
+                cooldown.pendingGearChange = false;
+                cooldown.lastBroadcastNanos = now;
+            }
+            return;
+        }
+
+        // Determine target viewers
         Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> targetViewers;
-        if (gearChanged && !visible.visibleTo.isEmpty()) {
-            // Equipment changed — broadcast to ALL current viewers
+        if (cooldownExpired && !visible.visibleTo.isEmpty()) {
             targetViewers = visible.visibleTo;
-        } else if (!visible.newlyVisibleTo.isEmpty()) {
-            // New viewers appeared — send only to them
+            cooldown.pendingGearChange = false;
+            cooldown.lastBroadcastNanos = now;
+        } else if (hasNewViewers) {
             targetViewers = visible.newlyVisibleTo;
         } else {
-            // Nothing to do
             return;
         }
 
-        if (equippedGear.isEmpty() || targetViewers.isEmpty()) {
+        if (targetViewers.isEmpty()) {
             return;
         }
 
-        // Build definitions once, reuse for each viewer
-        Map<String, ItemBase> definitions = buildDefinitions(equippedGear);
+        // ── FULL collection + build (only when actually broadcasting) ──
+        // Now that we know we need to send, do the expensive GearData work.
+        List<EquippedGear> equippedGear = collectEquippedRpgGear(player);
+        if (equippedGear.isEmpty()) {
+            return;
+        }
+
+        // Build definitions using cache — only rebuild items not already cached
+        Map<String, ItemBase> definitions = getOrBuildDefinitions(observedId, equippedGear);
         if (definitions.isEmpty()) {
             return;
         }
@@ -203,41 +266,29 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
             Ref<EntityStore> viewerRef = entry.getKey();
             if (!viewerRef.isValid()) continue;
 
-            // Get the viewer's PlayerRef (skip non-player viewers)
             PlayerRef viewerPlayerRef = store.getComponent(viewerRef, playerRefType);
             if (viewerPlayerRef == null) continue;
 
             UUID viewerId = viewerPlayerRef.getUuid();
-            // Don't send to the observed player themselves (they already have it)
             if (viewerId.equals(observedId)) continue;
 
-            // Per-viewer dedup
+            // Per-viewer cumulative dedup
             Set<String> alreadySent = viewerSentCache.computeIfAbsent(
                     viewerId, k -> ConcurrentHashMap.newKeySet());
 
-            // Filter to only items this viewer hasn't received (or all if gear changed)
-            Map<String, ItemBase> toSend;
-            List<EquippedGear> gearToSync;
-            if (gearChanged) {
-                toSend = definitions;
-                gearToSync = equippedGear;
-                alreadySent.addAll(definitions.keySet());
-            } else {
-                toSend = new HashMap<>();
-                gearToSync = new ArrayList<>();
-                for (EquippedGear equipped : equippedGear) {
-                    ItemBase def = definitions.get(equipped.itemId);
-                    if (def != null && alreadySent.add(equipped.itemId)) {
-                        toSend.put(equipped.itemId, def);
-                        gearToSync.add(equipped);
-                    }
+            // Filter to only items this viewer hasn't received
+            Map<String, ItemBase> toSend = new HashMap<>();
+            List<EquippedGear> gearToSync = new ArrayList<>();
+            for (EquippedGear equipped : equippedGear) {
+                ItemBase def = definitions.get(equipped.itemId);
+                if (def != null && alreadySent.add(equipped.itemId)) {
+                    toSend.put(equipped.itemId, def);
+                    gearToSync.add(equipped);
                 }
-                if (toSend.isEmpty()) continue;
             }
+            if (toSend.isEmpty()) continue;
 
-            // Send translations first (so keys exist when definition arrives)
-            registerTranslationsForViewer(viewerPlayerRef, gearToSync);
-            // Then send item definitions
+            registerMinimalTranslationsForViewer(viewerPlayerRef, gearToSync);
             sendDefinitions(viewerPlayerRef, toSend);
             viewersSynced++;
         }
@@ -253,8 +304,49 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
     // =========================================================================
 
     /**
-     * Collects all RPG gear items from a player's equipment slots
-     * (armor, active hotbar, active utility).
+     * Lightweight gear ID collection — reads only item ID strings, no metadata
+     * deserialization. Used for per-tick change detection. At 30 TPS × 20 players,
+     * this runs 600 times/sec and must be as cheap as possible.
+     *
+     * @return Set of rpg_gear_* item IDs currently equipped (empty if none)
+     */
+    @Nonnull
+    private Set<String> collectEquippedRpgItemIds(@Nonnull Player player) {
+        @SuppressWarnings("deprecation")
+        Inventory inventory = player.getInventory();
+        if (inventory == null) return Set.of();
+
+        Set<String> ids = new HashSet<>(6);
+
+        // Armor slots
+        ItemContainer armor = inventory.getArmor();
+        if (armor != null) {
+            for (short i = 0; i < armor.getCapacity(); i++) {
+                addIfRpgGearId(armor.getItemStack(i), ids);
+            }
+        }
+
+        // Active hotbar item
+        addIfRpgGearId(inventory.getActiveHotbarItem(), ids);
+
+        // Active utility item
+        addIfRpgGearId(inventory.getUtilityItem(), ids);
+
+        return ids;
+    }
+
+    /** Adds the item's ID to the set if it looks like RPG gear (prefix check, no deserialization). */
+    private static void addIfRpgGearId(@Nullable ItemStack item, @Nonnull Set<String> ids) {
+        if (item == null || item.isEmpty()) return;
+        String id = item.getItemId();
+        if (id != null && id.startsWith("rpg_gear_")) {
+            ids.add(id);
+        }
+    }
+
+    /**
+     * Full gear collection with GearData deserialization. Only called when
+     * actually broadcasting (not on every tick).
      */
     private List<EquippedGear> collectEquippedRpgGear(@Nonnull Player player) {
         @SuppressWarnings("deprecation")
@@ -273,7 +365,7 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
         }
 
         // Active hotbar item (right hand)
-        ItemStack handItem = inventory.getItemInHand();
+        ItemStack handItem = inventory.getActiveHotbarItem();
         addIfRpgGear(handItem, result);
 
         // Active utility item (left hand)
@@ -296,6 +388,41 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
     // DEFINITION BUILDING
     // =========================================================================
 
+    /**
+     * Gets or builds definitions using the per-player cache. Only builds definitions
+     * for items not already cached, avoiding redundant {@code ItemDefinitionBuilder.build()}
+     * calls for unchanged armor/utility during rapid hotbar scrolling.
+     */
+    @Nonnull
+    private Map<String, ItemBase> getOrBuildDefinitions(
+            @Nonnull UUID observedId,
+            @Nonnull List<EquippedGear> gear) {
+
+        Map<String, ItemBase> cached = definitionCache.computeIfAbsent(
+                observedId, k -> new ConcurrentHashMap<>());
+
+        Map<String, ItemBase> result = new HashMap<>(gear.size());
+        for (EquippedGear equipped : gear) {
+            // Use cached definition if available, otherwise build fresh
+            ItemBase def = cached.get(equipped.itemId);
+            if (def == null) {
+                def = definitionBuilder.build(equipped.itemStack, equipped.gearData);
+                if (def != null) {
+                    cached.put(equipped.itemId, def);
+                }
+            }
+            if (def != null) {
+                result.put(equipped.itemId, def);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Builds definitions without caching. Used by {@link #syncOnPlayerJoin}
+     * where caching is not needed (one-shot operation).
+     */
+    @Nonnull
     private Map<String, ItemBase> buildDefinitions(@Nonnull List<EquippedGear> gear) {
         Map<String, ItemBase> defs = new HashMap<>(gear.size());
         for (EquippedGear equipped : gear) {
@@ -312,25 +439,54 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
     // =========================================================================
 
     /**
-     * Registers translations for gear items with a viewer player.
+     * Registers minimal translations (name only, no tooltip) for remote viewers.
      *
-     * <p>The viewer doesn't need stat-accurate tooltips — they just need
-     * the translation keys to exist so the ItemBase definition resolves
-     * without errors. Uses null playerId for generic (non-stat-specific) text.
+     * <p>Remote viewers only see the 3D armor model — they never hover over
+     * another player's equipment. Full tooltip computation via
+     * {@code RichTooltipFormatter.build()} is extremely expensive (modifier range
+     * calculation, ServiceRegistry lookups, Message serialization per item).
+     *
+     * <p>This method sends just the display name as both name AND description,
+     * avoiding the entire tooltip pipeline. All translations are batched into
+     * a single {@code UpdateTranslations} packet per viewer.
      */
-    private void registerTranslationsForViewer(
+    private void registerMinimalTranslationsForViewer(
             @Nonnull PlayerRef viewerRef,
             @Nonnull List<EquippedGear> gear) {
+
+        Map<String, String> translations = new HashMap<>(gear.size() * 2);
+
         for (EquippedGear equipped : gear) {
             String compactId = equipped.gearData.instanceId().toCompactString();
 
-            ItemDefinitionBuilder.TranslationContent tc =
-                    definitionBuilder.buildTranslationContent(
-                            equipped.itemStack, equipped.gearData, null);
-            if (tc != null) {
-                translationService.registerTranslations(
-                        viewerRef, compactId, tc.name(), tc.description());
+            // Check if already registered for this viewer
+            if (translationService.isRegistered(viewerRef.getUuid(), compactId)) {
+                continue;
             }
+
+            // Name-only translation — cheap string operation, no tooltip formatting
+            String nameText = displayNameService.getGearDisplayName(equipped.gearData, equipped.itemStack);
+
+            String nameKey = TranslationSyncService.getNameKey(compactId);
+            String descKey = TranslationSyncService.getDescriptionKey(compactId);
+            translations.put(nameKey, nameText);
+            translations.put(descKey, nameText); // Description = name for remote viewers
+        }
+
+        if (translations.isEmpty()) {
+            return;
+        }
+
+        // Single batched packet for all translations
+        try {
+            UpdateTranslations packet = new UpdateTranslations();
+            packet.type = UpdateType.AddOrUpdate;
+            packet.translations = translations;
+            viewerRef.getPacketHandler().writeNoCache(packet);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log(
+                    "Failed to send minimal translations to viewer %s",
+                    viewerRef.getUuid().toString().substring(0, 8));
         }
     }
 
@@ -384,6 +540,10 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
         UUID joiningId = joiningPlayer.getUuid();
         Store<EntityStore> store = world.getEntityStore().getStore();
 
+        // Reset the joining player's viewer cache — they have a fresh client
+        // (world transition clears all definitions on the client side).
+        viewerSentCache.remove(joiningId);
+
         // Collect joining player's equipped RPG gear
         List<EquippedGear> joiningGear = collectEquippedRpgGear(joiningEntity);
         Map<String, ItemBase> joiningDefs = buildDefinitions(joiningGear);
@@ -405,13 +565,22 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
         // Direction 1: Send joining player's gear TO each other player
         if (!joiningDefs.isEmpty()) {
             for (PlayerRef otherPlayer : otherPlayers) {
-                registerTranslationsForViewer(otherPlayer, joiningGear);
+                UUID otherUuid = otherPlayer.getUuid();
+                registerMinimalTranslationsForViewer(otherPlayer, joiningGear);
                 sendDefinitions(otherPlayer, joiningDefs);
                 totalSynced++;
+
+                // Record in viewer cache so the broadcast system doesn't re-send
+                Set<String> otherSent = viewerSentCache.computeIfAbsent(
+                        otherUuid, k -> ConcurrentHashMap.newKeySet());
+                otherSent.addAll(joiningDefs.keySet());
             }
         }
 
         // Direction 2: Send each other player's gear TO the joining player
+        Set<String> joiningSent = viewerSentCache.computeIfAbsent(
+                joiningId, k -> ConcurrentHashMap.newKeySet());
+
         for (PlayerRef otherPlayer : otherPlayers) {
             Ref<EntityStore> otherRef = otherPlayer.getReference();
             if (otherRef == null || !otherRef.isValid()) continue;
@@ -426,9 +595,12 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
             Map<String, ItemBase> otherDefs = buildDefinitions(otherGear);
             if (otherDefs.isEmpty()) continue;
 
-            registerTranslationsForViewer(joiningPlayer, otherGear);
+            registerMinimalTranslationsForViewer(joiningPlayer, otherGear);
             sendDefinitions(joiningPlayer, otherDefs);
             totalSynced++;
+
+            // Record in joining player's viewer cache
+            joiningSent.addAll(otherDefs.keySet());
         }
 
         if (totalSynced > 0) {
@@ -446,16 +618,20 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
      * Call from GearManager shutdown or disconnect handler.
      */
     public void onPlayerDisconnect(@Nonnull UUID playerId) {
-        lastKnownGear.remove(playerId);
+        lastKnownGearIds.remove(playerId);
         viewerSentCache.remove(playerId);
+        definitionCache.remove(playerId);
+        cooldowns.remove(playerId);
     }
 
     /**
      * Clears all tracking state. Called on plugin shutdown.
      */
     public void shutdown() {
-        lastKnownGear.clear();
+        lastKnownGearIds.clear();
         viewerSentCache.clear();
+        definitionCache.clear();
+        cooldowns.clear();
     }
 
     // =========================================================================
@@ -466,4 +642,13 @@ public final class EquipmentDefinitionBroadcastSystem extends EntityTickingSyste
             @Nonnull String itemId,
             @Nonnull ItemStack itemStack,
             @Nonnull GearData gearData) {}
+
+    /**
+     * Mutable cooldown state per observed player. Tracks whether a gear change
+     * is pending broadcast and when the last broadcast fired (wall-clock nanos).
+     */
+    private static final class BroadcastCooldown {
+        volatile boolean pendingGearChange = false;
+        volatile long lastBroadcastNanos = 0;
+    }
 }

@@ -31,6 +31,9 @@ import io.github.larsonix.trailoforbis.gear.loot.LootCalculator.LootRoll;
 import io.github.larsonix.trailoforbis.gear.loot.LootSettings.MobType;
 import io.github.larsonix.trailoforbis.leveling.api.LevelingService;
 import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierComponent;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierConfig;
+import io.github.larsonix.trailoforbis.mobs.modifiers.MobModifierManager;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
@@ -135,6 +138,9 @@ public class LootListener extends DeathSystems.OnDeathSystem {
 
         // Extract realm context for loot bonuses
         RealmLootContext realmContext = extractRealmContext(store, ref, killerInfo.playerId());
+
+        // Apply modifier-based loot bonuses (per-modifier IIQ/IIR scaling)
+        realmContext = applyModifierLootBonus(store, ref, realmContext);
 
         // Apply realm DROP_LEVEL_BONUS — gear drops at higher level
         int effectiveMobLevel = mobLevel + getRealmDropLevelBonus(store, ref);
@@ -330,7 +336,42 @@ public class LootListener extends DeathSystems.OnDeathSystem {
      * @param playerId The player who killed the mob
      * @return Realm loot context with bonuses
      */
+    /**
+     * Adds modifier-based IIQ/IIR bonuses to the loot context.
+     *
+     * <p>Per-modifier scaling from config (default: 1 mod = 2x IIQ/1.5x IIR,
+     * 2 mods = 4x/3x, 3 mods = 7x/5x). These are ADDITIVE on top of
+     * existing realm bonuses — a 2-modifier boss in a realm with IIQ bonus
+     * gets both bonuses stacked.
+     */
     @Nonnull
+    private RealmLootContext applyModifierLootBonus(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull RealmLootContext existing) {
+
+        TrailOfOrbis pluginInstance = TrailOfOrbis.getInstanceOrNull();
+        if (pluginInstance == null) return existing;
+
+        MobModifierManager modManager = pluginInstance.getMobModifierManager();
+        if (modManager == null || !modManager.isEnabled()) return existing;
+
+        MobModifierComponent modComp = modManager.getComponent(ref, store);
+        if (modComp == null || modComp.modifierCount() == 0) return existing;
+
+        MobModifierConfig.RewardScaling scaling = modManager.getConfig().getRewardScaling(modComp.modifierCount());
+        double iiqBonus = (scaling.getIiq() - 1.0) * 100; // Convert multiplier to percentage (2.0 → 100%)
+        double iirBonus = (scaling.getIir() - 1.0) * 100; // Convert multiplier to percentage (1.5 → 50%)
+
+        LOGGER.atFine().log("[MobModifier] Loot bonus for %d modifiers: IIQ=+%.0f%%, IIR=+%.0f%%",
+            modComp.modifierCount(), iiqBonus, iirBonus);
+
+        return new RealmLootContext(
+            existing.itemQuantityBonus() + iiqBonus,
+            existing.itemRarityBonus() + iirBonus
+        );
+    }
+
     private RealmLootContext extractRealmContext(
             @Nonnull Store<EntityStore> store,
             @Nonnull Ref<EntityStore> ref,

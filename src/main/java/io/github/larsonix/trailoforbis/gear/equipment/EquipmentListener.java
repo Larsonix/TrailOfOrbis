@@ -41,7 +41,7 @@ import java.util.logging.Level;
  * <ul>
  *   <li>{@code SwitchActiveSlotEvent} - For weapons and utilities</li>
  *   <li>Custom {@code SlotFilter} - For armor (requires inventory hook)</li>
- *   <li>{@code LivingEntityInventoryChangeEvent} - For reactive validation</li>
+ *   <li>{@code InventoryChangeEvent} (ECS EntityEventSystem) - For reactive validation</li>
  * </ul>
  */
 public final class EquipmentListener {
@@ -440,7 +440,7 @@ public final class EquipmentListener {
     }
 
     private void checkActiveWeapon(Player player, Inventory inventory, PlayerRef playerRef) {
-        ItemStack weapon = inventory.getItemInHand();
+        ItemStack weapon = inventory.getActiveHotbarItem();
         if (weapon == null || weapon.isEmpty()) {
             return;
         }

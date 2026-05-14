@@ -1,9 +1,5 @@
 package io.github.larsonix.trailoforbis.maps;
 
-import com.hypixel.hytale.builtin.instances.config.InstanceWorldConfig;
-import com.hypixel.hytale.builtin.instances.removal.InstanceDataResource;
-import com.hypixel.hytale.builtin.instances.removal.RemovalCondition;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
@@ -15,12 +11,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.spawn.ISpawnProvider;
-import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.compat.party.PartyIntegrationManager;
 import io.github.larsonix.trailoforbis.maps.api.RealmsService;
-import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
-import io.github.larsonix.trailoforbis.compat.HexcodePedestalPlacer;
 import io.github.larsonix.trailoforbis.maps.config.MobPoolConfig;
 import io.github.larsonix.trailoforbis.maps.config.RealmModifierConfig;
 import io.github.larsonix.trailoforbis.maps.config.RealmsConfig;
@@ -38,25 +31,17 @@ import io.github.larsonix.trailoforbis.maps.instance.*;
 import io.github.larsonix.trailoforbis.maps.reward.RealmRewardService;
 import io.github.larsonix.trailoforbis.maps.reward.RewardChestManager;
 import io.github.larsonix.trailoforbis.maps.reward.RewardChestMonitor;
-import io.github.larsonix.trailoforbis.maps.spawning.BiomeMobPool;
 import io.github.larsonix.trailoforbis.maps.spawning.RealmEntitySpawner;
+import io.github.larsonix.trailoforbis.maps.spawning.RealmContainerClearer;
 import io.github.larsonix.trailoforbis.maps.spawning.RealmMobSpawner;
-import io.github.larsonix.trailoforbis.maps.spawning.RealmLabyrinthPlacer;
-import io.github.larsonix.trailoforbis.maps.spawning.RealmStructurePlacer;
-import io.github.larsonix.trailoforbis.maps.spawning.StructureBoundsRegistry;
 import io.github.larsonix.trailoforbis.maps.templates.RealmTemplateRegistry;
 import io.github.larsonix.trailoforbis.maps.ui.RealmHudManager;
 import io.github.larsonix.trailoforbis.maps.completion.VictoryPortalManager;
 import io.github.larsonix.trailoforbis.maps.completion.RealmVictorySequence;
 import io.github.larsonix.trailoforbis.maps.spawn.SpawnGatewayManager;
-import io.github.larsonix.trailoforbis.maps.gateway.GatewayTierRepository;
-import io.github.larsonix.trailoforbis.maps.gateway.GatewayUpgradeConfig;
 import io.github.larsonix.trailoforbis.maps.gateway.GatewayUpgradeManager;
-import io.github.larsonix.trailoforbis.database.repository.SpawnGatewayRepository;
-import io.github.larsonix.trailoforbis.util.ChunkLoadHelper;
 import io.github.larsonix.trailoforbis.util.EmoteCelebrationHelper;
 import io.github.larsonix.trailoforbis.util.MessageColors;
-import com.hypixel.hytale.math.util.ChunkUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -64,10 +49,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -128,6 +109,7 @@ public class RealmsManager implements RealmsService {
     private final RealmsConfig config;
     private final RealmModifierConfig modifierConfig;
     private final MobPoolConfig mobPoolConfig;
+    private final io.github.larsonix.trailoforbis.maps.config.RealmTemplateConfig templateConfig;
     private final RealmTemplateRegistry templateRegistry;
     private final RealmTeleportHandler teleportHandler;
     private final RealmRemovalHandler removalHandler;
@@ -135,29 +117,13 @@ public class RealmsManager implements RealmsService {
     private final RealmPortalManager portalManager;
     private final RealmMapGenerator mapGenerator;
 
-    /** Entity spawner for actual NPC spawning via Hytale API. */
+    /** Spawning module — mob pools, structure placement, boundary enforcement. */
     @Nullable
-    private RealmEntitySpawner entitySpawner;
+    private RealmSpawningModule spawningModule;
 
-    /** Mob spawner coordinator for managing realm mob waves. */
+    /** Persistence module — crash recovery and realm state tracking. */
     @Nullable
-    private RealmMobSpawner mobSpawner;
-
-    /** Runtime structure scatterer for complex vanilla prefabs (Monuments, Fossils, etc.). */
-    @Nullable
-    private RealmStructurePlacer structurePlacer;
-
-    /** Labyrinth carver for MOUNTAINS biome — carves Goblin_Lair corridors from solid terrain. */
-    @Nullable
-    private RealmLabyrinthPlacer labyrinthPlacer;
-
-    /** Shared registry of placed structure bounds — prevents overlap between placers. */
-    @Nullable
-    private StructureBoundsRegistry boundsRegistry;
-
-    /** Hexcode pedestal placer — places spell-crafting pedestals in realms when Hexcode is loaded. */
-    @Nullable
-    private HexcodePedestalPlacer pedestalPlacer;
+    private io.github.larsonix.trailoforbis.maps.persistence.RealmPersistenceModule persistenceModule;
 
     /** Reward service for distributing completion rewards. */
     @Nullable
@@ -187,13 +153,9 @@ public class RealmsManager implements RealmsService {
     @Nullable
     private RewardChestMonitor rewardChestMonitor;
 
-    /** Spawn gateway manager for placing portals around world spawn. */
+    /** Gateway module — spawn gateways + tier upgrades. */
     @Nullable
-    private SpawnGatewayManager spawnGatewayManager;
-
-    /** Gateway upgrade manager for tier-based portal upgrades. */
-    @Nullable
-    private GatewayUpgradeManager gatewayUpgradeManager;
+    private RealmGatewayModule gatewayModule;
 
     // ═══════════════════════════════════════════════════════════════════
     // STATE
@@ -204,11 +166,9 @@ public class RealmsManager implements RealmsService {
 
     /** Mapping of player ID to their current realm. */
     private final Map<UUID, UUID> playerToRealm = new ConcurrentHashMap<>();
-    /** Mob marker providers per realm — refreshed every tick on world thread. */
-    private final Map<UUID, io.github.larsonix.trailoforbis.maps.ui.RealmMobMarkerProvider> mobMarkerProviders = new ConcurrentHashMap<>();
 
-    /** Event listeners for realm events (keyed by event class). */
-    private final Map<Class<? extends RealmEvent>, List<Consumer<? extends RealmEvent>>> eventListeners = new ConcurrentHashMap<>();
+    /** Event bus for realm lifecycle events. */
+    private final RealmEventBus eventBus = new RealmEventBus();
 
     /** Reference to event registry for possible future integration. */
     @Nullable
@@ -222,9 +182,9 @@ public class RealmsManager implements RealmsService {
     @Nullable
     private RealmPlayerEnterListener playerEnterListener;
 
-    /** Scheduled executor for periodic tasks. */
+    /** Periodic tick module for realm scheduling. */
     @Nullable
-    private ScheduledExecutorService scheduler;
+    private RealmTickModule tickModule;
 
     /** Whether the manager is initialized. */
     private volatile boolean initialized = false;
@@ -244,6 +204,7 @@ public class RealmsManager implements RealmsService {
         this.config = configLoader.getRealmsConfig();
         this.modifierConfig = configLoader.getModifierConfig();
         this.mobPoolConfig = configLoader.getMobPoolConfig();
+        this.templateConfig = configLoader.getTemplateConfig();
         this.templateRegistry = new RealmTemplateRegistry();
         this.teleportHandler = new RealmTeleportHandler();
         this.removalHandler = new RealmRemovalHandler(teleportHandler);
@@ -300,6 +261,7 @@ public class RealmsManager implements RealmsService {
         try {
             LOGGER.atInfo().log("Loading template registry...");
             templateRegistry.loadFromConfig(config);
+            templateRegistry.setTemplateConfig(templateConfig);
             LOGGER.atInfo().log("Template registry loaded with %d templates",
                 templateRegistry.getValidTemplateCount());
         } catch (Exception e) {
@@ -307,36 +269,18 @@ public class RealmsManager implements RealmsService {
             // Continue - listeners still work, validation will catch missing templates
         }
 
-        // Initialize spawning systems
+        // Initialize spawning module
         try {
-            LOGGER.atInfo().log("Initializing spawning systems...");
+            LOGGER.atInfo().log("Initializing spawning module...");
             TrailOfOrbis plugin = TrailOfOrbis.getInstanceOrNull();
             if (plugin != null) {
-                entitySpawner = new RealmEntitySpawner(plugin);
-                mobSpawner = new RealmMobSpawner(entitySpawner, mobPoolConfig);
-                boundsRegistry = new StructureBoundsRegistry();
-                structurePlacer = new RealmStructurePlacer(boundsRegistry);
-                labyrinthPlacer = new RealmLabyrinthPlacer(boundsRegistry);
-                mobSpawner.setBoundsRegistry(boundsRegistry);
-
-                // Initialize Hexcode pedestal placer if Hexcode is loaded
-                if (HexcodeCompat.isLoaded()) {
-                    var pedestalConfig = plugin.getConfigManager().getHexcodeSpellConfig().getRealm_pedestal();
-                    pedestalPlacer = new HexcodePedestalPlacer(pedestalConfig);
-                    LOGGER.atInfo().log("Hexcode pedestal placer initialized (spawn chance: %.0f%%)",
-                        pedestalConfig.getSpawn_chance());
-                }
-
-                // Register mob pools for each biome from config
-                registerMobPoolsFromConfig();
-
-                LOGGER.atInfo().log("RealmEntitySpawner and RealmMobSpawner initialized with %d biome pools",
-                    RealmBiomeType.values().length);
+                spawningModule = new RealmSpawningModule();
+                spawningModule.initialize(plugin, mobPoolConfig);
             } else {
                 LOGGER.atWarning().log("TrailOfOrbis plugin not available - mob spawning disabled");
             }
         } catch (Exception e) {
-            LOGGER.atSevere().withCause(e).log("FAILED to initialize spawning systems");
+            LOGGER.atSevere().withCause(e).log("FAILED to initialize spawning module");
             // Continue - realms work without spawning
         }
 
@@ -348,53 +292,51 @@ public class RealmsManager implements RealmsService {
             LOGGER.atSevere().withCause(e).log("FAILED to set up removal condition checker");
         }
 
-        // Start scheduler for periodic tasks
+        // Start tick module for periodic tasks
         try {
-            LOGGER.atInfo().log("Starting scheduler...");
-            scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "RealmsManager-Scheduler");
-                t.setDaemon(true);
-                return t;
-            });
+            LOGGER.atInfo().log("Starting tick module...");
+            tickModule = new RealmTickModule(
+                realmsById, removalHandler, portalManager, hudManager,
+                spawningModule != null ? spawningModule.getMobMarkerProviders() : new ConcurrentHashMap<>(),
+                this::closeRealm);
+            if (spawningModule != null) {
+                tickModule.setMobSpawner(spawningModule.getMobSpawner());
+            }
+            tickModule.setTimerDiagEnabled(getConfig().isDebugMode());
+            tickModule.start();
+            LOGGER.atInfo().log("Tick module started successfully");
 
-            // Schedule periodic removal processing
-            scheduler.scheduleAtFixedRate(
-                this::processTick,
-                1, 1, TimeUnit.SECONDS
-            );
-            LOGGER.atInfo().log("Scheduler started successfully");
-
-            // Initialize victory sequence (requires scheduler)
+            // Initialize victory sequence (requires tick module running)
             victorySequence = new RealmVictorySequence(hudManager, victoryPortalManager, rewardChestManager, victoryEmoteHelper);
             LOGGER.atInfo().log("Victory sequence initialized");
         } catch (Exception e) {
-            LOGGER.atSevere().withCause(e).log("FAILED to start scheduler - realm timeouts disabled");
+            LOGGER.atSevere().withCause(e).log("FAILED to start tick module - realm timeouts disabled");
         }
 
-        // Initialize spawn gateway manager + gateway upgrade system
+        // Initialize gateway module (spawn portals + tier upgrades)
         try {
-            TrailOfOrbis plugin = TrailOfOrbis.getInstanceOrNull();
-            if (plugin != null && config.getSpawnGatewayConfig().isEnabled()) {
-                SpawnGatewayRepository gatewayRepository = new SpawnGatewayRepository(plugin.getDataManager());
-                spawnGatewayManager = new SpawnGatewayManager(config.getSpawnGatewayConfig(), gatewayRepository);
+            gatewayModule = new RealmGatewayModule();
+            gatewayModule.initialize(config);
+        } catch (Exception e) {
+            LOGGER.atSevere().withCause(e).log("FAILED to initialize gateway module");
+            // Continue - spawn gateways are optional
+        }
 
-                // Initialize gateway upgrade system
-                GatewayTierRepository tierRepository = new GatewayTierRepository(plugin.getDataManager());
-                GatewayUpgradeConfig upgradeConfig = GatewayUpgradeConfig.createDefault();
-                gatewayUpgradeManager = new GatewayUpgradeManager(upgradeConfig, tierRepository);
-
-                // Wire tier repository into spawn gateway manager for auto-registration
-                spawnGatewayManager.setGatewayTierRepository(tierRepository);
-
-                LOGGER.atInfo().log("SpawnGatewayManager + GatewayUpgradeManager initialized");
-            } else if (plugin == null) {
-                LOGGER.atWarning().log("TrailOfOrbis plugin not available - spawn gateways disabled");
-            } else {
-                LOGGER.atInfo().log("Spawn gateways disabled by config");
+        // Initialize persistence module for crash recovery
+        try {
+            TrailOfOrbis pluginRef = TrailOfOrbis.getInstanceOrNull();
+            if (pluginRef != null) {
+                persistenceModule = new io.github.larsonix.trailoforbis.maps.persistence.RealmPersistenceModule(
+                    pluginRef.getDataManager());
+                int orphans = persistenceModule.loadOrphanedPlayers();
+                if (orphans > 0) {
+                    LOGGER.atInfo().log("Persistence module initialized — %d orphaned players awaiting recovery", orphans);
+                } else {
+                    LOGGER.atInfo().log("Persistence module initialized — no orphaned players");
+                }
             }
         } catch (Exception e) {
-            LOGGER.atSevere().withCause(e).log("FAILED to initialize SpawnGatewayManager");
-            // Continue - spawn gateways are optional
+            LOGGER.atWarning().withCause(e).log("FAILED to initialize persistence module — crash recovery disabled");
         }
 
         instance = this;
@@ -441,14 +383,10 @@ public class RealmsManager implements RealmsService {
 
         LOGGER.atInfo().log("Shutting down RealmsManager with %d active realms", realmsById.size());
 
-        // Stop scheduler
-        if (scheduler != null) {
-            scheduler.shutdown();
-            try {
-                scheduler.awaitTermination(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        // Stop tick module
+        if (tickModule != null) {
+            tickModule.shutdown();
+            tickModule = null;
         }
 
         // Shutdown victory sequence
@@ -474,42 +412,24 @@ public class RealmsManager implements RealmsService {
         victoryPortalManager.clearAll();
 
         // Clear spawn gateway + upgrade managers
-        if (gatewayUpgradeManager != null) {
-            gatewayUpgradeManager.getRepository().clearCache();
-            gatewayUpgradeManager = null;
-        }
-        if (spawnGatewayManager != null) {
-            spawnGatewayManager.clearCache();
-            spawnGatewayManager = null;
+        if (gatewayModule != null) {
+            gatewayModule.shutdown();
+            gatewayModule = null;
         }
 
-        // Close all realms
+        // Close all realms (teleports players out)
         removalHandler.closeAll().join();
 
-        // Shutdown structure placer and bounds registry
-        if (structurePlacer != null) {
-            structurePlacer.shutdown();
-            structurePlacer = null;
-        }
-        if (labyrinthPlacer != null) {
-            labyrinthPlacer.shutdown();
-            labyrinthPlacer = null;
-        }
-        if (boundsRegistry != null) {
-            boundsRegistry.shutdown();
-            boundsRegistry = null;
+        // Clear persistence data AFTER players are safely out
+        // (if crash happens during closeAll, DB rows remain for recovery)
+        if (persistenceModule != null) {
+            persistenceModule.persistAndClearAll();
         }
 
-        // Shutdown mob spawner
-        if (mobSpawner != null) {
-            mobSpawner.shutdown();
-            mobSpawner = null;
-        }
-
-        // Clear entity spawner pending spawns
-        if (entitySpawner != null) {
-            entitySpawner.clearPendingSpawns();
-            entitySpawner = null;
+        // Shutdown spawning module
+        if (spawningModule != null) {
+            spawningModule.shutdown();
+            spawningModule = null;
         }
 
         // Clear state
@@ -540,48 +460,7 @@ public class RealmsManager implements RealmsService {
         removalHandler.setOnRealmClosed(this::onRealmClosed);
     }
 
-    /**
-     * Registers mob pools from configuration for all biomes.
-     *
-     * <p>Converts {@link MobPoolConfig.BiomeMobPool} (config class) to
-     * {@link BiomeMobPool} (spawning class) and registers with the mob spawner.
-     */
-    private void registerMobPoolsFromConfig() {
-        if (mobSpawner == null || mobPoolConfig == null) {
-            LOGGER.atWarning().log("Cannot register mob pools: spawner or config not available");
-            return;
-        }
-
-        int registered = 0;
-        for (RealmBiomeType biome : RealmBiomeType.values()) {
-            MobPoolConfig.BiomeMobPool configPool = mobPoolConfig.getMobPool(biome);
-
-            // Convert config pool to spawning pool
-            // Note: Elite is now a spawn-time modifier, not a separate pool
-            BiomeMobPool.Builder builder = BiomeMobPool.builder(biome);
-
-            // Add regular mobs (includes former elite mobs)
-            for (Map.Entry<String, Integer> entry : configPool.getRegularMobs().entrySet()) {
-                builder.addNormal(entry.getKey(), entry.getValue());
-            }
-
-            // Add boss mobs
-            for (Map.Entry<String, Integer> entry : configPool.getBossMobs().entrySet()) {
-                builder.addBoss(entry.getKey(), entry.getValue());
-            }
-
-            BiomeMobPool pool = builder.build();
-            mobSpawner.registerPool(pool);
-            registered++;
-
-            LOGGER.atFine().log("Registered mob pool for %s: %d normal, %d boss",
-                biome.name(),
-                configPool.getRegularMobs().size(),
-                configPool.getBossMobs().size());
-        }
-
-        LOGGER.atInfo().log("Registered %d biome mob pools", registered);
-    }
+    // registerMobPoolsFromConfig extracted to RealmSpawningModule
 
     // ═══════════════════════════════════════════════════════════════════
     // REALM SERVICE IMPLEMENTATION
@@ -775,20 +654,14 @@ public class RealmsManager implements RealmsService {
         portalManager.deactivateEntryPortalsNow(realm);
 
         // Despawn all mobs so they don't attack during the grace period
-        if (mobSpawner != null) {
-            World realmWorld = realm.getWorld();
-            if (realmWorld != null && realmWorld.isAlive()) {
-                realmWorld.execute(() -> {
-                    int despawned = mobSpawner.despawnAllMobs(realm);
-                    if (despawned > 0) {
-                        LOGGER.atFine().log("Despawned %d remaining mobs on realm %s close (reason: %s)",
-                            despawned, realmId.toString().substring(0, 8), reason);
-                    }
-                });
-            }
+        if (spawningModule != null) {
+            spawningModule.despawnAllMobs(realm, "close (reason: " + reason + ")");
         }
 
-        // Victory uses full grace period (60s) so players can explore portal + chest.
+        // Remove all containers in the arena (prevents looting after realm ends)
+        clearRealmContainers(realm);
+
+        // Victory uses full grace period (60s) so players can use the portal.
         // Timeout uses shorter grace (15s = 10s defeat banner + 5s buffer) — no reason
         // to keep the world alive for 60s when the player is being teleported out.
         Duration gracePeriod;
@@ -841,6 +714,13 @@ public class RealmsManager implements RealmsService {
         }
 
         if (!config.isBiomeEnabled(mapData.biome())) {
+            return ValidationResult.biomeUnavailable();
+        }
+
+        // Defense in depth: enforce biome level gates (prevents stone-rerolled maps
+        // from bypassing min-level requirements even if changeBiome filtering fails)
+        int biomeMinLevel = config.getBiomeSettings(mapData.biome()).getMinLevel();
+        if (mapData.level() < biomeMinLevel) {
             return ValidationResult.biomeUnavailable();
         }
 
@@ -1090,6 +970,11 @@ public class RealmsManager implements RealmsService {
     private void onRealmCreated(RealmInstance realm) {
         realmsById.put(realm.getRealmId(), realm);
 
+        // Persist realm state for crash recovery
+        if (persistenceModule != null) {
+            persistenceModule.onRealmCreated(realm);
+        }
+
         // Fire event to listeners
         fireEvent(new RealmCreatedEvent(realm, realm.getOwnerId()));
 
@@ -1103,17 +988,9 @@ public class RealmsManager implements RealmsService {
         if (realm.getWorld() != null) {
             fireEvent(new RealmReadyEvent(realm, realm.getWorld()));
 
-            // Add map markers for combat realms (not skill sanctum)
-            if (!realm.getBiome().isUtilityBiome()) {
-                World realmWorld = realm.getWorld();
-                realmWorld.setCompassUpdating(true);
-                realmWorld.getWorldMapManager().addMarkerProvider(
-                    "realmPortal", new RealmPortalMarkerProvider(realm.getMapData()));
-                // Red markers for alive mobs — helps players locate remaining monsters
-                var mobMarkerProvider = new io.github.larsonix.trailoforbis.maps.ui
-                    .RealmMobMarkerProvider(realm.getRealmId(), mobSpawner);
-                realmWorld.getWorldMapManager().addMarkerProvider("realmMobs", mobMarkerProvider);
-                mobMarkerProviders.put(realm.getRealmId(), mobMarkerProvider);
+            // Set up map markers (compass, mobs) for combat realms
+            if (spawningModule != null) {
+                spawningModule.setupMobMarkers(realm);
             }
         }
     }
@@ -1123,6 +1000,18 @@ public class RealmsManager implements RealmsService {
      */
     private void onPlayerEnterRealm(UUID playerId, RealmInstance realm) {
         playerToRealm.put(playerId, realm.getRealmId());
+
+        // Persist player-in-realm for crash recovery.
+        // On crash, Hytale's internal return coordinates are lost.
+        // We fall back to default world spawn (0, 64, 0) — safe degradation.
+        if (persistenceModule != null) {
+            World defaultWorld = Universe.get().getDefaultWorld();
+            if (defaultWorld != null) {
+                persistenceModule.onPlayerEnteredRealm(playerId, realm.getRealmId(),
+                    defaultWorld.getWorldConfig().getUuid(),
+                    new Vector3d(0, 64, 0));
+            }
+        }
 
         // Trigger guide milestone for first realm entry (skip sanctum/utility biomes)
         if (!realm.getBiome().isUtilityBiome()) {
@@ -1138,105 +1027,9 @@ public class RealmsManager implements RealmsService {
         if (isFirst && realm.isReady()) {
             realm.transitionTo(RealmState.ACTIVE);
 
-            // Initialize mob spawning for this realm (skip utility biomes like sanctum)
-            // CRITICAL: Spawning must run on the realm's world thread, not the caller's thread.
-            // The PlayerAddedToWorldEvent fires on the OLD world's thread, but NPCPlugin.spawnEntity()
-            // requires running on the target world's thread.
-            if (mobSpawner != null && !realm.getBiome().isUtilityBiome()) {
-                World realmWorld = realm.getWorld();
-                if (realmWorld != null) {
-                    // Await chunks in the spawn area before spawning mobs.
-                    // Arena centered at (0, 0), radius varies by realm size (25-200 blocks).
-                    int radiusInChunks = (realm.getMapData().computeArenaRadius() / ChunkUtil.SIZE) + 1;
-                    // Use thenRun (not thenRunAsync) so mob spawning runs inline on the
-                    // world thread in the same tick chunks finish loading — zero gap means
-                    // no "chunk not loaded" warnings from UpdateLocationSystems.
-                    realmWorld.execute(() -> {
-                        ChunkLoadHelper.awaitAreaLoaded(realmWorld, 0, 0, radiusInChunks)
-                            .thenRun(() -> {
-                                // Pre-register spawn zone as occupied bounds so boss camp
-                                // satellites and scattered structures can't overlap it.
-                                if (boundsRegistry != null) {
-                                    boundsRegistry.registerSpawnExclusion(
-                                        realm.getRealmId(), 0, 0, 12);
-                                }
-                                // Place structures before mobs. MOUNTAINS uses labyrinth carver;
-                                // all other biomes use scatter placer.
-                                if (realm.getBiome() == RealmBiomeType.MOUNTAINS && labyrinthPlacer != null) {
-                                    var labResult = labyrinthPlacer.generate(realmWorld, realm);
-                                    realm.setLabyrinthResult(labResult);
-                                } else if (structurePlacer != null) {
-                                    structurePlacer.placeStructures(realmWorld, realm);
-                                }
-                                // Place Hexcode pedestal (after structures, before mobs)
-                                if (pedestalPlacer != null) {
-                                    pedestalPlacer.tryPlacePedestal(realmWorld, realm);
-                                }
-                                // SUCCESS: on world thread, same tick — zero gap
-                                mobSpawner.initializeSpawning(realm)
-                                    .thenAccept(result -> {
-                                        if (result.success()) {
-                                            LOGGER.atInfo().log("Realm %s spawning initialized: %d/%d mobs",
-                                                realm.getRealmId().toString().substring(0, 8),
-                                                result.spawned(), result.target());
-                                        } else {
-                                            LOGGER.atWarning().log("Realm %s spawning failed: %s",
-                                                realm.getRealmId().toString().substring(0, 8),
-                                                result.error());
-                                        }
-                                    })
-                                    .exceptionally(ex -> {
-                                        LOGGER.atWarning().withCause(ex).log("Error initializing spawning for realm %s",
-                                            realm.getRealmId());
-                                        return null;
-                                    });
-                            })
-                            .exceptionally(ex -> {
-                                // TIMEOUT: runs on JVM scheduler thread, dispatch to world thread
-                                LOGGER.atWarning().log("Chunk load timeout for realm %s, spawning with delay",
-                                    realm.getRealmId().toString().substring(0, 8));
-                                realmWorld.execute(() -> {
-                                    // Pre-register spawn exclusion (timeout path)
-                                    if (boundsRegistry != null) {
-                                        boundsRegistry.registerSpawnExclusion(
-                                            realm.getRealmId(), 0, 0, 12);
-                                    }
-                                    // Place structures before mobs (timeout path)
-                                    if (realm.getBiome() == RealmBiomeType.MOUNTAINS && labyrinthPlacer != null) {
-                                        var labResult = labyrinthPlacer.generate(realmWorld, realm);
-                                        realm.setLabyrinthResult(labResult);
-                                    } else if (structurePlacer != null) {
-                                        structurePlacer.placeStructures(realmWorld, realm);
-                                    }
-                                    // Place Hexcode pedestal (timeout path)
-                                    if (pedestalPlacer != null) {
-                                        pedestalPlacer.tryPlacePedestal(realmWorld, realm);
-                                    }
-                                    mobSpawner.initializeSpawning(realm)
-                                        .thenAccept(result -> {
-                                            if (result.success()) {
-                                                LOGGER.atInfo().log("Realm %s spawning initialized (after timeout): %d/%d mobs",
-                                                    realm.getRealmId().toString().substring(0, 8),
-                                                    result.spawned(), result.target());
-                                            } else {
-                                                LOGGER.atWarning().log("Realm %s spawning failed (after timeout): %s",
-                                                    realm.getRealmId().toString().substring(0, 8),
-                                                    result.error());
-                                            }
-                                        })
-                                        .exceptionally(ex2 -> {
-                                            LOGGER.atWarning().withCause(ex2).log("Error initializing spawning for realm %s (after timeout)",
-                                                realm.getRealmId());
-                                            return null;
-                                        });
-                                });
-                                return null;
-                            });
-                    });
-                } else {
-                    LOGGER.atWarning().log("Cannot initialize spawning: realm %s has no world",
-                        realm.getRealmId().toString().substring(0, 8));
-                }
+            // Initialize mob spawning (structures + mobs, dispatched to world thread)
+            if (spawningModule != null) {
+                spawningModule.initializeSpawningForRealm(realm);
             }
 
             fireEvent(new RealmActivatedEvent(
@@ -1259,11 +1052,21 @@ public class RealmsManager implements RealmsService {
      * Called when a player exits a realm.
      *
      * <p>Note: HUD removal is handled by DrainPlayerFromWorldEvent handler,
-     * which fires before the player leaves the world. This method only
-     * handles tracking and empty realm logic.
+     * which fires before the player leaves the world. This method handles
+     * unclaimed reward delivery, tracking, and empty realm logic.
      */
     private void onPlayerExitRealm(UUID playerId, RealmInstance realm) {
+        // Deliver unclaimed rewards if realm was completed
+        if (realm.isObjectiveComplete() && rewardChestManager != null) {
+            deliverUnclaimedRewards(playerId, realm.getRealmId());
+        }
+
         playerToRealm.remove(playerId);
+
+        // Remove from crash recovery tracking
+        if (persistenceModule != null) {
+            persistenceModule.onPlayerExitedRealm(playerId);
+        }
 
         boolean isLast = realm.isEmpty();
 
@@ -1275,6 +1078,75 @@ public class RealmsManager implements RealmsService {
         if (isLast && (realm.isActive() || realm.isEnding())) {
             handleEmptyRealm(realm);
         }
+    }
+
+    /**
+     * Delivers unclaimed reward chest items directly to a player's inventory.
+     *
+     * <p>Called when a player exits a completed realm without looting the
+     * reward chest (e.g., via {@code /too realm exit} or victory portal).
+     */
+    private void deliverUnclaimedRewards(UUID playerId, UUID realmId) {
+        List<com.hypixel.hytale.server.core.inventory.ItemStack> unclaimed =
+            rewardChestManager.getUnclaimedRewards(realmId, playerId);
+        if (unclaimed.isEmpty()) {
+            return;
+        }
+
+        PlayerRef playerRef = Universe.get().getPlayer(playerId);
+        if (playerRef == null) {
+            LOGGER.atWarning().log("Cannot deliver %d unclaimed rewards — player %s offline",
+                unclaimed.size(), playerId.toString().substring(0, 8));
+            return;
+        }
+
+        // Get player inventory
+        com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entityRef =
+            playerRef.getReference();
+        if (entityRef == null || !entityRef.isValid()) {
+            return;
+        }
+
+        com.hypixel.hytale.server.core.entity.entities.Player player =
+            entityRef.getStore().getComponent(entityRef,
+                com.hypixel.hytale.server.core.entity.entities.Player.getComponentType());
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+
+        com.hypixel.hytale.server.core.inventory.Inventory inventory = player.getInventory();
+        int delivered = 0;
+
+        for (com.hypixel.hytale.server.core.inventory.ItemStack item : unclaimed) {
+            if (item == null || item.isEmpty()) continue;
+
+            com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction tx =
+                inventory.getHotbar().addItemStack(item);
+            if (!tx.succeeded()) {
+                tx = inventory.getBackpack().addItemStack(item);
+            }
+            if (tx.succeeded()) {
+                delivered++;
+            }
+        }
+
+        // Remove from storage — delivered or not, we've tried
+        rewardChestManager.removePlayerRewards(realmId, playerId);
+
+        // Notify the player
+        if (delivered > 0) {
+            Message msg = Message.empty()
+                .insert(Message.raw("[").color(MessageColors.GRAY))
+                .insert(Message.raw("Rewards").color(MessageColors.GOLD).bold(true))
+                .insert(Message.raw("] ").color(MessageColors.GRAY))
+                .insert(Message.raw("Unclaimed chest rewards delivered to your inventory.")
+                    .color(MessageColors.SUCCESS));
+            playerRef.sendMessage(msg);
+        }
+
+        LOGGER.atInfo().log("Delivered %d/%d unclaimed rewards to player %s from realm %s",
+            delivered, unclaimed.size(), playerId.toString().substring(0, 8),
+            realmId.toString().substring(0, 8));
     }
 
     /**
@@ -1290,7 +1162,25 @@ public class RealmsManager implements RealmsService {
             realm.getRealmId().toString().substring(0, 8), event.getReason());
 
         realmsById.remove(realm.getRealmId());
-        mobMarkerProviders.remove(realm.getRealmId());
+        if (spawningModule != null) {
+            spawningModule.removeMobMarkers(realm.getRealmId());
+            // Clean up mob spawn state, entity refs, bounds registry — returns mob UUIDs for ailment cleanup
+            java.util.Set<java.util.UUID> mobUuids = spawningModule.cleanupRealm(realm.getRealmId());
+            // Clean up ailment state for realm mobs
+            TrailOfOrbis too = TrailOfOrbis.getInstanceOrNull();
+            if (!mobUuids.isEmpty() && too != null && too.getAilmentTracker() != null) {
+                int cleaned = too.getAilmentTracker().cleanupEntities(mobUuids);
+                if (cleaned > 0) {
+                    LOGGER.atFine().log("Cleaned up ailment state for %d mobs from realm %s",
+                        cleaned, realm.getRealmId().toString().substring(0, 8));
+                }
+            }
+        }
+
+        // Remove from persistence tracking
+        if (persistenceModule != null) {
+            persistenceModule.onRealmClosed(realm.getRealmId());
+        }
 
         // Clean up player mappings
         for (UUID playerId : realm.getAllParticipants()) {
@@ -1300,7 +1190,7 @@ public class RealmsManager implements RealmsService {
         // Clean up victory portal if any
         victoryPortalManager.removeVictoryPortal(realm);
 
-        // Clean up reward chest (unclaimed items are discarded — chest is the reward mechanism)
+        // Clean up reward chest (unclaimed rewards delivered at exit time)
         if (rewardChestManager != null) {
             rewardChestManager.cleanup(realm.getRealmId());
         }
@@ -1374,18 +1264,12 @@ public class RealmsManager implements RealmsService {
         portalManager.deactivateEntryPortalsNow(realm);
 
         // Despawn any remaining mobs (must run on world thread)
-        if (mobSpawner != null) {
-            World realmWorld = realm.getWorld();
-            if (realmWorld != null && realmWorld.isAlive()) {
-                realmWorld.execute(() -> {
-                    int despawned = mobSpawner.despawnAllMobs(realm);
-                    if (despawned > 0) {
-                        LOGGER.atFine().log("Despawned %d remaining mobs on realm %s victory",
-                            despawned, realm.getRealmId().toString().substring(0, 8));
-                    }
-                });
-            }
+        if (spawningModule != null) {
+            spawningModule.despawnAllMobs(realm, "victory");
         }
+
+        // Remove all containers in the arena (prevents post-combat looting)
+        clearRealmContainers(realm);
 
         // Fire the completion event for listeners
         fireEvent(new RealmCompletedEvent(realm));
@@ -1529,6 +1413,16 @@ public class RealmsManager implements RealmsService {
     }
 
     /**
+     * Dispatches container clearing for a realm arena to the world thread.
+     * Removes all container blocks (chests, barrels, crates) and closes open windows.
+     */
+    private void clearRealmContainers(RealmInstance realm) {
+        World realmWorld = realm.getWorld();
+        if (realmWorld == null || !realmWorld.isAlive()) return;
+        realmWorld.execute(() -> RealmContainerClearer.clearContainers(realmWorld, realm));
+    }
+
+    /**
      * Checks if a realm should be removed (for RemovalCondition).
      */
     private boolean shouldRemoveRealm(UUID realmId) {
@@ -1551,201 +1445,6 @@ public class RealmsManager implements RealmsService {
         return false;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PERIODIC TASKS
-    // ═══════════════════════════════════════════════════════════════════
-
-    /**
-     * Called every second to process periodic tasks.
-     *
-     * <p>This method runs independently of player presence, ensuring that:
-     * <ul>
-     *   <li>Realm timeouts are checked even when no players are in the realm</li>
-     *   <li>Portal and removal cleanup happens regularly</li>
-     *   <li>Spawn gateway particles are spawned periodically</li>
-     * </ul>
-     */
-    private void processTick() {
-        try {
-            // Process pending removals
-            removalHandler.processPendingRemovals();
-
-            // Process portal timeouts
-            int expiredPortals = portalManager.processPortalTimeouts();
-            if (expiredPortals > 0) {
-                LOGGER.atFine().log("Removed %d expired portals", expiredPortals);
-            }
-
-            // Check for timed out realms (runs EVERY tick - critical for timeout enforcement)
-            // This runs regardless of whether players are in the realm
-            checkRealmTimeouts();
-
-            // Enforce arena boundaries — clamp mobs that wander outside the arena
-            enforceArenaBoundaries();
-
-            // Despawn recovery — respawn mobs that were lost to chunk unloading,
-            // NPC behavior tree ActionDespawn, or other unexpected removal.
-            // Throttled to every ~5 seconds to avoid per-tick overhead.
-            checkDespawnedMobs();
-
-            // Refresh mob marker positions (dispatched to world thread for ECS access)
-            refreshMobMarkerPositions();
-
-            // Tick combat HUDs (timer countdown + kill progress) — dispatched to world thread.
-            // This replaces HyUI's withRefreshRate() which uses a ScheduledExecutorService
-            // on its own thread and races with world transitions.
-            tickCombatHuds();
-
-            // Check for closed reward chests
-            if (rewardChestMonitor != null) {
-                rewardChestMonitor.tick();
-            }
-        } catch (Exception e) {
-            LOGGER.atSevere().withCause(e).log("Error in realm tick processing");
-        }
-    }
-
-    /**
-     * Checks all active realms for timeout expiration.
-     *
-     * <p>This runs independently of player presence. The realm timer starts when
-     * the first player enters (ACTIVE state) and continues even if all players leave.
-     * A realm only closes on:
-     * <ul>
-     *   <li>Timer expiration (failure/timeout)</li>
-     *   <li>All mobs killed (victory)</li>
-     * </ul>
-     */
-    private int timerDiagCounter = 0;
-
-    /** Tick counter for throttling despawn recovery checks (every ~5 seconds = 100 ticks). */
-    private int despawnRecoveryCounter = 0;
-    private static final int DESPAWN_RECOVERY_INTERVAL_TICKS = 100;
-
-    private void checkRealmTimeouts() {
-        timerDiagCounter++;
-        boolean doDiag = (timerDiagCounter % 10 == 1); // Log every 10 seconds
-
-        for (RealmInstance realm : realmsById.values()) {
-            if (!realm.isActive()) continue;
-
-            // DIAGNOSTIC: Check vanilla timer state every 10 seconds
-            if (doDiag) {
-                World world = realm.getWorld();
-                if (world != null) {
-                    try {
-                        Store<ChunkStore> cs = world.getChunkStore().getStore();
-                        InstanceDataResource idr = cs.getResource(InstanceDataResource.getResourceType());
-                        InstanceWorldConfig iwc = InstanceWorldConfig.get(world.getWorldConfig());
-                        int condCount = iwc != null ? iwc.getRemovalConditions().length : -1;
-                        String condTypes = "";
-                        if (iwc != null && condCount > 0) {
-                            StringBuilder sb = new StringBuilder();
-                            for (RemovalCondition c : iwc.getRemovalConditions()) {
-                                if (sb.length() > 0) sb.append(", ");
-                                sb.append(c.getClass().getSimpleName());
-                            }
-                            condTypes = sb.toString();
-                        }
-                        LOGGER.atInfo().log(
-                            "[TIMER-DIAG] Realm %s: elapsed=%ds, timeout=%ds, remaining=%ds | vanilla: conditions=%d [%s], timeoutTimer=%s, isRemoving=%b",
-                            realm.getRealmId().toString().substring(0, 8),
-                            realm.getElapsedTime().toSeconds(),
-                            realm.getTimeout().toSeconds(),
-                            realm.getRemainingTime().toSeconds(),
-                            condCount, condTypes,
-                            idr.getTimeoutTimer(),
-                            idr.isRemoving()
-                        );
-                    } catch (Exception e) {
-                        LOGGER.atFine().log("[TIMER-DIAG] Could not read vanilla state for realm %s: %s",
-                            realm.getRealmId().toString().substring(0, 8), e.getMessage());
-                    }
-                }
-            }
-
-            // Utility biomes (skill sanctum) have no timer — infinite duration
-            if (realm.getBiome().isUtilityBiome()) {
-                continue;
-            }
-
-            if (realm.isTimedOut()) {
-                LOGGER.atInfo().log("[TIMER-DIAG] OUR TIMER triggered timeout for realm %s (elapsed=%ds >= timeout=%ds)",
-                    realm.getRealmId().toString().substring(0, 8),
-                    realm.getElapsedTime().toSeconds(),
-                    realm.getTimeout().toSeconds());
-                realm.markTimedOut();
-                closeRealm(realm.getRealmId(), RealmInstance.CompletionReason.TIMEOUT);
-            }
-        }
-    }
-
-
-    /**
-     * Refreshes mob marker positions for all active realms.
-     * Dispatches to each realm's world thread for ECS store access.
-     */
-    /**
-     * Enforces arena boundaries for all active realms.
-     * Dispatches to each realm's world thread for ECS store access.
-     */
-    private void enforceArenaBoundaries() {
-        for (RealmInstance realm : realmsById.values()) {
-            if (!realm.isActive()) continue;
-            World world = realm.getWorld();
-            if (world == null || !world.isAlive()) continue;
-            UUID realmId = realm.getRealmId();
-            world.execute(() -> mobSpawner.enforceArenaBoundaries(realmId, world));
-        }
-    }
-
-    /**
-     * Checks for and respawns mobs that have despawned unexpectedly.
-     *
-     * <p>Throttled to every {@link #DESPAWN_RECOVERY_INTERVAL_TICKS} ticks (~5 seconds).
-     * Dispatches the actual respawn work to each realm's world thread since
-     * {@code spawnNow()} requires world thread access for ECS store operations.
-     */
-    private void checkDespawnedMobs() {
-        despawnRecoveryCounter++;
-        if (despawnRecoveryCounter < DESPAWN_RECOVERY_INTERVAL_TICKS) {
-            return;
-        }
-        despawnRecoveryCounter = 0;
-
-        for (RealmInstance realm : realmsById.values()) {
-            if (!realm.isActive()) continue;
-            World world = realm.getWorld();
-            if (world == null || !world.isAlive()) continue;
-            world.execute(() -> mobSpawner.checkAndRespawnDespawnedMobs(realm));
-        }
-    }
-
-    private void tickCombatHuds() {
-        // Iterate active realms and dispatch HUD refresh to each realm's world thread
-        for (RealmInstance realm : realmsById.values()) {
-            if (!realm.isActive()) continue;
-            World world = realm.getWorld();
-            if (world == null || !world.isAlive()) continue;
-
-            Set<UUID> realmPlayers = realm.getCurrentPlayers();
-            world.execute(() -> hudManager.tickCombatHuds(realmPlayers));
-        }
-    }
-
-    private void refreshMobMarkerPositions() {
-        for (var entry : mobMarkerProviders.entrySet()) {
-            RealmInstance realm = realmsById.get(entry.getKey());
-            if (realm == null || !realm.isActive()) {
-                continue;
-            }
-            World world = realm.getWorld();
-            if (world == null || !world.isAlive()) continue;
-
-            var provider = entry.getValue();
-            world.execute(() -> provider.refreshPositions(world));
-        }
-    }
 
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1770,6 +1469,16 @@ public class RealmsManager implements RealmsService {
     public java.util.Optional<PlayerRef> getPlayerRef(@Nonnull UUID playerId) {
         PlayerRef playerRef = Universe.get().getPlayer(playerId);
         return java.util.Optional.ofNullable(playerRef);
+    }
+
+    /**
+     * Gets the persistence module for crash recovery.
+     *
+     * @return The persistence module, or null if not initialized
+     */
+    @Nullable
+    public io.github.larsonix.trailoforbis.maps.persistence.RealmPersistenceModule getPersistenceModule() {
+        return persistenceModule;
     }
 
     /**
@@ -1862,16 +1571,22 @@ public class RealmsManager implements RealmsService {
         this.rewardChestManager = rewardChestManager;
         if (rewardChestManager != null) {
             this.rewardChestMonitor = new RewardChestMonitor(rewardChestManager);
+            if (tickModule != null) {
+                tickModule.setRewardChestMonitor(rewardChestMonitor);
+            }
             LOGGER.atInfo().log("RewardChestManager configured");
 
-            // Re-create victory sequence with the chest manager if scheduler is available
-            if (scheduler != null) {
+            // Re-create victory sequence with the chest manager if tick module is running
+            if (tickModule != null && tickModule.isRunning()) {
                 victorySequence = new RealmVictorySequence(
                     hudManager, victoryPortalManager, rewardChestManager, victoryEmoteHelper);
                 LOGGER.atInfo().log("Victory sequence updated with RewardChestManager");
             }
         } else {
             this.rewardChestMonitor = null;
+            if (tickModule != null) {
+                tickModule.setRewardChestMonitor(null);
+            }
         }
     }
 
@@ -1892,7 +1607,7 @@ public class RealmsManager implements RealmsService {
      */
     @Nullable
     public RealmEntitySpawner getEntitySpawner() {
-        return entitySpawner;
+        return spawningModule != null ? spawningModule.getEntitySpawner() : null;
     }
 
     /**
@@ -1902,7 +1617,7 @@ public class RealmsManager implements RealmsService {
      */
     @Nullable
     public RealmMobSpawner getMobSpawner() {
-        return mobSpawner;
+        return spawningModule != null ? spawningModule.getMobSpawner() : null;
     }
 
     /**
@@ -1932,7 +1647,7 @@ public class RealmsManager implements RealmsService {
      */
     @Nullable
     public SpawnGatewayManager getSpawnGatewayManager() {
-        return spawnGatewayManager;
+        return gatewayModule != null ? gatewayModule.getSpawnGatewayManager() : null;
     }
 
     /**
@@ -1942,7 +1657,7 @@ public class RealmsManager implements RealmsService {
      */
     @Nullable
     public GatewayUpgradeManager getGatewayUpgradeManager() {
-        return gatewayUpgradeManager;
+        return gatewayModule != null ? gatewayModule.getGatewayUpgradeManager() : null;
     }
 
     /**
@@ -1956,17 +1671,10 @@ public class RealmsManager implements RealmsService {
      */
     @Nonnull
     public CompletableFuture<Boolean> ensureSpawnGatewaysExist(@Nonnull World world) {
-        if (spawnGatewayManager == null) {
+        if (gatewayModule == null) {
             return CompletableFuture.completedFuture(false);
         }
-
-        // Load existing gateway tiers into cache when world activates
-        if (gatewayUpgradeManager != null) {
-            UUID worldUuid = world.getWorldConfig().getUuid();
-            gatewayUpgradeManager.getRepository().loadWorldGateways(worldUuid);
-        }
-
-        return spawnGatewayManager.ensureGatewaysExist(world);
+        return gatewayModule.ensureSpawnGatewaysExist(world);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1983,12 +1691,7 @@ public class RealmsManager implements RealmsService {
     public <T extends RealmEvent> void addListener(
             @Nonnull Class<T> eventClass,
             @Nonnull Consumer<T> listener) {
-        Objects.requireNonNull(eventClass, "Event class cannot be null");
-        Objects.requireNonNull(listener, "Listener cannot be null");
-
-        eventListeners
-            .computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>())
-            .add(listener);
+        eventBus.addListener(eventClass, listener);
     }
 
     /**
@@ -2002,11 +1705,7 @@ public class RealmsManager implements RealmsService {
     public <T extends RealmEvent> boolean removeListener(
             @Nonnull Class<T> eventClass,
             @Nonnull Consumer<T> listener) {
-        List<Consumer<? extends RealmEvent>> listeners = eventListeners.get(eventClass);
-        if (listeners != null) {
-            return listeners.remove(listener);
-        }
-        return false;
+        return eventBus.removeListener(eventClass, listener);
     }
 
     /**
@@ -2015,35 +1714,14 @@ public class RealmsManager implements RealmsService {
      * @param event The event to fire
      * @param <T> The event type
      */
-    @SuppressWarnings("unchecked")
     private <T extends RealmEvent> void fireEvent(@Nonnull T event) {
-        Class<?> eventClass = event.getClass();
+        eventBus.fireEvent(event);
+    }
 
-        // Fire to specific listeners
-        List<Consumer<? extends RealmEvent>> listeners = eventListeners.get(eventClass);
-        if (listeners != null) {
-            for (Consumer<? extends RealmEvent> listener : listeners) {
-                try {
-                    ((Consumer<T>) listener).accept(event);
-                } catch (Exception e) {
-                    LOGGER.atWarning().withCause(e).log("Error in realm event listener for %s",
-                        eventClass.getSimpleName());
-                }
-            }
-        }
-
-        // Fire to base RealmEvent listeners (if any registered)
-        if (eventClass != RealmEvent.class) {
-            List<Consumer<? extends RealmEvent>> baseListeners = eventListeners.get(RealmEvent.class);
-            if (baseListeners != null) {
-                for (Consumer<? extends RealmEvent> listener : baseListeners) {
-                    try {
-                        ((Consumer<RealmEvent>) listener).accept(event);
-                    } catch (Exception e) {
-                        LOGGER.atWarning().withCause(e).log("Error in base realm event listener");
-                    }
-                }
-            }
-        }
+    /**
+     * Returns the event bus for direct module access.
+     */
+    RealmEventBus getEventBus() {
+        return eventBus;
     }
 }

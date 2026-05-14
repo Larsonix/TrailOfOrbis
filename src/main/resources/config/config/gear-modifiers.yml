@@ -1355,7 +1355,7 @@ suffixes:
   # ──────────────────────────────────────────────────
 
   hex_volatility:
-    display_name: "Volatile"
+    display_name: "of Spellweaving"
     stat: volatility_max
     stat_type: flat
     base_min: 2.0

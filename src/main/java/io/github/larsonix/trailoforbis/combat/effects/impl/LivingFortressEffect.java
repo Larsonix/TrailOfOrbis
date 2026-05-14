@@ -48,6 +48,14 @@ public class LivingFortressEffect extends KeystoneCombatEffect {
         float healAmount = blockedDamage * BLOCK_HEAL_FRACTION;
         if (healAmount <= 0) return;
 
+        // Apply Health Recovery multiplier
+        if (ctx.defenderStats() != null) {
+            float recoveryPct = ctx.defenderStats().getHealthRecoveryPercent();
+            if (recoveryPct != 0) {
+                healAmount *= (1.0f + recoveryPct / 100.0f);
+            }
+        }
+
         if (ctx.defenderRef() != null && ctx.defenderRef().isValid()) {
             try {
                 EntityStatMap statMap = ctx.store().getComponent(ctx.defenderRef(),
