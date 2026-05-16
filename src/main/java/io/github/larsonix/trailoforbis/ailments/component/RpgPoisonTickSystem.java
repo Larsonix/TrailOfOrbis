@@ -14,11 +14,13 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.ailments.AilmentEffectManager;
 import io.github.larsonix.trailoforbis.ailments.AilmentTracker;
 import io.github.larsonix.trailoforbis.ailments.AilmentType;
 import io.github.larsonix.trailoforbis.combat.detection.DamageTypeClassifier;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
@@ -43,10 +45,16 @@ public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
     private static final float DOT_TICK_INTERVAL = 0.5f;
 
     private final AilmentTracker tracker;
+    @Nullable private final AilmentEffectManager ailmentEffectManager;
     private volatile DamageCause poisonCause;
 
     public RpgPoisonTickSystem(@Nonnull AilmentTracker tracker) {
+        this(tracker, null);
+    }
+
+    public RpgPoisonTickSystem(@Nonnull AilmentTracker tracker, @Nullable AilmentEffectManager ailmentEffectManager) {
         this.tracker = tracker;
+        this.ailmentEffectManager = ailmentEffectManager;
     }
 
     @Override
@@ -72,9 +80,12 @@ public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
         // Snapshot DPS and source BEFORE ticking (tickStacks may remove expired stacks)
         float currentDps = poison.getTotalDps();
         UUID primarySource = poison.getPrimarySourceUuid();
+        int stacksBefore = poison.getStackCount();
 
         // Tick all stack durations (removes expired stacks internally)
         poison.tickStacks(dt);
+
+        int stacksAfter = poison.getStackCount();
 
         // Accumulate time — only fire damage at intervals (not every ECS tick)
         float elapsed = poison.getElapsedSinceTick() + dt;
@@ -91,6 +102,18 @@ public class RpgPoisonTickSystem extends EntityTickingSystem<EntityStore> {
             poison.setElapsedSinceTick(0f);
         } else {
             poison.setElapsedSinceTick(elapsed);
+        }
+
+        // Refresh poison visual when stacks expire but some remain
+        // This resets the client's countdown ring to the new longest stack duration
+        if (stacksAfter < stacksBefore && !allExpired && ailmentEffectManager != null) {
+            float longestRemaining = poison.getLongestRemainingDuration();
+            if (longestRemaining > 0) {
+                UUID entityUuid = resolveEntityUuid(ref, store);
+                if (entityUuid != null) {
+                    ailmentEffectManager.refreshPoisonVisual(ref, entityUuid, longestRemaining, store);
+                }
+            }
         }
 
         // Remove component if all stacks expired

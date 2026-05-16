@@ -179,8 +179,8 @@ public class AilmentEffectManager {
      *
      * <p>Visuals: electric yellow tint (#1a1200 bottom, #ffee44 top).
      * No screen effect or VFX (shock doesn't impair vision).
-     * Lightning particle disabled — Weapon/Lightning_Sword/Lightning_Sword
-     * is missing from Hytale's live client.
+     * No particles — Lightning_Sword exists in Assets.zip but not in live client.
+     * Uses vanilla Ingredient_Lightning_Essence icon for HUD feedback.
      */
     private RPGEntityEffect createShockEffect() {
         String effectId = EFFECT_PREFIX + "shock";
@@ -196,6 +196,7 @@ public class AilmentEffectManager {
         effect.setDuration(2.0f); // Default, overridden per-application
         effect.setOverlapBehavior(OverlapBehavior.OVERWRITE);
         effect.setDebuff(true);
+        effect.setStatusEffectIcon("Icons/ItemsGenerated/Ingredient_Lightning_Essence.png");
 
         synchronized (pendingEffects) {
             pendingEffects.add(effect);
@@ -248,7 +249,7 @@ public class AilmentEffectManager {
      *
      * <p>Visuals: ice tint (#80ecff bottom, #da72ff top), snow particles,
      * freeze VFX, snow screen overlay. Speed is set per slow percentage.
-     *
+     * Uses vanilla Ingredient_Ice_Essence icon for HUD feedback.
      */
     private RPGEntityEffect createFreezeEffect(int slowPercent) {
         String effectId = FREEZE_EFFECT_PREFIX + slowPercent;
@@ -270,6 +271,8 @@ public class AilmentEffectManager {
         effect.setInfinite(false);
         effect.setDuration(3.0f); // Default, overridden per-application
         effect.setOverlapBehavior(OverlapBehavior.OVERWRITE);
+        effect.setDebuff(true);
+        effect.setStatusEffectIcon("Icons/ItemsGenerated/Ingredient_Ice_Essence.png");
 
         synchronized (pendingEffects) {
             pendingEffects.add(effect);
@@ -389,6 +392,49 @@ public class AilmentEffectManager {
                         types.size(), entityUuid.toString().substring(0, 8));
             }
         }
+    }
+
+    // ==================== Poison Visual Refresh ====================
+
+    /**
+     * Refreshes the poison visual effect with the current longest remaining stack duration.
+     *
+     * <p>Called by {@link io.github.larsonix.trailoforbis.ailments.component.RpgPoisonTickSystem}
+     * when individual stacks expire but others remain. Resets the client's countdown ring
+     * to reflect the actual remaining duration.
+     *
+     * @param entityRef  Entity reference (must be valid)
+     * @param entityUuid Entity UUID (for tracking)
+     * @param longestRemainingDuration Duration of the longest remaining stack (seconds)
+     * @param accessor   Component accessor (Store satisfies this)
+     */
+    public void refreshPoisonVisual(
+            @Nonnull Ref<EntityStore> entityRef,
+            @Nonnull UUID entityUuid,
+            float longestRemainingDuration,
+            @Nonnull ComponentAccessor<EntityStore> accessor
+    ) {
+        if (!initialized || poisonEffect == null || longestRemainingDuration <= 0) {
+            return;
+        }
+
+        if (!entityRef.isValid()) {
+            return;
+        }
+
+        EffectControllerComponent effectController = accessor.getComponent(
+                entityRef, EffectControllerComponent.getComponentType()
+        );
+        if (effectController == null) {
+            return;
+        }
+
+        // OVERWRITE replaces existing effect → countdown ring resets to new duration
+        effectController.addEffect(
+                entityRef, poisonEffect, longestRemainingDuration, OverlapBehavior.OVERWRITE, accessor);
+
+        LOGGER.atFine().log("Refreshed poison visual for %s (new duration: %.1fs)",
+                entityUuid.toString().substring(0, 8), longestRemainingDuration);
     }
 
     // ==================== Freeze Effect Access (Backward Compatibility) ====================

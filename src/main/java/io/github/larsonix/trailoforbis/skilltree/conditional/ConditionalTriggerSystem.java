@@ -48,6 +48,8 @@ public class ConditionalTriggerSystem {
 
     private final SkillTreeConfig skillTreeConfig;
 
+    @Nullable private ConditionalVisualCallback visualCallback;
+
     /**
      * Per-player effect trackers.
      */
@@ -70,6 +72,13 @@ public class ConditionalTriggerSystem {
      */
     public ConditionalTriggerSystem(@Nonnull SkillTreeConfig skillTreeConfig) {
         this.skillTreeConfig = Objects.requireNonNull(skillTreeConfig, "skillTreeConfig cannot be null");
+    }
+
+    public void setVisualCallback(@Nullable ConditionalVisualCallback callback) {
+        this.visualCallback = callback;
+        for (ConditionalEffectTracker tracker : trackers.values()) {
+            tracker.setVisualCallback(callback);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -351,6 +360,9 @@ public class ConditionalTriggerSystem {
     public void removePlayer(@Nonnull UUID playerId) {
         trackers.remove(playerId);
         conditionalNodeCache.remove(playerId);
+        if (visualCallback instanceof ConditionalVisualEffectManager manager) {
+            manager.cleanupPlayer(playerId);
+        }
         LOGGER.atFine().log("Removed player %s from conditional trigger system", playerId);
     }
 
@@ -384,7 +396,13 @@ public class ConditionalTriggerSystem {
      */
     @Nonnull
     private ConditionalEffectTracker getOrCreateTracker(@Nonnull UUID playerId) {
-        return trackers.computeIfAbsent(playerId, ConditionalEffectTracker::new);
+        return trackers.computeIfAbsent(playerId, id -> {
+            ConditionalEffectTracker tracker = new ConditionalEffectTracker(id);
+            if (visualCallback != null) {
+                tracker.setVisualCallback(visualCallback);
+            }
+            return tracker;
+        });
     }
 
     /**

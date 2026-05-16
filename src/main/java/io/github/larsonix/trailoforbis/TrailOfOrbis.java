@@ -278,6 +278,7 @@ public class TrailOfOrbis extends JavaPlugin {
 
     // Conditional effect trigger system (on-kill, on-crit, threshold bonuses)
     private ConditionalTriggerSystem conditionalTriggerSystem;
+    private io.github.larsonix.trailoforbis.skilltree.conditional.ConditionalVisualEffectManager conditionalVisualEffectManager;
 
     // Container sync tick system - syncs custom item definitions on container open
     private ContainerSyncTickSystem containerSyncTickSystem;
@@ -1366,6 +1367,18 @@ public class TrailOfOrbis extends JavaPlugin {
                 conditionalTriggerSystem = new ConditionalTriggerSystem(treeConfig);
                 getLogger().atInfo().log("ConditionalTriggerSystem initialized");
 
+                // Initialize conditional buff visual icons (per-node HUD status icons)
+                java.util.Map<String, io.github.larsonix.trailoforbis.skilltree.conditional.ConditionalConfig> conditionalNodes = new java.util.HashMap<>();
+                for (java.util.Map.Entry<String, io.github.larsonix.trailoforbis.skilltree.config.SkillNode> entry : treeConfig.getNodes().entrySet()) {
+                    io.github.larsonix.trailoforbis.skilltree.conditional.ConditionalConfig cc = entry.getValue().getConditional();
+                    if (cc != null) {
+                        conditionalNodes.put(entry.getKey(), cc);
+                    }
+                }
+                conditionalVisualEffectManager = new io.github.larsonix.trailoforbis.skilltree.conditional.ConditionalVisualEffectManager();
+                conditionalVisualEffectManager.initialize(conditionalNodes);
+                conditionalTriggerSystem.setVisualCallback(conditionalVisualEffectManager);
+
                 // Skill tree visualization is handled by the Skill Sanctum (3D world-based UI)
             } else {
                 getLogger().atWarning().log("Skill tree config empty or failed to load");
@@ -1788,6 +1801,12 @@ public class TrailOfOrbis extends JavaPlugin {
             getLogger().atInfo().log("Shutting down combat effect registry...");
             combatEffectRegistry.shutdown();
             combatEffectRegistry = null;
+        }
+
+        // Phase 1.6.9: Shutdown conditional visual effects
+        if (conditionalVisualEffectManager != null) {
+            conditionalVisualEffectManager.shutdown();
+            conditionalVisualEffectManager = null;
         }
 
         // Phase 1.7: Shutdown ailment system
@@ -3060,7 +3079,7 @@ public class TrailOfOrbis extends JavaPlugin {
             getEntityStoreRegistry().registerSystem(
                 new io.github.larsonix.trailoforbis.ailments.component.RpgBurnTickSystem(ailmentTracker));
             getEntityStoreRegistry().registerSystem(
-                new io.github.larsonix.trailoforbis.ailments.component.RpgPoisonTickSystem(ailmentTracker));
+                new io.github.larsonix.trailoforbis.ailments.component.RpgPoisonTickSystem(ailmentTracker, ailmentEffectManager));
 
             // Register death cleanup system — clears ailment visuals/state on entity death
             // Prevents screen overlays (red burn tint, green poison) from persisting through death screen

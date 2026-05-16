@@ -1,6 +1,8 @@
 # Hytale Entity Effects System
 
-This skill provides comprehensive documentation for Hytale's Entity Effect system, including JSON schema, API usage, and integration patterns.
+> **Definitive reference**: See `docs/reference/STATUS_EFFECT_SYSTEM.md` for the full authoritative reference (verified May 2026) covering internals, client rendering, vendor patterns, and all 123 vanilla effects.
+
+This document provides API usage documentation for Hytale's Entity Effect system, including JSON schema and integration patterns.
 
 ## Quick Reference
 
@@ -1113,6 +1115,90 @@ If Hytale's built-in effects don't match your needs, create custom effects:
 
 ---
 
+## ECS Event Hooks
+
+React to effects being added or removed without polling:
+
+```java
+import com.hypixel.hytale.server.core.entity.effect.EntityEffectEcsEvent;
+
+// Listen to effect additions
+public class EffectAddedListener
+extends EntityEventSystem<EntityStore, EntityEffectEcsEvent.EffectAdded> {
+    @Override
+    public void handle(int index, ArchetypeChunk<EntityStore> chunk,
+            Store<EntityStore> store, CommandBuffer<EntityStore> cmdBuffer,
+            EntityEffectEcsEvent.EffectAdded event) {
+        EntityEffectUpdate update = event.entityEffectUpdate;
+        // update.id, update.statusEffectIcon, etc.
+    }
+}
+
+// Listen to effect removals
+public class EffectRemovedListener
+extends EntityEventSystem<EntityStore, EntityEffectEcsEvent.EffectRemoved> {
+    @Override
+    public void handle(int index, ArchetypeChunk<EntityStore> chunk,
+            Store<EntityStore> store, CommandBuffer<EntityStore> cmdBuffer,
+            EntityEffectEcsEvent.EffectRemoved event) {
+        // React to removal
+    }
+}
+```
+
+---
+
+## Removal Sound Events
+
+Effects can play sounds when they expire or are removed:
+
+```json
+{
+  "ApplicationEffects": {
+    "WorldRemovalSoundEventId": "SFX_Effect_End_World",
+    "LocalRemovalSoundEventId": "SFX_Effect_End_Local"
+  }
+}
+```
+
+| Property | Description |
+|----------|-------------|
+| `WorldRemovalSoundEventId` | Sound heard by all nearby when effect ends |
+| `LocalRemovalSoundEventId` | Sound heard only by affected player when effect ends |
+
+---
+
+## First-Person Particles
+
+Particles visible only to the affected player (not other viewers):
+
+```json
+{
+  "ApplicationEffects": {
+    "FirstPersonParticles": [
+      {
+        "SystemId": "Effect_Fire_FP",
+        "TargetEntityPart": "Self",
+        "Scale": 0.5
+      }
+    ]
+  }
+}
+```
+
+Same format as `Particles` but rendered in first-person camera space only.
+
+---
+
+## Burn Water Immunity (Hardcoded)
+
+The Burn effect has a hardcoded `canApplyEffect()` check in `LivingEntityEffectSystem`:
+- Iterates through all blocks in the entity's bounding box
+- If ANY block is `Fluid_Water` → Burn is suppressed
+- This is the ONLY hardcoded per-effect check in the engine
+
+---
+
 ## Best Practices
 
 1. **Keep effects modular** - Separate visual effects from gameplay effects when possible
@@ -1120,4 +1206,8 @@ If Hytale's built-in effects don't match your needs, create custom effects:
 3. **Provide visual feedback** - Always include tints/particles for debuffs so players know what's affecting them
 4. **Test duration carefully** - Balance duration against DamageCalculatorCooldown for DoTs
 5. **Consider immunity frames** - Use `Invulnerable: true` for short dodge effects to prevent chain-stunning
-6. **Namespace custom effects** - Use `hyforged:` prefix for Hyforged-specific effects
+6. **Namespace custom effects** - Use `trailoforbis:` prefix for our plugin effects
+7. **Always null-check EffectControllerComponent** - Not all entities have it
+8. **Check effectIndex != Integer.MIN_VALUE** - Sentinel for "not found" (not -1)
+9. **Cache effect lookups as volatile static** - Avoid repeated asset map queries
+10. **Register effects during init only** - `loadAssets()` from within tick = deadlock

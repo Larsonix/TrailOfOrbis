@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
+import au.ellie.hyui.builders.HyUIHud;
 import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
@@ -230,6 +231,24 @@ public class HudLifecycleManager {
 
             try {
                 hud.restore(playerId, freshRef, worldStore, player);
+
+                // Direct synchronous MCHUD registration — eliminates the silent failure
+                // mode of HyUI's deferred safeAdd(). safeAdd() checks getReference()
+                // which can return null during transitions, causing it to exit silently.
+                // The HUD then exists in our activeHuds map but is never registered in
+                // the client's MCHUD — invisible with no recovery until the next refresh
+                // event. Direct setCustomHud() is synchronous and cannot silently fail
+                // (same pattern that makes RealmHudManager.showCombatHudDirect() reliable).
+                // resetHasBuilt() ensures the deferred safeAdd() (if it also succeeds)
+                // generates a harmless Clear+AppendInline rebuild instead of Set commands
+                // targeting a freshly-cleared group.
+                if (player != null) {
+                    HyUIHud activeHud = hud.getActiveHud(playerId);
+                    if (activeHud != null) {
+                        MultiHudWrapper.setCustomHud(player, freshRef, activeHud.name, activeHud);
+                        HudRefreshHelper.resetHasBuilt(activeHud);
+                    }
+                }
             } catch (Exception e) {
                 LOGGER.atWarning().withCause(e).log(
                     "Failed to restore %s HUD for player %s",

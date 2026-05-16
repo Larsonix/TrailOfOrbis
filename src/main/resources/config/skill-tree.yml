@@ -1924,7 +1924,11 @@ nodes:
       type: PERCENT
       value: -5.0
     conditional:
+      trigger: ON_CRIT
       duration: 3.0
+      stacking: STACK
+      max_stacks: 5
+      icon: Icons/ItemsGenerated/Ingredient_Crystal_Fragments_Blue.png
       effects:
       - modifierType: PERCENT
         stat: ATTACK_SPEED_PERCENT
@@ -1932,9 +1936,6 @@ nodes:
       - modifierType: PERCENT
         stat: MOVEMENT_SPEED_PERCENT
         value: 3.0
-      max_stacks: 5
-      stacking: STACK
-      trigger: ON_CRIT
   bridge_lightning_void_1:
     name: Storm Void I
     description: '+3% Attack Speed, +4% All Damage'
@@ -2530,7 +2531,11 @@ nodes:
       type: PERCENT
       value: -8.0
     conditional:
+      trigger: WHEN_HIT
       duration: 3.0
+      stacking: STACK
+      max_stacks: 5
+      icon: Icons/ItemsGenerated/Armor_Iron_Chest.png
       effects:
       - modifierType: FLAT
         stat: ARMOR
@@ -2538,9 +2543,6 @@ nodes:
       - modifierType: PERCENT
         stat: DAMAGE_TAKEN_PERCENT
         value: -2.0
-      max_stacks: 5
-      stacking: STACK
-      trigger: WHEN_HIT
   bridge_earth_void_1:
     name: Vital Roots I
     description: '+4% Max HP, +4% All Damage'
@@ -3139,13 +3141,14 @@ nodes:
       type: PERCENT
       value: -10.0
     conditional:
+      trigger: ON_KILL
       duration: 5.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Ingredient_Voidheart.png
       effects:
       - modifierType: PERCENT
         stat: ALL_DAMAGE_PERCENT
         value: 10.0
-      stacking: REFRESH
-      trigger: ON_KILL
   wind_entry:
     name: Path of Wind
     description: +8 Evasion
@@ -3619,7 +3622,10 @@ nodes:
       type: PERCENT
       value: -10.0
     conditional:
+      trigger: ON_EVADE
       duration: 3.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Ingredient_Feathers_Blue.png
       effects:
       - modifierType: PERCENT
         stat: ALL_DAMAGE_PERCENT
@@ -3627,8 +3633,6 @@ nodes:
       - modifierType: PERCENT
         stat: MOVEMENT_SPEED_PERCENT
         value: 5.0
-      stacking: REFRESH
-      trigger: ON_EVADE
   wind_keystone_2:
     name: Keen Eye
     description: 'While moving: +12% All Damage, +8 Evasion. +10 Accuracy, +5% Dodge Chance. -15% Max HP, -10 Armor.'
@@ -3652,7 +3656,10 @@ nodes:
       type: FLAT
       value: -10.0
     conditional:
+      trigger: WHILE_MOVING
       duration: 0.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Weapon_Dagger_Iron.png
       effects:
       - modifierType: PERCENT
         stat: ALL_DAMAGE_PERCENT
@@ -3660,8 +3667,6 @@ nodes:
       - modifierType: FLAT
         stat: EVASION
         value: 8.0
-      stacking: REFRESH
-      trigger: WHILE_MOVING
   havoc_entry:
     name: Path of Havoc
     description: '+4% Physical Damage'
@@ -3757,7 +3762,10 @@ nodes:
       type: FLAT
       value: 5.0
     conditional:
+      trigger: ON_KILL
       duration: 4.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Weapon_Sword_Adamantite.png
       effects:
       - modifierType: PERCENT
         stat: ATTACK_SPEED_PERCENT
@@ -3765,8 +3773,6 @@ nodes:
       - modifierType: FLAT
         stat: CRITICAL_CHANCE
         value: 8.0
-      stacking: REFRESH
-      trigger: ON_KILL
   havoc_frenzy_1:
     name: Frenzy I
     description: '+0.5% Life Steal'
@@ -5006,13 +5012,14 @@ nodes:
       type: PERCENT
       value: 5.0
     conditional:
+      trigger: ON_EVADE
       duration: 3.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Rock_Gem_Diamond.png
       effects:
       - modifierType: FLAT
         stat: CRITICAL_CHANCE
         value: 12.0
-      stacking: REFRESH
-      trigger: ON_EVADE
   striker_synergy_1:
     name: Quicksilver Reflexes
     description: 'Per 3 Striker nodes: +1% Attack Speed (max 10%)'
@@ -5496,13 +5503,14 @@ nodes:
       type: PERCENT
       value: 5.0
     conditional:
+      trigger: ON_BLOCK
       duration: 3.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Weapon_Bow_Iron.png
       effects:
       - modifierType: PERCENT
         stat: PROJECTILE_DAMAGE_PERCENT
         value: 10.0
-      stacking: REFRESH
-      trigger: ON_BLOCK
   warden_synergy_1:
     name: Fortified Range
     description: 'Per 3 Warden nodes: +2% Projectile Damage (max 20%)'
@@ -7118,7 +7126,10 @@ nodes:
       type: PERCENT
       value: -20.0
     conditional:
+      trigger: WHILE_MOVING
       duration: 0.0
+      stacking: REFRESH
+      icon: Icons/ItemsGenerated/Weapon_Spellbook_Grimoire_Purple.png
       effects:
       - modifierType: PERCENT
         stat: SPELL_DAMAGE_PERCENT
@@ -7126,8 +7137,6 @@ nodes:
       - modifierType: FLAT
         stat: MANA_REGEN
         value: 3.0
-      stacking: REFRESH
-      trigger: WHILE_MOVING
   sentinel_entry:
     name: Path of Sentinel
     description: '+3% Block Chance'

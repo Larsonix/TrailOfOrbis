@@ -1,6 +1,7 @@
 package io.github.larsonix.trailoforbis.ui.hud;
 
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -388,23 +389,45 @@ final class HudHealthChecker {
 
         int recreated = 0;
 
-        // Check persistent HUDs — discard + restore if not registered in client MCHUD.
-        // With the MHUD shim injected, PartyPro no longer replaces our MCHUD.
-        // This verification catches genuine safeAdd() failures from packet timing.
+        // Check persistent HUDs — two failure modes:
+        // 1. NOT registered in MCHUD (safeAdd() failed) → full recreate
+        // 2. Registered but client may have dropped initial packets during UI init window
+        //    → force rerender (Clear+Append) to ensure client visibility
+        // Both are caught by this single pass. Runs once per transition (~8s after).
         for (PersistentHud p : providers) {
             if (!p.isActive(uuid)) continue;
             HyUIHud hud = p.getActiveHud(uuid);
             if (hud == null) continue; // Not a HyUI-based HUD (e.g. combat ghost)
 
             if (!HudRefreshHelper.isRegisteredInMchud(hud, player)) {
+                // Case 1: Not registered server-side — full recreate
                 try {
                     p.discardStale(uuid);
                     p.restore(uuid, freshRef, store, player);
+                    // Direct registration for the new HUD (same fix as restoreAll)
+                    HyUIHud newHud = p.getActiveHud(uuid);
+                    if (newHud != null) {
+                        MultiHudWrapper.setCustomHud(player, freshRef, newHud.name, newHud);
+                        HudRefreshHelper.resetHasBuilt(newHud);
+                    }
                     LOGGER.atInfo().log("[HUD-VERIFY] Recreated %s for player %s",
                         p.hudName(), uuid.toString().substring(0, 8));
                     recreated++;
                 } catch (Exception e) {
                     LOGGER.atWarning().log("[HUD-VERIFY] Failed to recreate %s for %s: %s",
+                        p.hudName(), uuid.toString().substring(0, 8), e.getMessage());
+                }
+            } else {
+                // Case 2: Registered server-side but may be invisible on client.
+                // Force a full rerender (idempotent Clear+Append via MCHUD.add()).
+                // By ~8s post-transition, the client UI is fully initialized —
+                // this packet will not be dropped.
+                try {
+                    MultiHudWrapper.setCustomHud(player, freshRef, hud.name, hud);
+                    HudRefreshHelper.resetHasBuilt(hud);
+                    recreated++;
+                } catch (Exception e) {
+                    LOGGER.atFine().log("[HUD-VERIFY] Failed to rerender %s for %s: %s",
                         p.hudName(), uuid.toString().substring(0, 8), e.getMessage());
                 }
             }
@@ -449,7 +472,7 @@ final class HudHealthChecker {
         }
 
         if (recreated > 0) {
-            LOGGER.atInfo().log("[HUD-VERIFY] Recreated %d HUDs for player %s",
+            LOGGER.atFine().log("[HUD-VERIFY] Verified %d HUDs for player %s (rerender/recreate)",
                 recreated, uuid.toString().substring(0, 8));
         }
     }

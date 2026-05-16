@@ -155,13 +155,15 @@ public class MobModifierEffectRegistry {
         MobModifierConfig.ModifierSettings frostSettings = config.getModifierSettings(ModifierType.FROST_AURA);
         RPGApplicationEffects frostApp = RPGApplicationEffects.create();
         frostApp.withSpeed(1.0f - (float) frostSettings.getSlow_percent());
-        addRuntimeEffect(FROST_AURA_SLOW_ID, frostApp, false, 0.8f);
+        addRuntimeEffect(FROST_AURA_SLOW_ID, frostApp, false, 0.8f,
+                "Icons/ItemsGenerated/Ingredient_Ice_Essence.png", true);
 
         // Frozen proximity slow: same pattern as frost aura
         MobModifierConfig.ModifierSettings frozenSettings = config.getModifierSettings(ModifierType.FROZEN);
         RPGApplicationEffects frozenApp = RPGApplicationEffects.create();
         frozenApp.withSpeed(1.0f - (float) frozenSettings.getSlow_percent());
-        addRuntimeEffect(FROZEN_SLOW_ID, frozenApp, false, 0.8f);
+        addRuntimeEffect(FROZEN_SLOW_ID, frozenApp, false, 0.8f,
+                "Icons/ItemsGenerated/Ingredient_Ice_Essence.png", true);
 
         // Pack Leader speed buff: short-duration buff on nearby mobs
         MobModifierConfig.ModifierSettings packSettings = config.getModifierSettings(ModifierType.PACK_LEADER);
@@ -175,13 +177,25 @@ public class MobModifierEffectRegistry {
 
     private void addRuntimeEffect(@Nonnull String id, @Nonnull RPGApplicationEffects appEffects,
                                   boolean infinite, float duration) {
+        addRuntimeEffect(id, appEffects, infinite, duration, null, false);
+    }
+
+    private void addRuntimeEffect(@Nonnull String id, @Nonnull RPGApplicationEffects appEffects,
+                                  boolean infinite, float duration,
+                                  @Nullable String statusEffectIcon, boolean debuff) {
+        // Effects with icons use OVERWRITE so the countdown ring resets each tick
+        // (prevents icon blinking off at edge of range). Effects without icons
+        // use IGNORE (no network cost for invisible re-applications).
+        OverlapBehavior overlap = statusEffectIcon != null ? OverlapBehavior.OVERWRITE : OverlapBehavior.IGNORE;
+
         RPGEntityEffect effect = new RPGEntityEffect(id);
         effect.setApplicationEffects(appEffects);
         effect.setInfinite(infinite);
         effect.setDuration(duration);
         effect.setName(null);
-        effect.setDebuff(false);
-        effect.setOverlapBehavior(OverlapBehavior.IGNORE);
+        effect.setStatusEffectIcon(statusEffectIcon);
+        effect.setDebuff(debuff);
+        effect.setOverlapBehavior(overlap);
         effect.setRemovalBehavior(RemovalBehavior.COMPLETE);
 
         synchronized (pendingEffects) {

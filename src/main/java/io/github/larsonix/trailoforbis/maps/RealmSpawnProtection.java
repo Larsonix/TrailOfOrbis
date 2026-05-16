@@ -4,14 +4,20 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.OverlapBehavior;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import io.github.larsonix.trailoforbis.mobs.speed.RPGApplicationEffects;
+import io.github.larsonix.trailoforbis.mobs.speed.RPGEntityEffect;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,6 +100,9 @@ public class RealmSpawnProtection {
     /** Polling interval for movement checks. */
     private static final long CHECK_INTERVAL_MS = 200;
 
+    /** Visual-only EntityEffect ID for spawn shield icon. */
+    private static final String SPAWN_SHIELD_EFFECT_ID = "rpg_spawn_shield";
+
     /** Active protections keyed by player UUID. */
     private final ConcurrentHashMap<UUID, ProtectionEntry> protectedPlayers = new ConcurrentHashMap<>();
 
@@ -127,6 +136,31 @@ public class RealmSpawnProtection {
      * @param grantedAtMs System.currentTimeMillis() when protection was granted
      */
     private record ProtectionEntry(double spawnX, double spawnZ, long grantedAtMs) {}
+
+    // ═══════════════════════════════════════════════════════════════════
+    // EFFECT REGISTRATION (must be called during plugin init)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Creates and registers the spawn shield visual effect with the asset store.
+     *
+     * <p>Must be called during plugin initialization (never during a world tick).
+     * The effect is visual-only: icon + buff frame, no stat/speed/tint changes.
+     */
+    public void registerEffect() {
+        RPGEntityEffect effect = new RPGEntityEffect(SPAWN_SHIELD_EFFECT_ID);
+        RPGApplicationEffects emptyApp = RPGApplicationEffects.create();
+        effect.setApplicationEffects(emptyApp);
+        effect.setStatusEffectIcon("Icons/ItemsGenerated/Ingredient_Motes_Light.png");
+        effect.setDebuff(false);
+        effect.setInfinite(false);
+        effect.setDuration(60f);
+        effect.setOverlapBehavior(OverlapBehavior.OVERWRITE);
+        effect.setRemovalBehavior(RemovalBehavior.COMPLETE);
+
+        EntityEffect.getAssetStore().loadAssets("trailoforbis", List.of(effect));
+        LOGGER.atInfo().log("Registered spawn shield visual effect: %s", SPAWN_SHIELD_EFFECT_ID);
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // PUBLIC API
@@ -200,6 +234,9 @@ public class RealmSpawnProtection {
                 }
                 effectController.setInvulnerable(true);
 
+                // Apply visual-only spawn shield icon (buff frame + countdown ring)
+                applyShieldIcon(entityRef, effectController, store);
+
                 // Record protection state and mark as granted this visit
                 ProtectionEntry entry = new ProtectionEntry(spawnX, spawnZ, System.currentTimeMillis());
                 protectedPlayers.put(playerId, entry);
@@ -258,6 +295,7 @@ public class RealmSpawnProtection {
                             entityRef, EffectControllerComponent.getComponentType());
                         if (effectController != null) {
                             effectController.setInvulnerable(false);
+                            removeShieldIcon(entityRef, effectController, store);
                         }
                     }
                 }
@@ -428,6 +466,7 @@ public class RealmSpawnProtection {
                         entityRef, EffectControllerComponent.getComponentType());
                     if (effectController != null) {
                         effectController.setInvulnerable(false);
+                        removeShieldIcon(entityRef, effectController, store);
                         flagCleared = true;
                     }
                 }
@@ -440,5 +479,34 @@ public class RealmSpawnProtection {
         long durationMs = System.currentTimeMillis() - removed.grantedAtMs();
         LOGGER.atInfo().log("Spawn protection REVOKED for player %s — reason: %s (after %.1fs, flag cleared: %s)",
             playerId.toString().substring(0, 8), reason, durationMs / 1000.0, flagCleared);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SPAWN SHIELD ICON HELPERS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Applies the spawn shield visual icon to the player.
+     * Visual-only — does NOT grant invulnerability (that's done separately).
+     */
+    private void applyShieldIcon(@Nonnull Ref<EntityStore> entityRef,
+                                 @Nonnull EffectControllerComponent effectController,
+                                 @Nonnull Store<EntityStore> store) {
+        int idx = EntityEffect.getAssetMap().getIndex(SPAWN_SHIELD_EFFECT_ID);
+        if (idx == Integer.MIN_VALUE) return;
+        EntityEffect effect = EntityEffect.getAssetMap().getAsset(SPAWN_SHIELD_EFFECT_ID);
+        if (effect == null) return;
+        effectController.addEffect(entityRef, effect, 60f, OverlapBehavior.OVERWRITE, store);
+    }
+
+    /**
+     * Removes the spawn shield visual icon from the player.
+     */
+    private void removeShieldIcon(@Nonnull Ref<EntityStore> entityRef,
+                                  @Nonnull EffectControllerComponent effectController,
+                                  @Nonnull Store<EntityStore> store) {
+        int idx = EntityEffect.getAssetMap().getIndex(SPAWN_SHIELD_EFFECT_ID);
+        if (idx == Integer.MIN_VALUE) return;
+        effectController.removeEffect(entityRef, idx, store);
     }
 }

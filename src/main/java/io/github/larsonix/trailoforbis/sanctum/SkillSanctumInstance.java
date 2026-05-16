@@ -428,10 +428,12 @@ public class SkillSanctumInstance {
             visitorOriginalCanFly.clear(); // safety net
         }
 
-        // Close the underlying realm and remove the instance world.
-        // forceClose() only transitions the state to CLOSING — it does NOT delete the
-        // backing world.  Without safeRemoveInstance(), Hytale persists the world to disk
-        // and reloads it on every server restart, causing orphaned instances to accumulate.
+        // Close the underlying realm via RealmsManager — the proper realm closure pipeline.
+        // Previously called forceClose() + safeRemoveInstance() directly, but this silently
+        // failed: forceClose() transitions state which makes world.isAlive() return false,
+        // so safeRemoveInstance() was skipped. Meanwhile RealmsManager never deregistered
+        // the realm, causing worlds to accumulate indefinitely (7+ leaked worlds after 5h
+        // of play → SEVERE chunk processing delays → client crash).
         if (realmInstance != null) {
             World world = realmInstance.getWorld();
 
@@ -442,18 +444,26 @@ public class SkillSanctumInstance {
                 destroyTrackedEntities(world.getEntityStore().getStore());
             }
 
-            try {
-                realmInstance.forceClose(RealmInstance.CompletionReason.ABANDONED);
-            } catch (Exception e) {
-                LOGGER.atWarning().withCause(e).log("Error closing realm for %s", playerId);
-            }
-            // Actually delete the instance world so Hytale doesn't persist it
-            if (world != null && world.isAlive()) {
+            // Route through RealmsManager.closeRealm() which:
+            // 1. Deregisters realm from tracking (decrements remaining count)
+            // 2. Calls removalHandler.scheduleRemoval() for thread-safe world destruction
+            // 3. Portal/mob/container cleanup are no-ops for sanctums (nothing tracked)
+            // 4. Grace period resolves to ZERO (no participants remaining)
+            RealmsManager realmsManager = TrailOfOrbis.getInstance().getRealmsManager();
+            if (realmsManager != null) {
                 try {
-                    InstancesPlugin.safeRemoveInstance(world);
-                    LOGGER.atInfo().log("Removed instance world for sanctum %s", playerId);
+                    realmsManager.closeRealm(realmInstance.getRealmId(),
+                        RealmInstance.CompletionReason.ABANDONED);
                 } catch (Exception e) {
-                    LOGGER.atWarning().withCause(e).log("Failed to remove instance world for %s", playerId);
+                    LOGGER.atWarning().withCause(e).log(
+                        "Failed to close sanctum realm via RealmsManager for %s", playerId);
+                }
+            } else {
+                // Fallback during shutdown when RealmsManager is already destroyed
+                try {
+                    realmInstance.forceClose(RealmInstance.CompletionReason.ABANDONED);
+                } catch (Exception e) {
+                    LOGGER.atWarning().withCause(e).log("Error closing realm for %s", playerId);
                 }
             }
         }

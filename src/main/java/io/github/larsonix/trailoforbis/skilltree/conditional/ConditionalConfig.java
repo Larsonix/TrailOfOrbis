@@ -63,6 +63,13 @@ public class ConditionalConfig {
     private double threshold = 0.35;
 
     /**
+     * Status effect icon path for HUD display when this conditional is active.
+     * Null means no icon. Path is relative to asset root (e.g., "Icons/ItemsGenerated/Weapon_Sword_Adamantite.png").
+     */
+    @Nullable
+    private String icon;
+
+    /**
      * The stat effects when this conditional is active.
      */
     private List<ConditionalEffect> effects = new ArrayList<>();
@@ -122,6 +129,14 @@ public class ConditionalConfig {
         return threshold;
     }
 
+    /**
+     * Gets the status effect icon path, or null if no icon is configured.
+     */
+    @Nullable
+    public String getIcon() {
+        return icon;
+    }
+
     @Nonnull
     public List<ConditionalEffect> getEffects() {
         return effects != null ? effects : List.of();
@@ -158,6 +173,10 @@ public class ConditionalConfig {
 
     public void setThreshold(double threshold) {
         this.threshold = threshold;
+    }
+
+    public void setIcon(String icon) {
+        this.icon = icon;
     }
 
     public void setEffects(List<ConditionalEffect> effects) {

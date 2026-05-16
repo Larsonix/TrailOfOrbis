@@ -99,13 +99,7 @@
             "CollisionEnter": {
               "Interactions": [
                 {
-                  "Type": "Portal",
-                  "Next": {
-                    "Type": "Simple",
-                    "Effects": {
-                      "LocalSoundEventId": "SFX_Portal_Neutral_Teleport_Local"
-                    }
-                  }
+                  "Type": "Portal"
                 }
               ]
             }
