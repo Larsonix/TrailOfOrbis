@@ -1,5 +1,6 @@
 package io.github.larsonix.trailoforbis.maps;
 
+import com.hypixel.hytale.builtin.instances.InstancesPlugin;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
@@ -341,11 +342,63 @@ public class RealmsManager implements RealmsService {
             LOGGER.atWarning().withCause(e).log("FAILED to initialize persistence module — crash recovery disabled");
         }
 
+        // Register spawn shield visual effect (must happen during init, never during world tick)
+        spawnProtection.registerEffect();
+
         instance = this;
         initialized = true;
 
+        // Clean up orphaned realm instance worlds from previous sessions.
+        // These accumulate when the server is hard-killed while realms are active,
+        // or from bugs where realm closure doesn't reach the world removal pipeline
+        // (e.g., Skill Sanctum leak fixed in this version). Without cleanup, each
+        // orphaned world consumes a thread + memory indefinitely, degrading performance.
+        cleanupOrphanedRealmWorlds();
+
         LOGGER.atInfo().log("RealmsManager initialized with %d valid templates",
             templateRegistry.getValidTemplateCount());
+    }
+
+    /**
+     * Removes orphaned realm instance worlds that persist from previous sessions.
+     *
+     * <p>Hytale persists all worlds to disk. If the server is hard-killed while
+     * realms are active, those worlds are reloaded on next startup but have no
+     * corresponding {@link RealmInstance} in our tracking. Each orphaned world
+     * consumes a world thread, chunk generator, and ECS store — accumulating
+     * over time and causing severe performance degradation.
+     *
+     * <p>At init time, {@code realmsById} is empty (no realms created yet), so
+     * any world whose name starts with {@code "instance-realm_"} is guaranteed
+     * to be an orphan. Players who were in those realms when the server crashed
+     * are handled separately by {@code RealmPersistenceModule} (teleports them
+     * to overworld on reconnect).
+     */
+    private void cleanupOrphanedRealmWorlds() {
+        try {
+            var allWorlds = Universe.get().getWorlds();
+            int removed = 0;
+
+            for (World world : allWorlds.values()) {
+                String name = world.getName();
+                if (name != null && name.startsWith("instance-realm_") && world.isAlive()) {
+                    try {
+                        InstancesPlugin.safeRemoveInstance(world);
+                        removed++;
+                        LOGGER.atInfo().log("Removed orphaned realm world: %s", name);
+                    } catch (Exception e) {
+                        LOGGER.atWarning().log("Failed to remove orphaned realm world %s: %s",
+                            name, e.getMessage());
+                    }
+                }
+            }
+
+            if (removed > 0) {
+                LOGGER.atWarning().log("Cleaned up %d orphaned realm world(s) from previous session", removed);
+            }
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to scan for orphaned realm worlds");
+        }
     }
 
     /**
@@ -996,7 +1049,22 @@ public class RealmsManager implements RealmsService {
         // Fire event to listeners
         fireEvent(new RealmCreatedEvent(realm, realm.getOwnerId()));
 
-        LOGGER.atInfo().log("Realm %s created (total: %d)", realm.getRealmId(), realmsById.size());
+        int total = realmsById.size();
+        LOGGER.atInfo().log("Realm %s created (total: %d)", realm.getRealmId(), total);
+
+        // Leak detection: warn if realm count grows beyond expected bounds.
+        // A single player should never have more than ~3 concurrent realms
+        // (1 active + 1 sanctum + 1 in grace period). Higher counts indicate a leak.
+        if (total > 5) {
+            LOGGER.atWarning().log("[LEAK-DETECT] Realm count %d exceeds threshold! Active realms:", total);
+            for (var entry : realmsById.entrySet()) {
+                RealmInstance r = entry.getValue();
+                LOGGER.atWarning().log("[LEAK-DETECT]   %s — biome=%s, state=%s, players=%d, age=%ds",
+                    entry.getKey().toString().substring(0, 8),
+                    r.getBiome(), r.getState(),
+                    r.getPlayerCount(), r.getElapsedTime().toSeconds());
+            }
+        }
     }
 
     /**

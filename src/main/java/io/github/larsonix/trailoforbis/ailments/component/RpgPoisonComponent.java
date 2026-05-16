@@ -128,6 +128,19 @@ public class RpgPoisonComponent implements Component<EntityStore> {
         // Used by codec on load — stacks are rebuilt from tracker
     }
 
+    /**
+     * @return The longest remaining duration among all active stacks, or 0 if empty
+     */
+    public float getLongestRemainingDuration() {
+        float longest = 0f;
+        for (PoisonStack stack : stacks) {
+            if (stack.remainingDuration > longest) {
+                longest = stack.remainingDuration;
+            }
+        }
+        return longest;
+    }
+
     public float getElapsedSinceTick() { return elapsedSinceTick; }
     public void setElapsedSinceTick(float elapsed) { this.elapsedSinceTick = elapsed; }
 

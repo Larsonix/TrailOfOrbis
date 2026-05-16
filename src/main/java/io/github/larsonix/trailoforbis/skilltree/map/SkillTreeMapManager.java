@@ -120,17 +120,41 @@ public class SkillTreeMapManager implements SkillTreeMapService {
         UpdateWorldMapSettings settings = createMapSettings();
         player.getPacketHandler().writeNoCache(settings);
 
-        // Step 5: Generate and send skill tree content (positioned relative to player)
-        MapMarker[] markers = renderer.generateMarkers(uuid, playerX, playerZ);
+        // Step 5: Open the map UI FIRST — client map renderer must initialize
+        // before it can process markers. Without this ordering, markers sent
+        // before SetPage arrive while the renderer is uninitialized and are
+        // silently dropped, causing the "skill tree not appearing at first" issue.
+        player.getPacketHandler().writeNoCache(new SetPage(Page.Map, true));
 
+        // Step 6: Send markers on next tick — gives the client 1 frame to initialize
+        // the map renderer after receiving SetPage. Markers sent on the same packet
+        // batch as SetPage may be processed before the renderer is ready.
+        final double finalX = playerX;
+        final double finalZ = playerZ;
+        Ref<EntityStore> deferRef = player.getReference();
+        if (deferRef != null && deferRef.isValid()) {
+            World deferWorld = deferRef.getStore().getExternalData().getWorld();
+            if (deferWorld != null) {
+                deferWorld.execute(() -> {
+                    if (!playersInMapMode.contains(uuid)) return; // Closed before tick
+                    MapMarker[] markers = renderer.generateMarkers(uuid, finalX, finalZ);
+                    UpdateWorldMap mapUpdate = new UpdateWorldMap();
+                    mapUpdate.chunks = null;
+                    mapUpdate.addedMarkers = markers;
+                    mapUpdate.removedMarkers = null;
+                    player.getPacketHandler().writeNoCache(mapUpdate);
+                });
+                return;
+            }
+        }
+
+        // Fallback: no world access — send markers immediately (best effort)
+        MapMarker[] markers = renderer.generateMarkers(uuid, playerX, playerZ);
         UpdateWorldMap mapUpdate = new UpdateWorldMap();
-        mapUpdate.chunks = null;  // Don't send chunks
+        mapUpdate.chunks = null;
         mapUpdate.addedMarkers = markers;
         mapUpdate.removedMarkers = null;
         player.getPacketHandler().writeNoCache(mapUpdate);
-
-        // Step 6: Open the map UI
-        player.getPacketHandler().writeNoCache(new SetPage(Page.Map, true));
     }
 
     @Override

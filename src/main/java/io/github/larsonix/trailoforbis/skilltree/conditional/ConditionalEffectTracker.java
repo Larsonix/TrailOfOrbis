@@ -34,6 +34,9 @@ public class ConditionalEffectTracker {
 
     private final UUID playerId;
 
+    /** Optional callback for visual effect management (status icons). */
+    @Nullable private ConditionalVisualCallback visualCallback;
+
     /**
      * Active effects keyed by node ID.
      * Each node can have at most one active effect.
@@ -53,6 +56,10 @@ public class ConditionalEffectTracker {
      */
     public ConditionalEffectTracker(@Nonnull UUID playerId) {
         this.playerId = Objects.requireNonNull(playerId, "playerId cannot be null");
+    }
+
+    public void setVisualCallback(@Nullable ConditionalVisualCallback callback) {
+        this.visualCallback = callback;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -91,6 +98,10 @@ public class ConditionalEffectTracker {
             cooldowns.put(nodeId, cooldownEnd);
         }
 
+        if (visualCallback != null) {
+            visualCallback.onActivate(playerId, nodeId, (float) config.getDuration());
+        }
+
         LOGGER.atFine().log("Activated effect %s for player %s (stacks: %d)",
             nodeId, playerId, newEffect.stacks);
 
@@ -108,39 +119,43 @@ public class ConditionalEffectTracker {
     ) {
         return switch (config.getStacking()) {
             case REFRESH -> {
-                // Refresh duration to full
                 existing.expirationTime = currentTime + (long) (config.getDuration() * 1000);
+                if (visualCallback != null) {
+                    visualCallback.onActivate(playerId, nodeId, (float) config.getDuration());
+                }
                 LOGGER.atFine().log("Refreshed effect %s for player %s", nodeId, playerId);
                 yield true;
             }
             case STACK -> {
-                // Add a stack (up to max)
                 if (existing.stacks < config.getMaxStacks()) {
                     existing.stacks++;
-                    existing.expirationTime = currentTime + (long) (config.getDuration() * 1000);
-                    LOGGER.atFine().log("Stacked effect %s for player %s (now %d stacks)",
-                        nodeId, playerId, existing.stacks);
-                    yield true;
-                } else {
-                    // At max stacks, just refresh duration
-                    existing.expirationTime = currentTime + (long) (config.getDuration() * 1000);
-                    yield true;
                 }
+                existing.expirationTime = currentTime + (long) (config.getDuration() * 1000);
+                if (visualCallback != null) {
+                    visualCallback.onActivate(playerId, nodeId, (float) config.getDuration());
+                }
+                LOGGER.atFine().log("Stacked effect %s for player %s (now %d stacks)",
+                    nodeId, playerId, existing.stacks);
+                yield true;
             }
             case NO_REFRESH -> {
-                // Cannot trigger again while active
                 LOGGER.atFine().log("Effect %s blocked (no refresh) for player %s", nodeId, playerId);
                 yield false;
             }
             case EXTEND_DURATION -> {
-                // Add time instead of refreshing
                 existing.expirationTime += (long) (config.getDuration() * 1000);
+                float remainingSeconds = (existing.expirationTime - currentTime) / 1000f;
+                if (visualCallback != null) {
+                    visualCallback.onActivate(playerId, nodeId, remainingSeconds);
+                }
                 LOGGER.atFine().log("Extended effect %s for player %s", nodeId, playerId);
                 yield true;
             }
             case CONSUME_ON_HIT, CONSUME_ON_SKILL -> {
-                // These are consumed behaviors, not triggered - just refresh
                 existing.expirationTime = currentTime + (long) (config.getDuration() * 1000);
+                if (visualCallback != null) {
+                    visualCallback.onActivate(playerId, nodeId, (float) config.getDuration());
+                }
                 yield true;
             }
         };
@@ -180,6 +195,9 @@ public class ConditionalEffectTracker {
     public boolean deactivateEffect(@Nonnull String nodeId) {
         ActiveEffect removed = activeEffects.remove(nodeId);
         if (removed != null) {
+            if (visualCallback != null) {
+                visualCallback.onDeactivate(playerId, nodeId);
+            }
             LOGGER.atFine().log("Deactivated effect %s for player %s", nodeId, playerId);
             return true;
         }
@@ -195,6 +213,9 @@ public class ConditionalEffectTracker {
         ActiveEffect effect = activeEffects.get(nodeId);
         if (effect != null && !effect.config.isTimedEffect()) {
             activeEffects.remove(nodeId);
+            if (visualCallback != null) {
+                visualCallback.onDeactivate(playerId, nodeId);
+            }
             LOGGER.atFine().log("Deactivated persistent effect %s for player %s", nodeId, playerId);
         }
     }
@@ -235,6 +256,9 @@ public class ConditionalEffectTracker {
 
             if (effect.isActive(currentTime) && effect.config.getStacking() == behavior) {
                 consumed.add(effect.config);
+                if (visualCallback != null) {
+                    visualCallback.onDeactivate(playerId, entry.getKey());
+                }
                 iter.remove();
                 LOGGER.atFine().log("Consumed effect %s for player %s", entry.getKey(), playerId);
             }
@@ -260,6 +284,9 @@ public class ConditionalEffectTracker {
         while (iter.hasNext()) {
             Map.Entry<String, ActiveEffect> entry = iter.next();
             if (!entry.getValue().isActive(currentTime)) {
+                if (visualCallback != null) {
+                    visualCallback.onDeactivate(playerId, entry.getKey());
+                }
                 iter.remove();
                 removed++;
                 LOGGER.atFine().log("Expired effect %s for player %s", entry.getKey(), playerId);
