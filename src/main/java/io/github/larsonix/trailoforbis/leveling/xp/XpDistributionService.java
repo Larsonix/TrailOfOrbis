@@ -79,19 +79,40 @@ public class XpDistributionService {
             @Nonnull Vector3d mobPosition,
             @Nonnull Store<EntityStore> store) {
 
-        PartyConfig.XpSharingConfig sharingConfig = partyConfig.getXpSharing();
-
         // 1. Resolve eligible recipients
         List<UUID> recipients = resolveEligibleRecipients(killerUuid, mobPosition, store);
 
         // Determine sharing mode for XpSource tagging (only matters for groups)
-        // Party mode: sharing enabled + PartyPro active + killer in party
-        // Proximity mode: everything else (including sharing disabled → solo)
         boolean isPartyMode = recipients.size() > 1
-            && sharingConfig.isEnabled()
+            && partyConfig.getXpSharing().isEnabled()
             && isUsingPartyMode(killerUuid);
 
-        // 2. Solo fast-path
+        // 2. Delegate to core distribution logic
+        distribute(killerUuid, rawXp, perPlayerModifier, recipients, isPartyMode);
+    }
+
+    /**
+     * Core distribution logic — distributes XP to a pre-resolved recipient list.
+     *
+     * <p>Package-private for testability: tests can call this directly with
+     * a known recipient list, bypassing world/party resolution.
+     *
+     * @param killerUuid The player who got the kill
+     * @param rawXp Raw XP amount (after realm bonus, before per-player modifiers)
+     * @param perPlayerModifier Per-player adjustment callback
+     * @param recipients Pre-resolved eligible recipients (always includes killer)
+     * @param isPartyMode true if XP source should be PARTY_SHARE for non-killers
+     */
+    void distribute(
+            @Nonnull UUID killerUuid,
+            long rawXp,
+            @Nonnull XpRecipientModifier perPlayerModifier,
+            @Nonnull List<UUID> recipients,
+            boolean isPartyMode) {
+
+        PartyConfig.XpSharingConfig sharingConfig = partyConfig.getXpSharing();
+
+        // Solo fast-path
         if (recipients.size() <= 1) {
             long finalXp = Math.max(1, perPlayerModifier.apply(killerUuid, rawXp, -1));
             levelingService.addXp(killerUuid, finalXp, XpSource.MOB_KILL);
@@ -100,7 +121,7 @@ public class XpDistributionService {
             return;
         }
 
-        // 3. Pre-compute group max level (O(n), only if anti-boosting is enabled)
+        // Pre-compute group max level (O(n), only if anti-boosting is enabled)
         int groupMaxLevel = -1;
         if (partyConfig.getAntiBoosting().isEnabled()
                 && partyConfig.getAntiBoosting().isUsePartyMaxLevel()) {
@@ -113,11 +134,11 @@ public class XpDistributionService {
             }
         }
 
-        // 4. Calculate pool with group size multiplier
+        // Calculate pool with group size multiplier
         double multiplier = sharingConfig.getMultiplierForSize(recipients.size());
         long totalPool = Math.round(rawXp * multiplier);
 
-        // 5. Split by mode and grant
+        // Split by mode and grant
         if ("killer_bonus".equalsIgnoreCase(sharingConfig.getMode())) {
             distributeKillerBonus(killerUuid, rawXp, totalPool, recipients,
                 perPlayerModifier, groupMaxLevel, isPartyMode);

@@ -65,6 +65,8 @@ attributes:
     # +% spell power per point (Hexcode magic power)
     magicPower: 0.01
 
+    # chargeSpeedPercent: RESERVED — charge acceleration blocked by engine
+
   # Stats granted per point of WATER (Arcane Mage)
   waterGrants:
     # +% spell damage per point
@@ -111,6 +113,12 @@ attributes:
     # +% cast speed per point (Hexcode cast decay)
     castSpeed: 0.01
 
+    # +% combo acceleration per point (speed bonus per combo hit)
+    comboSpeedBonus: 0.1
+
+    # +% magic weapon cast speed per point
+    castSpeedPercent: 0.3
+
   # Stats granted per point of EARTH (Iron Fortress)
   earthGrants:
     # +% max HP per point
@@ -144,6 +152,9 @@ attributes:
 
     # +% projectile speed per point
     projectileSpeedPercent: 0.3
+
+    # +% ranged attack speed per point (draw/reload/fire)
+    projectileAttackSpeedPercent: 0.3
 
   # Stats granted per point of VOID (Life Devourer)
   voidGrants:
@@ -182,9 +193,13 @@ combat:
 
   # Minimum damage threshold (as % of max HP) to trigger the red screen flash
   # and health alert. Hits below this threshold won't send the DamageInfo packet.
-  # Default: 3.0 (3% of max HP)
-  healthAlertMinThreshold: 3.0
+  # Default: 15.0 (15% of max HP). DOT damage never triggers the red screen.
+  healthAlertMinThreshold: 15.0
 
+  # Minimum interval (ms) between red screen flash packets for the same player.
+  # Rate-limits the directional damage vignette when fighting multiple mobs.
+  # Default: 750 (max ~1.3 flashes per second)
+  healthAlertCooldownMs: 750
 
   # Evasion/Accuracy System (PoE-inspired formula)
   # Formula: ChanceToHit = hitChanceConstant × Accuracy / (Accuracy + (Evasion × evasionScalingFactor)^evasionExponent)

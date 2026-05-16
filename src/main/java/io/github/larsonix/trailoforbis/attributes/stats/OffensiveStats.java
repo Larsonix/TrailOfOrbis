@@ -54,6 +54,16 @@ public final class OffensiveStats {
 
     // ==================== Speed Modifiers ====================
     private float attackSpeedPercent;
+    /** % cooldown recovery speed. Reduces inter-attack gap without speeding up swings. Gear/skill tree only. */
+    private float cooldownRecoveryPercent;
+    /** % charge speed bonus. Affects bow charge and charged attack build-up. FIRE attribute + gear. */
+    private float chargeSpeedPercent;
+    /** % combo speed bonus per combo hit. Accelerates sustained combo chains. LIGHTNING + gear. */
+    private float comboSpeedBonus;
+    /** % projectile attack speed. Draw/reload/fire speed for ranged weapons. WIND + gear. */
+    private float projectileAttackSpeedPercent;
+    /** % cast speed for magic weapons. Separate from Hexcode's castSpeed (multiplier-scale). LIGHTNING + gear. */
+    private float castSpeedPercent;
 
     // ==================== Global Damage ====================
     /** Global damage bonus percentage. Applies to ALL damage types (physical + elemental). */
@@ -275,6 +285,11 @@ public final class OffensiveStats {
         this.meleeDamagePercent = builder.meleeDamagePercent;
         this.projectileDamagePercent = builder.projectileDamagePercent;
         this.attackSpeedPercent = builder.attackSpeedPercent;
+        this.cooldownRecoveryPercent = builder.cooldownRecoveryPercent;
+        this.chargeSpeedPercent = builder.chargeSpeedPercent;
+        this.comboSpeedBonus = builder.comboSpeedBonus;
+        this.projectileAttackSpeedPercent = builder.projectileAttackSpeedPercent;
+        this.castSpeedPercent = builder.castSpeedPercent;
         this.allDamagePercent = builder.allDamagePercent;
         this.meleeDamage = builder.meleeDamage;
         this.lifeLeech = builder.lifeLeech;
@@ -402,6 +417,26 @@ public final class OffensiveStats {
 
     public float getAttackSpeedPercent() {
         return attackSpeedPercent;
+    }
+
+    public float getCooldownRecoveryPercent() {
+        return cooldownRecoveryPercent;
+    }
+
+    public float getChargeSpeedPercent() {
+        return chargeSpeedPercent;
+    }
+
+    public float getComboSpeedBonus() {
+        return comboSpeedBonus;
+    }
+
+    public float getProjectileAttackSpeedPercent() {
+        return projectileAttackSpeedPercent;
+    }
+
+    public float getCastSpeedPercent() {
+        return castSpeedPercent;
     }
 
     public float getAllDamagePercent() {
@@ -703,6 +738,26 @@ public final class OffensiveStats {
         this.attackSpeedPercent = attackSpeedPercent;
     }
 
+    public void setCooldownRecoveryPercent(float cooldownRecoveryPercent) {
+        this.cooldownRecoveryPercent = cooldownRecoveryPercent;
+    }
+
+    public void setChargeSpeedPercent(float chargeSpeedPercent) {
+        this.chargeSpeedPercent = chargeSpeedPercent;
+    }
+
+    public void setComboSpeedBonus(float comboSpeedBonus) {
+        this.comboSpeedBonus = comboSpeedBonus;
+    }
+
+    public void setProjectileAttackSpeedPercent(float projectileAttackSpeedPercent) {
+        this.projectileAttackSpeedPercent = projectileAttackSpeedPercent;
+    }
+
+    public void setCastSpeedPercent(float castSpeedPercent) {
+        this.castSpeedPercent = castSpeedPercent;
+    }
+
     public void setAllDamagePercent(float allDamagePercent) {
         this.allDamagePercent = allDamagePercent;
     }
@@ -966,6 +1021,11 @@ public final class OffensiveStats {
         meleeDamagePercent = 0;
         projectileDamagePercent = 0;
         attackSpeedPercent = 0;
+        cooldownRecoveryPercent = 0;
+        chargeSpeedPercent = 0;
+        comboSpeedBonus = 0;
+        projectileAttackSpeedPercent = 0;
+        castSpeedPercent = 0;
         allDamagePercent = 0;
         meleeDamage = 0;
         lifeLeech = 0;
@@ -1047,6 +1107,11 @@ public final class OffensiveStats {
             .meleeDamagePercent(meleeDamagePercent)
             .projectileDamagePercent(projectileDamagePercent)
             .attackSpeedPercent(attackSpeedPercent)
+            .cooldownRecoveryPercent(cooldownRecoveryPercent)
+            .chargeSpeedPercent(chargeSpeedPercent)
+            .comboSpeedBonus(comboSpeedBonus)
+            .projectileAttackSpeedPercent(projectileAttackSpeedPercent)
+            .castSpeedPercent(castSpeedPercent)
             .allDamagePercent(allDamagePercent)
             .meleeDamage(meleeDamage)
             .lifeLeech(lifeLeech)
@@ -1121,6 +1186,11 @@ public final class OffensiveStats {
         private float meleeDamagePercent;
         private float projectileDamagePercent;
         private float attackSpeedPercent;
+        private float cooldownRecoveryPercent;
+        private float chargeSpeedPercent;
+        private float comboSpeedBonus;
+        private float projectileAttackSpeedPercent;
+        private float castSpeedPercent;
         private float allDamagePercent;
         private float meleeDamage;
         private float lifeLeech;
@@ -1264,6 +1334,31 @@ public final class OffensiveStats {
 
         public Builder attackSpeedPercent(float value) {
             this.attackSpeedPercent = value;
+            return this;
+        }
+
+        public Builder cooldownRecoveryPercent(float value) {
+            this.cooldownRecoveryPercent = value;
+            return this;
+        }
+
+        public Builder chargeSpeedPercent(float value) {
+            this.chargeSpeedPercent = value;
+            return this;
+        }
+
+        public Builder comboSpeedBonus(float value) {
+            this.comboSpeedBonus = value;
+            return this;
+        }
+
+        public Builder projectileAttackSpeedPercent(float value) {
+            this.projectileAttackSpeedPercent = value;
+            return this;
+        }
+
+        public Builder castSpeedPercent(float value) {
+            this.castSpeedPercent = value;
             return this;
         }
 

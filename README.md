@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <b>Release 1.0.2</b>
+  <b>Release 1.0.10</b>
 </p>
 
 ---
@@ -46,9 +46,9 @@ There are no classes. Your build is the sum of everything : the Gear Modifiers y
 | Attribute-derived stats | 30 (5 per element, zero overlap) |
 | Computed stat fields | 246 |
 | Skill Tree nodes | 485 |
-| Gear Modifier definitions | 101 |
+| Gear Modifier definitions | 118 |
 | Equipment types | 42 |
-| Stone types | 25 |
+| Stone types | 27 |
 | Realm biomes | 14 |
 | Realm Modifiers | 13 (7 difficulty + 6 reward) |
 | Gateway tiers | 7 (Copper → Adamantite) |
@@ -60,11 +60,11 @@ There are no classes. Your build is the sum of everything : the Gear Modifiers y
 
 **Combat** - 11-stage damage pipeline (Base → Flat → Elemental → Conversion → % Physical → % Elemental → % More → Conditionals → Crit → Defenses → True Damage). 4 Ailments. Evasion vs Accuracy formula. Active blocking. Death Recap on every death.
 
-**Equipment** - 7 rarities, 101 Modifier definitions, Quality 1-101. 25 Stones across 7 categories for rerolling, enhancing, locking, and corrupting gear. Loot Filter for configurable item filtering.
+**Equipment** - 7 rarities, 118 Modifier definitions, Quality 1-101. 27 Stones across 7 categories for rerolling, enhancing, locking, and corrupting gear. Loot Filter for configurable item filtering.
 
 **Realms** - 14 biome types, 4 sizes (15-70 mobs), 13 Map Modifiers. 7 difficulty prefixes make Realms harder, 6 reward suffixes make the loot better. Harder maps = better drops. Always.
 
-**Mob Scaling** - 5 mob classes with 52 stat types generated via Dirichlet distribution. Dynamic Elite spawns. Each mob has a unique stat profile.
+**Mob Scaling** - 8 mob archetypes with Template + Noise stat generation. Dynamic Elite spawns. Each mob has a unique stat profile.
 
 <p align="center">
   <img src="docs/images/screenshots/Volcano.png" alt="Volcano Realm biome" width="700">
@@ -136,7 +136,7 @@ src/main/java/io/github/larsonix/trailoforbis/
   attributes/     6 Elements, computed stats, calculators
   combat/         11-stage damage pipeline, avoidance, blocking
   gear/           Equipment generation, modifiers, tooltips, quality
-  gems/           Active and Support Gems (WIP)
+  gems/           Socket gems with stat bonuses
   leveling/       XP/level system, effort-based formula
   loot/           Drop tables, loot generation
   lootfilter/     Player-configurable loot filtering
@@ -162,7 +162,7 @@ Optional (not bundled) : MySQL, PostgreSQL drivers for external database support
 
 ## Credits
 
-- **LadyPaladra** - All visual assets : textures, models. Also creator of [The Armory](https://www.curseforge.com/hytale/mods/the-armory)
+- **LadyPaladra** - Stone icon textures and visual assets
 - **tiptox** - Logo
 
 ## License

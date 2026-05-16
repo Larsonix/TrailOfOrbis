@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Void_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Void_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Void",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

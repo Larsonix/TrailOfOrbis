@@ -1,0 +1,10 @@
+{
+  "DropEntries": [
+    {
+      "ItemId": "Portal_Device",
+      "MinQuantity": 1,
+      "MaxQuantity": 1,
+      "Chance": 1.0
+    }
+  ]
+}

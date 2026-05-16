@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Volcano_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Volcano_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Volcano",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

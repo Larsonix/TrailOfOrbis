@@ -75,6 +75,9 @@ public class ConfigManager implements ConfigService {
     private io.github.larsonix.trailoforbis.compat.HexcodeItemConfig hexcodeItemConfig;
     private io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig hexcodeSpellConfig;
 
+    // Weapon speed profiles
+    private io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfilesConfig weaponProfilesConfig;
+
     // Gear configuration
     private GearBalanceConfig gearBalanceConfig;
     private ModifierConfig modifierConfig;
@@ -323,6 +326,13 @@ public class ConfigManager implements ConfigService {
                 hexcodeSpellConfig.isEnabled() ? "yes" : "no",
                 hexcodeSpellConfig.getDamage_type_map().size());
 
+            // Load weapon speed profiles
+            weaponProfilesConfig = loadConfig("weapon-profiles.yml",
+                io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfilesConfig.class,
+                io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfilesConfig.createDefaults());
+            LOGGER.at(Level.INFO).log("Weapon profiles loaded: %d profiles",
+                weaponProfilesConfig.getProfiles().size());
+
             return true;
         } catch (RPGConfig.ConfigValidationException e) {
             LOGGER.at(Level.SEVERE).log("Configuration validation failed: %s", e.getMessage());
@@ -529,6 +539,11 @@ public class ConfigManager implements ConfigService {
 
     public io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig getHexcodeSpellConfig() {
         return hexcodeSpellConfig != null ? hexcodeSpellConfig : new io.github.larsonix.trailoforbis.compat.HexcodeSpellConfig();
+    }
+
+    public io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfilesConfig getWeaponProfilesConfig() {
+        return weaponProfilesConfig != null ? weaponProfilesConfig
+                : io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfilesConfig.createDefaults();
     }
 
     /**

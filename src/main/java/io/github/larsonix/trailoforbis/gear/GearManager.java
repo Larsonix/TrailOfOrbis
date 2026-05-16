@@ -329,9 +329,12 @@ public final class GearManager implements GearService {
     }
 
     private void initializeLootSystem() {
-        // Initialize loot module
+        // Initialize loot module with deferred pipeline dependencies
         lootManager = new io.github.larsonix.trailoforbis.gear.loot.GearLootManager();
-        lootManager.initialize(balanceConfig, core.getGearGenerator(), plugin);
+        ItemWorldSyncService worldSyncService = itemSyncManager != null
+                ? itemSyncManager.getItemWorldSyncService() : null;
+        lootManager.initialize(balanceConfig, core.getGearGenerator(), plugin,
+                itemRegistryService, worldSyncService);
 
         // Initialize conversion module (reskin, vanilla conversion, crafting preview, timed craft)
         conversionManager = new io.github.larsonix.trailoforbis.gear.conversion.GearConversionManager();

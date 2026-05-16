@@ -10,6 +10,7 @@ import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearModifier;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.model.ModifierType;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -84,15 +85,17 @@ public final class GearModifierRoller {
             @Nonnull String slot,
             @Nonnull Random random) {
 
+        double thMult = resolveTwoHandedMultiplier(gear);
+
         List<GearModifier> newPrefixes = gear.prefixes().stream()
-            .map(mod -> mod.locked() ? mod : rerollModifierValue(mod, gear.level(), gear.rarity(), random))
+            .map(mod -> mod.locked() ? mod : rerollModifierValue(mod, gear.level(), gear.rarity(), thMult, random))
             .toList();
 
         List<GearModifier> newSuffixes = gear.suffixes().stream()
-            .map(mod -> mod.locked() ? mod : rerollModifierValue(mod, gear.level(), gear.rarity(), random))
+            .map(mod -> mod.locked() ? mod : rerollModifierValue(mod, gear.level(), gear.rarity(), thMult, random))
             .toList();
 
-        return gear.withPrefixes(newPrefixes).withSuffixes(newSuffixes);
+        return gear.withModifiers(newPrefixes, newSuffixes);
     }
 
     /**
@@ -134,7 +137,8 @@ public final class GearModifierRoller {
 
         // Pick random unlocked modifier
         ModifierLocation target = unlocked.get(random.nextInt(unlocked.size()));
-        GearModifier rerolled = rerollModifierValue(target.modifier, gear.level(), gear.rarity(), random);
+        double thMult = resolveTwoHandedMultiplier(gear);
+        GearModifier rerolled = rerollModifierValue(target.modifier, gear.level(), gear.rarity(), thMult, random);
 
         // Replace at the correct position
         if (target.type == ModifierType.PREFIX) {
@@ -212,21 +216,22 @@ public final class GearModifierRoller {
             .collect(Collectors.toSet());
 
         // Roll new modifiers with redistributed counts
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> newPrefixes = new ArrayList<>(lockedPrefixes);
         if (newPrefixCount > 0) {
             List<GearModifier> rolledPrefixes = rollModifiersExcluding(
-                ModifierType.PREFIX, newPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random);
+                ModifierType.PREFIX, newPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random, thMult);
             newPrefixes.addAll(rolledPrefixes);
         }
 
         List<GearModifier> newSuffixes = new ArrayList<>(lockedSuffixes);
         if (newSuffixCount > 0) {
             List<GearModifier> rolledSuffixes = rollModifiersExcluding(
-                ModifierType.SUFFIX, newSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random);
+                ModifierType.SUFFIX, newSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random, thMult);
             newSuffixes.addAll(rolledSuffixes);
         }
 
-        return gear.withPrefixes(newPrefixes).withSuffixes(newSuffixes);
+        return gear.withModifiers(newPrefixes, newSuffixes);
     }
 
     /**
@@ -257,10 +262,11 @@ public final class GearModifierRoller {
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> newPrefixes = new ArrayList<>(lockedPrefixes);
         if (unlockedPrefixCount > 0) {
             List<GearModifier> rolledPrefixes = rollModifiersExcluding(
-                ModifierType.PREFIX, unlockedPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random);
+                ModifierType.PREFIX, unlockedPrefixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedPrefixIds, random, thMult);
             newPrefixes.addAll(rolledPrefixes);
         }
 
@@ -295,10 +301,11 @@ public final class GearModifierRoller {
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> newSuffixes = new ArrayList<>(lockedSuffixes);
         if (unlockedSuffixCount > 0) {
             List<GearModifier> rolledSuffixes = rollModifiersExcluding(
-                ModifierType.SUFFIX, unlockedSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random);
+                ModifierType.SUFFIX, unlockedSuffixCount, gear.level(), slot, gear.rarity(), equipmentType, excludedSuffixIds, random, thMult);
             newSuffixes.addAll(rolledSuffixes);
         }
 
@@ -358,8 +365,9 @@ public final class GearModifierRoller {
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> rolled = rollModifiersExcluding(
-            typeToAdd, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
+            typeToAdd, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random, thMult);
 
         if (rolled.isEmpty()) {
             return gear;
@@ -406,8 +414,9 @@ public final class GearModifierRoller {
             .map(GearModifier::id)
             .collect(Collectors.toSet());
 
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> rolled = rollModifiersExcluding(
-            type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
+            type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random, thMult);
 
         if (rolled.isEmpty()) {
             return gear;
@@ -472,7 +481,7 @@ public final class GearModifierRoller {
             .filter(GearModifier::locked)
             .toList();
 
-        return gear.withPrefixes(lockedPrefixes).withSuffixes(lockedSuffixes);
+        return gear.withModifiers(lockedPrefixes, lockedSuffixes);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -540,8 +549,9 @@ public final class GearModifierRoller {
                 .collect(Collectors.toSet());
         }
 
+        double thMult = resolveTwoHandedMultiplier(gear);
         List<GearModifier> rolled = rollModifiersExcluding(
-            target.type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random);
+            target.type, 1, gear.level(), slot, gear.rarity(), equipmentType, existingIds, random, thMult);
 
         if (rolled.isEmpty()) {
             return gear; // No replacement available
@@ -623,6 +633,22 @@ public final class GearModifierRoller {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
+     * Resolves the two-handed modifier multiplier for a gear item.
+     * Returns 1.0 for non-weapons, one-handed weapons, or items without a base item ID.
+     */
+    private double resolveTwoHandedMultiplier(@Nonnull GearData gear) {
+        String baseItemId = gear.baseItemId();
+        if (baseItemId == null || baseItemId.isEmpty()) {
+            return 1.0;
+        }
+        WeaponType weaponType = WeaponType.fromItemIdOrUnknown(baseItemId);
+        if (weaponType == WeaponType.UNKNOWN || !weaponType.isTwoHanded()) {
+            return 1.0;
+        }
+        return balanceConfig.modifierScaling().twoHandedModifierMultiplier();
+    }
+
+    /**
      * Rerolls a modifier's value based on its definition.
      */
     @Nonnull
@@ -630,6 +656,7 @@ public final class GearModifierRoller {
             @Nonnull GearModifier mod,
             int itemLevel,
             @Nonnull GearRarity rarity,
+            double twoHandedMultiplier,
             @Nonnull Random random) {
 
         // Find the modifier definition
@@ -640,7 +667,7 @@ public final class GearModifierRoller {
         }
 
         // Calculate new value using similar logic to ModifierPool
-        double newValue = calculateValue(def, itemLevel, rarity, random);
+        double newValue = calculateValue(def, itemLevel, rarity, twoHandedMultiplier, random);
         return mod.withNewValue(newValue);
     }
 
@@ -662,12 +689,14 @@ public final class GearModifierRoller {
     /**
      * Calculates the value for a modifier (mirrors ModifierPool logic).
      *
-     * <p>Includes exponential scaling for dramatic power progression.
+     * <p>Includes exponential scaling for dramatic power progression
+     * and two-handed weapon modifier scaling.
      */
     private double calculateValue(
             @Nonnull ModifierDefinition definition,
             int itemLevel,
             @Nonnull GearRarity rarity,
+            double twoHandedMultiplier,
             @Nonnull Random random) {
 
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
@@ -686,6 +715,12 @@ public final class GearModifierRoller {
         double extendedMax = scaledMax * rarityConfig.statMultiplier();
         double effectiveMin = scaledMin;
         double effectiveMax = extendedMax;
+
+        // Two-handed weapon modifier scaling (enlarges the entire range)
+        if (twoHandedMultiplier > 1.0) {
+            effectiveMin *= twoHandedMultiplier;
+            effectiveMax *= twoHandedMultiplier;
+        }
 
         // Roll factor (0.0 to 1.0)
         double rollFactor = random.nextDouble();
@@ -708,14 +743,14 @@ public final class GearModifierRoller {
     }
 
     /**
-     * Rolls modifiers while excluding certain IDs (backward-compatible — no equipment type).
+     * Rolls modifiers while excluding certain IDs (backward-compatible — no equipment type or 2H mult).
      */
     @Nonnull
     private List<GearModifier> rollModifiersExcluding(
             @Nonnull ModifierType type, int count, int itemLevel,
             @Nonnull String slot, @Nonnull GearRarity rarity,
             @Nonnull Set<String> excludedIds, @Nonnull Random random) {
-        return rollModifiersExcluding(type, count, itemLevel, slot, rarity, null, excludedIds, random);
+        return rollModifiersExcluding(type, count, itemLevel, slot, rarity, null, excludedIds, random, 1.0);
     }
 
     /**
@@ -727,15 +762,18 @@ public final class GearModifierRoller {
      *   <li>Stage 2: Equipment type filtering (equipment-stats.yml allowed lists)</li>
      *   <li>Stage 3: Excluded ID filtering (prevents duplicates)</li>
      * </ol>
+     *
+     * <p>Passes the two-handed multiplier directly as a parameter (thread-safe).
      */
     @Nonnull
     private List<GearModifier> rollModifiersExcluding(
             @Nonnull ModifierType type, int count, int itemLevel,
             @Nonnull String slot, @Nonnull GearRarity rarity,
             @Nullable EquipmentType equipmentType,
-            @Nonnull Set<String> excludedIds, @Nonnull Random random) {
+            @Nonnull Set<String> excludedIds, @Nonnull Random random,
+            double twoHandedMultiplier) {
         return modifierPool.rollModifiersExcluding(
-                type, count, itemLevel, slot, rarity, equipmentType, excludedIds, random);
+                type, count, itemLevel, slot, rarity, equipmentType, excludedIds, random, twoHandedMultiplier);
     }
 
     /**

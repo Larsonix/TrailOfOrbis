@@ -123,7 +123,7 @@ public class SkillNodeDetailPage {
                 .withLifetime(CustomPageLifetime.CanDismiss)
                 .fromHtml(html)
                 .addEventListener("close-btn", CustomUIEventBindingType.Activating, (data, ctx) -> {
-                    // Page closes automatically when button is clicked
+                    ctx.getPage().ifPresent(page -> page.close());
                 })
                 .open(store);
 

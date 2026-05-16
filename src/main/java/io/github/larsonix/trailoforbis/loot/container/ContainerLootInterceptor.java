@@ -42,6 +42,8 @@ import io.github.larsonix.trailoforbis.mobs.calculator.DistanceBonusCalculator;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -245,6 +247,17 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         ProcessedContainerResource processedResource =
             chunkStoreStore.getResource(processedContainerResType);
         if (processedResource.isProcessedByPlayer(target.x, target.y, target.z, playerId)) {
+            // Retroactive fix: clear any stale droplist on already-processed containers.
+            // Before this fix, we never cleared the vanilla droplist field, so Hytale's
+            // StashSystem (StashPlugin.StashSystem.onEntityAdded) would repopulate the
+            // container with fresh vanilla items on every chunk load (server restart).
+            // Clearing it here prevents any future repopulation for this container.
+            if (containerState.getDroplist() != null) {
+                containerState.setDroplist(null);
+                LOGGER.atInfo().log("Cleared stale droplist on already-processed container at (%d, %d, %d) in %s",
+                    target.x, target.y, target.z, world.getName());
+            }
+
             // Defensive recovery: if the container was externally cleared (e.g., L4E's
             // ContainerMonitoringSystem clears on window close), re-process rather than
             // showing the player an empty chest.
@@ -282,6 +295,14 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
             // Selective replacement — remove weapons/armor, preserve materials
             result = lootSystem.getReplacer().replace(
                 containerState.getItemContainer(), lootContext, tier, playerId);
+        }
+
+        // Clear the vanilla droplist to prevent Hytale's StashSystem from repopulating
+        // this container with fresh vanilla items on the next chunk load (server restart).
+        // StashPlugin.StashSystem.onEntityAdded() fires on every chunk load and generates
+        // random items from any non-null droplist, overwriting whatever is stored.
+        if (containerState.getDroplist() != null) {
+            containerState.setDroplist(null);
         }
 
         // Sync custom item definitions (rpg_gear_xxx, rpg_map_xxx) to the opening player
@@ -337,11 +358,11 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
     }
 
     /**
-     * Syncs all custom item definitions in a container to the opening player.
+     * Batch-syncs all custom item definitions in a container to the opening player.
      *
-     * <p>Iterates every slot and calls {@link ItemWorldSyncService#syncItemToPlayer}
-     * for each item with custom data (gear or realm map). Sends UpdateTranslations +
-     * UpdateItems packets so the client can render rpg_gear_xxx and rpg_map_xxx items.
+     * <p>Collects all items and uses {@link ItemWorldSyncService#syncItemsToPlayers}
+     * to send definitions in batched packets (2 total for gear instead of 2 per item).
+     * This prevents client-side packet processing stalls on first container open.
      *
      * <p>Must be called AFTER all container modifications and BEFORE the handler
      * returns, so the client has definitions before the container UI renders.
@@ -354,19 +375,23 @@ public class ContainerLootInterceptor extends EntityEventSystem<EntityStore, Use
         }
 
         short capacity = container.getCapacity();
-        int synced = 0;
+        List<ItemStack> items = new ArrayList<>();
         for (short slot = 0; slot < capacity; slot++) {
             ItemStack item = container.getItemStack(slot);
-            if (item == null || ItemStack.isEmpty(item)) {
-                continue;
-            }
-            if (itemWorldSyncService.syncItemToPlayer(playerRef, item)) {
-                synced++;
+            if (item != null && !ItemStack.isEmpty(item)) {
+                items.add(item);
             }
         }
 
+        if (items.isEmpty()) {
+            return;
+        }
+
+        int synced = itemWorldSyncService.syncItemsToPlayers(
+                List.of(playerRef), items);
+
         if (synced > 0 && debugLogging) {
-            LOGGER.atFine().log("Synced %d custom item definition(s) to player for container open", synced);
+            LOGGER.atFine().log("Batch-synced %d custom item definition(s) to player for container open", synced);
         }
     }
 

@@ -146,9 +146,8 @@ public final class GearItemSyncManager {
                 }
             });
 
-        // Pickup notification service
-        pickupNotificationService = new PickupNotificationService(
-                itemSyncService, customItemSyncService);
+        // Pickup notification service (no longer needs sync services — ImmediateItemSyncHandler handles sync)
+        pickupNotificationService = new PickupNotificationService();
 
         // World-level item sync
         itemWorldSyncService = new ItemWorldSyncService(

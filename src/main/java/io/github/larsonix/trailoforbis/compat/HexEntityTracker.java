@@ -60,7 +60,7 @@ public class HexEntityTracker extends HolderSystem<EntityStore> {
 
         UUID entityUuid = uuidComp.getUuid();
         Ref<EntityStore> entityRef = store.getExternalData().getRefFromUUID(entityUuid);
-        if (entityRef == null || !entityRef.isValid()) {
+        if (entityRef == null || !entityRef.isValid() || entityRef.getStore() != store) {
             return;
         }
 

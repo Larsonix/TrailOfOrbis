@@ -59,7 +59,7 @@ public class CombatEntityResolver {
         UUID creatorUuid = getCreatorFromProjectile(store, sourceRef);
         if (creatorUuid != null) {
             Ref<EntityStore> ownerRef = store.getExternalData().getRefFromUUID(creatorUuid);
-            if (ownerRef != null && ownerRef.isValid()) {
+            if (ownerRef != null && ownerRef.isValid() && ownerRef.getStore() == store) {
                 return ownerRef;
             }
         }

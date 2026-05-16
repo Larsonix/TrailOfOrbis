@@ -32,6 +32,7 @@ public class MobScalingConfig {
     private EliteChanceConfig eliteChance = new EliteChanceConfig();
     private BalanceMultiplierConfig balanceMultipliers = new BalanceMultiplierConfig();
     private LateGameScalingConfig lateGameScaling = new LateGameScalingConfig();
+    private double nameplateActivationRange = 20.0;
 
     // MobStatPoolConfig is now loaded standalone from ConfigManager (mob-stat-pool.yml)
 
@@ -168,6 +169,19 @@ public class MobScalingConfig {
     // YAML snake_case setter
     public void setLate_game_scaling(LateGameScalingConfig lateGameScaling) {
         this.lateGameScaling = lateGameScaling;
+    }
+
+    public double getNameplateActivationRange() {
+        return nameplateActivationRange;
+    }
+
+    public void setNameplateActivationRange(double nameplateActivationRange) {
+        this.nameplateActivationRange = nameplateActivationRange;
+    }
+
+    // YAML snake_case setter
+    public void setNameplate_activation_range(double range) {
+        this.nameplateActivationRange = range;
     }
 
     // ==================== Validation ====================

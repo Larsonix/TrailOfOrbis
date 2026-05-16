@@ -2,6 +2,7 @@ package io.github.larsonix.trailoforbis.lootfilter;
 
 import com.hypixel.hytale.logger.HytaleLogger;
 import io.github.larsonix.trailoforbis.database.DataManager;
+import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.gear.model.EquipmentType;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
@@ -36,12 +37,15 @@ public final class LootFilterManager {
 
     private final LootFilterRepository repository;
     private final LootFilterConfig config;
+    private final ModifierConfig modifierConfig;
     private final Map<String, ModifierFilterCategory> modifierCategoryMap;
     private final List<FilterProfile> presetProfiles;
 
-    public LootFilterManager(@Nonnull DataManager dataManager, @Nonnull LootFilterConfig config) {
+    public LootFilterManager(@Nonnull DataManager dataManager, @Nonnull LootFilterConfig config,
+                             @Nullable ModifierConfig modifierConfig) {
         this.repository = new LootFilterRepository(dataManager);
         this.config = config;
+        this.modifierConfig = modifierConfig;
         this.modifierCategoryMap = buildModifierCategoryMap();
         this.presetProfiles = config.getPresets().stream()
                 .map(LootFilterConfig.PresetConfig::toProfile)
@@ -239,6 +243,9 @@ public final class LootFilterManager {
 
     public boolean isSystemEnabled() { return config.isEnabled(); }
 
+    @Nullable
+    public ModifierConfig getModifierConfig() { return modifierConfig; }
+
     @Nonnull
     public Map<String, ModifierFilterCategory> getModifierCategoryMap() {
         return modifierCategoryMap;
@@ -251,12 +258,18 @@ public final class LootFilterManager {
 
     /**
      * Builds the modifier → category map using stat-based auto-derivation
-     * plus config overrides.
+     * from ModifierConfig, plus config overrides applied last.
      */
     private Map<String, ModifierFilterCategory> buildModifierCategoryMap() {
         Map<String, ModifierFilterCategory> map = new LinkedHashMap<>();
 
-        // Config overrides (takes priority — applied after auto-derivation would go here)
+        // Auto-derive category for every modifier based on stat field
+        if (modifierConfig != null) {
+            modifierConfig.prefixes().forEach((id, def) -> map.put(id, deriveCategory(def.stat())));
+            modifierConfig.suffixes().forEach((id, def) -> map.put(id, deriveCategory(def.stat())));
+        }
+
+        // Config overrides (takes priority — applied after auto-derivation)
         for (var entry : config.getCategoryOverrides().entrySet()) {
             try {
                 map.put(entry.getKey(), ModifierFilterCategory.valueOf(entry.getValue().toUpperCase()));
@@ -267,5 +280,25 @@ public final class LootFilterManager {
         }
 
         return map;
+    }
+
+    /**
+     * Derives a filter category from the stat name using pattern matching.
+     */
+    private static ModifierFilterCategory deriveCategory(@Nonnull String stat) {
+        String s = stat.toLowerCase();
+        if (s.equals("crit_chance") || s.equals("crit_multiplier")) return ModifierFilterCategory.CRITICAL;
+        if (s.contains("penetration")) return ModifierFilterCategory.PENETRATION;
+        if (s.contains("ailment") || s.startsWith("burn") || s.startsWith("freeze")
+                || s.startsWith("shock") || s.startsWith("poison")) return ModifierFilterCategory.AILMENT;
+        if (s.contains("damage") || s.contains("thorns")) return ModifierFilterCategory.DAMAGE;
+        if (s.contains("armor") || s.contains("evasion") || s.contains("energy_shield")
+                || s.contains("block") || s.contains("resistance")) return ModifierFilterCategory.DEFENSE;
+        if (s.contains("health") || s.contains("mana") || s.contains("stamina")
+                || s.contains("life") || s.contains("regen") || s.contains("leech")) return ModifierFilterCategory.RESOURCES;
+        if (s.contains("speed") || s.contains("movement") || s.contains("sprint")
+                || s.contains("walk") || s.contains("jump") || s.contains("climb")
+                || s.contains("crouch")) return ModifierFilterCategory.MOVEMENT;
+        return ModifierFilterCategory.UTILITY;
     }
 }

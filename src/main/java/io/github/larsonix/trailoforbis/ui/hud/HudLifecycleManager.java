@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
+import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -145,6 +146,23 @@ public class HudLifecycleManager {
         var realmHudManager = realmsManager != null ? realmsManager.getHudManager() : null;
         healthChecker = new HudHealthChecker(providers, realmsManager, realmHudManager, 8);
         healthChecker.start(intervalSeconds);
+    }
+
+    /**
+     * Sets the sanctum references for sanctum HUD recovery in the health checker.
+     *
+     * <p>Called after {@link SkillSanctumManager} is created (Phase 7.7.5),
+     * which is after the health checker starts (Phase 6.10). The health checker
+     * gracefully handles null references until this is called.
+     *
+     * @param sanctumManager the sanctum manager (nullable for disabled sanctum)
+     */
+    public void setSanctumReferences(@Nullable SkillSanctumManager sanctumManager) {
+        if (healthChecker != null) {
+            healthChecker.setSanctumReferences(
+                sanctumManager,
+                sanctumManager != null ? sanctumManager.getSkillPointHudManager() : null);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

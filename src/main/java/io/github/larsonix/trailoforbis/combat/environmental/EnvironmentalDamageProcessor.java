@@ -164,9 +164,11 @@ public class EnvironmentalDamageProcessor {
         damage.putMetaObject(RPGDamageSystem.ATTACK_TYPE, AttackType.UNKNOWN);
         damage.setAmount(0);
 
-        // Only show combat text if damage is positive — fully resisted DOTs (0.0) are silent
+        // Only show combat text if damage is positive — fully resisted DOTs (0.0) are silent.
+        // DOT uses sendCombatTextOnly() — floating numbers only, NO red screen flash.
+        // Continuous ticking damage should not trigger the directional vignette every 0.5s.
         if (rpgDamage > 0f) {
-            indicatorService.sendDamageIndicatorsVisualOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
+            indicatorService.sendCombatTextOnly(store, defenderRef, damage, rpgDamage, breakdown, false);
         }
         damage.putMetaObject(RPGDamageSystem.INDICATORS_SENT, true);
 

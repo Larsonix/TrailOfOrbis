@@ -189,7 +189,7 @@ public final class HexEntityRegistry {
     @Nullable
     public static Ref<EntityStore> resolveEntityRef(@Nonnull UUID casterUuid, @Nonnull Store<EntityStore> store) {
         Ref<EntityStore> ref = store.getExternalData().getRefFromUUID(casterUuid);
-        return (ref != null && ref.isValid()) ? ref : null;
+        return (ref != null && ref.isValid() && ref.getStore() == store) ? ref : null;
     }
 
     public static void clear() {

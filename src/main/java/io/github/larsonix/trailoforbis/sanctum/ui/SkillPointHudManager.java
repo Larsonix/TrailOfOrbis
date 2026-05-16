@@ -1,8 +1,10 @@
 package io.github.larsonix.trailoforbis.sanctum.ui;
 
 import au.ellie.hyui.builders.HyUIHud;
+import au.ellie.hyui.utils.MultiHudWrapper;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.skilltree.SkillTreeManager;
@@ -99,6 +101,38 @@ public class SkillPointHudManager {
             LOGGER.atInfo().log("Showed skill point HUD for player %s", playerId.toString().substring(0, 8));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Failed to show skill point HUD for player %s",
+                playerId.toString().substring(0, 8));
+        }
+    }
+
+    /**
+     * Shows the skill point HUD synchronously on the world thread (no nested world.execute).
+     *
+     * <p>Used by {@link io.github.larsonix.trailoforbis.ui.hud.HudHealthChecker} when
+     * the caller is already on the sanctum world thread and the player is fully loaded.
+     * Uses direct {@code MultiHudWrapper.setCustomHud()} + {@code resetHasBuilt()} to
+     * guarantee synchronous registration, bypassing {@code safeAdd()}'s
+     * {@code getReference()} null check that can fail during transitions.
+     *
+     * @param playerId  The player's UUID
+     * @param playerRef The player reference (fresh, resolved at call time)
+     * @param player    The Player component (resolved from entity store)
+     * @param store     The entity store
+     */
+    public void showHudDirect(@Nonnull UUID playerId, @Nonnull PlayerRef playerRef,
+                              @Nonnull Player player, @Nonnull Store<EntityStore> store) {
+        discardStaleHud(playerId);
+
+        try {
+            HyUIHud hud = SkillPointHud.create(playerRef, store, skillTreeManager);
+            MultiHudWrapper.setCustomHud(player, playerRef, hud.name, hud);
+            HudRefreshHelper.resetHasBuilt(hud);
+            activeHuds.put(playerId, hud);
+            if (hudToggleService != null) hudToggleService.applyToggleState(playerId, hud);
+            LOGGER.atInfo().log("Showed skill point HUD (direct) for player %s",
+                playerId.toString().substring(0, 8));
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log("Failed to show skill point HUD (direct) for player %s",
                 playerId.toString().substring(0, 8));
         }
     }
@@ -214,10 +248,14 @@ public class SkillPointHudManager {
     /**
      * Discards a stale HUD during world transitions WITHOUT sending packets.
      *
-     * <p>During world transitions, {@code Player.resetManagers()} already sends
-     * {@code CustomHud(clear=true)} which destroys all HyUI elements on the client.
-     * This method only removes from tracking map and cancels refresh tasks
-     * (via {@code remove()} which skips the crash-causing {@code hide()} call).
+     * <p>During world transitions, {@code JoinWorld(clearWorld=true)} clears all
+     * client-side HyUI elements. This method only removes from tracking map and
+     * cancels refresh tasks via {@link HudRefreshHelper#cancelRefreshTask} —
+     * the canonical pattern matching {@code XpBarHudManager} and
+     * {@code RealmHudManager.discardHud()}.
+     *
+     * <p>No explicit MCHUD removal needed: the deterministic name "too-skill-points"
+     * ensures the next {@code showHud()} replaces the orphaned entry.
      *
      * @param playerId The player's UUID
      */
@@ -227,14 +265,9 @@ public class SkillPointHudManager {
             return;
         }
 
-        try {
-            hud.remove();
-            LOGGER.atFine().log("Discarded stale skill point HUD for player %s (world transition)",
-                playerId.toString().substring(0, 8));
-        } catch (Exception e) {
-            LOGGER.atFine().log("Failed to discard stale skill point HUD for player %s: %s",
-                playerId.toString().substring(0, 8), e.getMessage());
-        }
+        HudRefreshHelper.cancelRefreshTask(hud);
+        LOGGER.atFine().log("Discarded stale skill point HUD for player %s (world transition)",
+            playerId.toString().substring(0, 8));
     }
 
     /**

@@ -55,13 +55,6 @@ weapons:
     prefixes: [sharp, heavy, brutal, piercing, deadly]
     suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
 
-  mace:
-    # Blunt damage, armor crushing
-    # Prefixes: 5 (damage + pen)
-    # Suffixes: 6 (parry + life steal + accuracy + conditional)
-    prefixes: [heavy, brutal, piercing, swift, deadly]
-    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_execution, of_the_berserker, of_second_wind]
-
   claws:
     # Fast attacks, life steal focused
     # Prefixes: 5 (speed + crit)
@@ -100,6 +93,13 @@ weapons:
     # Suffixes: 6 (parry + life steal + accuracy + conditional)
     prefixes: [sharp, heavy, precise, deadly, keen, piercing]
     suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_the_berserker, of_execution, of_second_wind]
+
+  mace:
+    # Blunt damage, armor crushing
+    # Prefixes: 5 (damage + pen)
+    # Suffixes: 6 (parry + life steal + accuracy + conditional)
+    prefixes: [heavy, brutal, piercing, swift, deadly]
+    suffixes: [of_parrying, vampiric, of_the_vampire, of_accuracy, of_execution, of_the_berserker, of_second_wind]
 
   # ---------------------------------------------------------------------------
   # RANGED - Physical Projectile
@@ -374,12 +374,12 @@ armor_slots:
 # - sword:      6 prefixes + 6 suffixes = 12 total ✓
 # - dagger:     5 prefixes + 6 suffixes = 11 total ✓
 # - axe:        5 prefixes + 6 suffixes = 11 total ✓
-# - mace:       5 prefixes + 6 suffixes = 11 total ✓
 # - claws:      5 prefixes + 6 suffixes = 11 total ✓
 # - club:       3 prefixes + 6 suffixes = 9 total ✓
 # - longsword:  6 prefixes + 6 suffixes = 12 total ✓
 # - battleaxe:  4 prefixes + 6 suffixes = 10 total ✓
 # - spear:      6 prefixes + 6 suffixes = 12 total ✓
+# - mace:       5 prefixes + 6 suffixes = 11 total ✓
 #
 # RANGED WEAPONS (projectile): ~4-6 prefixes, ~7-8 suffixes
 # - shortbow:   6 prefixes + 8 suffixes = 14 total ✓

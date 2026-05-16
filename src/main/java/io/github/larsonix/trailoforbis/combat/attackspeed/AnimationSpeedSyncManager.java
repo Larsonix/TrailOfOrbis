@@ -23,6 +23,10 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.combat.attackspeed.api.AttackSpeedApi;
+import io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfileRegistry;
+import io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponSpeedProfile;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 
 import java.util.Map;
 import java.util.Set;
@@ -69,6 +73,8 @@ public class AnimationSpeedSyncManager {
 
     private final TrailOfOrbis plugin;
     private final AnimationSpeedSyncConfig config;
+    private volatile WeaponProfileRegistry profileRegistry;
+    private volatile AttackSpeedApi attackSpeedApi;
     private final ConcurrentHashMap<UUID, SyncState> playerStates = new ConcurrentHashMap<>();
 
     /**
@@ -84,6 +90,21 @@ public class AnimationSpeedSyncManager {
     public AnimationSpeedSyncManager(TrailOfOrbis plugin, AnimationSpeedSyncConfig config) {
         this.plugin = plugin;
         this.config = config;
+    }
+
+    /**
+     * Sets the weapon profile registry for profile-aware animation speed calculation.
+     * Called after the registry is loaded during plugin initialization.
+     */
+    public void setProfileRegistry(WeaponProfileRegistry profileRegistry) {
+        this.profileRegistry = profileRegistry;
+    }
+
+    /**
+     * Sets the attack speed API for override-aware animation speed calculation.
+     */
+    public void setAttackSpeedApi(AttackSpeedApi attackSpeedApi) {
+        this.attackSpeedApi = attackSpeedApi;
     }
 
     /**
@@ -132,14 +153,11 @@ public class AnimationSpeedSyncManager {
             return;
         }
 
-        // Get the player's attack speed stat
+        // Get the player's stats
         ComputedStats stats = plugin.getAttributeManager().getStats(uuid);
         if (stats == null) {
             return;
         }
-
-        float attackSpeedPercent = stats.getAttackSpeedPercent();
-        float multiplier = config.calculateMultiplier(attackSpeedPercent);
 
         // Resolve the player's held weapon animation set
         PlayerRef playerRef = Universe.get().getPlayer(uuid);
@@ -148,6 +166,35 @@ public class AnimationSpeedSyncManager {
         }
 
         String animSetId = resolveHeldAnimationSetId(playerRef);
+
+        // Use profile-aware multiplier with full stat set if registry is available
+        float multiplier;
+        WeaponProfileRegistry registry = this.profileRegistry;
+        if (registry != null && animSetId != null) {
+            WeaponSpeedProfile profile = registry.getProfileByAnimationSet(animSetId);
+            AttackSpeedSnapshot snapshot = AttackSpeedResolver.resolve(
+                    stats.getAttackSpeedPercent(),
+                    stats.getCooldownRecoveryPercent(),
+                    stats.getComboSpeedBonus(),
+                    stats.getProjectileAttackSpeedPercent(),
+                    stats.getCastSpeedPercent(),
+                    1, // no combo tracking in animation sync (event-driven, not per-tick)
+                    profile,
+                    config.animationSpeedScale(),
+                    config.animationMinSpeed(), config.animationMaxSpeed());
+            multiplier = snapshot.animationMultiplier();
+        } else {
+            multiplier = config.calculateMultiplier(stats.getAttackSpeedPercent());
+        }
+
+        // Apply temporary override from API (Hexcode buffs, realm modifiers)
+        AttackSpeedApi api = this.attackSpeedApi;
+        if (api != null) {
+            float overrideMult = api.getActiveMultiplier(uuid);
+            if (Math.abs(overrideMult - 1.0f) > 0.001f) {
+                multiplier *= overrideMult;
+            }
+        }
 
         SyncState state = playerStates.computeIfAbsent(uuid, k -> new SyncState());
 
@@ -241,25 +288,46 @@ public class AnimationSpeedSyncManager {
             }
             UUID uuid = playerRef.getUuid();
 
-            // Check if player has attack speed stat ≠ 0
             ComputedStats stats = plugin.getAttributeManager().getStats(uuid);
             if (stats == null) {
                 return;
             }
 
-            float attackSpeedPercent = stats.getAttackSpeedPercent();
-            if (Math.abs(attackSpeedPercent) < 0.001f) {
-                return;
-            }
-
-            // Apply animation speed for held weapon (first-time send to new connection)
-            float multiplier = config.calculateMultiplier(attackSpeedPercent);
-            if (Math.abs(multiplier - 1.0f) < 0.001f) {
-                return;
-            }
-
             String animSetId = resolveHeldAnimationSetId(playerRef);
             if (animSetId == null || !isCombatAnimationSet(animSetId)) {
+                return;
+            }
+
+            // Use profile-aware multiplier with full stat set
+            float multiplier;
+            WeaponProfileRegistry registry = AnimationSpeedSyncManager.this.profileRegistry;
+            if (registry != null) {
+                WeaponSpeedProfile profile = registry.getProfileByAnimationSet(animSetId);
+                AttackSpeedSnapshot snapshot = AttackSpeedResolver.resolve(
+                        stats.getAttackSpeedPercent(),
+                        stats.getCooldownRecoveryPercent(),
+                        stats.getComboSpeedBonus(),
+                        stats.getProjectileAttackSpeedPercent(),
+                        stats.getCastSpeedPercent(),
+                        1, // no combo tracking in world-ready handler
+                        profile,
+                        config.animationSpeedScale(),
+                        config.animationMinSpeed(), config.animationMaxSpeed());
+                multiplier = snapshot.animationMultiplier();
+            } else {
+                multiplier = config.calculateMultiplier(stats.getAttackSpeedPercent());
+            }
+
+            // Apply temporary override from API
+            AttackSpeedApi api = AnimationSpeedSyncManager.this.attackSpeedApi;
+            if (api != null) {
+                float overrideMult = api.getActiveMultiplier(uuid);
+                if (Math.abs(overrideMult - 1.0f) > 0.001f) {
+                    multiplier *= overrideMult;
+                }
+            }
+
+            if (Math.abs(multiplier - 1.0f) < 0.001f) {
                 return;
             }
 

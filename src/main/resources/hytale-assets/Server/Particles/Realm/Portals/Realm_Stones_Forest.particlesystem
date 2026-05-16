@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_ForestSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_ForestCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_ForestCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_ForestGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

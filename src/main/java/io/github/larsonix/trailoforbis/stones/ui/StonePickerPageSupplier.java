@@ -383,10 +383,11 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
 
         StoneType stoneType = stoneTypeOpt.get();
 
-        // Detect crouching for bulk-action stones (refund stones + Lorekeeper's Scroll).
+        // Detect crouching for bulk-action stones (refund stones + Lorekeeper's Scroll + Fortune's Compass).
         // Read once, shared by both branches below.
         boolean isCrouching = false;
-        if (stoneType.isRefundStone() || stoneType == StoneType.LOREKEEPERS_SCROLL) {
+        if (stoneType.isRefundStone() || stoneType == StoneType.LOREKEEPERS_SCROLL
+                || stoneType == StoneType.FORTUNES_COMPASS) {
             try {
                 MovementStatesComponent movementComp = componentAccessor.getComponent(
                     ref, MovementStatesComponent.getComponentType());
@@ -466,11 +467,12 @@ public class StonePickerPageSupplier implements OpenCustomUIInteraction.CustomPa
         // inside the interaction chain tick. page.open() modifies the ECS store which
         // advances the server operation counter without advancing the simulation counter.
         World world = ref.getStore().getExternalData().getWorld();
+        final boolean bulkMode = isCrouching;
         world.execute(() -> {
             Store<EntityStore> deferredStore = world.getEntityStore().getStore();
             StonePickerPage page = new StonePickerPage(
                 plugin, playerRef, stoneType, itemInHand, activeSlot,
-                ContainerType.HOTBAR, applicationService
+                ContainerType.HOTBAR, applicationService, bulkMode
             );
             page.open(deferredStore);
         });

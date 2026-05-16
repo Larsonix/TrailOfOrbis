@@ -128,6 +128,7 @@ export default defineComponent({
     const editingProfileId = ref(null);
     const editingRuleIndex = ref(-1);
     const editingMapRule = ref(false); // true when editing a map rule vs gear rule
+    const modCategoryExpanded = ref(null); // which modifier category tab is open (string|null)
 
     // ── Bridge calls (return updated state JSON) ──
     function callBridge(method, ...args) {
@@ -391,6 +392,7 @@ export default defineComponent({
                   title: () => [h(Common.Title, { text: title })],
                   content: () => [
                     h("Group", {
+                      key: "lf-scroll-" + view.value,
                       layoutMode: "TopScrolling",
                       anchor: { Horizontal: 0 },
                       flexWeight: 1,
@@ -1155,11 +1157,12 @@ export default defineComponent({
             ["weapon", "head", "chest", "legs", "hands", "shield"],
             ["Weapon", "Head", "Chest", "Legs", "Hands", "Shield"],
             "EQUIPMENT_SLOT", "slots")];
-        case "WEAPON_TYPE":
+        case "WEAPON_TYPE": {
+          const wCat = effectiveState.value.weaponTypes || [];
           return [renderMultiToggle(idx, cond.types,
-            ["SWORD", "DAGGER", "AXE", "MACE", "LONGSWORD", "SPEAR", "CROSSBOW", "STAFF", "WAND"],
-            ["Sword", "Dagger", "Axe", "Mace", "Longsword", "Spear", "Crossbow", "Staff", "Wand"],
+            wCat.map(w => w.id), wCat.map(w => w.displayName),
             "WEAPON_TYPE", "types")];
+        }
         case "ARMOR_IMPLICIT":
           return [renderMultiToggle(idx, cond.defenseTypes,
             ["armor", "evasion", "energy_shield", "max_health", "block_chance"],
@@ -1182,26 +1185,22 @@ export default defineComponent({
         case "IMPLICIT_CONDITION":
           return renderImplicitEditor(idx, cond);
         case "REQUIRED_MODIFIERS":
-          return [renderReadOnlyCondition(cond.description,
-            "Configure via /lf commands or presets")];
+          return renderRequiredModifiersEditor(idx, cond);
         case "MODIFIER_VALUE_RANGE":
-          return [renderReadOnlyCondition(cond.description,
-            "Configure via /lf commands or presets")];
-        case "MAP_BIOME":
+          return renderModifierValueRangeEditor(idx, cond);
+        case "MAP_BIOME": {
+          const bCat = effectiveState.value.biomeTypes || [];
           return [renderMultiToggle(idx, cond.biomes,
-            ["FOREST", "DESERT", "VOLCANO", "TUNDRA", "SWAMP", "MOUNTAINS", "BEACH", "JUNGLE",
-             "CAVERNS", "FROZEN_CRYPTS", "SAND_TOMBS", "VOID", "CORRUPTED"],
-            ["Forest", "Desert", "Volcano", "Tundra", "Swamp", "Mountains", "Beach", "Jungle",
-             "Caverns", "Frozen Crypts", "Sand Tombs", "Void", "Corrupted"],
+            bCat.map(b => b.id), bCat.map(b => b.displayName),
             "MAP_BIOME", "biomes")];
+        }
         case "MAP_SIZE":
           return [renderMultiToggle(idx, cond.sizes,
             ["SMALL", "MEDIUM", "LARGE", "MASSIVE"],
             ["Small", "Medium", "Large", "Massive"],
             "MAP_SIZE", "sizes")];
         case "MAP_MODIFIER":
-          return [renderReadOnlyCondition(cond.description,
-            "Configure via /lf commands")];
+          return renderMapModifierEditor(idx, cond);
         default:
           return [renderReadOnlyCondition(cond.description, "")];
       }
@@ -1439,19 +1438,340 @@ export default defineComponent({
       ];
     }
 
-    // Read-only display for complex conditions (modifiers)
+    // ── Shared modifier label helper ──
+    function modButtonLabel(m) {
+      return m.statName;
+    }
+
+    // ── MAP_MODIFIER interactive editor ──
+    function renderMapModifierEditor(condIdx, cond) {
+      const realmMods = effectiveState.value.realmModifierTypes || [];
+      const prefixes = realmMods.filter(m => m.category === "PREFIX");
+      const suffixes = realmMods.filter(m => m.category === "SUFFIX");
+      const selected = cond.modifierTypes || [];
+      const minCount = cond.minCount || 1;
+
+      function toggleMod(modId) {
+        const newSet = [...selected];
+        const idx = newSet.indexOf(modId);
+        if (idx >= 0) {
+          newSet.splice(idx, 1);
+          if (newSet.length === 0) newSet.push(modId);
+        } else {
+          newSet.push(modId);
+        }
+        onUpdateCondition(condIdx, { type: "MAP_MODIFIER", modifierTypes: newSet, minCount: minCount });
+      }
+
+      function modButtons(mods) {
+        const btns = [];
+        for (const m of mods) {
+          const isSel = selected.includes(m.id);
+          const btnW = Math.max(100, m.displayName.length * 13 + 28);
+          btns.push(
+            h("Group", { layoutMode: "Top" }, [
+              h(Common.SmallTertiaryTextButton, {
+                text: m.displayName,
+                anchor: { Width: btnW, Height: 30 },
+                onActivating: () => toggleMod(m.id),
+              }),
+              h("Group", { anchor: { Width: btnW, Height: 3 }, background: { Color: COLORS.TITLE_GOLD }, visible: isSel }),
+            ])
+          );
+          btns.push(h("Group", { anchor: { Width: 3 } }));
+        }
+        return btns;
+      }
+
+      return [
+        // Min count row
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, [
+          h("Label", { text: "At least:", elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
+          h("Group", { anchor: { Width: 6 } }),
+          h(Common.SmallTertiaryTextButton, { text: "-", anchor: { Width: 50, Height: 32 },
+            onActivating: () => onUpdateCondition(condIdx, { type: "MAP_MODIFIER", modifierTypes: selected, minCount: Math.max(1, minCount - 1) }) }),
+          h("Group", { anchor: { Width: 45 } }, [
+            h("Label", { text: String(minCount), elStyle: { FontSize: 14, TextColor: COLORS.TEXT_PRIMARY, HorizontalAlignment: "Center" } }),
+          ]),
+          h(Common.SmallTertiaryTextButton, { text: "+", anchor: { Width: 50, Height: 32 },
+            onActivating: () => onUpdateCondition(condIdx, { type: "MAP_MODIFIER", modifierTypes: selected, minCount: Math.min(selected.length || 10, minCount + 1) }) }),
+          h("Group", { anchor: { Width: 6 } }),
+          h("Label", { text: "of these modifiers", elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
+        ]),
+        // Difficulty section
+        h("Group", { layoutMode: "Left", anchor: { Horizontal: 0, Height: 20 }, padding: { Top: 6 } }, [
+          h("Label", { text: "Difficulty:", elStyle: { FontSize: 12, TextColor: COLORS.NEGATIVE } }),
+        ]),
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 2 } }, modButtons(prefixes)),
+        // Reward section
+        h("Group", { layoutMode: "Left", anchor: { Horizontal: 0, Height: 20 }, padding: { Top: 6 } }, [
+          h("Label", { text: "Reward:", elStyle: { FontSize: 12, TextColor: COLORS.POSITIVE } }),
+        ]),
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 2 } }, modButtons(suffixes)),
+      ];
+    }
+
+    // ── REQUIRED_MODIFIERS interactive editor ──
+    function renderRequiredModifiersEditor(condIdx, cond) {
+      const catalog = effectiveState.value.modifierCatalog || [];
+      const categories = effectiveState.value.modifierCategories || [];
+      const selected = cond.modifierIds || [];
+      const minCount = cond.minCount || 1;
+      const expandedCat = modCategoryExpanded.value;
+
+      // Get display label for a modifier ID
+      function modDisplayName(id) {
+        const found = catalog.find(m => m.id === id);
+        if (!found) return id;
+        return found.statName;
+      }
+
+      function toggleMod(modId) {
+        const newSet = [...selected];
+        const idx = newSet.indexOf(modId);
+        if (idx >= 0) newSet.splice(idx, 1);
+        else newSet.push(modId);
+        onUpdateCondition(condIdx, { type: "REQUIRED_MODIFIERS", modifierIds: newSet, minCount: minCount });
+      }
+
+      function removeMod(modId) {
+        const newSet = selected.filter(id => id !== modId);
+        onUpdateCondition(condIdx, { type: "REQUIRED_MODIFIERS", modifierIds: newSet, minCount: minCount });
+      }
+
+      const children = [];
+
+      // Min count row
+      children.push(
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, [
+          h("Label", { text: "At least:", elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
+          h("Group", { anchor: { Width: 6 } }),
+          h(Common.SmallTertiaryTextButton, { text: "-", anchor: { Width: 50, Height: 32 },
+            onActivating: () => onUpdateCondition(condIdx, { type: "REQUIRED_MODIFIERS", modifierIds: selected, minCount: Math.max(1, minCount - 1) }) }),
+          h("Group", { anchor: { Width: 45 } }, [
+            h("Label", { text: String(minCount), elStyle: { FontSize: 14, TextColor: COLORS.TEXT_PRIMARY, HorizontalAlignment: "Center" } }),
+          ]),
+          h(Common.SmallTertiaryTextButton, { text: "+", anchor: { Width: 50, Height: 32 },
+            onActivating: () => onUpdateCondition(condIdx, { type: "REQUIRED_MODIFIERS", modifierIds: selected, minCount: Math.min(Math.max(1, selected.length), minCount + 1) }) }),
+          h("Group", { anchor: { Width: 6 } }),
+          h("Label", { text: "of these modifiers", elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
+        ])
+      );
+
+      // Selected modifiers (removable tags)
+      if (selected.length > 0) {
+        const tags = [];
+        for (const id of selected) {
+          const name = modDisplayName(id);
+          const tagW = Math.max(100, (name.length + 2) * 13 + 28);
+          tags.push(
+            h(Common.SmallTertiaryTextButton, {
+              text: name + " x",
+              anchor: { Width: tagW, Height: 28 },
+              onActivating: () => removeMod(id),
+            })
+          );
+          tags.push(h("Group", { anchor: { Width: 3 } }));
+        }
+        children.push(
+          h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, tags)
+        );
+      }
+
+      // Category tabs
+      const catBtns = [];
+      for (const cat of categories) {
+        const isSel = expandedCat === cat.id;
+        const catW = Math.max(100, cat.displayName.length * 13 + 28);
+        catBtns.push(
+          h("Group", { layoutMode: "Top" }, [
+            h(Common.SmallTertiaryTextButton, {
+              text: cat.displayName,
+              anchor: { Width: catW, Height: 30 },
+              onActivating: () => { modCategoryExpanded.value = isSel ? null : cat.id; },
+            }),
+            h("Group", { anchor: { Width: catW, Height: 3 }, background: { Color: cat.color }, visible: isSel }),
+          ])
+        );
+        catBtns.push(h("Group", { anchor: { Width: 2 } }));
+      }
+      children.push(spacer(4));
+      children.push(
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 } }, catBtns)
+      );
+
+      // Modifier list for selected category
+      if (expandedCat) {
+        const modsInCat = catalog.filter(m => m.category === expandedCat);
+        if (modsInCat.length > 0) {
+          const modBtns = [];
+          for (const m of modsInCat) {
+            const isSel = selected.includes(m.id);
+            const label = modButtonLabel(m);
+            const btnW = Math.max(140, label.length * 13 + 28);
+            modBtns.push(
+              h("Group", { layoutMode: "Top" }, [
+                h(Common.SmallTertiaryTextButton, {
+                  text: label,
+                  anchor: { Width: btnW, Height: 28 },
+                  onActivating: () => toggleMod(m.id),
+                }),
+                h("Group", { anchor: { Width: btnW, Height: 3 }, background: { Color: COLORS.TITLE_GOLD }, visible: isSel }),
+              ])
+            );
+            modBtns.push(h("Group", { anchor: { Width: 3 } }));
+          }
+          children.push(spacer(4));
+          children.push(
+            h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 } }, modBtns)
+          );
+        } else {
+          children.push(spacer(4));
+          children.push(noteText("No modifiers in this category."));
+        }
+      }
+
+      return children;
+    }
+
+    // ── MODIFIER_VALUE_RANGE interactive editor ──
+    function renderModifierValueRangeEditor(condIdx, cond) {
+      const catalog = effectiveState.value.modifierCatalog || [];
+      const categories = effectiveState.value.modifierCategories || [];
+      const currentModId = cond.modifierId || "";
+      const minVal = cond.minValue || 0;
+      const maxVal = cond.maxValue || 100;
+      const expandedCat = modCategoryExpanded.value;
+
+      // Get display name for current modifier
+      const currentMod = catalog.find(m => m.id === currentModId);
+      const currentName = currentMod ? currentMod.statName : (currentModId || "None selected");
+
+      function selectMod(modId) {
+        onUpdateCondition(condIdx, { type: "MODIFIER_VALUE_RANGE", modifierId: modId, minValue: minVal, maxValue: maxVal });
+      }
+
+      function updateRange(newMin, newMax) {
+        onUpdateCondition(condIdx, { type: "MODIFIER_VALUE_RANGE", modifierId: currentModId, minValue: newMin, maxValue: newMax });
+      }
+
+      const children = [];
+
+      // Current modifier display
+      children.push(
+        h("Group", { layoutMode: "Left", anchor: { Horizontal: 0, Height: 24 }, padding: { Top: 4 } }, [
+          h("Label", { text: "Modifier: ", elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
+          h("Label", { text: currentName, elStyle: { FontSize: 13, TextColor: COLORS.TEXT_PRIMARY } }),
+        ])
+      );
+
+      // Category tabs
+      const catBtns = [];
+      for (const cat of categories) {
+        const isSel = expandedCat === cat.id;
+        const catW = Math.max(100, cat.displayName.length * 13 + 28);
+        catBtns.push(
+          h("Group", { layoutMode: "Top" }, [
+            h(Common.SmallTertiaryTextButton, {
+              text: cat.displayName,
+              anchor: { Width: catW, Height: 30 },
+              onActivating: () => { modCategoryExpanded.value = isSel ? null : cat.id; },
+            }),
+            h("Group", { anchor: { Width: catW, Height: 3 }, background: { Color: cat.color }, visible: isSel }),
+          ])
+        );
+        catBtns.push(h("Group", { anchor: { Width: 2 } }));
+      }
+      children.push(spacer(4));
+      children.push(
+        h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 } }, catBtns)
+      );
+
+      // Modifier list (single-select)
+      if (expandedCat) {
+        const modsInCat = catalog.filter(m => m.category === expandedCat);
+        if (modsInCat.length > 0) {
+          const modBtns = [];
+          for (const m of modsInCat) {
+            const isSel = m.id === currentModId;
+            const label = modButtonLabel(m);
+            const btnW = Math.max(140, label.length * 13 + 28);
+            modBtns.push(
+              h("Group", { layoutMode: "Top" }, [
+                h(Common.SmallTertiaryTextButton, {
+                  text: label,
+                  anchor: { Width: btnW, Height: 28 },
+                  onActivating: () => selectMod(m.id),
+                }),
+                h("Group", { anchor: { Width: btnW, Height: 3 }, background: { Color: COLORS.TITLE_GOLD }, visible: isSel }),
+              ])
+            );
+            modBtns.push(h("Group", { anchor: { Width: 3 } }));
+          }
+          children.push(spacer(4));
+          children.push(
+            h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 } }, modBtns)
+          );
+        }
+      }
+
+      // Value range editor (custom because field names are minValue/maxValue not min/max)
+      if (currentModId) {
+        children.push(spacer(6));
+        children.push(
+          h("Group", { layoutMode: "Top", anchor: { Horizontal: 0 } }, [
+            h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, [
+              h("Group", { anchor: { Width: 45, Height: 32 } }, [
+                h("Label", { text: "Min:", elStyle: { FontSize: 13, TextColor: COLORS.TEXT_MUTED, VerticalAlignment: "Center" } }),
+              ]),
+              h(Common.SmallTertiaryTextButton, { text: "-5", anchor: { Width: 70, Height: 32 },
+                onActivating: () => updateRange(Math.max(0, minVal - 5), maxVal) }),
+              h(Common.SmallTertiaryTextButton, { text: "-1", anchor: { Width: 58, Height: 32 },
+                onActivating: () => updateRange(Math.max(0, minVal - 1), maxVal) }),
+              h("Group", { anchor: { Width: 60, Height: 32 } }, [
+                h("Label", { text: String(minVal), elStyle: { FontSize: 14, TextColor: COLORS.TEXT_PRIMARY, HorizontalAlignment: "Center" } }),
+              ]),
+              h(Common.SmallTertiaryTextButton, { text: "+1", anchor: { Width: 58, Height: 32 },
+                onActivating: () => updateRange(Math.min(maxVal, minVal + 1), maxVal) }),
+              h(Common.SmallTertiaryTextButton, { text: "+5", anchor: { Width: 70, Height: 32 },
+                onActivating: () => updateRange(Math.min(maxVal, minVal + 5), maxVal) }),
+            ]),
+            h("Group", { layoutMode: "LeftCenterWrap", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, [
+              h("Group", { anchor: { Width: 45, Height: 32 } }, [
+                h("Label", { text: "Max:", elStyle: { FontSize: 13, TextColor: COLORS.TEXT_MUTED, VerticalAlignment: "Center" } }),
+              ]),
+              h(Common.SmallTertiaryTextButton, { text: "-5", anchor: { Width: 70, Height: 32 },
+                onActivating: () => updateRange(minVal, Math.max(minVal, maxVal - 5)) }),
+              h(Common.SmallTertiaryTextButton, { text: "-1", anchor: { Width: 58, Height: 32 },
+                onActivating: () => updateRange(minVal, Math.max(minVal, maxVal - 1)) }),
+              h("Group", { anchor: { Width: 60, Height: 32 } }, [
+                h("Label", { text: String(maxVal), elStyle: { FontSize: 14, TextColor: COLORS.TEXT_PRIMARY, HorizontalAlignment: "Center" } }),
+              ]),
+              h(Common.SmallTertiaryTextButton, { text: "+1", anchor: { Width: 58, Height: 32 },
+                onActivating: () => updateRange(minVal, Math.min(999999, maxVal + 1)) }),
+              h(Common.SmallTertiaryTextButton, { text: "+5", anchor: { Width: 70, Height: 32 },
+                onActivating: () => updateRange(minVal, Math.min(999999, maxVal + 5)) }),
+            ]),
+          ])
+        );
+      }
+
+      return children;
+    }
+
+    // Read-only display for conditions without interactive editors (fallback)
     function renderReadOnlyCondition(description, hint) {
       const children = [
         h("Group", { layoutMode: "Left", anchor: { Horizontal: 0 }, padding: { Top: 4 } }, [
           h("Label", { text: description,
-            elStyle: { FontSize: 12, TextColor: COLORS.TEXT_SECONDARY } }),
+            elStyle: { FontSize: 13, TextColor: COLORS.TEXT_SECONDARY } }),
         ]),
       ];
       if (hint) {
         children.push(
           h("Group", { layoutMode: "Left", anchor: { Horizontal: 0 }, padding: { Top: 2 } }, [
             h("Label", { text: hint,
-              elStyle: { FontSize: 11, TextColor: COLORS.TEXT_MUTED } }),
+              elStyle: { FontSize: 12, TextColor: COLORS.TEXT_MUTED } }),
           ])
         );
       }

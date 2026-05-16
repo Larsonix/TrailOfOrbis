@@ -38,7 +38,6 @@ public enum EquipmentType {
     SWORD(Category.WEAPON, WeaponType.SWORD, null, null),
     DAGGER(Category.WEAPON, WeaponType.DAGGER, null, null),
     AXE(Category.WEAPON, WeaponType.AXE, null, null),
-    MACE(Category.WEAPON, WeaponType.MACE, null, null),
     CLAWS(Category.WEAPON, WeaponType.CLAWS, null, null),
     CLUB(Category.WEAPON, WeaponType.CLUB, null, null),
 
@@ -48,6 +47,7 @@ public enum EquipmentType {
     LONGSWORD(Category.WEAPON, WeaponType.LONGSWORD, null, null),
     BATTLEAXE(Category.WEAPON, WeaponType.BATTLEAXE, null, null),
     SPEAR(Category.WEAPON, WeaponType.SPEAR, null, null),
+    MACE(Category.WEAPON, WeaponType.MACE, null, null),
 
     // =========================================================================
     // WEAPONS - Ranged

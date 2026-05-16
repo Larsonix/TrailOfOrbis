@@ -760,9 +760,9 @@ public class PlayerJoinListener {
             return;
         }
 
-        // Skip realm instance worlds - we only want gateways in the main overworld
+        // Skip all instance worlds — gateways belong only in the overworld
         String worldName = world.getName();
-        if (worldName != null && worldName.toLowerCase().contains("realm")) {
+        if (worldName != null && worldName.startsWith("instance-")) {
             return;
         }
 
@@ -998,6 +998,11 @@ public class PlayerJoinListener {
         // Clean up stone tooltip sync tracking
         if (rpg != null && rpg.getStoneTooltipSyncService() != null) {
             rpg.getStoneTooltipSyncService().onPlayerDisconnect(uuid);
+        }
+
+        // Clean up chat item link viewer cache
+        if (rpg != null && rpg.getChatItemLinkHandler() != null) {
+            rpg.getChatItemLinkHandler().onPlayerDisconnect(uuid);
         }
 
         // Clear PartyPro HUD custom text

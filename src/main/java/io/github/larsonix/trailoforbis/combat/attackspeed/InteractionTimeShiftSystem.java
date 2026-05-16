@@ -22,10 +22,18 @@ import com.hypixel.hytale.server.core.modules.interaction.InteractionModule;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 import com.hypixel.hytale.server.core.modules.interaction.system.InteractionSystems;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.attributes.ComputedStats;
+import io.github.larsonix.trailoforbis.combat.attackspeed.api.AttackSpeedApi;
+import io.github.larsonix.trailoforbis.combat.attackspeed.combo.ComboTracker;
+import io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfileRegistry;
+import io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponSpeedProfile;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -52,8 +60,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *       matches the server-side operation speed.</li>
  * </ol>
  *
- * <p>All three layers use the same multiplier from {@link AnimationSpeedSyncConfig},
- * keeping server operations, cooldowns, and visuals in sync.
+ * <p>Multipliers are resolved per-weapon-type via {@link AttackSpeedResolver} and
+ * {@link WeaponProfileRegistry}. Different weapons respond differently to the same
+ * stat investment (e.g., daggers benefit more from raw speed, battleaxes from cooldown).
  *
  * <p>Runs AFTER {@link InteractionSystems.TickInteractionManagerSystem} each tick.
  *
@@ -61,10 +70,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code chain.timeShift} to 0 every tick after the first run, making it useless for
  * ongoing speed modification and causing 60+ desync packets/sec.
  *
- * <p><b>Formula:</b>
+ * <p><b>Formula (weapon-profile-aware):</b>
  * <pre>
- * multiplier    = 1.0 + (attackSpeedPercent * scale / 100.0), clamped to [min, max]
- * extraSeconds  = min(dt * (multiplier - 1.0), MAX_EXTRA_PER_TICK)
+ * snapshot = AttackSpeedResolver.resolve(attackSpeedPercent, weaponProfile, config)
+ * chainExtra = min(dt * (snapshot.chainMultiplier - 1.0), MAX_EXTRA_PER_TICK)
+ * cdExtra    = min(dt * (snapshot.cooldownMultiplier - 1.0), MAX_EXTRA_PER_TICK)
  * </pre>
  *
  * @see InteractionEntry#setTimestamp(long, float)
@@ -82,11 +92,20 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
      */
     private static final float MAX_EXTRA_PER_TICK = 0.1f;
 
+    /** Absolute floor for any multiplier after override application (prevents frozen attacks). */
+    private static final float ABSOLUTE_MIN_MULTIPLIER = 0.2f;
+    /** Absolute ceiling for any multiplier after override application. */
+    private static final float ABSOLUTE_MAX_MULTIPLIER = 5.0f;
+
     private final TrailOfOrbis plugin;
     private final AnimationSpeedSyncConfig syncConfig;
+    private final WeaponProfileRegistry profileRegistry;
+    private final ComboTracker comboTracker = new ComboTracker();
+    private final AttackSpeedApi attackSpeedApi = new AttackSpeedApi();
 
     private final ComponentType<EntityStore, InteractionManager> interactionManagerType;
     private final ComponentType<EntityStore, PlayerRef> playerRefType;
+    private final ComponentType<EntityStore, Player> playerType;
 
     @Nullable
     private Query<EntityStore> query;
@@ -110,11 +129,17 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
      */
     private final ConcurrentHashMap<UUID, String> primaryAttackCooldownIds = new ConcurrentHashMap<>();
 
-    public InteractionTimeShiftSystem(@Nonnull TrailOfOrbis plugin, @Nonnull AnimationSpeedSyncConfig syncConfig) {
+    public InteractionTimeShiftSystem(
+            @Nonnull TrailOfOrbis plugin,
+            @Nonnull AnimationSpeedSyncConfig syncConfig,
+            @Nonnull WeaponProfileRegistry profileRegistry
+    ) {
         this.plugin = plugin;
         this.syncConfig = syncConfig;
+        this.profileRegistry = profileRegistry;
         this.interactionManagerType = InteractionModule.get().getInteractionManagerComponent();
         this.playerRefType = PlayerRef.getComponentType();
+        this.playerType = Player.getComponentType();
         this.dependencies = Set.of(
                 new SystemDependency<>(Order.AFTER, InteractionSystems.TickInteractionManagerSystem.class)
         );
@@ -131,7 +156,7 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
     @Override
     public Query<EntityStore> getQuery() {
         if (query == null) {
-            query = Archetype.of(interactionManagerType, playerRefType);
+            query = Archetype.of(interactionManagerType, playerRefType, playerType);
         }
         return query;
     }
@@ -160,31 +185,64 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
             return;
         }
 
-        float attackSpeedPercent = stats.getAttackSpeedPercent();
-        if (Math.abs(attackSpeedPercent) < 0.001f) {
-            return;
-        }
-
-        float multiplier = syncConfig.calculateMultiplier(attackSpeedPercent);
-        float speedBonus = multiplier - 1.0f;
-
-        if (Math.abs(speedBonus) < 0.001f) {
-            return;
-        }
-
         InteractionManager manager = store.getComponent(entityRef, interactionManagerType);
         if (manager == null) {
             return;
         }
 
-        float extraSeconds = Math.min(dt * speedBonus, MAX_EXTRA_PER_TICK);
+        // Resolve weapon type and profile from held item
+        Player player = archetypeChunk.getComponent(index, playerType);
+        WeaponType weaponType = resolveHeldWeaponType(player);
+        WeaponSpeedProfile profile = profileRegistry.getProfile(weaponType);
 
-        // Phase 1: Accelerate active attack chains + track cooldown IDs
-        accelerateActiveChains(manager, uuid, extraSeconds);
+        // Detect active Primary chain for combo tracking
+        int primaryChainId = findActivePrimaryChainId(manager);
 
-        // Phase 2: Accelerate the tracked Primary attack cooldown (inter-attack gap)
+        // Update combo tracker — detects new attacks, handles timeout/weapon-switch resets
+        int comboStage = comboTracker.update(uuid, primaryChainId, weaponType, profile);
+
+        // Compute per-phase multipliers from all 6 stats × weapon profile × combo stage
+        AttackSpeedSnapshot snapshot = AttackSpeedResolver.resolve(
+                stats.getAttackSpeedPercent(),
+                stats.getCooldownRecoveryPercent(),
+                stats.getComboSpeedBonus(),
+                stats.getProjectileAttackSpeedPercent(),
+                stats.getCastSpeedPercent(),
+                comboStage,
+                profile,
+                syncConfig.animationSpeedScale(),
+                syncConfig.animationMinSpeed(),
+                syncConfig.animationMaxSpeed()
+        );
+
+        // Apply temporary override from API (Hexcode spell buffs, realm modifiers, etc.)
+        // Override is multiplicative on top of stat-derived values, then re-clamped
+        // to absolute bounds. Slow debuffs (override < 1.0) correctly produce negative
+        // extra seconds, which shifts timestamps forward (less elapsed time = slower attacks).
+        float overrideMult = attackSpeedApi.getActiveMultiplier(uuid);
+        if (Math.abs(overrideMult - 1.0f) > 0.001f) {
+            snapshot = new AttackSpeedSnapshot(
+                    clamp(snapshot.chainMultiplier() * overrideMult, ABSOLUTE_MIN_MULTIPLIER, ABSOLUTE_MAX_MULTIPLIER),
+                    clamp(snapshot.cooldownMultiplier() * overrideMult, ABSOLUTE_MIN_MULTIPLIER, ABSOLUTE_MAX_MULTIPLIER),
+                    clamp(snapshot.animationMultiplier() * overrideMult, syncConfig.animationMinSpeed(), syncConfig.animationMaxSpeed())
+            );
+        }
+
+        if (snapshot.isIdentity()) {
+            return;
+        }
+
+        // Chain acceleration uses chainMultiplier (weapon-weighted swing speed + combo bonus)
+        // Symmetric cap: positive = faster, negative = slower (slow debuffs)
+        float chainExtra = clamp(dt * (snapshot.chainMultiplier() - 1.0f), -MAX_EXTRA_PER_TICK, MAX_EXTRA_PER_TICK);
+        accelerateActiveChains(manager, uuid, chainExtra);
+
+        // Cooldown acceleration uses cooldownMultiplier (weapon-weighted gap reduction)
         if (reflectionAvailable) {
-            accelerateAttackCooldown(manager, uuid, extraSeconds);
+            float cdExtra = clamp(dt * (snapshot.cooldownMultiplier() - 1.0f), -MAX_EXTRA_PER_TICK, MAX_EXTRA_PER_TICK);
+            if (Math.abs(cdExtra) > 0.0001f) {
+                accelerateAttackCooldown(manager, uuid, cdExtra);
+            }
         }
     }
 
@@ -214,22 +272,26 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
                 continue;
             }
 
-            // Skip ranged weapons with ammo/reload mechanics — their reload uses
-            // Simple+Repeat interactions where timestamp acceleration causes desync
-            // between server iteration timing and ammo stat application, resulting
-            // in an infinite reload loop. Bows are unaffected (ChargingInteraction
-            // reads simulationTimestamp, which we don't modify).
-            if (isAmmoReloadChain(chain)) {
-                primaryAttackCooldownIds.remove(uuid);
-                continue;
-            }
-
-            // Track cooldown ID from Primary chains
+            // Always track cooldown IDs from Primary chains (even for ammo weapons —
+            // cooldown acceleration between volleys is safe and desirable)
             if (type == InteractionType.Primary) {
                 String cooldownId = extractCooldownId(chain);
                 if (cooldownId != null) {
                     primaryAttackCooldownIds.put(uuid, cooldownId);
                 }
+            }
+
+            // Safety: never accelerate chain timestamps on ammo-reload weapons,
+            // regardless of profile config. This is a hard engine constraint —
+            // ammo-based reload uses Simple+Repeat chains where timestamp acceleration
+            // causes permanent desync (infinite reload loop).
+            if (isAmmoReloadChain(chain)) {
+                continue;
+            }
+
+            // Skip if chain acceleration is effectively zero (e.g., crossbow atkWeight=0)
+            if (Math.abs(extraSeconds) < 0.0001f) {
+                continue;
             }
 
             // Advance entry timestamp to accelerate chain operations
@@ -369,10 +431,64 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
     }
 
     /**
+     * Resolves the weapon type for the player's currently held item.
+     *
+     * @param player The player entity (from ECS query), or null
+     * @return The weapon type, or UNKNOWN if not resolvable
+     */
+    @Nonnull
+    private static WeaponType resolveHeldWeaponType(@Nullable Player player) {
+        if (player == null) {
+            return WeaponType.UNKNOWN;
+        }
+        try {
+            Inventory inventory = player.getInventory();
+            if (inventory == null) {
+                return WeaponType.UNKNOWN;
+            }
+            ItemStack heldItem = inventory.getActiveHotbarItem();
+            if (heldItem == null) {
+                return WeaponType.UNKNOWN;
+            }
+            com.hypixel.hytale.server.core.asset.type.item.config.Item item = heldItem.getItem();
+            if (item == null || item == com.hypixel.hytale.server.core.asset.type.item.config.Item.UNKNOWN) {
+                return WeaponType.UNKNOWN;
+            }
+            return WeaponType.fromItemIdOrUnknown(item.getId());
+        } catch (Exception e) {
+            return WeaponType.UNKNOWN;
+        }
+    }
+
+    /**
+     * Finds the chainId of the active Primary interaction chain, or -1 if none active.
+     * Used for combo detection — each new Primary attack gets a new chainId.
+     */
+    private static int findActivePrimaryChainId(InteractionManager manager) {
+        for (InteractionChain chain : manager.getChains().values()) {
+            if (chain.getType() == InteractionType.Primary
+                    && chain.getServerState() == InteractionState.NotFinished) {
+                return chain.getChainId();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Returns the public API for external mods to push temporary speed overrides.
+     */
+    @Nonnull
+    public AttackSpeedApi getAttackSpeedApi() {
+        return attackSpeedApi;
+    }
+
+    /**
      * Removes tracked state for a disconnected player.
      */
     public void onPlayerDisconnect(UUID uuid) {
         primaryAttackCooldownIds.remove(uuid);
+        comboTracker.clear(uuid);
+        attackSpeedApi.onPlayerDisconnect(uuid);
     }
 
     /**
@@ -404,5 +520,9 @@ public class InteractionTimeShiftSystem extends EntityTickingSystem<EntityStore>
      */
     public static boolean isCooldownAccelerationAvailable() {
         return reflectionAvailable;
+    }
+
+    private static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

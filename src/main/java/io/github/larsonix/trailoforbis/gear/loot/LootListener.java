@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathSystems;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -73,21 +74,26 @@ public class LootListener extends DeathSystems.OnDeathSystem {
     private final TrailOfOrbis plugin;
     private final LootCalculator calculator;
     private final LootGenerator generator;
+    @Nullable
+    private final DeferredLootPipeline pipeline;
 
     /**
-     * Creates a new loot listener system.
+     * Creates a new loot listener system with deferred pipeline.
      *
      * @param plugin The plugin instance
      * @param calculator The loot calculator
      * @param generator The loot generator
+     * @param pipeline The deferred loot pipeline (nullable — falls back to synchronous if null)
      */
     public LootListener(
             @Nonnull TrailOfOrbis plugin,
             @Nonnull LootCalculator calculator,
-            @Nonnull LootGenerator generator) {
+            @Nonnull LootGenerator generator,
+            @Nullable DeferredLootPipeline pipeline) {
         this.plugin = Objects.requireNonNull(plugin, "plugin cannot be null");
         this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
         this.generator = Objects.requireNonNull(generator, "generator cannot be null");
+        this.pipeline = pipeline; // nullable — synchronous fallback
     }
 
     @Override
@@ -103,6 +109,8 @@ public class LootListener extends DeathSystems.OnDeathSystem {
             @Nonnull DeathComponent deathComponent,
             @Nonnull Store<EntityStore> store,
             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+
+        // ── Fast-path filters (unchanged, ~0.05ms total) ──
 
         // Skip player deaths
         Player playerComponent = store.getComponent(ref, Player.getComponentType());
@@ -124,70 +132,95 @@ public class LootListener extends DeathSystems.OnDeathSystem {
             return;
         }
 
-        // Determine mob type (normal/elite/boss)
+        // ── Lightweight context capture (~0.05ms) ──
+        // All ECS component reads happen HERE, not deferred — refs become invalid after tick
+
         MobType mobType = determineMobType(npc, store, ref);
-
-        // Get mob level (prefers realm level for realm mobs)
         int mobLevel = getMobLevel(store, ref);
-
-        // Get death position
         Vector3d deathPosition = getEntityPosition(store, ref);
-
-        // Get player level for drop level blending
         int playerLevel = getPlayerLevel(killerInfo.playerId());
-
-        // Extract realm context for loot bonuses
         RealmLootContext realmContext = extractRealmContext(store, ref, killerInfo.playerId());
-
-        // Apply modifier-based loot bonuses (per-modifier IIQ/IIR scaling)
         realmContext = applyModifierLootBonus(store, ref, realmContext);
-
-        // Apply realm DROP_LEVEL_BONUS — gear drops at higher level
         int effectiveMobLevel = mobLevel + getRealmDropLevelBonus(store, ref);
+        int qualityBonus = getRealmQualityBonus(store, ref);
 
-        // Calculate loot with realm context
+        // ── Deferred pipeline (preferred) or synchronous fallback ──
+        if (pipeline != null) {
+            // Resolve World for deferred execution
+            World world = store.getExternalData().getWorld();
+            if (world == null) {
+                LOGGER.atWarning().log("Cannot resolve World from store — skipping loot for %s", getRoleName(npc));
+                return;
+            }
+
+            // Queue to deferred pipeline (~0.01ms)
+            // ALL generation, registration, sync, and spawning happens off this tick
+            pipeline.queueDeath(new DeferredLootPipeline.DeathContext(
+                    deathPosition,
+                    mobType,
+                    effectiveMobLevel,
+                    playerLevel,
+                    killerInfo.playerId(),
+                    realmContext,
+                    qualityBonus,
+                    world
+            ));
+
+            LOGGER.atFine().log("Queued loot for %s kill by %s (level %d)",
+                    getRoleName(npc), killerInfo.playerId(), effectiveMobLevel);
+        } else {
+            // Synchronous fallback (used when pipeline dependencies are missing)
+            processLootSynchronously(store, commandBuffer, killerInfo, npc,
+                    mobType, effectiveMobLevel, playerLevel, deathPosition,
+                    realmContext, qualityBonus);
+        }
+    }
+
+    // =========================================================================
+    // SYNCHRONOUS FALLBACK (when deferred pipeline is unavailable)
+    // =========================================================================
+
+    /**
+     * Processes loot synchronously on the current tick. This is the legacy path
+     * used only when the deferred pipeline is unavailable.
+     */
+    private void processLootSynchronously(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull KillerInfo killerInfo,
+            @Nonnull NPCEntity npc,
+            @Nonnull MobType mobType,
+            int effectiveMobLevel,
+            int playerLevel,
+            @Nonnull Vector3d deathPosition,
+            @Nonnull RealmLootContext realmContext,
+            int qualityBonus) {
+
         LootRoll lootRoll = calculator.calculateLoot(
-                killerInfo.playerId(),
-                mobType,
-                effectiveMobLevel,
-                playerLevel,
-                deathPosition,
-                realmContext
-        );
+                killerInfo.playerId(), mobType, effectiveMobLevel,
+                playerLevel, deathPosition, realmContext);
 
         if (!lootRoll.shouldDrop()) {
-            LOGGER.atFine().log("No loot drop for %s death", getRoleName(npc));
+            LOGGER.atFine().log("No loot drop for %s death (sync fallback)", getRoleName(npc));
             return;
         }
 
-        // Generate drops
         List<ItemStack> drops = generator.generateDrops(lootRoll);
-
         if (drops.isEmpty()) {
-            LOGGER.atFine().log("Generated 0 drops (generation failed)");
             return;
         }
 
-        // Apply realm GEAR_QUALITY_BONUS — boost quality on each gear drop
-        int qualityBonus = getRealmQualityBonus(store, ref);
         if (qualityBonus > 0) {
             applyQualityBonus(drops, qualityBonus);
         }
 
-        // Sync item definitions to ALL nearby players BEFORE spawning
-        // This ensures any client picking up the item has the definition when notifyPickupItem() fires
         syncItemsToNearbyPlayers(store, deathPosition, drops);
-
-        // Spawn items in world
         int spawnedCount = spawnDrops(store, commandBuffer, drops, deathPosition);
 
         if (spawnedCount > 0) {
-            LOGGER.atInfo().log("Spawned %d gear drop(s) for %s kill by %s (level %d, rarity bonus %.1f%%)",
+            LOGGER.atInfo().log("Spawned %d gear drop(s) for %s kill by %s (level %d, rarity bonus %.1f%%) [sync fallback]",
                     spawnedCount, getRoleName(npc), killerInfo.playerId(),
                     lootRoll.itemLevel(), lootRoll.rarityBonus());
-        } else {
-            LOGGER.atWarning().log("Failed to spawn any gear drops for %s kill (generated %d items)",
-                    getRoleName(npc), drops.size());
         }
     }
 

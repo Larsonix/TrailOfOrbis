@@ -137,8 +137,7 @@ class ImplicitDamageCalculatorTest {
             // Spellbooks excluded — they use a separate mana_regen implicit
             WeaponType[] oneHandedTypes = {
                 WeaponType.SWORD, WeaponType.DAGGER, WeaponType.AXE,
-                WeaponType.MACE, WeaponType.CLAWS, WeaponType.CLUB,
-                WeaponType.WAND
+                WeaponType.CLAWS, WeaponType.CLUB, WeaponType.WAND
             };
 
             WeaponImplicit reference = calculator.calculate(WeaponType.SWORD, level, random);
@@ -175,8 +174,8 @@ class ImplicitDamageCalculatorTest {
 
             WeaponType[] twoHandedTypes = {
                 WeaponType.LONGSWORD, WeaponType.BATTLEAXE, WeaponType.SPEAR,
-                WeaponType.SHORTBOW, WeaponType.CROSSBOW, WeaponType.BLOWGUN,
-                WeaponType.STAFF
+                WeaponType.MACE, WeaponType.SHORTBOW, WeaponType.CROSSBOW,
+                WeaponType.BLOWGUN, WeaponType.STAFF
             };
 
             WeaponImplicit reference = calculator.calculate(WeaponType.LONGSWORD, level, random);

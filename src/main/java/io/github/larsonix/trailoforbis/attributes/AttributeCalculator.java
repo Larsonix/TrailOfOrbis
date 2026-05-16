@@ -143,6 +143,8 @@ public class AttributeCalculator {
         float critChance = BASE_CRIT_CHANCE + (lightning * lightningGrants.getCritChance());
         float staminaRegen = lightning * lightningGrants.getStaminaRegen();
         float shockChance = lightning * lightningGrants.getShockChance();
+        float comboSpeedBonus = lightning * lightningGrants.getComboSpeedBonus();
+        float castSpeedPercent = lightning * lightningGrants.getCastSpeedPercent();
 
         // EARTH stats
         float maxHealth = baseStats.getMaxHealth();
@@ -158,6 +160,7 @@ public class AttributeCalculator {
         float projectileDamagePercent = wind * windGrants.getProjectileDamagePercent();
         float jumpForceBonus = wind * windGrants.getJumpForcePercent();
         float projectileSpeedPercent = wind * windGrants.getProjectileSpeedPercent();
+        float projectileAttackSpeedPercent = wind * windGrants.getProjectileAttackSpeedPercent();
 
         // VOID stats
         float lifeSteal = voidAttr * voidGrants.getLifeSteal();
@@ -213,12 +216,15 @@ public class AttributeCalculator {
             // ==================== Offense: LIGHTNING ====================
             .criticalChance(critChance)
             .attackSpeedPercent(attackSpeedPercent)
+            .comboSpeedBonus(comboSpeedBonus)
+            .castSpeedPercent(castSpeedPercent)
             .shockChance(shockChance)
 
             // ==================== Offense: WIND ====================
             .accuracy(accuracy)
             .projectileDamagePercent(projectileDamagePercent)
             .projectileSpeedPercent(projectileSpeedPercent)
+            .projectileAttackSpeedPercent(projectileAttackSpeedPercent)
 
             // ==================== Offense: VOID ====================
             .lifeSteal(lifeSteal)

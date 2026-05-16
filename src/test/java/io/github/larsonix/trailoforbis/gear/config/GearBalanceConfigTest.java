@@ -582,7 +582,7 @@ class GearBalanceConfigTest {
         @Test
         @DisplayName("Valid config creates successfully")
         void validConfig_createsSuccessfully() {
-            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, Map.of(
+            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, 1.5, Map.of(
                 "common", 50,
                 "rare", 10
             ));
@@ -594,7 +594,7 @@ class GearBalanceConfigTest {
         @Test
         @DisplayName("Category weight lookup returns correct value")
         void categoryWeight_existingCategory_returnsWeight() {
-            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, Map.of(
+            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, 1.5, Map.of(
                 "common", 50,
                 "rare", 10
             ));
@@ -605,7 +605,7 @@ class GearBalanceConfigTest {
         @Test
         @DisplayName("Unknown category returns default 50")
         void categoryWeight_unknown_returns50() {
-            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, Map.of());
+            ModifierScalingConfig config = new ModifierScalingConfig(0.02, 0.3, 1.5, Map.of());
 
             assertEquals(50, config.categoryWeight("unknown"));
         }
@@ -615,7 +615,7 @@ class GearBalanceConfigTest {
         void negativeGlobalScale_throwsException() {
             assertThrows(
                 IllegalArgumentException.class,
-                () -> new ModifierScalingConfig(-0.02, 0.3, Map.of())
+                () -> new ModifierScalingConfig(-0.02, 0.3, 1.5, Map.of())
             );
         }
 
@@ -624,7 +624,7 @@ class GearBalanceConfigTest {
         void rollVarianceGreaterThan1_throwsException() {
             assertThrows(
                 IllegalArgumentException.class,
-                () -> new ModifierScalingConfig(0.02, 1.5, Map.of())
+                () -> new ModifierScalingConfig(0.02, 1.5, 1.5, Map.of())
             );
         }
     }

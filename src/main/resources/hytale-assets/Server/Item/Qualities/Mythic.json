@@ -10,7 +10,6 @@
   "VisibleQualityLabel": true,
   "RenderSpecialSlot": true,
   "ItemEntityConfig": {
-    "ParticleSystemId": "Drop_Legendary",
-    "ParticleColor": "#ff4500"
+    "ParticleSystemId": "Drop_Mythic"
   }
 }

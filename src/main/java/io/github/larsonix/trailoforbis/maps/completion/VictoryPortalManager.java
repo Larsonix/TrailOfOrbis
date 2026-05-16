@@ -297,9 +297,9 @@ public class VictoryPortalManager {
                 continue;
             }
 
-            // Skip worlds that appear to be realm instances
+            // Skip all instance worlds (realms, sanctum, forgotten temple, etc.)
             String worldName = world.getName();
-            if (worldName != null && worldName.toLowerCase().contains("realm")) {
+            if (worldName != null && worldName.startsWith("instance-")) {
                 continue;
             }
 

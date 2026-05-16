@@ -435,6 +435,114 @@ class LevelingRepositoryTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // SHUTDOWN FAILURE HANDLING
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Shutdown Failure Handling")
+    class ShutdownFailureHandling {
+
+        @Test
+        @DisplayName("shutdown with connection failure should still clear cache")
+        void shutdown_withConnectionFailure_shouldStillClearCache() throws SQLException {
+            // Load data first (need valid connection for load)
+            setupNoDbData();
+            repository.loadOrCreate(testPlayer);
+            assertEquals(1, repository.getCacheSize());
+            waitForAsync();
+
+            // Now make connection fail for the shutdown saves
+            reset(dataManager);
+            when(dataManager.getConnection()).thenThrow(new SQLException("Connection lost"));
+
+            // Shutdown should not throw and should still clear cache
+            assertDoesNotThrow(() -> repository.shutdown());
+            assertEquals(0, repository.getCacheSize());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LOAD FAILURE HANDLING
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Load Failure Handling")
+    class LoadFailureHandling {
+
+        @Test
+        @DisplayName("loadOrCreate with connection failure should create new data gracefully")
+        void loadOrCreate_withConnectionFailure_shouldCreateNewData() throws SQLException {
+            // First getConnection for SELECT fails, but subsequent for INSERT might also fail
+            when(dataManager.getConnection()).thenThrow(new SQLException("DB down"));
+
+            PlayerLevelData result = repository.loadOrCreate(testPlayer);
+
+            // Should fall through to createNew (loadFromDatabase catches and returns null)
+            assertNotNull(result);
+            assertEquals(testPlayer, result.uuid());
+            assertEquals(0, result.xp());
+            assertTrue(repository.isCached(testPlayer),
+                "New data should still be cached even if DB is down");
+        }
+
+        @Test
+        @DisplayName("loadOrCreate with ResultSet error should create new data")
+        void loadOrCreate_withResultSetError_shouldCreateNewData() throws SQLException {
+            when(dataManager.getConnection()).thenReturn(connection);
+            when(connection.prepareStatement(contains("SELECT"))).thenReturn(selectStmt);
+            when(connection.prepareStatement(contains("INSERT"))).thenReturn(insertStmt);
+            when(selectStmt.executeQuery()).thenThrow(new SQLException("ResultSet error"));
+
+            PlayerLevelData result = repository.loadOrCreate(testPlayer);
+
+            assertNotNull(result);
+            assertEquals(0, result.xp());
+            assertTrue(repository.isCached(testPlayer));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // INSERT FALLBACK PARAMETER VERIFICATION
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("INSERT Fallback Parameters")
+    class InsertFallbackParameters {
+
+        @Test
+        @DisplayName("INSERT fallback should set all 5 parameters correctly")
+        void insertFallback_setsAllParameters() throws SQLException {
+            setupUpdateWithInsertFallbackMock();
+
+            Instant now = Instant.now();
+            PlayerLevelData data = new PlayerLevelData(testPlayer, 42, 7, now, now);
+
+            repository.saveSync(data);
+
+            // Verify INSERT statement parameters
+            verify(insertStmt).setString(1, testPlayer.toString()); // uuid
+            verify(insertStmt).setLong(2, 42L); // xp
+            verify(insertStmt).setInt(3, 7); // level (non-null)
+            verify(insertStmt, times(2)).setTimestamp(anyInt(), any(Timestamp.class)); // timestamps
+            verify(insertStmt).executeUpdate();
+        }
+
+        @Test
+        @DisplayName("INSERT fallback with null storedLevel should use setNull")
+        void insertFallback_nullStoredLevel_usesSetNull() throws SQLException {
+            setupUpdateWithInsertFallbackMock();
+
+            PlayerLevelData data = PlayerLevelData.createWithXp(testPlayer, 100);
+            assertNull(data.storedLevel(), "Precondition: storedLevel should be null");
+
+            repository.saveSync(data);
+
+            // The INSERT should use setNull for the level column
+            verify(insertStmt).setNull(3, java.sql.Types.INTEGER);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // LIFECYCLE - saveAll()
     // ═══════════════════════════════════════════════════════════════════
 

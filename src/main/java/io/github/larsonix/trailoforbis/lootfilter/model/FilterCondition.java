@@ -147,7 +147,7 @@ public sealed interface FilterCondition permits
         @Override
         public String describe() {
             return types.stream()
-                    .map(WeaponType::getIdPattern)
+                    .map(t -> capitalize(t.name()))
                     .sorted()
                     .collect(Collectors.joining(", "));
         }

@@ -1,0 +1,323 @@
+# =============================================================================
+# Weapon Speed Profiles
+# =============================================================================
+# Each profile controls how attack speed stats affect a specific weapon type.
+#
+# CURRENTLY UNIFORM: All weapons scale identically for baseline testing.
+# Per-weapon differentiation (daggers faster, battleaxes heavier) will be
+# tuned after confirming the base system feels correct on all weapon types.
+#
+# statWeights: multiplier on stat benefit (1.0 = normal)
+# speedLimits: min/max multiplier bounds + animation scale (1.0 = matches server)
+# comboStages: max combo stages (3 for melee, 1 for ranged/magic)
+# comboResetMs: ms before combo resets to stage 1
+# baseComboPercent: universal combo speed bonus per hit
+# =============================================================================
+
+profiles:
+
+  # =========================================
+  # ONE-HANDED MELEE
+  # =========================================
+
+  sword:
+    weaponTypes: [SWORD]
+    animationSets: [Sword]
+    category: melee
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  dagger:
+    weaponTypes: [DAGGER, CLAWS]
+    animationSets: [Daggers, Daggers_Claw, Daggers_Push, Dagger]
+    category: melee
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  axe:
+    weaponTypes: [AXE]
+    animationSets: [Axe]
+    category: melee
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  club:
+    weaponTypes: [CLUB]
+    animationSets: [Club, Club_Flail]
+    category: melee
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  # =========================================
+  # TWO-HANDED MELEE
+  # =========================================
+
+  longsword:
+    weaponTypes: [LONGSWORD]
+    animationSets: [Longsword]
+    category: melee_2h
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  battleaxe:
+    weaponTypes: [BATTLEAXE]
+    animationSets: [Battleaxe]
+    category: melee_2h
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  spear:
+    weaponTypes: [SPEAR]
+    animationSets: [Spear]
+    category: melee_2h
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  mace:
+    weaponTypes: [MACE]
+    animationSets: [Mace]
+    category: melee_2h
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  # =========================================
+  # RANGED
+  # =========================================
+
+  shortbow:
+    weaponTypes: [SHORTBOW]
+    animationSets: [Shortbow, Bow]
+    category: ranged
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+      projectileAttackSpeedPercent: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  crossbow:
+    weaponTypes: [CROSSBOW]
+    animationSets: [Crossbow, Crossbow_Heavy]
+    category: ranged_ammo
+    comboStages: 1
+    comboResetMs: 0
+    baseComboPercent: 0.0
+    statWeights:
+      # NO chain acceleration — confirmed engine desync (ammo reload loop)
+      attackSpeedPercent: 0.0
+      cooldownRecoveryPercent: 1.0
+      projectileAttackSpeedPercent: 0.5
+    speedLimits:
+      minMultiplier: 0.8
+      maxMultiplier: 1.5
+      # NO animation speed patching — prevents infinite reload desync
+      animationSpeedScale: 0.0
+
+  blowgun:
+    weaponTypes: [BLOWGUN]
+    animationSets: []
+    category: ranged
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+      projectileAttackSpeedPercent: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  # =========================================
+  # THROWN
+  # =========================================
+
+  thrown:
+    weaponTypes: [BOMB, DART, KUNAI]
+    animationSets: [Throwing_Knife]
+    category: thrown
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  # =========================================
+  # MAGIC
+  # =========================================
+
+  staff:
+    weaponTypes: [STAFF]
+    animationSets: [Staff]
+    category: magic
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      castSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  wand:
+    weaponTypes: [WAND]
+    animationSets: [Wand]
+    category: magic
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      castSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  spellbook:
+    weaponTypes: [SPELLBOOK]
+    animationSets: [Spellbook]
+    category: magic
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      castSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0
+
+  # =========================================
+  # OFFHAND
+  # =========================================
+
+  shield:
+    weaponTypes: [SHIELD]
+    animationSets: [Shield]
+    category: offhand
+    comboStages: 1
+    comboResetMs: 0
+    baseComboPercent: 0.0
+    statWeights:
+      attackSpeedPercent: 0.0
+      cooldownRecoveryPercent: 0.0
+    speedLimits:
+      minMultiplier: 1.0
+      maxMultiplier: 1.0
+      animationSpeedScale: 0.0
+
+  # =========================================
+  # FALLBACK
+  # =========================================
+
+  default:
+    weaponTypes: [UNKNOWN]
+    animationSets: []
+    category: melee
+    comboStages: 3
+    comboResetMs: 1000
+    baseComboPercent: 1.0
+    statWeights:
+      attackSpeedPercent: 1.0
+      cooldownRecoveryPercent: 1.0
+      comboSpeedBonus: 1.0
+    speedLimits:
+      minMultiplier: 0.5
+      maxMultiplier: 3.0
+      animationSpeedScale: 1.0

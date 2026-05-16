@@ -17,6 +17,7 @@ import io.github.larsonix.trailoforbis.maps.ui.RealmMobMarkerProvider;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -146,6 +147,9 @@ final class RealmTickModule {
             // Check for timed out realms (runs EVERY tick - critical for timeout enforcement)
             checkRealmTimeouts();
 
+            // Check for stuck READY realms (created but never entered)
+            checkReadyTimeouts();
+
             // Enforce arena boundaries — clamp mobs that wander outside the arena
             enforceArenaBoundaries();
 
@@ -193,6 +197,32 @@ final class RealmTickModule {
                 }
                 realm.markTimedOut();
                 onRealmTimedOut.accept(realm.getRealmId(), RealmInstance.CompletionReason.TIMEOUT);
+            }
+        }
+    }
+
+    /**
+     * Closes realms stuck in READY state (created but never entered).
+     * Uses the same timeout as portal entry (default 120s).
+     */
+    private void checkReadyTimeouts() {
+        Instant now = Instant.now();
+        int readyTimeoutSeconds = portalManager.getPortalEntryTimeoutSeconds();
+
+        for (RealmInstance realm : realmsById.values()) {
+            if (!realm.isReady()) continue;
+
+            Instant readyAt = realm.getReadyAt();
+            if (readyAt == null) continue;
+
+            long ageSeconds = now.getEpochSecond() - readyAt.getEpochSecond();
+            if (ageSeconds >= readyTimeoutSeconds) {
+                // Double-check state — player may have entered between iteration start and now
+                if (!realm.isReady()) continue;
+
+                LOGGER.atInfo().log("Realm %s stuck in READY for %ds — closing as abandoned",
+                    realm.getRealmId().toString().substring(0, 8), ageSeconds);
+                onRealmTimedOut.accept(realm.getRealmId(), RealmInstance.CompletionReason.ABANDONED);
             }
         }
     }

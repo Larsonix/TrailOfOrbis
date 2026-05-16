@@ -45,7 +45,7 @@ class LootListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new LootListener(plugin, lootCalculator, lootGenerator);
+        listener = new LootListener(plugin, lootCalculator, lootGenerator, null);
     }
 
     // =========================================================================
@@ -60,7 +60,7 @@ class LootListenerTest {
         @DisplayName("constructor accepts valid dependencies")
         void constructor_AcceptsValidDependencies() {
             assertDoesNotThrow(() ->
-                new LootListener(plugin, lootCalculator, lootGenerator)
+                new LootListener(plugin, lootCalculator, lootGenerator, null)
             );
         }
 
@@ -68,7 +68,7 @@ class LootListenerTest {
         @DisplayName("constructor throws for null plugin")
         void constructor_ThrowsForNullPlugin() {
             assertThrows(NullPointerException.class, () ->
-                new LootListener(null, lootCalculator, lootGenerator)
+                new LootListener(null, lootCalculator, lootGenerator, null)
             );
         }
 
@@ -76,7 +76,7 @@ class LootListenerTest {
         @DisplayName("constructor throws for null calculator")
         void constructor_ThrowsForNullCalculator() {
             assertThrows(NullPointerException.class, () ->
-                new LootListener(plugin, null, lootGenerator)
+                new LootListener(plugin, null, lootGenerator, null)
             );
         }
 
@@ -84,7 +84,7 @@ class LootListenerTest {
         @DisplayName("constructor throws for null generator")
         void constructor_ThrowsForNullGenerator() {
             assertThrows(NullPointerException.class, () ->
-                new LootListener(plugin, lootCalculator, null)
+                new LootListener(plugin, lootCalculator, (LootGenerator) null, null)
             );
         }
     }

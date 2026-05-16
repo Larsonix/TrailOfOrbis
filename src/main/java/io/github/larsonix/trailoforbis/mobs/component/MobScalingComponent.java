@@ -114,6 +114,19 @@ public class MobScalingComponent implements Component<EntityStore> {
      */
     private boolean isDying;
 
+    // ==================== Deferred Nameplate ====================
+
+    /**
+     * Nameplate text to display above this mob (e.g., "Lv27", "[Elite] Lv27").
+     *
+     * <p>NOT serialized — regenerated on load from mobLevel + classification + modifiers.
+     * The actual Nameplate ECS component is added later by MobNameplateActivationSystem
+     * when a player gets within proximity range. This prevents a burst of health bars
+     * when many mobs become visible simultaneously (realm entry).
+     */
+    @Nullable
+    private String nameplateText;
+
     // ==================== Computed Stats ====================
 
     /** The full calculated mob stats with random distribution */
@@ -138,6 +151,7 @@ public class MobScalingComponent implements Component<EntityStore> {
         this.vanillaDamage = 10.0f; // Default vanilla damage
         this.isDying = false;
         this.stats = MobStats.UNSCALED;
+        this.nameplateText = null;
     }
 
     /**
@@ -155,6 +169,7 @@ public class MobScalingComponent implements Component<EntityStore> {
         this.vanillaDamage = other.vanillaDamage;
         this.isDying = other.isDying;
         this.stats = other.stats; // MobStats is immutable, safe to share
+        this.nameplateText = other.nameplateText;
     }
 
     // ==================== Static Accessor ====================
@@ -295,6 +310,15 @@ public class MobScalingComponent implements Component<EntityStore> {
      */
     public void setDying(boolean dying) {
         this.isDying = dying;
+    }
+
+    @Nullable
+    public String getNameplateText() {
+        return nameplateText;
+    }
+
+    public void setNameplateText(@Nullable String nameplateText) {
+        this.nameplateText = nameplateText;
     }
 
     @Nonnull

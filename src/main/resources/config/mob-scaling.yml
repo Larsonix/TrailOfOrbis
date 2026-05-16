@@ -20,6 +20,11 @@
 # Master switch for the entire mob scaling system
 enabled: true
 
+# Distance (blocks) at which mob nameplates become visible.
+# Prevents mass health bar burst when entering realms or new areas.
+# Mobs beyond this range have no nameplate — their health bar only shows on damage.
+nameplate_activation_range: 20
+
 # -----------------------------------------------------------------------------
 # SAFE ZONE CONFIGURATION
 # -----------------------------------------------------------------------------

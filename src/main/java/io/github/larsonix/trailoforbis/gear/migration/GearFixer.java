@@ -219,7 +219,7 @@ public final class GearFixer {
             trimmedPrefixes = trimUnlocked(gear.prefixes(), excess);
         }
 
-        return gear.withPrefixes(trimmedPrefixes).withSuffixes(trimmedSuffixes);
+        return gear.withModifiers(trimmedPrefixes, trimmedSuffixes);
     }
 
     /**

@@ -533,6 +533,14 @@ public final class LootGenerator {
     }
 
     /**
+     * Gets the loot category configuration.
+     */
+    @Nonnull
+    public LootCategoryConfig getCategoryConfig() {
+        return categoryConfig;
+    }
+
+    /**
      * Gets the slot weights map.
      *
      * @return Unmodifiable view of slot weights

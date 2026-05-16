@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
  * <p>Each weapon type has a distinct playstyle and therefore should
  * have access to different stat modifiers:
  * <ul>
- *   <li><b>Melee (one-handed)</b>: SWORD, DAGGER, AXE, MACE, CLAWS, CLUB</li>
- *   <li><b>Melee (two-handed)</b>: LONGSWORD, BATTLEAXE, SPEAR</li>
+ *   <li><b>Melee (one-handed)</b>: SWORD, DAGGER, AXE, CLAWS, CLUB</li>
+ *   <li><b>Melee (two-handed)</b>: LONGSWORD, BATTLEAXE, SPEAR, MACE</li>
  *   <li><b>Ranged (physical)</b>: SHORTBOW, CROSSBOW, BLOWGUN</li>
  *   <li><b>Ranged (thrown)</b>: BOMB, DART, KUNAI</li>
  *   <li><b>Magic</b>: STAFF, WAND, SPELLBOOK</li>
@@ -29,7 +29,6 @@ public enum WeaponType {
     SWORD("Sword", Category.MELEE, "balanced melee"),
     DAGGER("Daggers", Category.MELEE, "fast, crit-focused"),
     AXE("Axe", Category.MELEE, "high damage melee"),
-    MACE("Mace", Category.MELEE, "blunt damage"),
     CLAWS("Claws", Category.MELEE, "fast dual attacks"),
     CLUB("Club", Category.MELEE, "primitive blunt"),
 
@@ -37,6 +36,7 @@ public enum WeaponType {
     LONGSWORD("Longsword", Category.MELEE_2H, "slow, high damage"),
     BATTLEAXE("Battleaxe", Category.MELEE_2H, "very high damage"),
     SPEAR("Spear", Category.MELEE_2H, "reach, balanced"),
+    MACE("Mace", Category.MELEE_2H, "blunt damage"),
 
     // Ranged (physical projectile)
     SHORTBOW("Shortbow", Category.RANGED, "fast projectile"),
@@ -151,7 +151,7 @@ public enum WeaponType {
     /**
      * Whether this weapon requires two hands.
      *
-     * <p>Two-handed weapons: LONGSWORD, BATTLEAXE, SPEAR (MELEE_2H),
+     * <p>Two-handed weapons: LONGSWORD, BATTLEAXE, SPEAR, MACE (MELEE_2H),
      * SHORTBOW, CROSSBOW, BLOWGUN (RANGED), STAFF (MAGIC — staves are two-handed).
      */
     public boolean isTwoHanded() {

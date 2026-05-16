@@ -277,6 +277,15 @@ public final class ItemDefinitionBuilder {
             // Set item level
             definition.itemLevel = gearData.level();
 
+            // [SE-DIAG] Temporary diagnostic — verify weapon.statModifiers on protocol definition
+            if (definition.weapon != null && definition.weapon.statModifiers != null) {
+                LOGGER.atInfo().log("[SE-DIAG] %s: weapon.statMods=%d keys=%s",
+                    itemId, definition.weapon.statModifiers.size(),
+                    definition.weapon.statModifiers.keySet());
+            } else if (definition.weapon != null) {
+                LOGGER.atInfo().log("[SE-DIAG] %s: weapon=PRESENT but statModifiers=NULL", itemId);
+            }
+
             return definition;
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(

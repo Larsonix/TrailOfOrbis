@@ -121,6 +121,21 @@ public final class StatMapping {
         registerPercent("attack_speed_percent",
             (s, v) -> s.setAttackSpeedPercent(s.getAttackSpeedPercent() + v));
 
+        registerPercent("cooldown_recovery_percent",
+            (s, v) -> s.setCooldownRecoveryPercent(s.getCooldownRecoveryPercent() + v));
+
+        registerPercent("charge_speed_percent",
+            (s, v) -> s.setChargeSpeedPercent(s.getChargeSpeedPercent() + v));
+
+        registerPercent("combo_speed_bonus",
+            (s, v) -> s.setComboSpeedBonus(s.getComboSpeedBonus() + v));
+
+        registerPercent("projectile_attack_speed_percent",
+            (s, v) -> s.setProjectileAttackSpeedPercent(s.getProjectileAttackSpeedPercent() + v));
+
+        registerPercent("cast_speed_percent",
+            (s, v) -> s.setCastSpeedPercent(s.getCastSpeedPercent() + v));
+
         registerPercent("movement_speed_percent",
             (s, v) -> s.setMovementSpeedPercent(s.getMovementSpeedPercent() + v));
 

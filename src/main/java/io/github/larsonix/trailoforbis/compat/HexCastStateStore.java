@@ -280,7 +280,7 @@ public final class HexCastStateStore {
             }
 
             Ref<EntityStore> ref = store.getExternalData().getRefFromUUID(record.casterUuid);
-            if (ref != null && ref.isValid()) {
+            if (ref != null && ref.isValid() && ref.getStore() == store) {
                 if (best == null || record.timestampMs > best.timestampMs) {
                     best = record;
                 }

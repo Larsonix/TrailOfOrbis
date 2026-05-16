@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Swamp_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Swamp_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Swamp",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

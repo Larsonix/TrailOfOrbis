@@ -61,10 +61,10 @@ public final class DotSourceResolver {
             }
         } catch (Exception ignored) {}
 
-        // Tier 2: Local store UUID registry (inherently same-world)
+        // Tier 2: Local store UUID registry — validate store membership to prevent cross-store crashes
         try {
             Ref<EntityStore> ref = store.getExternalData().getRefFromUUID(sourceUuid);
-            if (ref != null && ref.isValid()) {
+            if (ref != null && ref.isValid() && ref.getStore() == store) {
                 return new Damage.EntitySource(ref);
             }
         } catch (Exception ignored) {}

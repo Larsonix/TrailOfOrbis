@@ -144,7 +144,7 @@ public class UIManager implements UIService {
         }
 
         StonePickerPage page = new StonePickerPage(
-            plugin, player, stoneType, stoneItem, stoneSlot, stoneContainer, applicationService
+            plugin, player, stoneType, stoneItem, stoneSlot, stoneContainer, applicationService, false
         );
         page.open(store);
         trackOpenPage(playerId, "stone_picker");

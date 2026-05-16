@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_BeachSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_BeachCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_BeachCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_BeachGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

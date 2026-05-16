@@ -1,0 +1,9 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Rarity_Sparkle"
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": true
+}

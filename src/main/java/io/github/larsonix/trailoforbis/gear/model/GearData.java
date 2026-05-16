@@ -488,6 +488,23 @@ public record GearData(
     }
 
     /**
+     * Create a new GearData with both prefix and suffix lists replaced atomically.
+     *
+     * <p>This avoids the intermediate-state validation failure that occurs when
+     * chaining {@code withPrefixes().withSuffixes()} — the intermediate GearData
+     * would have new prefixes but original suffixes, potentially exceeding the
+     * rarity's max modifier count even if the final total is valid.
+     *
+     * @param newPrefixes The new prefix list
+     * @param newSuffixes The new suffix list
+     * @return New GearData with both modifier lists replaced
+     */
+    @Nonnull
+    public GearData withModifiers(@Nonnull List<GearModifier> newPrefixes, @Nonnull List<GearModifier> newSuffixes) {
+        return new GearData(instanceId, level, rarity, quality, newPrefixes, newSuffixes, corrupted, implicit, armorImplicit, baseItemId, activeGem, supportGems, supportSlotCount);
+    }
+
+    /**
      * Create a new GearData with updated corruption state.
      *
      * @param newCorrupted The new corruption state

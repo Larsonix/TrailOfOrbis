@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Forest_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Forest_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Forest",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

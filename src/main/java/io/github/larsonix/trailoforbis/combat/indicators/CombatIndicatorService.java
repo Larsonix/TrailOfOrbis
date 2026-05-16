@@ -65,8 +65,9 @@ public class CombatIndicatorService {
      * previous one for the same UUID is skipped.
      */
     private final java.util.Map<java.util.UUID, Long> lastFlashTime = new java.util.HashMap<>();
-    /** Minimum interval between screen flash packets for the same defender (ms). */
-    private static final long FLASH_DEDUP_INTERVAL_MS = 50;
+    /** Minimum interval between screen flash packets for the same defender (ms).
+     *  Fallback if config is unavailable; overridden by {@code healthAlertCooldownMs} in config. */
+    private static final long DEFAULT_FLASH_COOLDOWN_MS = 750;
 
     /**
      * Creates a new CombatIndicatorService.
@@ -212,6 +213,48 @@ public class CombatIndicatorService {
     }
 
     /**
+     * Sends floating combat text only — NO red screen flash (DamageInfo packet).
+     *
+     * <p>Used for DOT damage (burn/poison) where the continuous ticking damage is
+     * expected and should not trigger the directional damage vignette every 0.5s.
+     * The attacker still sees floating numbers on the defender.
+     *
+     * @param store The entity store
+     * @param defenderRef The defender entity reference
+     * @param damage The damage event
+     * @param rpgDamage The calculated RPG damage amount
+     * @param breakdown The damage breakdown for determining indicator style
+     * @param wasParried Whether the attack was parried
+     */
+    public void sendCombatTextOnly(
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> defenderRef,
+        @Nonnull Damage damage,
+        float rpgDamage,
+        @Nonnull DamageBreakdown breakdown,
+        boolean wasParried
+    ) {
+        Ref<EntityStore> attackerRef = entityResolver.getAttackerRef(store, damage);
+
+        // No sendDefenderIndicator() — DOT should not flash the red screen
+
+        Float hitAngle = damage.getIfPresentMetaObject(Damage.HIT_ANGLE);
+        sendAttackerCombatText(
+            store, defenderRef, attackerRef, rpgDamage,
+            new CombatTextParams(
+                breakdown.wasCritical(),
+                breakdown.wasBlocked(),
+                breakdown.wasDodged(),
+                breakdown.wasEvaded(),
+                wasParried,
+                breakdown.wasMissed()
+            ),
+            hitAngle,
+            breakdown
+        );
+    }
+
+    /**
      * Sends avoidance indicators when damage is avoided.
      *
      * <p>Two audiences:
@@ -274,15 +317,19 @@ public class CombatIndicatorService {
             return;
         }
 
-        // Time-window dedup: skip redundant screen flash for the same defender.
-        // AoE spells hitting 40 targets that reflect damage would send 40 flash packets
-        // to the same player — they only see one flash anyway.
+        // Rate-limit screen flashes: max ~1 per cooldown window.
+        // Prevents rapid red flashing when fighting multiple mobs simultaneously.
+        long cooldownMs = DEFAULT_FLASH_COOLDOWN_MS;
+        try {
+            cooldownMs = plugin.getConfigManager().getRPGConfig().getCombat().getHealthAlertCooldownMs();
+        } catch (Exception ignored) { /* fallback to default */ }
+
         java.util.UUID defenderUuid = defender.getUuid();
         long now = System.currentTimeMillis();
         Long lastFlash = lastFlashTime.get(defenderUuid);
-        if (lastFlash != null && (now - lastFlash) < FLASH_DEDUP_INTERVAL_MS) {
-            LOGGER.at(Level.FINE).log("INDICATOR SKIPPED for defender %s: within %dms dedup window",
-                defender.getUsername(), FLASH_DEDUP_INTERVAL_MS);
+        if (lastFlash != null && (now - lastFlash) < cooldownMs) {
+            LOGGER.at(Level.FINE).log("INDICATOR SKIPPED for defender %s: within %dms cooldown window",
+                defender.getUsername(), cooldownMs);
             return;
         }
         lastFlashTime.put(defenderUuid, now);

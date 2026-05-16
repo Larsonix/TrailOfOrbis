@@ -83,6 +83,11 @@ public final class DebugStatRegistry {
         // OFFENSIVE — SPEED & UTILITY
         // =====================================================================
         register("attack_speed_percent", "offensive", ComputedStats::getAttackSpeedPercent, (s, v) -> s.setAttackSpeedPercent(v));
+        register("cooldown_recovery_percent", "offensive", ComputedStats::getCooldownRecoveryPercent, (s, v) -> s.setCooldownRecoveryPercent(v));
+        register("charge_speed_percent", "offensive", ComputedStats::getChargeSpeedPercent, (s, v) -> s.setChargeSpeedPercent(v));
+        register("combo_speed_bonus", "offensive", ComputedStats::getComboSpeedBonus, (s, v) -> s.setComboSpeedBonus(v));
+        register("projectile_attack_speed_percent", "offensive", ComputedStats::getProjectileAttackSpeedPercent, (s, v) -> s.setProjectileAttackSpeedPercent(v));
+        register("cast_speed_percent", "offensive", ComputedStats::getCastSpeedPercent, (s, v) -> s.setCastSpeedPercent(v));
         register("accuracy", "offensive", ComputedStats::getAccuracy, (s, v) -> s.setAccuracy(v));
         register("accuracy_percent", "offensive", ComputedStats::getAccuracyPercent, (s, v) -> s.setAccuracyPercent(v));
         register("armor_penetration", "offensive", ComputedStats::getArmorPenetration, (s, v) -> s.setArmorPenetration(v));

@@ -74,7 +74,7 @@ public class MobClassificationConfig {
         xpMultipliers.put(RPGMobClass.BOSS, 5.0);
 
         // Stat Multipliers
-        statMultipliers.put(RPGMobClass.PASSIVE, 0.1);
+        statMultipliers.put(RPGMobClass.PASSIVE, 1.0);
         statMultipliers.put(RPGMobClass.MINOR, 1.0);  // Normal stats - they're still combat mobs
         statMultipliers.put(RPGMobClass.HOSTILE, 1.0);
         statMultipliers.put(RPGMobClass.ELITE, 1.5);

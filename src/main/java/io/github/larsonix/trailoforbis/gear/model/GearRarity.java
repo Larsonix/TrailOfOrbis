@@ -29,6 +29,7 @@ public enum GearRarity {
         1.0,    // durabilityMultiplier
         64.0,   // dropWeight (4× geometric: 75.0%)
         "#C9D2DD", // hexColor (light gray)
+        "#D8E2EE", // particleHexColor (brighter for BlendAdd)
         "Common"   // hytaleQualityId
     ),
 
@@ -40,6 +41,7 @@ public enum GearRarity {
         1.2,
         16.0,   // dropWeight (4× geometric: 18.75%)
         "#3E9049", // green
+        "#55CC66", // particleHexColor (brighter green)
         "Uncommon"
     ),
 
@@ -51,6 +53,7 @@ public enum GearRarity {
         1.5,
         4.0,    // dropWeight (4× geometric: 4.69%)
         "#2770B7", // blue
+        "#4499FF", // particleHexColor (brighter blue)
         "Rare"
     ),
 
@@ -62,6 +65,7 @@ public enum GearRarity {
         2.0,
         1.0,    // dropWeight (4× geometric: 1.17%)
         "#8B339E", // purple
+        "#BB55DD", // particleHexColor (brighter purple)
         "Epic"
     ),
 
@@ -73,6 +77,7 @@ public enum GearRarity {
         3.0,
         0.25,   // dropWeight (4× geometric: 0.29%)
         "#BB8A2C", // gold/orange
+        "#FFCC44", // particleHexColor (brighter gold)
         "Legendary"
     ),
 
@@ -84,6 +89,7 @@ public enum GearRarity {
         5.0,
         0.0625, // dropWeight (4× geometric: 0.073%)
         "#FF4500", // red-orange
+        "#FF6633", // particleHexColor (brighter red-orange)
         "Mythic"
     ),
 
@@ -95,6 +101,7 @@ public enum GearRarity {
         5.0,    // durabilityMultiplier
         0.0,    // dropWeight — DISABLED: Unique items don't drop naturally
         "#AF6025", // PoE-style orange
+        "#FF8844", // particleHexColor (brighter orange)
         "Unique"
     );
 
@@ -105,11 +112,13 @@ public enum GearRarity {
     private final double durabilityMultiplier;
     private final double dropWeight;
     private final String hexColor;
+    private final String particleHexColor;
     private final String hytaleQualityId;
 
     GearRarity(int maxModifiers, int maxPrefixes, int maxSuffixes,
                double statMultiplier, double durabilityMultiplier,
-               double dropWeight, String hexColor, String hytaleQualityId) {
+               double dropWeight, String hexColor, String particleHexColor,
+               String hytaleQualityId) {
         this.maxModifiers = maxModifiers;
         this.maxPrefixes = maxPrefixes;
         this.maxSuffixes = maxSuffixes;
@@ -117,6 +126,7 @@ public enum GearRarity {
         this.durabilityMultiplier = durabilityMultiplier;
         this.dropWeight = dropWeight;
         this.hexColor = hexColor;
+        this.particleHexColor = particleHexColor;
         this.hytaleQualityId = hytaleQualityId;
     }
 
@@ -208,6 +218,20 @@ public enum GearRarity {
      */
     public String getHexColor() {
         return hexColor;
+    }
+
+    /**
+     * Brightened hex color for particle rendering.
+     *
+     * <p>Standard hex colors are designed for text contrast on dark backgrounds.
+     * With BlendAdd particle rendering, darker colors appear dim because they
+     * add less light. These brightened variants produce clearly visible colored
+     * particles in the portal rarity aura.
+     *
+     * @return Brightened hex color string for particle use
+     */
+    public String getParticleHexColor() {
+        return particleHexColor;
     }
 
     /**

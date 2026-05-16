@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_SwampSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_SwampCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_SwampCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_SwampGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

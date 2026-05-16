@@ -32,38 +32,52 @@ public enum RealmBiomeType {
 
     // Standard combat biomes
     FOREST("Forest", "Realm_Forest", 0x228B22, "Realm_Map_Forest",
+            "Realm_Portal_Forest", "Ingredient_Crystal_Green",
             Set.of("Soil_Grass_Full", "Soil_Dirt", "Rock_Stone")),
     DESERT("Desert", "Realm_Desert", 15583663, "Realm_Map_Desert",
+            "Realm_Portal_Desert", "Ingredient_Crystal_Yellow",
             Set.of("Soil_Sand_White", "Soil_Sand_Red", "Rock_Sandstone")),
     VOLCANO("Volcano", "Realm_Volcano", 0x8B0000, "Realm_Map_Volcano",
+            "Realm_Portal_Volcano", "Ingredient_Crystal_Red",
             Set.of("Rock_Volcanic", "Rock_Basalt")),
     TUNDRA("Tundra", "Realm_Tundra", 0xE0FFFF, "Realm_Map_Tundra",
+            "Realm_Portal_Tundra", "Ingredient_Crystal_Blue",
             Set.of("Soil_Snow", "Rock_Ice", "Rock_Stone")),
     SWAMP("Swamp", "Realm_Swamp", 0x2F4F4F, "Realm_Map_Swamp",
+            "Realm_Portal_Swamp", "Ingredient_Crystal_Green",
             Set.of("Soil_Mud", "Soil_Dirt", "Soil_Grass", "Rock_Stone")),
     MOUNTAINS("Mountains", "Realm_Mountains", 7372944, null,
+            null, null,
             Set.of("Rock_Stone", "Rock_Basalt", "Rock_Slate")),
     BEACH("Beach", "Realm_Beach", 16445670, "Realm_Map_Beach",
+            "Realm_Portal_Beach", "Ingredient_Crystal_Yellow",
             Set.of("Soil_Sand_White", "Soil_Sand_Red", "Rock_Sandstone", "Rock_Stone")),
     JUNGLE("Jungle", "Realm_Jungle", 25600, "Realm_Map_Jungle",
+            "Realm_Portal_Jungle", "Ingredient_Crystal_Green",
             Set.of("Soil_Grass_Full", "Soil_Mud", "Rock_Stone")),
 
     // Underground / themed biomes
     CAVERNS("Caverns", "Realm_Caverns", 3556687, "Realm_Map_Caverns",
+            "Realm_Portal_Caverns", "Ingredient_Crystal_Cyan",
             Set.of("Rock_Stone", "Rock_Shale", "Rock_Slate", "Rock_Basalt")),
     FROZEN_CRYPTS("Frozen Crypts", "Realm_Frozen_Crypts", 0x4488CC, "Realm_Map_Frozen_Crypts",
+            "Realm_Portal_Frozen_Crypts", "Ingredient_Crystal_Blue",
             Set.of("Rock_Ice", "Rock_Stone")),
     SAND_TOMBS("Sand Tombs", "Realm_Sand_Tombs", 12886112, "Realm_Map_Sand_Tombs",
+            "Realm_Portal_Sand_Tombs", "Ingredient_Crystal_Yellow",
             Set.of("Rock_Sandstone", "Rock_Stone")),
 
     // High-difficulty biomes
     VOID("Void", "Realm_Void", 1710638, null,
+            "Realm_Portal_Void", "Ingredient_Crystal_Purple",
             Set.of("Rock_Stone", "Rock_Basalt")),
     CORRUPTED("Corrupted", "Realm_Corrupted", 4915330, null,
+            null, null,
             Set.of("Rock_Volcanic", "Rock_Basalt")),
 
     // Non-combat / utility
     SKILL_SANCTUM("Skill Sanctum", "realm_skill_sanctum", 0x9966FF, null,
+            null, null,
             Set.of("Soil_Grass_Full", "Soil_Dirt", "Rock_Stone"));
 
     // ═══════════════════════════════════════════════════════════════════
@@ -77,6 +91,8 @@ public enum RealmBiomeType {
     private final String templatePrefix;
     private final int themeColor;
     private final String mapItemId;
+    private final String portalBlockId;
+    private final String decorativeBlockId;
     private final Set<String> terrainMaterials;
 
     /** Arena radius tiers for template name resolution (e.g., realm_forest_r50) */
@@ -89,11 +105,14 @@ public enum RealmBiomeType {
     // ═══════════════════════════════════════════════════════════════════
 
     RealmBiomeType(String displayName, @Nonnull String templatePrefix, int themeColor,
-                   @Nullable String mapItemId, Set<String> terrainMaterials) {
+                   @Nullable String mapItemId, @Nullable String portalBlockId,
+                   @Nullable String decorativeBlockId, Set<String> terrainMaterials) {
         this.displayName = displayName;
         this.templatePrefix = templatePrefix;
         this.themeColor = themeColor;
         this.mapItemId = mapItemId;
+        this.portalBlockId = portalBlockId;
+        this.decorativeBlockId = decorativeBlockId;
         this.terrainMaterials = terrainMaterials;
     }
 
@@ -129,6 +148,25 @@ public enum RealmBiomeType {
     public String getThemeColorHex() {
         return String.format("#%06X", themeColor);
     }
+
+    /**
+     * Gets the portal block ID for this biome's themed portal variant.
+     * Returns null for biomes without portal visuals (portal stays as vanilla Portal_Device).
+     */
+    @Nullable
+    public String getPortalBlockId() { return portalBlockId; }
+
+    /**
+     * Whether this biome has a themed portal variant.
+     */
+    public boolean hasPortalVariant() { return portalBlockId != null; }
+
+    /**
+     * Gets the decorative block ID placed around active portals for this biome.
+     * Returns null for biomes without portal decorations.
+     */
+    @Nullable
+    public String getDecorativeBlockId() { return decorativeBlockId; }
 
     // ═══════════════════════════════════════════════════════════════════
     // TEMPLATE RESOLUTION

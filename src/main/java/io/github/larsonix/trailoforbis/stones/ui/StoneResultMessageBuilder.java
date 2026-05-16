@@ -55,10 +55,10 @@ public final class StoneResultMessageBuilder {
     );
 
     /**
-     * Compact notification content for toast display.
+     * Notification content for toast display.
      *
      * @param primary Stone name in rarity color (bold)
-     * @param secondary Compact diff summary (first change + count of additional changes)
+     * @param secondary All diff changes joined by newlines
      */
     public record NotificationContent(@Nonnull Message primary, @Nonnull Message secondary) {}
 
@@ -70,8 +70,7 @@ public final class StoneResultMessageBuilder {
      * Builds compact notification content for a successful stone application.
      *
      * <p>Primary: stone display name in rarity color, bold.
-     * Secondary: first diff line (most important change), with "(+N more)"
-     * appended if there were additional changes. Falls back to the legacy
+     * Secondary: all diff lines joined by newlines. Falls back to the legacy
      * message if no diff could be computed.
      *
      * @param stoneType The stone that was applied
@@ -102,9 +101,8 @@ public final class StoneResultMessageBuilder {
         }
 
         Message secondary = lines.get(0);
-        if (lines.size() > 1) {
-            secondary = secondary
-                .insert(Message.raw(" (+" + (lines.size() - 1) + " more)").color(COLOR_LABEL));
+        for (int i = 1; i < lines.size(); i++) {
+            secondary = secondary.insert(Message.raw("\n")).insert(lines.get(i));
         }
 
         return new NotificationContent(primary, secondary);

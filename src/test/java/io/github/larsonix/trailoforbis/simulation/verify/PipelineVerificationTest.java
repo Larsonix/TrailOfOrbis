@@ -679,13 +679,13 @@ class PipelineVerificationTest {
                 .uuid(player.getUuid()).build();
             ComputedStats withoutTree = pipeline.compute(player, BaseStats.defaults(), emptyTree, gear);
 
-            // Both deal physical (no element)
+            // Both deal physical (no element) — use isDOT=true to skip crit RNG (deterministic comparison)
             DamageBreakdown dmgWithTree = damageCalculator.calculate(
                 100f, withTree, withTree.toElementalStats(), null, null,
-                AttackType.MELEE, false, 1.0f, false, null, 20, false);
+                AttackType.MELEE, true, 1.0f, false, null, 20, false);
             DamageBreakdown dmgWithoutTree = damageCalculator.calculate(
                 100f, withoutTree, withoutTree.toElementalStats(), null, null,
-                AttackType.MELEE, false, 1.0f, false, null, 20, false);
+                AttackType.MELEE, true, 1.0f, false, null, 20, false);
 
             assertTrue(dmgWithTree.physicalDamage() > dmgWithoutTree.physicalDamage(),
                 "Tree bonuses must increase damage. With=" + dmgWithTree.physicalDamage()

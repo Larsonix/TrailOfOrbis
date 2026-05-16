@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_JungleSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_JungleCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_JungleCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_JungleGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

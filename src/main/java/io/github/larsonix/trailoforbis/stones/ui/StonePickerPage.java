@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -34,7 +35,11 @@ import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.tooltip.RealmMapTooltipBuilder;
 import io.github.larsonix.trailoforbis.stones.ModifiableItem;
 import io.github.larsonix.trailoforbis.stones.ModifiableItemIO;
+import io.github.larsonix.trailoforbis.stones.StoneAction;
+import io.github.larsonix.trailoforbis.stones.StoneActionRegistry;
+import io.github.larsonix.trailoforbis.stones.StoneActionResult;
 import io.github.larsonix.trailoforbis.stones.StoneType;
+import io.github.larsonix.trailoforbis.stones.StoneUtils;
 import io.github.larsonix.trailoforbis.ui.RPGStyles;
 import io.github.larsonix.trailoforbis.util.MessageSerializer;
 
@@ -44,6 +49,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * HyUI-based stone picker page for selecting target items when using stones.
@@ -115,6 +122,9 @@ public class StonePickerPage {
     // Tracks which instance IDs had their translations modified (for restore on close)
     private final List<String> modifiedInstanceIds = new ArrayList<>();
 
+    // When true, applies all available stones to the selected item instead of just one
+    private final boolean bulkMode;
+
     // When true, onDismiss skips tooltip restoration (the apply path resyncs its own tooltips)
     private boolean applyInProgress = false;
 
@@ -132,6 +142,7 @@ public class StonePickerPage {
      * @param stoneSlot The slot containing the stone
      * @param stoneContainer Which container the stone is in
      * @param applicationService Service for applying stones
+     * @param bulkMode If true, applies all available stones to the selected item at once
      */
     public StonePickerPage(
             @Nonnull TrailOfOrbis plugin,
@@ -140,7 +151,8 @@ public class StonePickerPage {
             @Nonnull ItemStack stoneItem,
             short stoneSlot,
             @Nonnull ContainerType stoneContainer,
-            @Nonnull StoneApplicationService applicationService) {
+            @Nonnull StoneApplicationService applicationService,
+            boolean bulkMode) {
 
         this.plugin = plugin;
         this.player = player;
@@ -149,6 +161,7 @@ public class StonePickerPage {
         this.stoneSlot = stoneSlot;
         this.stoneContainer = stoneContainer;
         this.applicationService = applicationService;
+        this.bulkMode = bulkMode;
 
         GearManager gearManager = plugin.getGearManager();
         ItemDisplayNameService displayNameService = gearManager.getItemDisplayNameService();
@@ -784,7 +797,7 @@ public class StonePickerPage {
                     clearGridTooltips(ctx);
 
                     ctx.getPage().ifPresent(page -> page.close());
-                    handleApply();
+                    if (bulkMode) handleBulkApply(); else handleApply();
                 });
         }
 
@@ -806,7 +819,7 @@ public class StonePickerPage {
                     applyInProgress = true;
                     clearGridTooltips(ctx);
                     ctx.getPage().ifPresent(page -> page.close());
-                    handleApply();
+                    if (bulkMode) handleBulkApply(); else handleApply();
                 });
         }
 
@@ -932,6 +945,120 @@ public class StonePickerPage {
         plugin.getUIManager().closePage(player.getUuid());
     }
 
+    /**
+     * Handles bulk application — applies all available stones of this type to the selected item
+     * until the stones are exhausted or the item reaches its maximum bonus.
+     *
+     * <p>Currently used by Fortune's Compass (sneak-click) to apply up to 4× at once.
+     * The loop runs in the same tick (pure data manipulation, no I/O), so it's safe
+     * and fast. Consumption is batched — all stones removed at once after the loop.
+     */
+    private void handleBulkApply() {
+        if (selectedIndex < 0 || selectedIndex >= compatibleItems.size()) {
+            LOGGER.atWarning().log("Cannot bulk apply - no valid selection");
+            return;
+        }
+
+        CompatibleItemScanner.ScannedItem selectedItem = compatibleItems.get(selectedIndex);
+
+        // Get fresh player state
+        Ref<EntityStore> ref = player.getReference();
+        if (ref == null || !ref.isValid()) {
+            sendWarningNotification("Failed to apply stone!");
+            return;
+        }
+        Store<EntityStore> freshStore = ref.getStore();
+        Player playerEntity = freshStore.getComponent(ref, Player.getComponentType());
+        if (playerEntity == null) {
+            sendWarningNotification("Failed to apply stone!");
+            return;
+        }
+        Inventory inventory = playerEntity.getInventory();
+        if (inventory == null) {
+            sendWarningNotification("Failed to apply stone!");
+            return;
+        }
+
+        // Get containers
+        ItemContainer stoneContainerObj = stoneContainer.getContainer(inventory);
+        ItemContainer targetContainerObj = selectedItem.container().getContainer(inventory);
+        if (stoneContainerObj == null || targetContainerObj == null) {
+            sendWarningNotification("Failed to apply stone!");
+            return;
+        }
+
+        // Validate stone still exists
+        ItemStack currentStone = stoneContainerObj.getItemStack(stoneSlot);
+        if (currentStone == null || currentStone.isEmpty() || !StoneUtils.isStone(currentStone)) {
+            sendWarningNotification("Stone no longer in inventory!");
+            return;
+        }
+        int stonesAvailable = currentStone.getQuantity();
+
+        // Validate target still exists
+        ItemStack currentTarget = targetContainerObj.getItemStack(selectedItem.slot());
+        if (currentTarget == null || currentTarget.isEmpty()) {
+            sendWarningNotification("Target item no longer in inventory!");
+            return;
+        }
+
+        // Get action and execute loop
+        StoneActionRegistry actionRegistry = applicationService.getActionRegistry();
+        StoneAction action = actionRegistry.getAction(stoneType);
+        Random random = ThreadLocalRandom.current();
+        ModifiableItem currentData = selectedItem.data();
+        int successCount = 0;
+
+        while (successCount < stonesAvailable && action.canApply(currentData)) {
+            StoneActionResult result = actionRegistry.execute(stoneType, currentData, random);
+            if (!result.success() || result.modifiedItem() == null) break;
+
+            // Write back modified data
+            ItemStack updatedTarget = ModifiableItemIO.writeBack(currentTarget, result.modifiedItem());
+            if (updatedTarget == null) break;
+
+            targetContainerObj.setItemStackForSlot(selectedItem.slot(), updatedTarget);
+            currentTarget = updatedTarget;
+            currentData = result.modifiedItem();
+            successCount++;
+        }
+
+        if (successCount == 0) {
+            sendWarningNotification("Failed to apply stone!");
+            plugin.getUIManager().closePage(player.getUuid());
+            return;
+        }
+
+        // Consume all at once
+        stoneContainerObj.removeItemStackFromSlot(stoneSlot, successCount);
+
+        // Summary notification
+        int totalBonus = (currentData instanceof RealmMapData mapData)
+            ? mapData.fortunesCompassBonus() : 0;
+        String detail = "+" + (successCount * 5) + "% Item Quantity added (+" + totalBonus + "% total)"
+            + " \u2014 " + successCount + " stone" + (successCount > 1 ? "s" : "") + " used";
+        NotificationUtil.sendNotification(
+            player.getPacketHandler(),
+            Message.raw(stoneType.getDisplayName()).color(stoneType.getHexColor()).bold(true),
+            Message.raw(detail).color("#55FF55"),
+            NotificationStyle.Success);
+
+        // Defer tooltip resync to next tick (same pattern as single-apply)
+        ModifiableItem originalData = selectedItem.data();
+        final ItemStack finalTarget = currentTarget;
+        World world = playerEntity.getWorld();
+        if (world != null) {
+            world.execute(() -> resyncModifiedItem(finalTarget, originalData));
+        } else {
+            resyncModifiedItem(finalTarget, originalData);
+        }
+
+        plugin.getUIManager().closePage(player.getUuid());
+
+        LOGGER.atInfo().log("Player %s bulk-applied %dx %s to map",
+            player.getUsername(), successCount, stoneType.getDisplayName());
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // PREVIEW TEXT
     // ═══════════════════════════════════════════════════════════════════
@@ -962,6 +1089,19 @@ public class StonePickerPage {
             case VARYNS_TOUCH -> "Corrupts with unpredictable effects";
             case LOREKEEPERS_SCROLL -> "Reveals hidden modifiers";
             case GENESIS_STONE -> "Fills all remaining modifier slots";
+            case FORTUNES_COMPASS -> {
+                if (item.data() instanceof RealmMapData mapData) {
+                    int current = mapData.fortunesCompassBonus();
+                    int remaining = (20 - current) / 5;
+                    if (bulkMode && remaining > 1) {
+                        yield "Applies up to " + remaining + "x (+5% each, max 20%)";
+                    } else {
+                        yield "Adds +5% Item Quantity (currently +" + current + "%)";
+                    }
+                } else {
+                    yield stoneType.getDescription();
+                }
+            }
             default -> stoneType.getDescription();
         };
     }

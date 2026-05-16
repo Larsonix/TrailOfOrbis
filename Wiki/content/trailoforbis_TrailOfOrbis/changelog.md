@@ -10,6 +10,60 @@ published: true
 
 # Changelog
 
+## 1.0.10
+
+### Attack Speed
+- **Full Rework.** Combo system — attacks speed up the longer you fight. Hit 1 is normal, hit 2 is faster, hit 3 is peak
+- **Animation Matches Server.** The "swing is done but damage hasn't landed" feel is gone
+- **6 New Speed Stats.** Cooldown recovery, combo speed, cast speed, projectile speed
+- **Hexcode Speed Buffs.** Hex mods can now push temporary speed overrides (haste, slow)
+
+### Weapons
+- **Two-Handed Weapons Got a Buff.** All modifier values on two-handed weapons are now 50% stronger than one-handed
+- **Mace is Two-Handed Now.** Gets the full 1.5x treatment
+
+### Portals
+- **Full Visual Overhaul.** Biome-colored particles, rarity glow, animated biome preview through the portal frame
+- **Rarity Particle Aura.** Higher rarity maps glow more
+- **Stuck Gateways Fixed.** Realms that were activated but never entered auto-close after 120s
+- **Gateways No Longer Spawn in Instances.** Forgotten Temple was generating gateways inside realm worlds
+
+### Compass
+- **Height Indicators.** Mob markers show up/down arrows when mobs are above or below you
+- **Distance Scaling.** Markers get smaller and fade out the further away the mob is
+
+### Loot
+- **Rarity Drop Particles.** Now show properly
+- **Stone Pickup Notifications.** Picking up a stone shows a rarity-colored toast like gear does
+- **Loot Filter UI Reworked.** The modifier conditions are fully interactive now — category tabs, stat pickers, value ranges, all in the UI
+- **Chests Don't Reroll on Restart.** Server restart was re-generating chest contents from vanilla drop tables
+
+### Stones
+- **Fortune's Compass Bulk Apply.** Sneak-click to apply all your compasses to a map at once
+- **All Changes Show in Toast.** Stone modification notification now shows every stat line
+- **Alterverse Shard Crash Fixed.** Redistributing between prefix and suffix could exceed the rarity's max modifier count
+- **Escape Closes the Picker.** Stone picker and skill node detail both respond to Escape properly
+
+### Combat
+- **Thorns Kills Count.** Thorns damage killing a mob now gives XP, drops loot, counts for realm progress
+- **Tamed Horses Survive World Transitions.** Mounts were dying immediately after teleporting
+- **Red Screen Toned Down.** DOT damage no longer triggers the red flash
+
+### Hexcode Compatibility
+- **Glyph HUD Works now!**
+
+### UI & HUDs
+- **Skill Point HUD Survives the Sanctum.** Entering the skill sanctum was destroying the skill point HUD
+- **Signature Ability HUD Restored.** The weapon ability indicator was missing for RPG weapons
+- **Chat Item Links.** Shift-clicking items into chat shows rarity-colored item names
+
+### Stability
+- **No More Stutter on Mob Kills.** Loot generation was blocking the main thread — full async pipeline now
+- **Container First-Drag Fixed.** Opening a container for the first time and dragging an item could freeze
+- **Memory Bloat Fixed.** Item registry was loading all items into memory at boot and never cleaning up
+- **Multi-World Damage Freeze Fixed.** A race condition between realm worlds could permanently disable damage processing
+- **Cross-World Combat Crash Fixed.** Players getting kicked during combat in a different world could crash the server
+
 ## 1.0.9
 
 ### Skill Tree

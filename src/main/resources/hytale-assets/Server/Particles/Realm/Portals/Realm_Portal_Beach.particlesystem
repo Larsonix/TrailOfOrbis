@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Beach_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Beach_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Beach",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

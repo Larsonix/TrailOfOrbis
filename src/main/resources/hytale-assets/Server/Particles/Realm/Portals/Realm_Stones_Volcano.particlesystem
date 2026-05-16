@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_VolcanoSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_VolcanoCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_VolcanoCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_VolcanoGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

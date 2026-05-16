@@ -7,6 +7,10 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.InventoryChangeEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
+import com.hypixel.hytale.server.core.inventory.transaction.SlotTransaction;
+import com.hypixel.hytale.server.core.inventory.transaction.Transaction;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
@@ -87,9 +91,14 @@ public final class ImmediateItemSyncHandler {
     /**
      * Handles an inventory change event by immediately syncing any unsynced RPG items.
      *
-     * <p>Registered via {@code InventoryChangeEventSystem.addFirstHandler()} so it runs
-     * before all other handlers, ensuring {@code UpdateItems} is queued in the same tick
-     * as the inventory change — before Hytale's sync system sends {@code UpdatePlayerInventory}.
+     * <p>Uses the event's transaction data to sync only changed slots rather than
+     * scanning the entire container. Falls back to full scan if no transaction data
+     * is available (edge cases like programmatic bulk adds).
+     *
+     * <p>Registered via {@code InventoryChangeEventSystem.addHandler()} so it runs
+     * before notification handlers, ensuring {@code UpdateItems} is queued in the same
+     * tick as the inventory change — before Hytale's sync system sends
+     * {@code UpdatePlayerInventory}.
      */
     public void onInventoryChange(@Nonnull Player player, @Nonnull InventoryChangeEvent event) {
         // Resolve PlayerRef from ECS
@@ -112,23 +121,81 @@ public final class ImmediateItemSyncHandler {
             return;
         }
 
-        // Scan the changed container for RPG items that need syncing
         ItemContainer container = event.getItemContainer();
         if (container == null) {
             return;
         }
 
-        syncUnsyncedItems(playerRef, container);
+        // Use transaction data to target only changed slots (avoids O(capacity) scan)
+        Transaction transaction = event.getTransaction();
+        if (transaction != null) {
+            syncFromTransaction(playerRef, container, transaction);
+        } else {
+            // Fallback: no transaction data (edge case). Full scan with hash dedup.
+            syncUnsyncedItems(playerRef, container);
+        }
     }
 
     /**
-     * Scans a container and syncs any RPG item whose definition hasn't been sent
-     * to this player yet.
+     * Syncs only items from the transaction's changed slots.
+     * Much cheaper than scanning all 36+ slots for the common case.
+     */
+    private void syncFromTransaction(@Nonnull PlayerRef playerRef,
+                                     @Nonnull ItemContainer container,
+                                     @Nonnull Transaction transaction) {
+        int synced = 0;
+
+        if (transaction instanceof ItemStackTransaction ist) {
+            for (ItemStackSlotTransaction slotTx : ist.getSlotTransactions()) {
+                if (syncSlotIfNeeded(playerRef, container, slotTx)) {
+                    synced++;
+                }
+            }
+        } else if (transaction instanceof SlotTransaction slotTx) {
+            if (syncSlotIfNeeded(playerRef, container, slotTx)) {
+                synced++;
+            }
+        }
+
+        if (synced > 0) {
+            LOGGER.atFine().log("[ImmediateSync] Synced %d item definition(s) for player %s",
+                    synced, playerRef.getUuid().toString().substring(0, 8));
+        }
+    }
+
+    /**
+     * Syncs a single slot's item if it needs an update.
      *
-     * <p>Iterates every slot. For each non-empty slot, checks item type
-     * (gear → map → gem) and calls the appropriate sync service. The sync services
-     * use hash-based dedup internally, so already-synced items are skipped with
-     * just a hash comparison — no packets sent.
+     * @return true if a sync was sent
+     */
+    private boolean syncSlotIfNeeded(@Nonnull PlayerRef playerRef,
+                                     @Nonnull ItemContainer container,
+                                     @Nonnull SlotTransaction slotTx) {
+        if (!slotTx.succeeded()) {
+            return false;
+        }
+
+        // Only care about items ADDED (after is non-empty)
+        ItemStack after = slotTx.getSlotAfter();
+        if (after == null || after.isEmpty()) {
+            return false;
+        }
+
+        // Verify the item is still in the container (loot filter may have ejected it)
+        ItemStack current = container.getItemStack(slotTx.getSlot());
+        if (current == null || current.isEmpty()) {
+            return false;
+        }
+
+        // Sync the item (hash dedup inside prevents duplicate packets)
+        if (trySyncGear(playerRef, current)) return true;
+        if (trySyncMap(playerRef, current)) return true;
+        return trySyncGem(playerRef, current);
+    }
+
+    /**
+     * Fallback: scans all slots in a container for unsynced RPG items.
+     * Used only when transaction data is unavailable.
      */
     private void syncUnsyncedItems(@Nonnull PlayerRef playerRef, @Nonnull ItemContainer container) {
         short capacity = container.getCapacity();
@@ -156,7 +223,7 @@ public final class ImmediateItemSyncHandler {
         }
 
         if (synced > 0) {
-            LOGGER.atFine().log("[ImmediateSync] Synced %d item definition(s) for player %s",
+            LOGGER.atFine().log("[ImmediateSync] Synced %d item definition(s) for player %s (full scan fallback)",
                     synced, playerRef.getUuid().toString().substring(0, 8));
         }
     }

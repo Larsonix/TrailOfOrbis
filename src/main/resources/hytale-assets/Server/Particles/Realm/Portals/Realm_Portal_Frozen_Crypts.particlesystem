@@ -1,0 +1,51 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_Spawn"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_Flash"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_CenterCircle"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_Waves",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_SmokeAlpha",
+      "StartDelay": 0,
+      "PositionOffset": {
+        "Y": 0.2
+      }
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_Sparks",
+      "StartDelay": 0
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_SparksRunes"
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_Center",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Portal_Frozen_Crypts_CenterGlow",
+      "StartDelay": 0.5
+    },
+    {
+      "SpawnerId": "Realm_Preview_Frozen_Crypts",
+      "PositionOffset": {
+        "X": 0,
+        "Z": 0.15
+      }
+    }
+  ],
+  "CullDistance": 50.0,
+  "IsImportant": false
+}

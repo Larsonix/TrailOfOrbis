@@ -327,20 +327,39 @@ public class RealmPortalManager {
                 if (keyInfo != null) {
                     World world = keyInfo.getWorld();
                     if (world != null && world.isAlive()) {
-                        // Remove the portal
-                        removePortal(world, keyInfo.position())
-                            .thenAccept(success -> {
-                                if (success) {
-                                    LOGGER.atInfo().log("Removed expired portal at %s (age: %ds)",
-                                        keyInfo.position(), ageSeconds);
-                                }
-                            });
+                        if (activatedDevices.contains(key)) {
+                            // Activated device — deactivate (keep block), don't destroy
+                            deactivatePortal(world, keyInfo.position())
+                                .thenAccept(success -> {
+                                    if (success) {
+                                        LOGGER.atInfo().log("Deactivated expired portal device at %s (age: %ds)",
+                                            keyInfo.position(), ageSeconds);
+                                    }
+                                });
+                            activatedDevices.remove(key);
+                        } else {
+                            // Spawned portal — remove block entirely
+                            removePortal(world, keyInfo.position())
+                                .thenAccept(success -> {
+                                    if (success) {
+                                        LOGGER.atInfo().log("Removed expired portal at %s (age: %ds)",
+                                            keyInfo.position(), ageSeconds);
+                                    }
+                                });
+                        }
                     }
                 }
 
-                // Clean up tracking maps (even if world removal failed)
+                // Clean up ALL tracking maps (even if world removal failed)
                 portalCreationTime.remove(key);
                 portalToOwner.remove(key);
+                UUID realmId = portalToRealm.remove(key);
+                if (realmId != null) {
+                    Set<PortalPosition> portals = realmToPortals.get(realmId);
+                    if (portals != null) {
+                        portals.removeIf(pp -> pp.toKey().equals(key));
+                    }
+                }
                 removedCount++;
             }
         }
@@ -781,7 +800,8 @@ public class RealmPortalManager {
             portalToRealm.remove(key);
             portalToOwner.remove(key);
             portalCreationTime.remove(key);
-            activatedDevices.remove(key);
+            // Do NOT remove from activatedDevices here — deactivateAllPortalsForRealm()
+            // needs it to distinguish deactivation (keep block) from removal (replace with air)
 
             // Schedule block state change on world thread
             World world = portal.getWorld();
@@ -883,6 +903,31 @@ public class RealmPortalManager {
     }
 
     /**
+     * Clears all tracking for a portal at the given position.
+     * Used when a portal's destination is found invalid and the block was reset ("adjusted").
+     *
+     * @param world The world containing the portal
+     * @param position The portal block position
+     */
+    public void clearPortalTrackingAt(@Nonnull World world, @Nonnull Vector3i position) {
+        String key = createPortalKey(world, position);
+        UUID realmId = portalToRealm.remove(key);
+        portalToOwner.remove(key);
+        portalCreationTime.remove(key);
+        activatedDevices.remove(key);
+
+        if (realmId != null) {
+            Set<PortalPosition> portals = realmToPortals.get(realmId);
+            if (portals != null) {
+                portals.removeIf(pp -> pp.toKey().equals(key));
+            }
+        }
+
+        LOGGER.atInfo().log("Cleared stale portal tracking at %s (was realm %s)",
+            position, realmId != null ? realmId.toString().substring(0, 8) : "none");
+    }
+
+    /**
      * Gets the total number of tracked portals.
      *
      * @return Portal count
@@ -956,6 +1001,9 @@ public class RealmPortalManager {
 
         // Mark as an activated device (not spawned by us) for proper cleanup
         activatedDevices.add(key);
+
+        // Track creation time so processPortalTimeouts() can catch stale portals as a safety net
+        portalCreationTime.put(key, Instant.now());
 
         LOGGER.atInfo().log("Tracking activated portal device at %s for realm %s", position, realm.getRealmId());
     }

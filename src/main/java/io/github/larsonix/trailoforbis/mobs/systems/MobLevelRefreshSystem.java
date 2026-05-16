@@ -276,11 +276,16 @@ public class MobLevelRefreshSystem extends TickingSystem<EntityStore>
 
             updateEntityStats(store, mobRef, scaling, newStats, manager);
 
-            // Update native nameplate with new level
+            // Update nameplate text (stored in component for deferred activation)
+            String newText = MobInfoFormatter.formatPlainText(
+                newLevel, 0, classification, null);
+            scaling.setNameplateText(newText);
+
+            // Also update the live Nameplate if it's already been activated by proximity.
+            // Only update if text is non-empty (already activated) to avoid prematurely
+            // revealing distant mob nameplates before the activation system approves them.
             Nameplate nameplate = store.getComponent(mobRef, Nameplate.getComponentType());
-            if (nameplate != null) {
-                String newText = MobInfoFormatter.formatPlainText(
-                    newLevel, 0, classification, null);
+            if (nameplate != null && !nameplate.getText().isEmpty()) {
                 nameplate.setText(newText);
             }
 

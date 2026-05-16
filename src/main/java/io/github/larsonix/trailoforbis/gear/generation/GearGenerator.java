@@ -294,7 +294,7 @@ public final class GearGenerator {
         // Create and register the custom item SYNCHRONOUSLY.
         // Pass the RPG rarity so the reskin ResourceType matches the correct
         // workbench recipe group (e.g., MYTHIC → Epic+Legendary skins).
-        itemRegistry.createAndRegisterSync(baseItemAsset, customItemId, gearData.rarity());
+        itemRegistry.createAndRegister(baseItemAsset, customItemId, gearData.rarity());
     }
 
     // =========================================================================
@@ -331,6 +331,72 @@ public final class GearGenerator {
             @Nullable WeaponType weaponType,
             @Nullable ElementType element
     ) {
+        GeneratedGear generated = generateOnly(skinItem, itemLevel, slot, rarity,
+                equipmentType, weaponType, element);
+        if (generated == null) {
+            return null;
+        }
+
+        // Register custom item (synchronous path for backward compat)
+        registerCustomItem(skinItem, generated.gearData());
+
+        return generated.finalItem();
+    }
+
+    // =========================================================================
+    // SIDE-EFFECT-FREE GENERATION (for deferred loot pipeline)
+    // =========================================================================
+
+    /**
+     * Result of pure item generation — no registration, no side effects.
+     *
+     * <p>Used by {@code DeferredLootPipeline} to generate items on a background
+     * thread, deferring registration to the world thread.
+     *
+     * @param finalItem     The ItemStack with GearData applied (ready to spawn)
+     * @param gearData      The generated gear data (needed for registration + sync)
+     * @param baseItemAsset The base Hytale Item asset (needed for registration)
+     */
+    public record GeneratedGear(
+            @Nonnull ItemStack finalItem,
+            @Nonnull GearData gearData,
+            @Nonnull Item baseItemAsset
+    ) {}
+
+    /**
+     * Generates gear without registering it in the item registry.
+     *
+     * <p>This is the pure-computation core of gear generation. It performs all
+     * RNG rolls, modifier selection, implicit calculation, and data assembly
+     * but does NOT:
+     * <ul>
+     *   <li>Register the item in Hytale's asset map ({@code registerCustomItem})</li>
+     *   <li>Write to the database</li>
+     *   <li>Acquire any locks</li>
+     * </ul>
+     *
+     * <p>Thread-safe when using the default ThreadLocalRandom constructor.
+     * Designed for use on background threads in the deferred loot pipeline.
+     *
+     * @param skinItem      The base ItemStack to use as visual skin
+     * @param itemLevel     The item level
+     * @param slot          The gear slot string ("weapon", "head", "chest", etc.)
+     * @param rarity        The rolled rarity
+     * @param equipmentType The resolved equipment type (from implicit)
+     * @param weaponType    The weapon type (nullable — for weapons only)
+     * @param element       The damage element (nullable — null = physical)
+     * @return Generated gear with all data needed for deferred registration, or null on failure
+     */
+    @Nullable
+    public GeneratedGear generateOnly(
+            @Nonnull ItemStack skinItem,
+            int itemLevel,
+            @Nonnull String slot,
+            @Nonnull GearRarity rarity,
+            @Nonnull EquipmentType equipmentType,
+            @Nullable WeaponType weaponType,
+            @Nullable ElementType element
+    ) {
         Objects.requireNonNull(skinItem, "skinItem cannot be null");
         Objects.requireNonNull(slot, "slot cannot be null");
         Objects.requireNonNull(rarity, "rarity cannot be null");
@@ -356,14 +422,19 @@ public final class GearGenerator {
             modifierPool.setElementAffinity(affinity);
         }
 
+        // Resolve two-handed modifier multiplier (2H weapons get stronger modifiers to compensate for lost offhand)
+        double twoHandedMult = (weaponType != null && weaponType.isTwoHanded())
+                ? balanceConfig.modifierScaling().twoHandedModifierMultiplier()
+                : 1.0;
+
         // Roll modifiers with equipment type filtering
         List<GearModifier> prefixes;
         List<GearModifier> suffixes;
         try {
             prefixes = modifierPool.rollPrefixes(
-                    prefixCount, itemLevel, slot, rarity, equipmentType);
+                    prefixCount, itemLevel, slot, rarity, equipmentType, twoHandedMult);
             suffixes = modifierPool.rollSuffixes(
-                    suffixCount, itemLevel, slot, rarity, equipmentType);
+                    suffixCount, itemLevel, slot, rarity, equipmentType, twoHandedMult);
         } finally {
             modifierPool.clearElementAffinity();
         }
@@ -371,9 +442,7 @@ public final class GearGenerator {
         // Generate unique instance ID
         GearInstanceId instanceId = GearInstanceIdGenerator.generate();
 
-        // Generate implicits using the pre-resolved identity.
-        // Unlike generateImplicitsWithElement (which infers from slot string + itemId),
-        // this directly uses the resolved weaponType and equipmentType from the implicit roll.
+        // Generate implicits using the pre-resolved identity
         String skinItemId = skinItem.getItemId();
         WeaponImplicit implicit = null;
         ArmorImplicit armorImplicit = null;
@@ -381,18 +450,15 @@ public final class GearGenerator {
         if (weaponType != null && weaponType != WeaponType.SHIELD
                 && implicitCalculator.isEnabled()
                 && implicitCalculator.shouldHaveImplicit(weaponType)) {
-            // Weapon with weapon-style implicit (damage, mana_regen, etc.)
             if (element != null) {
                 implicit = implicitCalculator.calculateWithElement(weaponType, itemLevel, element, random);
             } else {
                 implicit = implicitCalculator.calculate(weaponType, itemLevel, random);
             }
         } else if (equipmentType.isOffhand() && implicitDefenseCalculator.isEnabled()) {
-            // Shield — gets block_chance via defense implicit
             armorImplicit = implicitDefenseCalculator.calculateShield(itemLevel, random);
         } else if (equipmentType.isArmor() && implicitDefenseCalculator.isEnabled()
                 && implicitDefenseCalculator.shouldHaveImplicit(equipmentType)) {
-            // Armor with defense implicit (armor, evasion, ES, health)
             ArmorMaterial material = equipmentType.getArmorMaterial();
             ArmorSlot armorSlot = equipmentType.getArmorSlot();
             if (material != null && armorSlot != null) {
@@ -413,21 +479,28 @@ public final class GearGenerator {
                 .baseItemId(skinItemId)
                 .build();
 
-        // Register custom item
-        registerCustomItem(skinItem, gearData);
-
         // Inject Hexcode metadata if applicable
         ItemStack itemForGear = injectHexMetadataIfApplicable(skinItem, skinItemId, rarity);
 
         // Write gear data to ItemStack
         ItemStack result = GearUtils.setGearData(itemForGear, gearData);
 
+        // Resolve base item asset for deferred registration
+        Item baseItemAsset = skinItem.getItem();
+        if (baseItemAsset == null || baseItemAsset == Item.UNKNOWN) {
+            baseItemAsset = Item.getAssetMap().getAsset(skinItemId);
+        }
+        if (baseItemAsset == null || baseItemAsset == Item.UNKNOWN) {
+            LOGGER.atWarning().log("Cannot resolve base item asset for %s", skinItemId);
+            return null;
+        }
+
         int modCount = prefixes.size() + suffixes.size();
         LOGGER.atFine().log("Generated %s %s gear from category (level %d, Q%d, %d mods, element=%s)",
                 rarity, slot, itemLevel, quality, modCount,
                 element != null ? element.name() : "none");
 
-        return result;
+        return new GeneratedGear(result, gearData, baseItemAsset);
     }
 
     /**
@@ -497,6 +570,11 @@ public final class GearGenerator {
             modifierPool.setElementAffinity(affinity);
         }
 
+        // Resolve two-handed modifier multiplier (2H weapons get stronger modifiers to compensate for lost offhand)
+        double twoHandedMult = (weaponType != null && weaponType.isTwoHanded())
+                ? balanceConfig.modifierScaling().twoHandedModifierMultiplier()
+                : 1.0;
+
         // Calculate modifier distribution to exactly hit max_modifiers
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
         int[] distribution = calculateModifierDistribution(rarityConfig);
@@ -507,9 +585,9 @@ public final class GearGenerator {
         List<GearModifier> suffixes;
         try {
             prefixes = modifierPool.rollPrefixes(
-                    prefixCount, itemLevel, slot, rarity, equipmentType);
+                    prefixCount, itemLevel, slot, rarity, equipmentType, twoHandedMult);
             suffixes = modifierPool.rollSuffixes(
-                    suffixCount, itemLevel, slot, rarity, equipmentType);
+                    suffixCount, itemLevel, slot, rarity, equipmentType, twoHandedMult);
         } finally {
             modifierPool.clearElementAffinity();
         }
@@ -917,6 +995,11 @@ public final class GearGenerator {
                 generator.modifierPool.setElementAffinity(affinity);
             }
 
+            // Resolve two-handed modifier multiplier (2H weapons get stronger modifiers to compensate for lost offhand)
+            double twoHandedMult = (weaponType != null && weaponType.isTwoHanded())
+                    ? generator.balanceConfig.modifierScaling().twoHandedModifierMultiplier()
+                    : 1.0;
+
             // Determine modifiers (with element affinity active if applicable)
             RarityConfig rarityConfig = generator.balanceConfig.rarityConfig(finalRarity);
             List<GearModifier> prefixes;
@@ -932,14 +1015,14 @@ public final class GearGenerator {
                     int suffixCount = rarityConfig.maxModifiers() - prefixes.size();
                     suffixCount = Math.max(0, Math.min(suffixCount, rarityConfig.maxSuffixes()));
                     suffixes = generator.modifierPool.rollSuffixes(
-                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType, twoHandedMult);
                 } else if (forcedSuffixes != null) {
                     // Suffixes forced, roll remaining prefixes
                     suffixes = forcedSuffixes;
                     int prefixCount = rarityConfig.maxModifiers() - suffixes.size();
                     prefixCount = Math.max(0, Math.min(prefixCount, rarityConfig.maxPrefixes()));
                     prefixes = generator.modifierPool.rollPrefixes(
-                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType, twoHandedMult);
                 } else {
                     // Neither forced - use distribution to exactly hit max_modifiers
                     int[] distribution = generator.calculateModifierDistribution(rarityConfig);
@@ -947,9 +1030,9 @@ public final class GearGenerator {
                     int suffixCount = distribution[1];
 
                     prefixes = generator.modifierPool.rollPrefixes(
-                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                            prefixCount, itemLevel, slot, finalRarity, resolvedEquipmentType, twoHandedMult);
                     suffixes = generator.modifierPool.rollSuffixes(
-                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType);
+                            suffixCount, itemLevel, slot, finalRarity, resolvedEquipmentType, twoHandedMult);
                 }
             } finally {
                 generator.modifierPool.clearElementAffinity();

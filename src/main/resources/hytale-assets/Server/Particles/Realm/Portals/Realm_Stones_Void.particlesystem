@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_VoidSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_VoidCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_VoidCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_VoidGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

@@ -97,7 +97,7 @@ public final class GearStatCalculator {
         // Offhand compatibility is two-tiered:
         //   1) RPG weapons: check Hytale's native Utility.Compatible flag from the weapon's Item asset.
         //      Compatible=true  → sword, axe, club, claws, wand, crossbow (offhand allowed)
-        //      Compatible=false → daggers (dual-wield), longsword, battleaxe, spear, bow, staff
+        //      Compatible=false → daggers (dual-wield), mace, longsword, battleaxe, spear, bow, staff
         //   2) Everything else (torches, food, blocks, vanilla weapons, empty hand): offhand ALWAYS
         //      applies. Non-weapon items should never suppress offhand stats — the Utility.Compatible
         //      flag defaults to false for non-weapons, but that's not a deliberate 2H suppression.
@@ -398,7 +398,7 @@ public final class GearStatCalculator {
      *
      * <p>Weapons with {@code Compatible=true}: sword, axe, club, claws, wand, crossbow.
      * Weapons with {@code Compatible=false} (or absent): daggers (dual-wield),
-     * longsword, battleaxe, spear, shortbow, staff.
+     * mace, longsword, battleaxe, spear, shortbow, staff.
      *
      * <p>Fallback when the Item asset can't be resolved (custom rpg_gear_*
      * with failed base resolution, unknown mod items): returns {@code true} (allow offhand).

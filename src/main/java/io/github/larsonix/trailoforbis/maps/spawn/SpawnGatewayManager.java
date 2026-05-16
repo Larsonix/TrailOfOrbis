@@ -116,6 +116,13 @@ public class SpawnGatewayManager {
             return CompletableFuture.completedFuture(false);
         }
 
+        // Defense-in-depth: gateways must only be placed in the overworld
+        String worldName = world.getName();
+        if (worldName != null && worldName.startsWith("instance-")) {
+            LOGGER.atFine().log("Skipping gateway placement in instance world: %s", worldName);
+            return CompletableFuture.completedFuture(false);
+        }
+
         UUID worldUuid = world.getWorldConfig().getUuid();
 
         // Prevent concurrent placement for same world

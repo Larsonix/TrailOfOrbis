@@ -2,14 +2,19 @@ package io.github.larsonix.trailoforbis.lootfilter.bridge;
 
 import com.google.gson.Gson;
 import com.hypixel.hytale.logger.HytaleLogger;
+import io.github.larsonix.trailoforbis.gear.config.ModifierConfig;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.lootfilter.LootFilterManager;
 import io.github.larsonix.trailoforbis.lootfilter.model.ConditionType;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterAction;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterCondition;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterProfile;
 import io.github.larsonix.trailoforbis.lootfilter.model.FilterRule;
+import io.github.larsonix.trailoforbis.lootfilter.model.ModifierFilterCategory;
 import io.github.larsonix.trailoforbis.lootfilter.model.PlayerFilterState;
+import io.github.larsonix.trailoforbis.maps.core.RealmBiomeType;
+import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifierType;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -22,6 +27,7 @@ import li.kelp.vuetale.app.PlayerUiManager;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,9 +55,21 @@ public class LootFilterBridge {
     private final LootFilterManager filterManager;
     private final TrailOfOrbis plugin;
 
+    // Cached static catalogs (computed once, included in every state response)
+    private final List<Map<String, Object>> modifierCatalog;
+    private final List<Map<String, Object>> realmModifierTypes;
+    private final List<Map<String, Object>> weaponTypes;
+    private final List<Map<String, Object>> biomeTypes;
+    private final List<Map<String, Object>> modifierCategories;
+
     public LootFilterBridge(@Nonnull LootFilterManager filterManager, @Nonnull TrailOfOrbis plugin) {
         this.filterManager = filterManager;
         this.plugin = plugin;
+        this.modifierCatalog = buildModifierCatalog();
+        this.realmModifierTypes = buildRealmModifierCatalog();
+        this.weaponTypes = buildWeaponTypeCatalog();
+        this.biomeTypes = buildBiomeTypeCatalog();
+        this.modifierCategories = buildModifierCategoriesList();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -420,6 +438,13 @@ public class LootFilterBridge {
         }
         map.put("profiles", profiles);
 
+        // Static catalogs (cached, same for all players)
+        map.put("modifierCatalog", modifierCatalog);
+        map.put("modifierCategories", modifierCategories);
+        map.put("realmModifierTypes", realmModifierTypes);
+        map.put("weaponTypes", weaponTypes);
+        map.put("biomeTypes", biomeTypes);
+
         return map;
     }
 
@@ -451,13 +476,15 @@ public class LootFilterBridge {
         map.put("name", rule.name());
         map.put("enabled", rule.enabled());
         map.put("action", rule.action().name());
-        map.put("summary", rule.describeSummary());
 
         List<Map<String, Object>> conditions = new ArrayList<>();
         for (FilterCondition cond : rule.conditions()) {
             conditions.add(serializeCondition(cond));
         }
         map.put("conditions", conditions);
+
+        // Build summary using display descriptions where available
+        map.put("summary", buildDisplaySummary(rule, conditions));
 
         return map;
     }
@@ -491,11 +518,13 @@ public class LootFilterBridge {
             case FilterCondition.RequiredModifiers c -> {
                 map.put("modifierIds", List.copyOf(c.modifierIds()));
                 map.put("minCount", c.minCount());
+                map.put("displayDescription", resolveModifierIdsDisplay(c.modifierIds(), c.minCount()));
             }
             case FilterCondition.ModifierValueRange c -> {
                 map.put("modifierId", c.modifierId());
                 map.put("minValue", c.minValue());
                 map.put("maxValue", c.maxValue());
+                map.put("displayDescription", resolveModifierValueDisplay(c.modifierId(), c.minValue(), c.maxValue()));
             }
             case FilterCondition.ImplicitCondition c -> {
                 map.put("minPercentile", c.minPercentile());
@@ -516,6 +545,27 @@ public class LootFilterBridge {
         }
 
         return map;
+    }
+
+    @Nonnull
+    private String buildDisplaySummary(@Nonnull FilterRule rule,
+                                        @Nonnull List<Map<String, Object>> serializedConditions) {
+        if (serializedConditions.isEmpty()) return "Everything > " + rule.action().name();
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < serializedConditions.size(); i++) {
+            if (i > 0) sb.append(", ");
+            Map<String, Object> condMap = serializedConditions.get(i);
+            // Prefer displayDescription (resolved names) over description (raw IDs)
+            Object display = condMap.get("displayDescription");
+            if (display != null) {
+                sb.append(display);
+            } else {
+                sb.append(condMap.get("description"));
+            }
+        }
+        sb.append(" > ").append(rule.action().name());
+        return sb.toString();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -735,5 +785,171 @@ public class LootFilterBridge {
             LOGGER.atWarning().withCause(e).log("Bridge: updateMapCondition failed");
             return "null";
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATALOG BUILDERS (static data, computed once at construction)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private List<Map<String, Object>> buildModifierCatalog() {
+        ModifierConfig modConfig = filterManager.getModifierConfig();
+        if (modConfig == null) return List.of();
+
+        Map<String, ModifierFilterCategory> categoryMap = filterManager.getModifierCategoryMap();
+        List<Map<String, Object>> catalog = new ArrayList<>();
+
+        modConfig.prefixes().forEach((id, def) -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", id);
+            entry.put("displayName", def.displayName());
+            entry.put("statName", formatStatDisplayName(def.stat(), def.statType().name()));
+            ModifierFilterCategory cat = categoryMap.get(id);
+            entry.put("category", cat != null ? cat.name() : "UTILITY");
+            entry.put("type", "PREFIX");
+            catalog.add(entry);
+        });
+
+        modConfig.suffixes().forEach((id, def) -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", id);
+            entry.put("displayName", def.displayName());
+            entry.put("statName", formatStatDisplayName(def.stat(), def.statType().name()));
+            ModifierFilterCategory cat = categoryMap.get(id);
+            entry.put("category", cat != null ? cat.name() : "UTILITY");
+            entry.put("type", "SUFFIX");
+            catalog.add(entry);
+        });
+
+        // Sort by category then display name for consistent UI ordering
+        catalog.sort((a, b) -> {
+            int catCmp = ((String) a.get("category")).compareTo((String) b.get("category"));
+            return catCmp != 0 ? catCmp : ((String) a.get("displayName")).compareToIgnoreCase((String) b.get("displayName"));
+        });
+
+        return List.copyOf(catalog);
+    }
+
+    private List<Map<String, Object>> buildModifierCategoriesList() {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (ModifierFilterCategory cat : ModifierFilterCategory.values()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", cat.name());
+            entry.put("displayName", cat.getDisplayName());
+            entry.put("color", cat.getColor());
+            list.add(entry);
+        }
+        return List.copyOf(list);
+    }
+
+    private List<Map<String, Object>> buildRealmModifierCatalog() {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (RealmModifierType type : RealmModifierType.values()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", type.name());
+            entry.put("displayName", type.getDisplayName());
+            entry.put("category", type.getCategory().name());
+            list.add(entry);
+        }
+        return List.copyOf(list);
+    }
+
+    private List<Map<String, Object>> buildWeaponTypeCatalog() {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (WeaponType type : WeaponType.values()) {
+            if (type == WeaponType.UNKNOWN) continue;
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", type.name());
+            entry.put("displayName", capitalizeEnum(type.name()));
+            entry.put("category", type.getCategory().name());
+            list.add(entry);
+        }
+        return List.copyOf(list);
+    }
+
+    private List<Map<String, Object>> buildBiomeTypeCatalog() {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (RealmBiomeType biome : RealmBiomeType.values()) {
+            if (biome == RealmBiomeType.SKILL_SANCTUM) continue;
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", biome.name());
+            entry.put("displayName", biome.getDisplayName());
+            list.add(entry);
+        }
+        return List.copyOf(list);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DISPLAY DESCRIPTION RESOLVERS
+    // ═══════════════════════════════════════════════════════════════════
+
+    private String resolveModifierIdsDisplay(@Nonnull Set<String> modifierIds, int minCount) {
+        ModifierConfig modConfig = filterManager.getModifierConfig();
+        List<String> names = modifierIds.stream().sorted().map(id -> {
+            if (modConfig != null) {
+                var def = modConfig.getPrefix(id).orElse(null);
+                if (def == null) def = modConfig.getSuffix(id).orElse(null);
+                if (def != null) return def.displayName();
+            }
+            return capitalizeEnum(id);
+        }).toList();
+
+        String joined = String.join(", ", names);
+        if (minCount == 1 && modifierIds.size() == 1) return "Has: " + joined;
+        if (minCount >= modifierIds.size()) return "Has all: " + joined;
+        return "Has " + minCount + "+ of: " + joined;
+    }
+
+    private String resolveModifierValueDisplay(@Nonnull String modifierId, double minValue, double maxValue) {
+        String displayName = capitalizeEnum(modifierId);
+        ModifierConfig modConfig = filterManager.getModifierConfig();
+        if (modConfig != null) {
+            var def = modConfig.getPrefix(modifierId).orElse(null);
+            if (def == null) def = modConfig.getSuffix(modifierId).orElse(null);
+            if (def != null) displayName = def.displayName();
+        }
+
+        if (maxValue >= 999_999) return displayName + " >= " + formatVal(minValue);
+        if (minValue <= 0) return displayName + " <= " + formatVal(maxValue);
+        return displayName + " " + formatVal(minValue) + "-" + formatVal(maxValue);
+    }
+
+    private static String formatVal(double v) {
+        return v == (long) v ? String.valueOf((long) v) : String.valueOf(v);
+    }
+
+    /** Same overrides as RichTooltipFormatter.STAT_DISPLAY_OVERRIDES */
+    private static final Map<String, String> STAT_DISPLAY_OVERRIDES = Map.of(
+        "stamina_regen_start_delay", "Stamina Recovery Speed",
+        "energy_shield_regen_delay", "ES Regen Delay"
+    );
+
+    /**
+     * Formats a stat ID into a human-readable display name.
+     * Mirrors RichTooltipFormatter.getModifierDisplayName() logic.
+     */
+    private static String formatStatDisplayName(@Nonnull String statId, @Nonnull String statType) {
+        String override = STAT_DISPLAY_OVERRIDES.get(statId.toLowerCase());
+        if (override != null) return override;
+
+        String id = statId;
+        // For percent modifiers, strip "_percent" suffix to avoid "Physical Damage Percent"
+        if ("PERCENT".equalsIgnoreCase(statType) && id.endsWith("_percent")) {
+            id = id.substring(0, id.length() - "_percent".length());
+        }
+
+        return capitalizeEnum(id);
+    }
+
+    private static String capitalizeEnum(@Nonnull String enumName) {
+        String[] parts = enumName.toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!sb.isEmpty()) sb.append(" ");
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                if (part.length() > 1) sb.append(part.substring(1));
+            }
+        }
+        return sb.toString();
     }
 }

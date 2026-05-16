@@ -99,6 +99,7 @@ public final class UnifiedPickupListener {
 
     /**
      * Processes the transaction to find newly added items and trigger notifications.
+     * Checks inventory fullness once per event (not per slot) to avoid redundant scans.
      */
     private void processTransaction(@Nonnull PlayerRef playerRef,
                                     @Nonnull ItemContainer container,
@@ -107,17 +108,23 @@ public final class UnifiedPickupListener {
             return;
         }
 
+        boolean anyPickup = false;
+
         // ItemStackTransaction wraps multiple slot transactions (e.g., addItemStack → pickup)
         if (transaction instanceof ItemStackTransaction ist) {
             for (ItemStackSlotTransaction slotTx : ist.getSlotTransactions()) {
-                handleSlotAddition(playerRef, container, slotTx);
+                if (handleSlotAddition(playerRef, container, slotTx)) {
+                    anyPickup = true;
+                }
             }
-            return;
+        } else if (transaction instanceof SlotTransaction slotTx) {
+            // Single slot transaction (e.g., setItemStackForSlot → crafting, conversion)
+            anyPickup = handleSlotAddition(playerRef, container, slotTx);
         }
 
-        // Single slot transaction (e.g., setItemStackForSlot → crafting, conversion)
-        if (transaction instanceof SlotTransaction slotTx) {
-            handleSlotAddition(playerRef, container, slotTx);
+        // Check fullness once per event, not per slot
+        if (anyPickup) {
+            pickupService.checkInventoryFullness(playerRef);
         }
     }
 
@@ -128,34 +135,40 @@ public final class UnifiedPickupListener {
      * phantom notifications for items ejected by the loot filter — the filter runs
      * before this handler (via {@code addFirstHandler()}) and removes blocked items
      * from the container, but the immutable transaction snapshot still shows the ADD.
+     *
+     * @return true if a pickup notification was sent
      */
-    private void handleSlotAddition(@Nonnull PlayerRef playerRef,
+    private boolean handleSlotAddition(@Nonnull PlayerRef playerRef,
                                     @Nonnull ItemContainer container,
                                     @Nonnull SlotTransaction slotTx) {
         if (!slotTx.succeeded()) {
-            return;
+            return false;
         }
 
         ItemStack after = slotTx.getSlotAfter();
         if (ItemStack.isEmpty(after)) {
-            return;
+            return false;
         }
 
         // Verify item is still in the container (may have been ejected by loot filter)
         ItemStack currentInSlot = container.getItemStack(slotTx.getSlot());
         if (ItemStack.isEmpty(currentInSlot)) {
-            return;
+            return false;
         }
 
         // Only notify for genuinely new items (slot was empty before, or item changed)
         ItemStack before = slotTx.getSlotBefore();
         if (!ItemStack.isEmpty(before) && isSameItem(before, after)) {
-            return;
+            // Same item in same slot — only notify if quantity increased (stacking pickup).
+            // Skip if quantity unchanged or decreased (metadata/durability update).
+            if (after.getQuantity() <= before.getQuantity()) {
+                return false;
+            }
         }
 
         // Delegate to notification service (handles gear, maps, stones, gems)
         pickupService.handlePickup(playerRef, after);
-        pickupService.checkInventoryFullness(playerRef);
+        return true;
     }
 
     /**

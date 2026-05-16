@@ -57,6 +57,8 @@ import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.modifiers.RealmModifier;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+
 import javax.annotation.Nonnull;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -203,6 +205,18 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         // Get NPC component
         NPCEntity npc = holder.getComponent(npcType);
         if (npc == null || npc.getRole() == null) return;
+
+        // Skip tamed/mounted entities — NPCMountComponent is present on horses that have
+        // been tamed. Its ownerPlayerRef is NOT serialized, so on LOAD Hytale's
+        // NPCMountSystems.OnAdd may remove it, but if our system runs first we catch it here.
+        try {
+            if (holder.getComponent(NPCMountComponent.getComponentType()) != null) {
+                LOGGER.atFine().log("[MobScaling] Skipping mounted/tamed entity %s", npc.getRoleName());
+                return;
+            }
+        } catch (Exception e) {
+            // MountPlugin not initialized — fall through to normal processing
+        }
 
         // Log that we're processing this mob (FINE level - per-mob diagnostic)
         LOGGER.atFine().log("[MobScaling] Processing %s (no existing MobScalingComponent)", npc.getRoleName());
@@ -397,7 +411,9 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             holder.addComponent(MobModifierComponent.getComponentType(), modComp);
         }
 
-        // Add native nameplate with mob level text (skip for PASSIVE — ambient creatures look normal)
+        // Store nameplate text for deferred activation. MobNameplateActivationSystem
+        // populates the text when a player gets within range. We add an empty Nameplate
+        // component immediately to suppress the client's default health bar rendering.
         if (classification != RPGMobClass.PASSIVE) {
             String nameplateText;
             if (!modifiers.isEmpty() && modManager != null) {
@@ -407,8 +423,8 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
                 nameplateText = MobInfoFormatter.formatPlainText(
                     mobLevel, 0, classification, null);
             }
-            Nameplate nameplate = holder.ensureAndGetComponent(Nameplate.getComponentType());
-            nameplate.setText(nameplateText);
+            scaling.setNameplateText(nameplateText);
+            holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
         }
 
         // Set DisplayNameComponent for death screen / kill feed display
@@ -610,18 +626,23 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
             holder.addComponent(MobModifierComponent.getComponentType(), modComp);
         }
 
-        // Add native nameplate with realm mob level text (skip for PASSIVE — ambient creatures look normal)
+        // Add empty Nameplate to suppress the client's default health bar rendering.
+        // Only populate nameplate TEXT for elite/boss mobs — regular hostile realm mobs
+        // don't need level text since the realm level is already known from the map.
+        // This reduces screen clutter while preserving elite/boss visual identity.
         if (classification != RPGMobClass.PASSIVE) {
-            String nameplateText;
-            if (!modifiers.isEmpty() && modManager != null) {
-                nameplateText = MobModifierApplier.formatNameplate(
-                    realmLevel, classification, modifiers, modManager.getConfig());
-            } else {
-                nameplateText = MobInfoFormatter.formatPlainText(
-                    realmLevel, 0, classification, null);
+            if (classification == RPGMobClass.ELITE || classification == RPGMobClass.BOSS) {
+                String nameplateText;
+                if (!modifiers.isEmpty() && modManager != null) {
+                    nameplateText = MobModifierApplier.formatNameplate(
+                        realmLevel, classification, modifiers, modManager.getConfig());
+                } else {
+                    nameplateText = MobInfoFormatter.formatPlainText(
+                        realmLevel, 0, classification, null);
+                }
+                scaling.setNameplateText(nameplateText);
             }
-            Nameplate nameplate = holder.ensureAndGetComponent(Nameplate.getComponentType());
-            nameplate.setText(nameplateText);
+            holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
         }
 
         // Set DisplayNameComponent for death screen / kill feed display
@@ -684,6 +705,20 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         RPGMobClass classification = scaling.getClassification();
         String roleName = scaling.getRoleName();
 
+        // Refresh vanillaHP from current Role — handles taming/role reset.
+        // NPCMountSystems.OnAdd may reset the Role on LOAD (ownerPlayerRef not serialized),
+        // making the stored vanillaHP stale. Reading from the current Role ensures the
+        // ADDITIVE health offset is calculated against the correct base.
+        NPCEntity npcForHP = holder.getComponent(npcType);
+        if (npcForHP != null && npcForHP.getRole() != null) {
+            int currentVanillaHP = npcForHP.getRole().getInitialMaxHealth();
+            if (currentVanillaHP != scaling.getVanillaHP() && currentVanillaHP > 0) {
+                LOGGER.atFine().log("[MobScaling] VanillaHP updated: %d -> %d (role change) for %s",
+                    scaling.getVanillaHP(), currentVanillaHP, roleName);
+                scaling.setVanillaHP(currentVanillaHP);
+            }
+        }
+
         MobClassificationConfig classConfig = manager.getClassificationService().getConfig();
         double statMultiplier = classConfig.getStatMultiplier(classification);
 
@@ -730,6 +765,26 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         }
 
         scaling.setStats(stats);
+
+        // Regenerate nameplate text from recalculated data
+        if (classification != RPGMobClass.PASSIVE) {
+            String nameplateText;
+            List<ModifierType> modifiers = modComp != null ? modComp.getModifiers() : List.of();
+            MobModifierManager modManager = plugin.getMobModifierManager();
+            if (!modifiers.isEmpty() && modManager != null && modManager.isEnabled()) {
+                nameplateText = MobModifierApplier.formatNameplate(
+                    mobLevel, classification, modifiers, modManager.getConfig());
+            } else {
+                nameplateText = MobInfoFormatter.formatPlainText(
+                    mobLevel, 0, classification, null);
+            }
+            scaling.setNameplateText(nameplateText);
+
+            // Ensure Nameplate component exists (old saves may not have one persisted)
+            if (holder.getComponent(Nameplate.getComponentType()) == null) {
+                holder.addComponent(Nameplate.getComponentType(), new Nameplate(""));
+            }
+        }
 
         // Re-apply health modifier with current formula (putModifier is idempotent)
         applyStatModifiers(holder, scaling, stats, AddReason.LOAD, manager);
@@ -800,9 +855,26 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         // Calculate current ratio to preserve health percentage for LOAD reason
         // SPAWN reason always starts at 100% (1.0 ratio)
         float currentRatio = 1.0f;
+        int vanillaHP = component.getVanillaHP();
+
         if (reason == AddReason.LOAD) {
+            // Capture health ratio WITH old modifier (preserves health percentage)
             float max = healthStat.getMax();
             currentRatio = max > 0 ? healthStat.get() / max : 1.0f;
+
+            // Remove old modifier to discover the ACTUAL vanilla base HP.
+            // Critical when the NPC's Role changed (taming, NPCMountSystems role reset)
+            // because the stored vanillaHP may be from a different Role.
+            statMap.removeModifier(healthStatIndex, RPG_HEALTH_KEY);
+            float actualVanillaMax = healthStat.getMax();
+            if (actualVanillaMax > 0) {
+                vanillaHP = (int) actualVanillaMax;
+                component.setVanillaHP(vanillaHP); // Update for future saves
+            }
+        }
+
+        if (vanillaHP <= 0) {
+            vanillaHP = 100; // Fallback: matches Health.json asset max
         }
 
         // === WEIGHTED RPG FORMULA ===
@@ -811,11 +883,6 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         // - Compresses the range using √(vanilla/100) weight
         // - Applies exponential scaling to match gear progression
         // - Makes level 1 mobs easier than vanilla
-
-        int vanillaHP = component.getVanillaHP();
-        if (vanillaHP <= 0) {
-            vanillaHP = 100; // Fallback: matches Health.json asset max
-        }
 
         double rpgTargetHP = stats.maxHealth()
                 * manager.getConfig().getBalanceMultipliers().getHealth();
@@ -881,6 +948,15 @@ public class MobScalingSystem extends HolderSystem<EntityStore> {
         } else {
             float newMax = healthStat.getMax();
             statMap.setStatValue(healthStatIndex, newMax * currentRatio);
+        }
+
+        // Safety net: ensure entity survived the health recalculation.
+        // Catches edge cases where ratio × newMax rounds to 0 (e.g., stale vanillaHP
+        // from a Role change produced a near-zero offset on a previous save).
+        if (reason == AddReason.LOAD && healthStat.get() <= 0) {
+            statMap.maximizeStatValue(healthStatIndex);
+            LOGGER.atWarning().log("[MobScaling] Health safety net activated for %s (ratio=%.3f)",
+                component.getRoleName(), currentRatio);
         }
 
         // Clear vanilla NPC health regeneration for this entity.

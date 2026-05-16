@@ -43,6 +43,8 @@ public final class ModifierPool {
     private final Random random;
 
     /** Temporary element affinity for the current roll batch. Set/cleared by GearGenerator. */
+    // TODO: elementAffinity has the same thread-safety issue as the old twoHandedMultiplier field
+    // — pass as parameter in a future refactor to eliminate shared mutable state.
     @Nullable
     private AttributeType elementAffinity;
 
@@ -115,6 +117,7 @@ public final class ModifierPool {
         this.elementAffinity = null;
     }
 
+
     /**
      * Rolls a list of prefixes for the given parameters.
      *
@@ -150,7 +153,29 @@ public final class ModifierPool {
             GearRarity rarity,
             @Nullable EquipmentType equipmentType
     ) {
-        return rollModifiers(ModifierType.PREFIX, count, itemLevel, slot, rarity, equipmentType);
+        return rollModifiers(ModifierType.PREFIX, count, itemLevel, slot, rarity, equipmentType, 1.0);
+    }
+
+    /**
+     * Rolls a list of prefixes with equipment type filtering and two-handed multiplier.
+     *
+     * @param count The number of prefixes to roll
+     * @param itemLevel The item level
+     * @param slot The gear slot (for filtering)
+     * @param rarity The gear rarity (affects value ranges)
+     * @param equipmentType The equipment type for stat restrictions (nullable)
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
+     * @return List of rolled GearModifier instances
+     */
+    public List<GearModifier> rollPrefixes(
+            int count,
+            int itemLevel,
+            String slot,
+            GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            double twoHandedMultiplier
+    ) {
+        return rollModifiers(ModifierType.PREFIX, count, itemLevel, slot, rarity, equipmentType, twoHandedMultiplier);
     }
 
     /**
@@ -182,7 +207,29 @@ public final class ModifierPool {
             GearRarity rarity,
             @Nullable EquipmentType equipmentType
     ) {
-        return rollModifiers(ModifierType.SUFFIX, count, itemLevel, slot, rarity, equipmentType);
+        return rollModifiers(ModifierType.SUFFIX, count, itemLevel, slot, rarity, equipmentType, 1.0);
+    }
+
+    /**
+     * Rolls a list of suffixes with equipment type filtering and two-handed multiplier.
+     *
+     * @param count The number of suffixes to roll
+     * @param itemLevel The item level
+     * @param slot The gear slot (for filtering)
+     * @param rarity The gear rarity (affects value ranges)
+     * @param equipmentType The equipment type for stat restrictions (nullable)
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
+     * @return List of rolled GearModifier instances
+     */
+    public List<GearModifier> rollSuffixes(
+            int count,
+            int itemLevel,
+            String slot,
+            GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            double twoHandedMultiplier
+    ) {
+        return rollModifiers(ModifierType.SUFFIX, count, itemLevel, slot, rarity, equipmentType, twoHandedMultiplier);
     }
 
     /**
@@ -229,6 +276,30 @@ public final class ModifierPool {
             String slot,
             GearRarity rarity,
             @Nullable EquipmentType equipmentType
+    ) {
+        return rollModifiers(type, count, itemLevel, slot, rarity, equipmentType, 1.0);
+    }
+
+    /**
+     * Rolls modifiers of the specified type with equipment type filtering and 2H multiplier.
+     *
+     * @param type PREFIX or SUFFIX
+     * @param count Number of modifiers to roll
+     * @param itemLevel Item level for value scaling
+     * @param slot Gear slot for slot-based filtering
+     * @param rarity Rarity for value adjustments
+     * @param equipmentType Equipment type for stat restrictions (nullable)
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
+     * @return List of unique modifiers
+     */
+    public List<GearModifier> rollModifiers(
+            ModifierType type,
+            int count,
+            int itemLevel,
+            String slot,
+            GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            double twoHandedMultiplier
     ) {
         if (count <= 0) {
             return List.of();
@@ -290,8 +361,8 @@ public final class ModifierPool {
                     : selectWeighted(remaining);
             selectedIds.add(selected.id());
 
-            // Calculate value
-            double value = calculateValue(selected, itemLevel, rarity);
+            // Calculate value (with 2H multiplier for two-handed weapons)
+            double value = calculateValue(selected, itemLevel, rarity, twoHandedMultiplier);
 
             // Create GearModifier with all required fields (defaults to unlocked)
             result.add(GearModifier.of(
@@ -340,6 +411,34 @@ public final class ModifierPool {
             @Nonnull Set<String> excludedIds,
             @Nonnull Random rng
     ) {
+        return rollModifiersExcluding(type, count, itemLevel, slot, rarity, equipmentType, excludedIds, rng, 1.0);
+    }
+
+    /**
+     * Rolls modifiers with full two-stage filtering, excluded IDs, explicit Random, and 2H multiplier.
+     *
+     * @param type PREFIX or SUFFIX
+     * @param count Number of modifiers to roll
+     * @param itemLevel Item level for value scaling
+     * @param slot Gear slot for Stage 1 filtering
+     * @param rarity Rarity for value adjustments
+     * @param equipmentType Equipment type for Stage 2 filtering (nullable)
+     * @param excludedIds Modifier IDs to exclude (already on the item)
+     * @param rng Explicit random source
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
+     * @return List of unique modifiers
+     */
+    public List<GearModifier> rollModifiersExcluding(
+            @Nonnull ModifierType type,
+            int count,
+            int itemLevel,
+            @Nonnull String slot,
+            @Nonnull GearRarity rarity,
+            @Nullable EquipmentType equipmentType,
+            @Nonnull Set<String> excludedIds,
+            @Nonnull Random rng,
+            double twoHandedMultiplier
+    ) {
         if (count <= 0) return List.of();
 
         // Stage 1: Slot filtering
@@ -381,7 +480,7 @@ public final class ModifierPool {
 
             ModifierDefinition selected = selectWeighted(remaining, rng);
             selectedIds.add(selected.id());
-            double value = calculateValue(selected, itemLevel, rarity, rng);
+            double value = calculateValue(selected, itemLevel, rarity, rng, twoHandedMultiplier);
 
             result.add(GearModifier.of(
                     selected.id(), selected.displayName(), type,
@@ -467,6 +566,13 @@ public final class ModifierPool {
     }
 
     /**
+     * Calculates the final value for a modifier (no 2H multiplier — backward compat).
+     */
+    double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity) {
+        return calculateValue(definition, itemLevel, rarity, 1.0);
+    }
+
+    /**
      * Calculates the final value for a modifier.
      *
      * <p>The calculation considers:
@@ -476,6 +582,7 @@ public final class ModifierPool {
      *   <li><b>Exponential scaling multiplier</b> (if enabled)</li>
      *   <li>Roll variance from balance config</li>
      *   <li>Rarity stat multiplier</li>
+     *   <li>Two-handed weapon multiplier</li>
      *   <li>Mythic minimum roll percentile</li>
      *   <li>Legendary/Mythic extended range</li>
      * </ul>
@@ -483,9 +590,10 @@ public final class ModifierPool {
      * @param definition The modifier definition
      * @param itemLevel The item level
      * @param rarity The gear rarity
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
      * @return The calculated value
      */
-    double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity) {
+    double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity, double twoHandedMultiplier) {
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
         double rollVariance = balanceConfig.modifierScaling().rollVariance();
 
@@ -503,6 +611,12 @@ public final class ModifierPool {
         double extendedMax = scaledMax * rarityConfig.statMultiplier();
         double effectiveMin = scaledMin;
         double effectiveMax = extendedMax;
+
+        // Two-handed weapon modifier scaling (enlarges the entire range)
+        if (twoHandedMultiplier > 1.0) {
+            effectiveMin *= twoHandedMultiplier;
+            effectiveMax *= twoHandedMultiplier;
+        }
 
         // Roll factor (0.0 to 1.0)
         double rollFactor = random.nextDouble();
@@ -526,8 +640,13 @@ public final class ModifierPool {
         return Math.max(effectiveMin * (1 - rollVariance), finalValue);
     }
 
-    /** Overload with explicit Random for stone operations. */
+    /** Overload with explicit Random for stone operations (no 2H multiplier — backward compat). */
     double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity, Random rng) {
+        return calculateValue(definition, itemLevel, rarity, rng, 1.0);
+    }
+
+    /** Overload with explicit Random and 2H multiplier for stone operations. */
+    double calculateValue(ModifierDefinition definition, int itemLevel, GearRarity rarity, Random rng, double twoHandedMultiplier) {
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
         double rollVariance = balanceConfig.modifierScaling().rollVariance();
         ValueRange baseRange = definition.calculateRange(itemLevel);
@@ -537,6 +656,13 @@ public final class ModifierPool {
         double extendedMax = scaledMax * rarityConfig.statMultiplier();
         double effectiveMin = scaledMin;
         double effectiveMax = extendedMax;
+
+        // Two-handed weapon modifier scaling (enlarges the entire range)
+        if (twoHandedMultiplier > 1.0) {
+            effectiveMin *= twoHandedMultiplier;
+            effectiveMax *= twoHandedMultiplier;
+        }
+
         double rollFactor = rng.nextDouble();
         if (rarityConfig.minRollPercentile() > 0) {
             double minPercentile = rarityConfig.minRollPercentile();

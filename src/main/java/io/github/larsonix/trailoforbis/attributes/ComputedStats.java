@@ -345,6 +345,26 @@ public final class ComputedStats {
         return offensive.getAttackSpeedPercent();
     }
 
+    public float getCooldownRecoveryPercent() {
+        return offensive.getCooldownRecoveryPercent();
+    }
+
+    public float getChargeSpeedPercent() {
+        return offensive.getChargeSpeedPercent();
+    }
+
+    public float getComboSpeedBonus() {
+        return offensive.getComboSpeedBonus();
+    }
+
+    public float getProjectileAttackSpeedPercent() {
+        return offensive.getProjectileAttackSpeedPercent();
+    }
+
+    public float getCastSpeedPercent() {
+        return offensive.getCastSpeedPercent();
+    }
+
     public float getAccuracy() {
         return offensive.getAccuracy();
     }
@@ -1131,6 +1151,26 @@ public final class ComputedStats {
         offensive.setAttackSpeedPercent((float) value);
     }
 
+    public void setCooldownRecoveryPercent(double value) {
+        offensive.setCooldownRecoveryPercent((float) value);
+    }
+
+    public void setChargeSpeedPercent(double value) {
+        offensive.setChargeSpeedPercent((float) value);
+    }
+
+    public void setComboSpeedBonus(double value) {
+        offensive.setComboSpeedBonus((float) value);
+    }
+
+    public void setProjectileAttackSpeedPercent(double value) {
+        offensive.setProjectileAttackSpeedPercent((float) value);
+    }
+
+    public void setCastSpeedPercent(double value) {
+        offensive.setCastSpeedPercent((float) value);
+    }
+
     public void setAccuracy(double value) {
         offensive.setAccuracy((float) value);
     }
@@ -1695,6 +1735,11 @@ public final class ComputedStats {
             .meleeDamagePercent(offensive.getMeleeDamagePercent())
             .projectileDamagePercent(offensive.getProjectileDamagePercent())
             .attackSpeedPercent(offensive.getAttackSpeedPercent())
+            .cooldownRecoveryPercent(offensive.getCooldownRecoveryPercent())
+            .chargeSpeedPercent(offensive.getChargeSpeedPercent())
+            .comboSpeedBonus(offensive.getComboSpeedBonus())
+            .projectileAttackSpeedPercent(offensive.getProjectileAttackSpeedPercent())
+            .castSpeedPercent(offensive.getCastSpeedPercent())
             .accuracy(offensive.getAccuracy())
             .armorPenetration(offensive.getArmorPenetration())
             .lifeSteal(offensive.getLifeSteal())
@@ -2015,6 +2060,31 @@ public final class ComputedStats {
 
         public Builder attackSpeedPercent(float value) {
             offensive.attackSpeedPercent(value);
+            return this;
+        }
+
+        public Builder cooldownRecoveryPercent(float value) {
+            offensive.cooldownRecoveryPercent(value);
+            return this;
+        }
+
+        public Builder chargeSpeedPercent(float value) {
+            offensive.chargeSpeedPercent(value);
+            return this;
+        }
+
+        public Builder comboSpeedBonus(float value) {
+            offensive.comboSpeedBonus(value);
+            return this;
+        }
+
+        public Builder projectileAttackSpeedPercent(float value) {
+            offensive.projectileAttackSpeedPercent(value);
+            return this;
+        }
+
+        public Builder castSpeedPercent(float value) {
+            offensive.castSpeedPercent(value);
             return this;
         }
 

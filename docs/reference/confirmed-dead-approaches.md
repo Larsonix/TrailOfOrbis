@@ -253,6 +253,24 @@ Sending `UpdateItems` or `UpdateTranslations` packets between `DrainPlayerFromWo
 
 **General rule**: `InteractionEntry.setTimestamp()` acceleration only works safely on short-lived attack chains (`Simple` interactions that complete in < 1s). Long-running chains with `Repeat` loops, stat modifiers, or ammo systems break because the cumulative timestamp shift causes iteration-level desync. For ranged weapons: let vanilla timing run unmodified.
 
+## Bow/Charged Weapon Charge Speed Acceleration (2026-05-15)
+
+**What failed**: Accelerating bow charge progress via the same `InteractionEntry.setTimestamp()` pattern used for melee attacks.
+
+**How it failed**: `ChargingInteraction` calculates charge progress in `simulateTick0()` during the simulation tick path. During simulation ticks, `InteractionEntry.setUseSimulationState(true)` switches `getTimestamp()` to read from the private `simulationTimestamp` field instead of the server `timestamp` field. Our `setTimestamp()` calls only modify the server path — the simulation path is untouched.
+
+**Also tried / confirmed dead**:
+- **Direct `simulationTimestamp` modification**: No public setter exists. The field is private on `InteractionEntry`. Reflection is possible but the timestamp is set once at chain start (first run logic, line 623-626 in `InteractionManager.simulationTick`) and then `getTimeInSeconds(tickTime)` computes delta from current system nanotime — advancing the timestamp would shorten the apparent elapsed time, not lengthen it.
+- **`InteractionChain.setTimeShift()`**: Applied only during the first tick of a chain (line 624: `time = chain.getTimeShift()`). Subsequent ticks compute time from `System.nanoTime() - simulationTimestamp`. The shift is ONE-SHOT, not persistent.
+- **Custom `IInteractionSimulationHandler`**: Returns `time` with no modifier hooks. Would require replacing the handler on the `InteractionManager` — no clean injection point.
+- **`InteractionManager.setGlobalTimeShift()`**: Only affects the global time shift array, which is applied to cooldowns and the first-run shift, not ongoing charge progress.
+
+**Why this is architecturally blocked**: The simulation tick path is deliberately client-authoritative. `simulationTimestamp` is set once, private, and charge progress is computed as `(System.nanoTime() - simulationTimestamp) / 1E9`. There is no multiplication step or configurable rate — elapsed wall-clock time IS charge progress. This prevents server-side mods from desyncing charge timing from client predictions.
+
+**No vendor mods (54 searched) have solved this.** All accept vanilla charge timing as-is.
+
+**Current approach**: The `chargeSpeedPercent` stat field exists in `OffensiveStats` (forward-compatible placeholder) but produces zero mechanical effect. No FIRE attribute grant, no gear modifier suffix. Will be activated when/if Hytale exposes a public charge rate API.
+
 ## HyUI HUD Registration: addUnsafe() Does NOT Bypass getReference() (2026-05-06)
 
 **What failed**: Calling `hud.addUnsafe()` after `HudBuilder.show()` to force synchronous HUD registration during world transitions (commit `dd9d997`, reverted).

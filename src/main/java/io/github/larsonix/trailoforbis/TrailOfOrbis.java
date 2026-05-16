@@ -1,10 +1,13 @@
 package io.github.larsonix.trailoforbis;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -17,6 +20,9 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.DrainPlayerFromWorldEvent;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.protocol.packets.setup.ClientFeature;
+import com.hypixel.hytale.protocol.packets.setup.UpdateFeatures;
+import com.hypixel.hytale.server.core.universe.Universe;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.api.services.AttributeService;
 import io.github.larsonix.trailoforbis.api.services.ConfigService;
@@ -94,6 +100,7 @@ import io.github.larsonix.trailoforbis.skilltree.map.SkillTreeMapManager;
 import io.github.larsonix.trailoforbis.skilltree.repository.SkillTreeRepository;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompat;
 import io.github.larsonix.trailoforbis.compat.HexcodeCompatManager;
+import io.github.larsonix.trailoforbis.compat.HexcodeHudAdapterShim;
 import io.github.larsonix.trailoforbis.compat.HexcodeSkillTreeOverlay;
 import io.github.larsonix.trailoforbis.compat.HytaleAPICompat;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
@@ -109,6 +116,7 @@ import io.github.larsonix.trailoforbis.mobs.component.MobScalingComponent;
 import io.github.larsonix.trailoforbis.mobs.spawn.component.RPGSpawnedMarker;
 import io.github.larsonix.trailoforbis.mobs.stats.MobStatComponent;
 import io.github.larsonix.trailoforbis.mobs.systems.MobLevelRefreshSystem;
+import io.github.larsonix.trailoforbis.mobs.systems.MobNameplateActivationSystem;
 import io.github.larsonix.trailoforbis.mobs.systems.MobRegenerationSystem;
 import io.github.larsonix.trailoforbis.mobs.systems.DeferredSpawnSystem;
 import io.github.larsonix.trailoforbis.mobs.systems.MobScalingSystem;
@@ -289,6 +297,9 @@ public class TrailOfOrbis extends JavaPlugin {
     // Gear manager - handles gear generation, item sync, and equipment stats
     private GearManager gearManager;
 
+    // Chat item link handler - formats <Item:xxx> tags in chat as styled item names
+    private io.github.larsonix.trailoforbis.chat.ChatItemLinkHandler chatItemLinkHandler;
+
     // Gem manager - handles skill gem config loading, socketing, and item creation
     private GemManager gemManager;
 
@@ -426,6 +437,41 @@ public class TrailOfOrbis extends JavaPlugin {
             EventPriority.FIRST,
             PlayerConnectEvent.class,
             PlayerJoinListener::onPlayerConnect
+        );
+
+        // PlayerReadyEvent: FIRST - Suppress health bar burst on world entry.
+        // When a player enters any world, Hytale's EntityTracker sends health stats for
+        // ALL visible mobs in the first tick, causing a burst of health bars. We temporarily
+        // disable DisplayHealthBars for the joining player and re-enable after 3 seconds.
+        // This is per-player via direct UpdateFeatures packet — does not affect other players.
+        eventRegistry.registerGlobal(
+            EventPriority.FIRST,
+            PlayerReadyEvent.class,
+            event -> {
+                com.hypixel.hytale.server.core.entity.entities.Player player = event.getPlayer();
+                if (player == null) return;
+                UUID playerId = player.getUuid();
+                com.hypixel.hytale.server.core.universe.PlayerRef playerRef = Universe.get().getPlayer(playerId);
+                if (playerRef == null) return;
+
+                // Disable health bars for this player immediately
+                Map<ClientFeature, Boolean> disableHealthBars = new EnumMap<>(ClientFeature.class);
+                disableHealthBars.put(ClientFeature.DisplayHealthBars, false);
+                playerRef.getPacketHandler().write(new UpdateFeatures(disableHealthBars));
+
+                // Re-enable after 3 seconds once entity tracking has settled
+                World world = player.getWorld();
+                CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(() -> {
+                    if (world == null || !world.isAlive()) return;
+                    world.execute(() -> {
+                        com.hypixel.hytale.server.core.universe.PlayerRef fresh = Universe.get().getPlayer(playerId);
+                        if (fresh == null) return;
+                        Map<ClientFeature, Boolean> enableHealthBars = new EnumMap<>(ClientFeature.class);
+                        enableHealthBars.put(ClientFeature.DisplayHealthBars, true);
+                        fresh.getPacketHandler().write(new UpdateFeatures(enableHealthBars));
+                    });
+                });
+            }
         );
 
         // PlayerReadyEvent: EARLY - Load RPG data BEFORE other plugins need it
@@ -708,6 +754,68 @@ public class TrailOfOrbis extends JavaPlugin {
         }
     }
 
+    /**
+     * Replaces Hexcode's HudController adapter with an MHUD-aware version.
+     *
+     * <p>Hexcode v0.7.0 added a "yield to foreign HUDs" mechanism in {@code HudController.ensureHud()}.
+     * When {@code adapter.getCurrentHud()} returns a HUD that isn't Hexcode's own (e.g., the MCHUD
+     * composite wrapper), Hexcode silently hides its glyph info HUD. With our MHUD shim making
+     * multi-HUD coexistence work, this yield is counterproductive.
+     *
+     * <p>We replace {@code HudController.instance} (non-final static) with a new instance whose
+     * adapter returns Hexcode's own HexcodeHud from {@code activeHuds} (neutralizing the yield)
+     * and routes {@code setHud/clearHud} through MHUD for proper multi-HUD registration.
+     */
+    private void injectHexcodeHudAdapter() {
+        if (!HexcodeCompat.isLoaded()) return;
+
+        try {
+            Class<?> controllerClass = Class.forName("com.riprod.hexcode.core.common.hud.controller.HudController");
+
+            // Get the existing singleton instance
+            java.lang.reflect.Field instanceField = controllerClass.getDeclaredField("instance");
+            instanceField.setAccessible(true);
+            Object oldInstance = instanceField.get(null);
+            if (oldInstance == null) {
+                LOGGER.atWarning().log("Hexcode HudController not booted yet — cannot inject adapter");
+                return;
+            }
+
+            // Capture the activeHuds map (ConcurrentHashMap) from the old instance
+            java.lang.reflect.Field activeHudsField = controllerClass.getDeclaredField("activeHuds");
+            activeHudsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.Map<java.util.UUID, ?> activeHuds =
+                (java.util.Map<java.util.UUID, ?>) activeHudsField.get(oldInstance);
+
+            // Create our MHUD-aware adapter
+            var shimAdapter = new HexcodeHudAdapterShim(activeHuds);
+
+            // Get the HudAdapter interface class for the constructor lookup
+            Class<?> adapterInterface = Class.forName("com.riprod.hexcode.core.common.hud.api.HudAdapter");
+
+            // Create a new HudController via the private constructor
+            java.lang.reflect.Constructor<?> ctor = controllerClass.getDeclaredConstructor(adapterInterface);
+            ctor.setAccessible(true);
+            Object newInstance = ctor.newInstance(shimAdapter);
+
+            // Copy the activeHuds reference into the new instance so state is shared
+            java.lang.reflect.Field newActiveHudsField = controllerClass.getDeclaredField("activeHuds");
+            newActiveHudsField.setAccessible(true);
+            newActiveHudsField.set(newInstance, activeHuds);
+
+            // Replace the singleton
+            instanceField.set(null, newInstance);
+
+            LOGGER.atInfo().log("Injected MHUD-aware adapter into Hexcode HudController — yield logic neutralized");
+        } catch (ClassNotFoundException e) {
+            LOGGER.atFine().log("Hexcode HudController not found — HUD adapter injection skipped");
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log(
+                "Failed to inject Hexcode HUD adapter — Hexcode's glyph HUD may not display alongside ours");
+        }
+    }
+
     private void grantDefaultPermissions() {
         try {
             PermissionsModule perms = PermissionsModule.get();
@@ -861,6 +969,10 @@ public class TrailOfOrbis extends JavaPlugin {
         // MobRegenerationSystem - applies health regen to scaled mobs
         getEntityStoreRegistry().registerSystem(new MobRegenerationSystem(this));
         getLogger().atInfo().log("Registered MobRegenerationSystem");
+
+        // MobNameplateActivationSystem - deferred nameplate display on proximity/damage
+        getEntityStoreRegistry().registerSystem(new MobNameplateActivationSystem(this));
+        getLogger().atInfo().log("Registered MobNameplateActivationSystem");
 
         // MobModifierTickSystem - behavioral modifiers (enrage, regen, auras)
         getEntityStoreRegistry().registerSystem(new MobModifierTickSystem(this));
@@ -1063,6 +1175,11 @@ public class TrailOfOrbis extends JavaPlugin {
         if (HexcodeCompat.isLoaded()) {
             HexcodeCompatManager.get().runHealthCheck();
         }
+
+        // Phase 1.5a6: Inject MHUD-aware adapter into Hexcode's HudController
+        // Hexcode v0.7.0 yields its HUD when it detects foreign HUDs (our MCHUD composite).
+        // This replaces its adapter so it uses MHUD slots instead of yielding.
+        injectHexcodeHudAdapter();
 
         // Phase 1.5b: Grant Default group permissions for player-facing commands
         // Without this, only OP players can use commands (permissions default to denied).
@@ -1708,6 +1825,12 @@ public class TrailOfOrbis extends JavaPlugin {
             gemManager = null;
         }
 
+        // Shutdown chat item link handler
+        if (chatItemLinkHandler != null) {
+            chatItemLinkHandler.shutdown();
+            chatItemLinkHandler = null;
+        }
+
         // Phase 1.10: Shutdown GearManager (handles item registry, loot, etc.)
         if (gearManager != null) {
             getLogger().atInfo().log("Shutting down GearManager...");
@@ -2221,6 +2344,12 @@ public class TrailOfOrbis extends JavaPlugin {
         return stoneTooltipSyncService;
     }
 
+    /** @return null if not initialized */
+    @Nullable
+    public io.github.larsonix.trailoforbis.chat.ChatItemLinkHandler getChatItemLinkHandler() {
+        return chatItemLinkHandler;
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     /**
@@ -2407,6 +2536,12 @@ public class TrailOfOrbis extends JavaPlugin {
                     skillSanctumManager.getSkillPointHudManager().setHudToggleService(hudToggleService);
                     skillSanctumManager.getSkillNodeHudManager().setHudToggleService(hudToggleService);
                 }
+
+                // Wire sanctum references into HUD health checker for skill point HUD recovery
+                if (hudLifecycleManager != null) {
+                    hudLifecycleManager.setSanctumReferences(skillSanctumManager);
+                }
+
                 getLogger().atInfo().log("Skill Sanctum system initialized");
             } else {
                 getLogger().atWarning().log("Skill Sanctum system failed to initialize");
@@ -2517,23 +2652,39 @@ public class TrailOfOrbis extends JavaPlugin {
             io.github.larsonix.trailoforbis.config.RPGConfig.CombatConfig.AttackSpeedConfig configClass =
                 configManager.getRPGConfig().getCombat().getAttackSpeed();
 
+            // Load weapon speed profiles (per-weapon-type speed configuration)
+            io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfileRegistry weaponProfileRegistry =
+                new io.github.larsonix.trailoforbis.combat.attackspeed.config.WeaponProfileRegistry(
+                    configManager.getWeaponProfilesConfig());
+
             // Initialize animation speed sync (visual swing speed matching attack speed stat)
             io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncConfig animConfig =
                 configClass.toAnimationSyncConfig();
             animationSpeedSyncManager = new io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncManager(
                 this, animConfig);
+            animationSpeedSyncManager.setProfileRegistry(weaponProfileRegistry);
             animationSpeedSyncManager.register(getEventRegistry());
             ServiceRegistry.register(
                 io.github.larsonix.trailoforbis.combat.attackspeed.AnimationSpeedSyncManager.class,
                 animationSpeedSyncManager);
-            getLogger().atInfo().log("Animation speed sync initialized");
+            getLogger().atInfo().log("Animation speed sync initialized (weapon profiles: active)");
 
             // Initialize Tier 1 interaction time shift + cooldown acceleration
             if (configClass.isInteractionTimeShiftEnabled()) {
                 interactionTimeShiftSystem =
-                    new io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem(this, animConfig);
+                    new io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem(
+                        this, animConfig, weaponProfileRegistry);
                 getEntityStoreRegistry().registerSystem(interactionTimeShiftSystem);
-                getLogger().atInfo().log("Interaction time shift system initialized (cooldown acceleration: %s)",
+
+                // Register public API for Hexcode/mod integration
+                io.github.larsonix.trailoforbis.combat.attackspeed.api.AttackSpeedApi attackSpeedApi =
+                    interactionTimeShiftSystem.getAttackSpeedApi();
+                animationSpeedSyncManager.setAttackSpeedApi(attackSpeedApi);
+                ServiceRegistry.register(
+                    io.github.larsonix.trailoforbis.combat.attackspeed.api.AttackSpeedApi.class,
+                    attackSpeedApi);
+
+                getLogger().atInfo().log("Interaction time shift system initialized (cooldown acceleration: %s, API: registered)",
                     io.github.larsonix.trailoforbis.combat.attackspeed.InteractionTimeShiftSystem
                         .isCooldownAccelerationAvailable() ? "active" : "unavailable");
             }
@@ -2631,64 +2782,75 @@ public class TrailOfOrbis extends JavaPlugin {
      * alongside vanilla fragment keys.
      */
     private void replacePortalDevicePageSupplier() {
-        try {
-            // Get the Portal_Device BlockType from the asset store
-            com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType portalDevice =
-                com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.fromString("Portal_Device");
+        // Replace the page supplier on Portal_Device AND all biome portal variants.
+        // Our Realm_Portal_* blocks are visual copies of Portal_Device — they must go
+        // through the exact same code paths, including our custom page supplier.
+        int replaced = 0;
+        replaced += replacePageSupplierOnBlock("Portal_Device") ? 1 : 0;
 
-            if (portalDevice == null) {
-                getLogger().atWarning().log("Portal_Device block not found in asset store");
-                return;
+        for (io.github.larsonix.trailoforbis.maps.core.RealmBiomeType biome :
+                io.github.larsonix.trailoforbis.maps.core.RealmBiomeType.values()) {
+            if (biome.hasPortalVariant()) {
+                replaced += replacePageSupplierOnBlock(biome.getPortalBlockId()) ? 1 : 0;
+            }
+        }
+
+        getLogger().atInfo().log("Replaced page supplier on %d portal block types", replaced);
+    }
+
+    /**
+     * Replaces the page supplier on a single portal block type.
+     *
+     * @param blockTypeId The block type ID (e.g., "Portal_Device", "Realm_Portal_Forest")
+     * @return true if replacement succeeded
+     */
+    private boolean replacePageSupplierOnBlock(@Nonnull String blockTypeId) {
+        try {
+            com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType blockType =
+                com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.fromString(blockTypeId);
+
+            if (blockType == null) {
+                getLogger().atFine().log("Block type '%s' not found in asset store (may not be loaded yet)", blockTypeId);
+                return false;
             }
 
-            getLogger().atInfo().log("Found Portal_Device block, looking for Use interaction...");
-
-            // Get the RootInteraction for the Use interaction type
-            Map<com.hypixel.hytale.protocol.InteractionType, String> interactions = portalDevice.getInteractions();
+            Map<com.hypixel.hytale.protocol.InteractionType, String> interactions = blockType.getInteractions();
             if (interactions == null || !interactions.containsKey(com.hypixel.hytale.protocol.InteractionType.Use)) {
-                getLogger().atWarning().log("Portal_Device has no Use interaction");
-                return;
+                getLogger().atFine().log("Block '%s' has no Use interaction", blockTypeId);
+                return false;
             }
 
             String rootInteractionId = interactions.get(com.hypixel.hytale.protocol.InteractionType.Use);
-            getLogger().atInfo().log("Portal_Device Use interaction ID: %s", rootInteractionId);
 
-            // Get the RootInteraction from the asset store
             com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction rootInteraction =
                 com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction
                     .getAssetMap().getAsset(rootInteractionId);
 
             if (rootInteraction == null) {
-                getLogger().atWarning().log("RootInteraction '%s' not found", rootInteractionId);
-                return;
+                getLogger().atFine().log("RootInteraction '%s' not found for block '%s'", rootInteractionId, blockTypeId);
+                return false;
             }
 
-            // Find the OpenCustomUIInteraction within the root interaction's chain
             OpenCustomUIInteraction openCustomUI = findOpenCustomUIInteraction(rootInteraction);
             if (openCustomUI == null) {
-                getLogger().atWarning().log("No OpenCustomUIInteraction found in Portal_Device's Use interaction");
-                return;
+                getLogger().atFine().log("No OpenCustomUIInteraction in block '%s'", blockTypeId);
+                return false;
             }
 
-            getLogger().atInfo().log("Found OpenCustomUIInteraction, replacing page supplier...");
-
-            // Create our custom page supplier
             RealmPortalDevicePageSupplier ourSupplier = new RealmPortalDevicePageSupplier();
 
-            // Copy the config from the existing supplier if possible
+            // Copy the PortalDeviceConfig from the existing supplier
             try {
                 java.lang.reflect.Field configField =
                     RealmPortalDevicePageSupplier.class.getDeclaredField("config");
                 configField.setAccessible(true);
 
-                // Try to get the existing config from vanilla supplier
                 java.lang.reflect.Field vanillaPageSupplierField =
                     OpenCustomUIInteraction.class.getDeclaredField("customPageSupplier");
                 vanillaPageSupplierField.setAccessible(true);
                 Object vanillaSupplier = vanillaPageSupplierField.get(openCustomUI);
 
                 if (vanillaSupplier != null) {
-                    // Get config from vanilla supplier
                     java.lang.reflect.Field vanillaConfigField =
                         vanillaSupplier.getClass().getDeclaredField("config");
                     vanillaConfigField.setAccessible(true);
@@ -2696,24 +2858,25 @@ public class TrailOfOrbis extends JavaPlugin {
 
                     if (vanillaConfig instanceof com.hypixel.hytale.builtin.portals.components.PortalDeviceConfig) {
                         configField.set(ourSupplier, vanillaConfig);
-                        getLogger().atInfo().log("Copied PortalDeviceConfig from vanilla supplier");
                     }
                 }
             } catch (Exception e) {
-                getLogger().atFine().log("Could not copy config from vanilla supplier: %s", e.getMessage());
+                getLogger().atFine().log("Could not copy config from vanilla supplier for '%s': %s",
+                    blockTypeId, e.getMessage());
             }
 
-            // Replace the page supplier using reflection
             java.lang.reflect.Field pageSupplierField =
                 OpenCustomUIInteraction.class.getDeclaredField("customPageSupplier");
             pageSupplierField.setAccessible(true);
             pageSupplierField.set(openCustomUI, ourSupplier);
 
-            getLogger().atInfo().log("Successfully replaced Portal_Device page supplier!");
+            getLogger().atInfo().log("Replaced page supplier on block '%s'", blockTypeId);
+            return true;
 
         } catch (Exception e) {
             getLogger().atWarning().withCause(e).log(
-                "Failed to replace Portal_Device page supplier - realm maps on Ancient Gateway may not work");
+                "Failed to replace page supplier on block '%s'", blockTypeId);
+            return false;
         }
     }
 
@@ -2988,6 +3151,15 @@ public class TrailOfOrbis extends JavaPlugin {
             getEntityStoreRegistry().registerSystem(broadcastSystem);
             getLogger().atInfo().log("Registered EquipmentDefinitionBroadcastSystem");
 
+            // Chat item link handler — intercepts <Item:xxx> tags in chat messages and
+            // replaces them with styled item names (rarity-colored, prefix/suffix).
+            // Also broadcasts RPG item definitions to all chat recipients.
+            chatItemLinkHandler = new io.github.larsonix.trailoforbis.chat.ChatItemLinkHandler(
+                    gearManager.getItemDisplayNameService(),
+                    gearManager.getItemDefinitionBuilder(),
+                    gearManager.getTranslationSyncService());
+            chatItemLinkHandler.initialize(getEventRegistry());
+
             getLogger().atInfo().log("Gear system initialized via GearManager - equipment bonuses, item sync, and loot enabled");
 
             // Initialize Gem System (requires GearManager's ItemRegistryService and CustomItemSyncService)
@@ -3077,7 +3249,8 @@ public class TrailOfOrbis extends JavaPlugin {
             }
 
             lootFilterManager = new io.github.larsonix.trailoforbis.lootfilter.LootFilterManager(
-                    dataManager, lfConfig);
+                    dataManager, lfConfig,
+                    gearManager != null ? gearManager.getModifierConfig() : null);
             lootFilterManager.initialize();
 
             // Register loot filter as FIRST handler on InventoryChangeEventSystem

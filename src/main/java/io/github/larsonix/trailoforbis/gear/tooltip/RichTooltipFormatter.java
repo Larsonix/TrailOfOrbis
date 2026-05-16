@@ -394,10 +394,11 @@ public final class RichTooltipFormatter {
         double qualityMult = gearData.qualityMultiplier();
         int itemLevel = gearData.level();
         GearRarity rarity = gearData.rarity();
+        double twoHandedMult = resolveTwoHandedMultiplier(gearData);
 
         // Prefix zone
         for (GearModifier mod : gearData.prefixes()) {
-            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity));
+            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity, twoHandedMult));
         }
 
         // Separator between prefix and suffix zones
@@ -405,10 +406,26 @@ public final class RichTooltipFormatter {
 
         // Suffix zone
         for (GearModifier mod : gearData.suffixes()) {
-            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity));
+            section = section.insert(buildModifierLine(mod, qualityMult, itemLevel, rarity, twoHandedMult));
         }
 
         return section;
+    }
+
+    /**
+     * Resolves the two-handed modifier multiplier for tooltip range display.
+     * Returns 1.0 for non-weapons and one-handed weapons.
+     */
+    private double resolveTwoHandedMultiplier(@Nonnull GearData gearData) {
+        String baseItemId = gearData.baseItemId();
+        if (baseItemId == null || baseItemId.isEmpty()) {
+            return 1.0;
+        }
+        WeaponType weaponType = WeaponType.fromItemIdOrUnknown(baseItemId);
+        if (weaponType == WeaponType.UNKNOWN || !weaponType.isTwoHanded()) {
+            return 1.0;
+        }
+        return balanceConfig.modifierScaling().twoHandedModifierMultiplier();
     }
 
     /**
@@ -418,6 +435,15 @@ public final class RichTooltipFormatter {
     private Message buildModifierGroupSeparator() {
         return Message.raw("\n--------")
                 .color(TooltipStyles.SEPARATOR);
+    }
+
+    /**
+     * Builds a single modifier line (backward compat — no 2H multiplier for range).
+     */
+    @Nonnull
+    public Message buildModifierLine(@Nonnull GearModifier modifier, double qualityMultiplier,
+                                     int itemLevel, @Nonnull GearRarity rarity) {
+        return buildModifierLine(modifier, qualityMultiplier, itemLevel, rarity, 1.0);
     }
 
     /**
@@ -432,10 +458,11 @@ public final class RichTooltipFormatter {
      * @param qualityMultiplier The quality multiplier (quality / 50.0)
      * @param itemLevel The current item level (for range computation)
      * @param rarity The current gear rarity (for range computation)
+     * @param twoHandedMultiplier Multiplier for 2H weapons (1.0 for 1H)
      */
     @Nonnull
     public Message buildModifierLine(@Nonnull GearModifier modifier, double qualityMultiplier,
-                                     int itemLevel, @Nonnull GearRarity rarity) {
+                                     int itemLevel, @Nonnull GearRarity rarity, double twoHandedMultiplier) {
         double adjustedValue = modifier.value() * qualityMultiplier;
         boolean lowerIsBetter = TooltipStyles.isLowerBetter(modifier.statId());
         String sign = adjustedValue >= 0 ? "+" : "";
@@ -450,7 +477,7 @@ public final class RichTooltipFormatter {
                         .color(TooltipStyles.VALUE_WHITE));
 
         // Append roll range in gray brackets (dynamically computed from current level/rarity)
-        String rangeStr = computeModifierRangeString(modifier, qualityMultiplier, itemLevel, rarity);
+        String rangeStr = computeModifierRangeString(modifier, qualityMultiplier, itemLevel, rarity, twoHandedMultiplier);
         if (rangeStr != null) {
             line = line.insert(Message.raw(" " + rangeStr)
                     .color(TooltipStyles.LABEL_GRAY));
@@ -474,31 +501,40 @@ public final class RichTooltipFormatter {
         return buildModifierLine(modifier, qualityMultiplier, 0, GearRarity.COMMON);
     }
 
-    /**
-     * Computes the display range string for a modifier at the given gear state.
-     *
-     * <p>The range represents the TRUE boundaries a reroll would produce, including
-     * roll variance and quality adjustment. Returns null if the definition is not found.
-     *
-     * <p>Formula mirrors {@code ModifierPool.calculateValue()} / {@code GearModifierRoller.calculateValue()}:
-     * <pre>
-     * baseRange = definition.calculateRange(itemLevel)
-     * scaledMin = baseRange.min * expMultiplier
-     * scaledMax = baseRange.max * expMultiplier * rarityStatMultiplier
-     * trueMin = min(scaledMin, scaledMax) * (1 - rollVariance)   // variance floor
-     * trueMax = max(scaledMin, scaledMax) * (1 + rollVariance)   // variance ceiling
-     * Display: [trueMin * qualityMult, trueMax * qualityMult]
-     * </pre>
-     *
-     * <p>Note: For low rarities (stat_multiplier < 1.0), scaledMax can be less than
-     * scaledMin. We use Math.min/max to handle this correctly.
-     */
+    /** Backward-compat overload without 2H multiplier. */
     @Nullable
     private String computeModifierRangeString(
             @Nonnull GearModifier modifier,
             double qualityMultiplier,
             int itemLevel,
             @Nonnull GearRarity rarity) {
+        return computeModifierRangeString(modifier, qualityMultiplier, itemLevel, rarity, 1.0);
+    }
+
+    /**
+     * Computes the display range string for a modifier at the given gear state.
+     *
+     * <p>The range represents the TRUE boundaries a reroll would produce, including
+     * roll variance, 2H multiplier, and quality adjustment. Returns null if the definition is not found.
+     *
+     * <p>Formula mirrors {@code ModifierPool.calculateValue()} exactly:
+     * <pre>
+     * baseRange = definition.calculateRange(itemLevel)
+     * scaledMin = baseRange.min * expMultiplier
+     * scaledMax = baseRange.max * expMultiplier * rarityStatMultiplier
+     * if 2H: scaledMin/Max *= twoHandedMultiplier
+     * trueMin = min(scaledMin, scaledMax) * (1 - rollVariance)
+     * trueMax = max(scaledMin, scaledMax) * (1 + rollVariance)
+     * Display: [trueMin * qualityMult, trueMax * qualityMult]
+     * </pre>
+     */
+    @Nullable
+    private String computeModifierRangeString(
+            @Nonnull GearModifier modifier,
+            double qualityMultiplier,
+            int itemLevel,
+            @Nonnull GearRarity rarity,
+            double twoHandedMultiplier) {
 
         if (itemLevel <= 0) {
             return null; // No level context available
@@ -514,11 +550,17 @@ public final class RichTooltipFormatter {
         RarityConfig rarityConfig = balanceConfig.rarityConfig(rarity);
         double rollVariance = balanceConfig.modifierScaling().rollVariance();
 
-        // Calculate effective range (mirrors ModifierPool/GearModifierRoller formula exactly)
+        // Calculate effective range (mirrors ModifierPool.calculateValue() exactly)
         ValueRange baseRange = definition.calculateRange(itemLevel);
         double expMultiplier = balanceConfig.exponentialScaling().calculateMultiplier(itemLevel);
         double scaledMin = baseRange.min() * expMultiplier;
         double scaledMax = baseRange.max() * expMultiplier * rarityConfig.statMultiplier();
+
+        // Two-handed weapon modifier scaling (enlarges the entire range)
+        if (twoHandedMultiplier > 1.0) {
+            scaledMin *= twoHandedMultiplier;
+            scaledMax *= twoHandedMultiplier;
+        }
 
         // The generation formula always uses scaledMin as "effectiveMin" and applies:
         //   floor = effectiveMin * (1-rv)     ← minimum possible value

@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_DesertSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_DesertCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_DesertCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_DesertGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

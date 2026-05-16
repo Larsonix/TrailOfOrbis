@@ -284,6 +284,51 @@ prefixes:
     allowed_slots: [weapon, hands]
     required_attribute: LIGHTNING  # Attack speed → Storm archetype
 
+  alacrity:
+    display_name: "of Alacrity"
+    stat: cooldown_recovery_percent
+    stat_type: percent
+    base_min: 0.5
+    base_max: 1.5
+    scale_per_level: 0.05
+    weight: 15
+    allowed_slots: [weapon, hands]
+
+  # charging: RESERVED — charge acceleration blocked by engine
+
+  flurry:
+    display_name: "of Flurry"
+    stat: combo_speed_bonus
+    stat_type: percent
+    base_min: 0.3
+    base_max: 0.9
+    scale_per_level: 0.03
+    weight: 8
+    allowed_slots: [weapon, hands]
+    required_attribute: LIGHTNING  # Combo → Storm archetype
+
+  quickdraw:
+    display_name: "Quickdraw"
+    stat: projectile_attack_speed_percent
+    stat_type: percent
+    base_min: 0.5
+    base_max: 1.5
+    scale_per_level: 0.05
+    weight: 12
+    allowed_slots: [weapon]
+    required_attribute: WIND  # Ranged speed → Ranger archetype
+
+  incantation:
+    display_name: "of Incantation"
+    stat: cast_speed_percent
+    stat_type: percent
+    base_min: 0.5
+    base_max: 1.5
+    scale_per_level: 0.05
+    weight: 12
+    allowed_slots: [weapon]
+    required_attribute: LIGHTNING  # Cast speed → Storm caster
+
   # ===========================================================================
   # MOVEMENT (Action - Moving Faster, Legs/Hands Only)
   # ===========================================================================

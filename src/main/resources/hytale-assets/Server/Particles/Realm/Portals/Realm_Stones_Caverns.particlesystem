@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_CavernsSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_CavernsCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_CavernsCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_CavernsGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

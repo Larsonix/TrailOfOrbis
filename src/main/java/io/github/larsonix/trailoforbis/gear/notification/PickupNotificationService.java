@@ -14,8 +14,6 @@ import io.github.larsonix.trailoforbis.TrailOfOrbis;
 import io.github.larsonix.trailoforbis.api.ServiceRegistry;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemData;
 import io.github.larsonix.trailoforbis.gear.item.CustomItemInstanceId;
-import io.github.larsonix.trailoforbis.gear.item.CustomItemSyncService;
-import io.github.larsonix.trailoforbis.gear.item.ItemSyncService;
 import io.github.larsonix.trailoforbis.gear.model.GearData;
 import io.github.larsonix.trailoforbis.gear.model.GearRarity;
 import io.github.larsonix.trailoforbis.gear.tooltip.TooltipStyles;
@@ -27,6 +25,8 @@ import io.github.larsonix.trailoforbis.gems.model.GemDefinition;
 import io.github.larsonix.trailoforbis.gems.util.GemUtils;
 import io.github.larsonix.trailoforbis.maps.core.RealmMapData;
 import io.github.larsonix.trailoforbis.maps.items.RealmMapUtils;
+import io.github.larsonix.trailoforbis.stones.StoneType;
+import io.github.larsonix.trailoforbis.stones.StoneUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -43,7 +43,8 @@ import java.util.logging.Level;
  * <ul>
  *   <li>RPG Gear (all rarities) — enhanced rarity toast (color, level, quality, 3D model)</li>
  *   <li>Realm Maps (all rarities) — enhanced rarity toast (color, level, quality, 3D model)</li>
- *   <li>Gems / Stones / Vanilla — simple "Picked up X" toast</li>
+ *   <li>Stones (all rarities) — rarity-colored name toast (color, 3D model)</li>
+ *   <li>Gems / Vanilla — simple "Picked up X" toast</li>
  * </ul>
  *
  * <p>Runs at handler position 4 in the InventoryChangeEvent chain, AFTER:
@@ -63,14 +64,7 @@ public final class PickupNotificationService {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    private final ItemSyncService gearSyncService;
-    private final CustomItemSyncService customItemSyncService;
-
-    public PickupNotificationService(
-            @Nullable ItemSyncService gearSyncService,
-            @Nullable CustomItemSyncService customItemSyncService) {
-        this.gearSyncService = gearSyncService;
-        this.customItemSyncService = customItemSyncService;
+    public PickupNotificationService() {
     }
 
     // =========================================================================
@@ -133,15 +127,21 @@ public final class PickupNotificationService {
             return;
         }
 
-        // Stones — trigger guide, then simple toast
-        if (io.github.larsonix.trailoforbis.stones.StoneUtils.isStone(itemStack)) {
+        // Stones — trigger guide, then rarity-colored toast
+        if (StoneUtils.isStone(itemStack)) {
             TrailOfOrbis rpgStone = TrailOfOrbis.getInstanceOrNull();
             if (rpgStone != null && rpgStone.getGuideManager() != null) {
                 rpgStone.getGuideManager().tryShow(player.getUuid(), io.github.larsonix.trailoforbis.guide.GuideMilestone.FIRST_STONE);
             }
+
+            Optional<StoneType> stoneTypeOpt = StoneUtils.readStoneType(itemStack);
+            if (stoneTypeOpt.isPresent()) {
+                sendStonePickupToast(player, itemStack, stoneTypeOpt.get());
+                return;
+            }
         }
 
-        // Simple toast for all remaining items (stones, vanilla)
+        // Simple toast for all remaining items (vanilla)
         // Replaces Hytale's disabled native notifyPickupItem() toast
         sendSimplePickupToast(player, itemStack);
     }
@@ -211,12 +211,10 @@ public final class PickupNotificationService {
         Objects.requireNonNull(item, "item cannot be null");
         Objects.requireNonNull(gearData, "gearData cannot be null");
 
-        // 1. Sync item definition (includes translation with display name + qualityIndex)
-        if (gearSyncService != null && gearData.hasInstanceId()) {
-            gearSyncService.syncItem(player, item, gearData);
-        }
+        // Item definition sync is handled by ImmediateItemSyncHandler (handler position 2)
+        // which runs before this handler (position 4) in the InventoryChangeEvent chain.
 
-        // 2. Toast: enhanced for ALL gear (rarity-colored name + level/quality subtitle)
+        // Toast: enhanced for ALL gear (rarity-colored name + level/quality subtitle)
         sendEnhancedPickupToast(player, item, gearData);
 
         // 3. Guide milestones
@@ -246,9 +244,7 @@ public final class PickupNotificationService {
         Objects.requireNonNull(player, "player cannot be null");
         Objects.requireNonNull(customData, "customData cannot be null");
 
-        if (customItemSyncService != null && customData.hasInstanceId()) {
-            customItemSyncService.syncItem(player, customData);
-        }
+        // Item definition sync is handled by ImmediateItemSyncHandler (handler position 2).
     }
 
     // =========================================================================
@@ -318,10 +314,35 @@ public final class PickupNotificationService {
     }
 
     /**
+     * Stone pickup toast: stone name in rarity color + 3D item model.
+     *
+     * <p>Mirrors the gear toast pattern but without a subtitle (stones have
+     * no level/quality). Uses the stone's rarity color from {@link StoneType#getHexColor()}.
+     */
+    private void sendStonePickupToast(@Nonnull PlayerRef player, @Nonnull ItemStack itemStack,
+                                       @Nonnull StoneType stoneType) {
+        try {
+            String rarityColor = stoneType.getHexColor();
+            Message title = Message.translation(itemStack.getItem().getTranslationKey())
+                    .color(rarityColor);
+
+            NotificationUtil.sendNotification(
+                    player.getPacketHandler(),
+                    title,
+                    null,
+                    itemStack.toPacket(),
+                    NotificationStyle.Default
+            );
+        } catch (Exception e) {
+            LOGGER.at(Level.FINE).withCause(e).log("Failed to send stone pickup toast");
+        }
+    }
+
+    /**
      * Simple "Picked up [item]" toast — exact replica of Hytale's native
      * {@code Player.notifyPickupItem()} notification.
      *
-     * <p>Used for gems, stones, and vanilla items. Produces the same visual
+     * <p>Used for gems and vanilla items. Produces the same visual
      * the player would see from the native system: item name from translation
      * key, no subtitle, 3D item model, Default style.
      */

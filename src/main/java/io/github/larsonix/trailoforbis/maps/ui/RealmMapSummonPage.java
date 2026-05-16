@@ -1,7 +1,9 @@
 package io.github.larsonix.trailoforbis.maps.ui;
 
 import com.hypixel.hytale.builtin.portals.PortalsPlugin;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.builtin.portals.components.PortalDevice;
 import com.hypixel.hytale.builtin.portals.components.PortalDeviceConfig;
 import com.hypixel.hytale.builtin.portals.utils.BlockTypeUtils;
@@ -118,8 +120,11 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
                 : capitalize(mapData.rarity().name()) + " Realm (Unidentified)";
         cmd.set("#Title0.TextSpans", Message.raw(title).color(mapData.rarity().getHexColor()));
 
-        // Artwork: use default for now (vanilla DefaultArtwork.png stays)
-        // TODO: Per-biome artwork when assets are available
+        // Per-biome artwork in the portal summon UI
+        if (mapData.identified()) {
+            String artworkFile = "Pages/Portals/Realm_Artwork_" + mapData.biome().name() + ".png";
+            cmd.set("#Artwork.Background", artworkFile);
+        }
 
         // Hide WIP notice — not relevant for realms
         // The WIP notice is a direct child without an ID in the .ui, so we can't hide it directly.
@@ -335,6 +340,11 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
         }
 
         sourceWorld.execute(() -> {
+            // Activate portal visuals FIRST (swaps block to biome variant)
+            // Must happen before activatePortalDevice() so the PortalDevice component
+            // is created on the new biome-colored block, not the old Portal_Device.
+            realmsManager.getPortalVisualManager().activate(sourceWorld, portalPosition, mapData);
+
             activatePortalDevice(sourceWorld, realm);
 
             realmsManager.getPortalManager().trackPortalRealm(sourceWorld, portalPosition, realm);
@@ -392,8 +402,25 @@ public class RealmMapSummonPage extends InteractiveCustomUIPage<RealmMapSummonPa
             if (currentType != null) {
                 BlockType onState = BlockTypeUtils.getBlockForState(currentType, portalConfig.getOnState());
                 if (onState != null) {
-                    world.setBlockInteractionState(portalPosition, currentType, portalConfig.getOnState());
+                    // Use force=true via chunk to ensure the state transition always happens,
+                    // even if the engine thinks the block is already in Active state
+                    // (can happen if a previous activation wasn't fully cleaned up).
+                    WorldChunk chunk = world.getChunkIfInMemory(
+                            ChunkUtil.indexChunkFromBlock(portalPosition.x, portalPosition.z));
+                    if (chunk != null) {
+                        chunk.setBlockInteractionState(
+                                portalPosition.x, portalPosition.y, portalPosition.z,
+                                currentType, portalConfig.getOnState(), true);
+                    } else {
+                        // Fallback to world-level (non-force) if chunk not in memory
+                        world.setBlockInteractionState(portalPosition, currentType, portalConfig.getOnState());
+                    }
+                } else {
+                    LOGGER.atWarning().log("Block state variant '%s' not found for block type %s at %s",
+                            portalConfig.getOnState(), currentType.getId(), portalPosition);
                 }
+            } else {
+                LOGGER.atWarning().log("No block type at portal position %s during activation", portalPosition);
             }
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("Error activating portal device at %s", portalPosition);

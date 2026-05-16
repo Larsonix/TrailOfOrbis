@@ -415,6 +415,7 @@ public final class GearBalanceConfig {
     public record ModifierScalingConfig(
             double globalScalePerLevel,
             double rollVariance,
+            double twoHandedModifierMultiplier,
             Map<String, Integer> weightCategories
     ) {
         public ModifierScalingConfig {
@@ -423,6 +424,10 @@ public final class GearBalanceConfig {
             }
             if (rollVariance < 0 || rollVariance > 1) {
                 throw new IllegalArgumentException("rollVariance must be [0, 1]");
+            }
+            if (twoHandedModifierMultiplier < 1.0) {
+                throw new IllegalArgumentException(
+                    "twoHandedModifierMultiplier must be >= 1.0, got: " + twoHandedModifierMultiplier);
             }
             weightCategories = Map.copyOf(weightCategories);
         }

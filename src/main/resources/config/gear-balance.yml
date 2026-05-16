@@ -157,6 +157,11 @@ modifier_scaling:
   # 0.3 = values can be 70%-130% of calculated base
   roll_variance: 0.3
 
+  # Two-handed weapons lose the offhand slot entirely, so their modifiers
+  # are multiplied by this factor to compensate. Applied at generation time.
+  # 1.5 = 2H modifier values are 50% stronger than 1H
+  two_handed_modifier_multiplier: 1.5
+
   # Modifier weight categories (for drop pools)
   weight_categories:
     very_common: 100          # Physical Damage, Max Health, Armor

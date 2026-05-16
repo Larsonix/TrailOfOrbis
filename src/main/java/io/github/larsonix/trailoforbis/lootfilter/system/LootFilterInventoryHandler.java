@@ -171,12 +171,16 @@ public final class LootFilterInventoryHandler {
         if (itemStack == null || itemStack.isEmpty()) return;
 
         // Skip in-place modifications (durability, metadata, etc.)
-        // If the slot had the same item ID before, this is NOT a new pickup
+        // If the slot had the same item ID before with unchanged/decreased quantity,
+        // this is NOT a new pickup — it's a metadata or durability update.
         ItemStack before = slot.getSlotBefore();
         if (before != null && !before.isEmpty()
                 && before.getItemId() != null
                 && before.getItemId().equals(itemStack.getItemId())) {
-            return;
+            // Same item in same slot — only process if quantity increased (stacking pickup).
+            if (itemStack.getQuantity() <= before.getQuantity()) {
+                return;
+            }
         }
 
         if (GearUtils.isRpgGear(itemStack)) {

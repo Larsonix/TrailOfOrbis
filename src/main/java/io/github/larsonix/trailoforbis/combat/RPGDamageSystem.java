@@ -197,17 +197,16 @@ public class RPGDamageSystem extends DamageEventSystem {
     @Nullable
     private volatile CombatEffectRegistry combatEffectRegistry;
 
-    /** Re-entrancy guard: prevents recursive damage pipeline execution (e.g., combat effects firing damage). */
-    private boolean processingDamage = false;
+    /** Re-entrancy guard: prevents recursive damage pipeline execution (e.g., combat effects firing damage).
+     *  ThreadLocal because this singleton system is shared across all world threads (default + realms). */
+    private final ThreadLocal<Boolean> processingDamage = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     // ── Attacker context cache for AoE performance ──
     // For Hexcode area spells hitting 40+ targets, all damage events share the same attacker.
     // Cache attacker-side data on first hit, reuse for subsequent targets in the same burst.
     // Keyed by attacker player UUID (not ref identity — ref identity is fragile across source rewrites).
-    @Nullable
-    private io.github.larsonix.trailoforbis.combat.context.AttackerContext cachedAttackerCtx;
-    @Nullable
-    private UUID cachedAttackerUuid;
+    private final ThreadLocal<io.github.larsonix.trailoforbis.combat.context.AttackerContext> cachedAttackerCtx = new ThreadLocal<>();
+    private final ThreadLocal<UUID> cachedAttackerUuid = new ThreadLocal<>();
 
     public RPGDamageSystem(@Nonnull TrailOfOrbis plugin) {
         this.plugin = plugin;
@@ -368,16 +367,16 @@ public class RPGDamageSystem extends DamageEventSystem {
         // from within our pipeline. Even if they arrive while processingDamage is true
         // (unlikely in single-threaded ECS, but possible via world.execute callbacks),
         // they must still be processed — blocking them silently kills DOT damage.
-        if (processingDamage && !isDOTSource(damage)) {
+        if (processingDamage.get() && !isDOTSource(damage)) {
             LOGGER.atWarning().log("[RPGDamageSystem] Re-entrant non-DOT damage detected — skipping RPG pipeline");
             return;
         }
-        boolean wasProcessing = processingDamage;
-        processingDamage = true;
+        boolean wasProcessing = processingDamage.get();
+        processingDamage.set(true);
         try {
-        handleInner(index, archetypeChunk, store, commandBuffer, damage);
+            handleInner(index, archetypeChunk, store, commandBuffer, damage);
         } finally {
-            processingDamage = wasProcessing;
+            processingDamage.set(wasProcessing);
         }
     }
 
@@ -499,7 +498,8 @@ public class RPGDamageSystem extends DamageEventSystem {
 
                 // Rewrite source to EntitySource for attacker resolution in the main pipeline.
                 // Must happen BEFORE defender resolution so kill attribution works.
-                if (casterRef != null && casterRef.isValid()) {
+                // Validate store membership — ThreadLocal casterRef can be from a different world.
+                if (casterRef != null && casterRef.isValid() && casterRef.getStore() == store) {
                     damage.setSource(new Damage.EntitySource(casterRef));
                 }
 
@@ -833,15 +833,16 @@ public class RPGDamageSystem extends DamageEventSystem {
         UUID resolvedAttackerUuid = entityResolver.getAttackerPlayerUuid(store, damage);
         long currentStatsVersion = (resolvedAttackerUuid != null && plugin.getAttributeManager() != null)
             ? plugin.getAttributeManager().getStatsVersion(resolvedAttackerUuid) : 0L;
-        boolean cacheHit = (cachedAttackerCtx != null
+        io.github.larsonix.trailoforbis.combat.context.AttackerContext localCachedCtx = cachedAttackerCtx.get();
+        boolean cacheHit = (localCachedCtx != null
             && resolvedAttackerUuid != null
-            && resolvedAttackerUuid.equals(cachedAttackerUuid)
-            && cachedAttackerCtx.statsVersion() == currentStatsVersion);
+            && resolvedAttackerUuid.equals(cachedAttackerUuid.get())
+            && localCachedCtx.statsVersion() == currentStatsVersion);
 
         if (cacheHit) {
             // Reuse cached attacker data — avoids 6-8 redundant lookups per target
-            ctx.attackerStats = cachedAttackerCtx.attackerStats();
-            ctx.attackerElemental = cachedAttackerCtx.attackerElemental();
+            ctx.attackerStats = localCachedCtx.attackerStats();
+            ctx.attackerElemental = localCachedCtx.attackerElemental();
             ctx.attackerUuid = resolvedAttackerUuid;
         } else {
             // Cache miss — resolve fresh
@@ -876,8 +877,8 @@ public class RPGDamageSystem extends DamageEventSystem {
                                     liveRawId, cachedRawId);
 
                                 // Invalidate AoE cache so no more targets use stale data
-                                cachedAttackerCtx = null;
-                                cachedAttackerUuid = null;
+                                cachedAttackerCtx.remove();
+                                cachedAttackerUuid.remove();
 
                                 // Defer a full recalculation to the next tick
                                 // (can't call recalculateStats inline during ECS damage processing)
@@ -1064,7 +1065,7 @@ public class RPGDamageSystem extends DamageEventSystem {
 
         // Resolve attacker level: use cache or resolve fresh
         if (cacheHit) {
-            ctx.attackerLevel = cachedAttackerCtx.attackerLevel();
+            ctx.attackerLevel = localCachedCtx.attackerLevel();
         } else {
             ctx.attackerLevel = resolveAttackerLevel(store, damage);
 
@@ -1072,14 +1073,14 @@ public class RPGDamageSystem extends DamageEventSystem {
             // Only cache player attackers (mob attackers have per-entity stats, no sharing benefit).
             if (resolvedAttackerUuid != null) {
                 Ref<EntityStore> currentAttackerRef = entityResolver.getAttackerRef(store, damage);
-                cachedAttackerUuid = resolvedAttackerUuid;
-                cachedAttackerCtx = new io.github.larsonix.trailoforbis.combat.context.AttackerContext(
+                cachedAttackerUuid.set(resolvedAttackerUuid);
+                cachedAttackerCtx.set(new io.github.larsonix.trailoforbis.combat.context.AttackerContext(
                     currentAttackerRef, resolvedAttackerUuid,
                     ctx.attackerStats, ctx.attackerElemental, ctx.attackerLevel,
                     ctx.hasRpgWeapon, ctx.rpgWeaponDamage,
                     ctx.attackerStats != null ? ctx.attackerStats.getWeaponItemId() : null,
                     currentStatsVersion
-                );
+                ));
             }
         }
 
@@ -1433,9 +1434,14 @@ public class RPGDamageSystem extends DamageEventSystem {
     ) {
         // Set hinted attacker for recovery processor (avoids 6 redundant resolveTrueAttacker calls)
         Ref<EntityStore> attackerRef = entityResolver.getAttackerRef(store, damage);
+        // Validate store membership — cross-store refs crash on getComponent()
+        if (attackerRef != null && attackerRef.getStore() != store) {
+            LOGGER.atWarning().log("[RPGDamage] Cross-store attacker ref in recovery phase — skipping hint");
+            attackerRef = null;
+        }
         recoveryProcessor.setHintedAttacker(attackerRef);
         try {
-        processRecoveryAndThornsInner(store, commandBuffer, damage, ctx);
+            processRecoveryAndThornsInner(store, commandBuffer, damage, ctx);
         } finally {
             recoveryProcessor.clearHintedAttacker();
         }
@@ -1560,8 +1566,34 @@ public class RPGDamageSystem extends DamageEventSystem {
                         }
                     }
                     markMobDamaged(killedAttacker, store);
-                    DeathComponent.tryAddComponent(commandBuffer, killedAttacker, damage);
-                    LOGGER.atInfo().log("Thorns killed attacker — DeathComponent added");
+                    fireModifierDeathTriggers(killedAttacker, store);
+
+                    // Create new Damage with the defender (thorns player) as source.
+                    // The original `damage` has the mob as source (mob attacked player),
+                    // but downstream death systems (XP, loot, realm) need the PLAYER
+                    // as source to attribute the kill correctly.
+                    Damage thornsDeath = new Damage(
+                        new Damage.EntitySource(ctx.defenderRef),
+                        damage.getDamageCauseIndex(),
+                        flatThorns + reflected
+                    );
+                    DeathComponent.tryAddComponent(commandBuffer, killedAttacker, thornsDeath);
+
+                    // Fire ON_KILL skill tree triggers for the thorns player
+                    triggerHandler.fireOnKillTrigger(store, thornsDeath);
+
+                    // Fire combat effect ON_KILL hooks (Berserker's Rage, etc.)
+                    if (combatEffectRegistry != null && ctx.defenderUuid != null) {
+                        UUID victimUuid = ctx.attackerUuid != null
+                            ? ctx.attackerUuid : new UUID(0, 0);
+                        CombatEffectContext effectCtx = ctx.toEffectContext(
+                            thornsDeath, store, commandBuffer);
+                        combatEffectRegistry.runOnKill(
+                            ctx.defenderUuid, victimUuid, 0f, effectCtx);
+                    }
+
+                    LOGGER.atInfo().log("Thorns killed attacker — DeathComponent added (killer=%s)",
+                        ctx.defenderUuid);
                 }
             }
 

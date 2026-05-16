@@ -101,7 +101,7 @@ public final class TestConfigFactory {
             rarityConfigs,
             quality,
             new AttributeRequirementsConfig(0.5, 10, attrMults),
-            new ModifierScalingConfig(0.01, 0.3, Map.of("common", 100, "rare", 10)),
+            new ModifierScalingConfig(0.01, 0.3, 1.5, Map.of("common", 100, "rare", 10)),
             new LootConfig(0.5, 0.01, new DistanceScalingConfig(true, 100, 2.0), Map.of()),
             new StoneDropConfig(0.1, Map.of("quality_stone", 50, "modifier_stone", 30)),
             ExponentialScalingConfig.DISABLED,   // Tests use disabled for backward compat
@@ -190,7 +190,7 @@ public final class TestConfigFactory {
             rarityConfigs,
             quality,
             new AttributeRequirementsConfig(0.5, 10, attrMults),
-            new ModifierScalingConfig(0.01, 0.3, Map.of("common", 100, "rare", 10)),
+            new ModifierScalingConfig(0.01, 0.3, 1.5, Map.of("common", 100, "rare", 10)),
             new LootConfig(0.5, 0.01, new DistanceScalingConfig(true, 100, 2.0), Map.of()),
             new StoneDropConfig(0.1, Map.of("quality_stone", 50, "modifier_stone", 30)),
             ExponentialScalingConfig.DISABLED,

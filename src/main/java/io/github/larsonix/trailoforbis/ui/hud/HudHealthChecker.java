@@ -12,6 +12,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.maps.RealmsManager;
 import io.github.larsonix.trailoforbis.maps.instance.RealmInstance;
 import io.github.larsonix.trailoforbis.maps.ui.RealmHudManager;
+import io.github.larsonix.trailoforbis.sanctum.SkillSanctumManager;
+import io.github.larsonix.trailoforbis.sanctum.ui.SkillPointHudManager;
 import io.github.larsonix.trailoforbis.util.PlayerWorldCache;
 
 import javax.annotation.Nonnull;
@@ -48,8 +50,27 @@ final class HudHealthChecker {
     @Nullable private final RealmsManager realmsManager;
     @Nullable private final RealmHudManager realmHudManager;
 
+    /** Late-bound sanctum references (sanctum is created after health checker starts). */
+    @Nullable private volatile SkillSanctumManager sanctumManager;
+    @Nullable private volatile SkillPointHudManager skillPointHudManager;
+
     /** Per-player cooldown — nanoTime of last restore attempt. Prevents spam during transitions. */
     private final Map<UUID, Long> lastRestoreAttempt = new ConcurrentHashMap<>();
+
+    /**
+     * Consecutive restore counter per player. When a player's HUDs are restored
+     * repeatedly without ever being "all healthy", we exponentially back off the
+     * cooldown to avoid wasting world-thread time on a pathological loop.
+     *
+     * <p>Reset to 0 when a health check finds ALL HUDs present (healthy state).
+     */
+    private final Map<UUID, Integer> consecutiveRestores = new ConcurrentHashMap<>();
+
+    /** After this many consecutive restores, start backing off. */
+    private static final int BACKOFF_THRESHOLD = 5;
+
+    /** Maximum backoff multiplier (caps at 6x the base cooldown = ~48s at 8s base). */
+    private static final int MAX_BACKOFF_MULTIPLIER = 6;
 
     /**
      * Tracks players awaiting a one-time verification rerender.
@@ -76,6 +97,19 @@ final class HudHealthChecker {
         this.realmsManager = realmsManager;
         this.realmHudManager = realmHudManager;
         this.cooldownNanos = TimeUnit.SECONDS.toNanos(cooldownSeconds);
+    }
+
+    /**
+     * Sets the sanctum references for sanctum HUD recovery.
+     *
+     * <p>Called after {@link SkillSanctumManager} is created (Phase 7.7.5),
+     * which is after the health checker starts (Phase 6.10). Uses volatile
+     * fields for safe publication to the scheduler thread.
+     */
+    void setSanctumReferences(@Nullable SkillSanctumManager sanctumManager,
+                              @Nullable SkillPointHudManager skillPointHudManager) {
+        this.sanctumManager = sanctumManager;
+        this.skillPointHudManager = skillPointHudManager;
     }
 
     /**
@@ -114,6 +148,7 @@ final class HudHealthChecker {
         }
         lastRestoreAttempt.clear();
         pendingVerification.clear();
+        consecutiveRestores.clear();
         LOGGER.atInfo().log("HUD health checker stopped");
     }
 
@@ -132,6 +167,7 @@ final class HudHealthChecker {
     void onDisconnect(@Nonnull UUID playerId) {
         lastRestoreAttempt.remove(playerId);
         pendingVerification.remove(playerId);
+        consecutiveRestores.remove(playerId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -149,8 +185,16 @@ final class HudHealthChecker {
                 if (!world.isAlive()) continue;
 
                 // Skip players within cooldown (event-driven path handles first N seconds)
+                // Apply backoff multiplier for players with repeated consecutive restores
                 Long last = lastRestoreAttempt.get(uuid);
-                if (last != null && (System.nanoTime() - last) < cooldownNanos) continue;
+                if (last != null) {
+                    int restoreCount = consecutiveRestores.getOrDefault(uuid, 0);
+                    int multiplier = 1;
+                    if (restoreCount >= BACKOFF_THRESHOLD) {
+                        multiplier = Math.min(restoreCount - BACKOFF_THRESHOLD + 2, MAX_BACKOFF_MULTIPLIER);
+                    }
+                    if ((System.nanoTime() - last) < cooldownNanos * multiplier) continue;
+                }
 
                 // One-time verification rerender: after cooldown expires, force-rerender
                 // all active HUDs to ensure the client actually rendered them. This catches
@@ -188,7 +232,27 @@ final class HudHealthChecker {
                     }
                 }
 
-                if (!anyPersistentMissing && !realmHudMissing) continue;
+                // Check sanctum skill point HUD (not a PersistentHud — managed separately)
+                boolean sanctumHudMissing = false;
+                if (sanctumManager != null && sanctumManager.hasActiveSanctum(uuid)
+                        && skillPointHudManager != null
+                        && skillPointHudManager.getHud(uuid) == null) {
+                    sanctumHudMissing = true;
+                }
+
+                if (!anyPersistentMissing && !realmHudMissing && !sanctumHudMissing) {
+                    // All HUDs healthy — reset backoff counter
+                    consecutiveRestores.remove(uuid);
+                    continue;
+                }
+
+                // Track consecutive restore attempts for backoff
+                int count = consecutiveRestores.merge(uuid, 1, Integer::sum);
+                if (count == BACKOFF_THRESHOLD) {
+                    LOGGER.atWarning().log("[HUD-HEAL] Player %s hit %d consecutive restores — "
+                        + "enabling backoff (persistent=%b, realm=%b, sanctum=%b)",
+                        uuid, count, anyPersistentMissing, realmHudMissing, sanctumHudMissing);
+                }
 
                 // Set cooldown BEFORE deferring — prevents double-scheduling
                 lastRestoreAttempt.put(uuid, System.nanoTime());
@@ -206,11 +270,12 @@ final class HudHealthChecker {
 
                 final boolean needsPersistent = anyPersistentMissing;
                 final boolean needsRealm = realmHudMissing;
+                final boolean needsSanctum = sanctumHudMissing;
                 final RealmInstance capturedRealm = realm;
 
                 targetWorld.execute(() ->
                     restoreOnWorldThread(uuid, targetWorld, needsPersistent,
-                        needsRealm, capturedRealm));
+                        needsRealm, capturedRealm, needsSanctum));
             }
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("[HUD-HEAL] Health check failed");
@@ -226,7 +291,8 @@ final class HudHealthChecker {
             @Nonnull World world,
             boolean needsPersistent,
             boolean needsRealm,
-            @Nullable RealmInstance realm) {
+            @Nullable RealmInstance realm,
+            boolean needsSanctum) {
 
         if (!world.isAlive()) return;
 
@@ -270,6 +336,20 @@ final class HudHealthChecker {
                     uuid.toString().substring(0, 8));
             } catch (Exception e) {
                 LOGGER.atWarning().log("[HUD-HEAL] Failed to restore combat HUD for %s: %s",
+                    uuid.toString().substring(0, 8), e.getMessage());
+            }
+        }
+
+        // Restore sanctum skill point HUD (direct — same pattern as realm combat HUD)
+        if (needsSanctum && sanctumManager != null && skillPointHudManager != null
+                && sanctumManager.hasActiveSanctum(uuid)
+                && skillPointHudManager.getHud(uuid) == null) {
+            try {
+                skillPointHudManager.showHudDirect(uuid, freshRef, player, store);
+                LOGGER.atInfo().log("[HUD-HEAL] Restored skill point HUD for player %s",
+                    uuid.toString().substring(0, 8));
+            } catch (Exception e) {
+                LOGGER.atWarning().log("[HUD-HEAL] Failed to restore skill point HUD for %s: %s",
                     uuid.toString().substring(0, 8), e.getMessage());
             }
         }
@@ -346,6 +426,23 @@ final class HudHealthChecker {
                     }
                 } catch (Exception e) {
                     LOGGER.atWarning().log("[HUD-VERIFY] Failed to recreate combat HUD for %s: %s",
+                        uuid.toString().substring(0, 8), e.getMessage());
+                }
+            }
+        }
+
+        // Check sanctum skill point HUD
+        if (skillPointHudManager != null && skillPointHudManager.getHud(uuid) != null) {
+            HyUIHud spHud = skillPointHudManager.getHud(uuid);
+            if (spHud != null && !HudRefreshHelper.isRegisteredInMchud(spHud, player)) {
+                try {
+                    skillPointHudManager.discardStaleHud(uuid);
+                    skillPointHudManager.showHudDirect(uuid, freshRef, player, store);
+                    LOGGER.atInfo().log("[HUD-VERIFY] Recreated skill point HUD for player %s",
+                        uuid.toString().substring(0, 8));
+                    recreated++;
+                } catch (Exception e) {
+                    LOGGER.atWarning().log("[HUD-VERIFY] Failed to recreate skill point HUD for %s: %s",
                         uuid.toString().substring(0, 8), e.getMessage());
                 }
             }

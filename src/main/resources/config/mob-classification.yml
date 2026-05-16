@@ -21,7 +21,7 @@ xp_multipliers:
 
 # Stat Multipliers (Applied to HP, Damage, etc.)
 stat_multipliers:
-  PASSIVE: 0.1    # 10% scaling for passive creatures (minimal stats)
+  PASSIVE: 1.0    # Full RPG scaling for passive/tameable creatures
   MINOR: 1.0      # Normal scaling - they're still combat mobs
   HOSTILE: 1.0    # Base scaling for standard enemies
   ELITE: 1.5      # +50% stats for mini-bosses

@@ -391,12 +391,11 @@ class MobClassificationServiceTest {
         }
 
         @Test
-        @DisplayName("PASSIVE stat multiplier is 0.1 (10% of hostile)")
-        void passiveStatMultiplier_isTenPercent() {
+        @DisplayName("PASSIVE stat multiplier is 1.0 (same as hostile — tameable mobs get full RPG stats)")
+        void passiveStatMultiplier_isFullScale() {
             double statMult = config.getStatMultiplier(RPGMobClass.PASSIVE);
-            assertEquals(0.1, statMult, 0.001,
-                "PASSIVE stat multiplier should be 0.1 (10%) — not 0. " +
-                "PASSIVE mobs receive minimal but non-zero scaling.");
+            assertEquals(1.0, statMult, 0.001,
+                "PASSIVE stat multiplier should be 1.0 — tameable/passive mobs get full RPG scaling.");
         }
     }
 

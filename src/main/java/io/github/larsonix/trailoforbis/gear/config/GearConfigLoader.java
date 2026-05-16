@@ -940,6 +940,7 @@ public final class GearConfigLoader {
     ) {
         double globalScale = ctx.getDouble(data, "global_scale_per_level");
         double rollVariance = ctx.getDouble(data, "roll_variance");
+        double twoHandedMult = ctx.getDoubleOrDefault(data, "two_handed_modifier_multiplier", 1.0);
 
         Map<String, Object> categoriesData = ctx.getMap(data, "weight_categories");
         Map<String, Integer> categories = new HashMap<>();
@@ -949,7 +950,7 @@ public final class GearConfigLoader {
                     ctx.toInt(entry.getValue(), "weight_categories." + entry.getKey()));
         }
 
-        return new ModifierScalingConfig(globalScale, rollVariance, categories);
+        return new ModifierScalingConfig(globalScale, rollVariance, twoHandedMult, categories);
     }
 
     private LootConfig parseLootConfig(Map<String, Object> data, ConfigContext ctx) {

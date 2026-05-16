@@ -43,8 +43,7 @@ __pycache__/
 _recovery*/
 _backup*/
 _corrupted_backup/
-src/main/resources/config/backups/
-src/main/resources/config/.versions.yml
+changelogs/TrailOfOrbis/
 LadyPaladraStonesDesignCommission/
 Wiki/hytale-docs-main/
 Wiki/voile-extracted/
@@ -59,16 +58,16 @@ docs/vendor/
 # ==========================================
 
 # ─── Root project files ───
-!.gitignore
-!README.md
-!CONTRIBUTING.md
-!LICENSE
-!LICENSE-ASSETS
-!build.gradle.kts
-!settings.gradle.kts
-!gradle.properties
-!gradlew
-!gradlew.bat
+!/.gitignore
+!/README.md
+!/CONTRIBUTING.md
+!/LICENSE
+!/LICENSE-ASSETS
+!/build.gradle.kts
+!/settings.gradle.kts
+!/gradle.properties
+!/gradlew
+!/gradlew.bat
 
 # ─── CI/CD workflows ───
 !.github/**
@@ -81,6 +80,10 @@ docs/vendor/
 
 # ─── Source code (all Java, resources, tests) ───
 !src/**
+# Re-exclude runtime artifacts within src/
+src/main/resources/config/backups/
+src/main/resources/config/.versions.yml
+src/main/resources/config/config/
 
 # ─── Wiki content (in-game wiki, ships via Voile) ───
 !Wiki/content/**
@@ -165,4 +168,3 @@ docs/research/NEXT_RESEARCH_PROMPT.md
 !scripts/generate-octant-assets.py
 !scripts/generate-octant-positions.py
 !scripts/create-elemental-assets.java
-changelogs/TrailOfOrbis

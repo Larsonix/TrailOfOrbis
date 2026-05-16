@@ -1,0 +1,24 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Realm_Stones_Frozen_CryptsSpawn",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_Frozen_CryptsCircles",
+      "RotationOffset": {
+        "Yaw": 90.0
+      }
+    },
+    {
+      "SpawnerId": "Realm_Stones_Frozen_CryptsCircles2"
+    },
+    {
+      "SpawnerId": "Realm_Stones_Frozen_CryptsGlow"
+    }
+  ],
+  "BoundingRadius": 10,
+  "IsImportant": false
+}

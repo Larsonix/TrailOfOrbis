@@ -255,8 +255,9 @@ public final class CustomItemSyncService {
             return; // No registry service available
         }
 
-        // Skip if already registered
+        // Skip if already registered — but observe it to keep it hot
         if (itemRegistryService.isRegistered(customItemId)) {
+            itemRegistryService.observeItem(customItemId);
             return;
         }
 

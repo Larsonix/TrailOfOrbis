@@ -79,10 +79,12 @@ public class CombatRecoveryProcessor {
 
     /**
      * Resolves the attacker ref, using the hint if available.
+     * Validates store membership to prevent cross-store crashes during world transitions.
      */
     @Nullable
     private Ref<EntityStore> resolveAttacker(@Nonnull Store<EntityStore> store, @Nonnull Damage damage) {
-        if (hintedAttackerRef != null && hintedAttackerRef.isValid()) {
+        if (hintedAttackerRef != null && hintedAttackerRef.isValid()
+                && hintedAttackerRef.getStore() == store) {
             return hintedAttackerRef;
         }
         // Fallback to full resolution
@@ -93,7 +95,12 @@ public class CombatRecoveryProcessor {
         if (immediateRef == null || !immediateRef.isValid()) {
             return null;
         }
-        return entityResolver.resolveTrueAttacker(store, immediateRef);
+        Ref<EntityStore> resolved = entityResolver.resolveTrueAttacker(store, immediateRef);
+        if (resolved != null && resolved.getStore() != store) {
+            LOGGER.atWarning().log("Cross-store attacker ref detected in resolveAttacker — skipping recovery");
+            return null;
+        }
+        return resolved;
     }
 
     /**

@@ -251,7 +251,15 @@ public class RealmPortalDevicePageSupplier implements OpenCustomUIInteraction.Cu
 
         // If portal has invalid destination, reset it
         if (existingDevice != null && blockType == onBlock && !isPortalWorldValid(destinationWorld)) {
-            world.setBlockInteractionState(new Vector3i(targetBlock.x, targetBlock.y, targetBlock.z), blockType, config.getOffState());
+            Vector3i portalPos = new Vector3i(targetBlock.x, targetBlock.y, targetBlock.z);
+            world.setBlockInteractionState(portalPos, blockType, config.getOffState());
+
+            // Clear stale portal tracking so isPortalActive() returns false
+            TrailOfOrbis plugin = TrailOfOrbis.getInstanceOrNull();
+            if (plugin != null && plugin.getRealmsManager() != null) {
+                plugin.getRealmsManager().getPortalManager().clearPortalTrackingAt(world, portalPos);
+            }
+
             playerRef.sendMessage(Message.translation("server.portals.device.adjusted").color(MessageColors.ERROR));
             return null;
         }

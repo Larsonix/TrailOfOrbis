@@ -115,6 +115,7 @@ public class RealmsManager implements RealmsService {
     private final RealmRemovalHandler removalHandler;
     private final RealmInstanceFactory instanceFactory;
     private final RealmPortalManager portalManager;
+    private final io.github.larsonix.trailoforbis.maps.portal.PortalVisualManager portalVisualManager;
     private final RealmMapGenerator mapGenerator;
 
     /** Spawning module — mob pools, structure placement, boundary enforcement. */
@@ -210,6 +211,7 @@ public class RealmsManager implements RealmsService {
         this.removalHandler = new RealmRemovalHandler(teleportHandler);
         this.instanceFactory = new RealmInstanceFactory(templateRegistry, config, removalHandler);
         this.portalManager = new RealmPortalManager();
+        this.portalVisualManager = new io.github.larsonix.trailoforbis.maps.portal.PortalVisualManager();
         this.mapGenerator = new RealmMapGenerator(config, modifierConfig);
         this.hudManager = new RealmHudManager();
         this.spawnProtection = new RealmSpawnProtection();
@@ -437,11 +439,21 @@ public class RealmsManager implements RealmsService {
         playerToRealm.clear();
         templateRegistry.clear();
         portalManager.clearTracking();
+        portalVisualManager.shutdown();
 
         initialized = false;
         instance = null;
 
         LOGGER.atInfo().log("RealmsManager shutdown complete");
+    }
+
+    /**
+     * Deactivates portal visuals (block swap, decoratives, particles) for all portals of a realm.
+     * Immediately stops particle ticking, defers block cleanup to world thread.
+     */
+    private void deactivatePortalVisuals(@Nonnull RealmInstance realm) {
+        portalVisualManager.deactivateForPortals(
+                portalManager.getPortalsForRealm(realm.getRealmId()));
     }
 
     /**
@@ -650,6 +662,9 @@ public class RealmsManager implements RealmsService {
         // TIMEOUT = failed realm — no rewards. Only COMPLETED gets rewards (via triggerCompletion()).
         // ABANDONED and FORCE_CLOSED also don't get rewards.
 
+        // Revert portal visuals (swap back to base Portal_Device, remove decoratives, stop particles)
+        deactivatePortalVisuals(realm);
+
         // Immediately deactivate entry portals so new maps can be used
         portalManager.deactivateEntryPortalsNow(realm);
 
@@ -667,6 +682,9 @@ public class RealmsManager implements RealmsService {
         Duration gracePeriod;
         if (reason == RealmInstance.CompletionReason.TIMEOUT) {
             gracePeriod = Duration.ofSeconds(15);
+        } else if (realm.isReady() || realm.getAllParticipants().isEmpty()) {
+            // Never-entered realm — no players to wait for, close immediately
+            gracePeriod = Duration.ZERO;
         } else {
             gracePeriod = Duration.ofSeconds(config.getCompletionGracePeriodSeconds());
         }
@@ -1535,6 +1553,11 @@ public class RealmsManager implements RealmsService {
     @Nonnull
     public RealmPortalManager getPortalManager() {
         return portalManager;
+    }
+
+    @Nonnull
+    public io.github.larsonix.trailoforbis.maps.portal.PortalVisualManager getPortalVisualManager() {
+        return portalVisualManager;
     }
 
     /**

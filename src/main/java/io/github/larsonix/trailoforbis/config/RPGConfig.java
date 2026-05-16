@@ -440,6 +440,9 @@ public class RPGConfig {
             private float burnDamagePercent = 0.4f;          // +0.4% burn damage
             private float igniteChance = 0.1f;               // +0.1% ignite chance
             private float magicPower = 0.01f;                // +1% spell power per point
+            // chargeSpeedPercent: reserved for future — charge acceleration blocked by engine
+            // (ChargingInteraction reads private simulationTimestamp, no public API to modify)
+            private float chargeSpeedPercent = 0.0f;
 
             public float getPhysicalDamagePercent() {
                 return physicalDamagePercent;
@@ -487,6 +490,14 @@ public class RPGConfig {
 
             public void setMagicPower(float magicPower) {
                 this.magicPower = magicPower;
+            }
+
+            public float getChargeSpeedPercent() {
+                return chargeSpeedPercent;
+            }
+
+            public void setChargeSpeedPercent(float chargeSpeedPercent) {
+                this.chargeSpeedPercent = chargeSpeedPercent;
             }
         }
 
@@ -583,7 +594,9 @@ public class RPGConfig {
             private float critChance = 0.1f;             // +0.1% crit chance
             private float staminaRegen = 0.1f;           // +0.1 stamina/s regen
             private float shockChance = 0.1f;            // +0.1% shock chance
-            private float castSpeed = 0.01f;             // +1% cast speed per point
+            private float castSpeed = 0.01f;             // +1% cast speed per point (Hexcode internal)
+            private float comboSpeedBonus = 0.1f;        // +0.1% combo acceleration per point
+            private float castSpeedPercent = 0.3f;       // +0.3% magic weapon cast speed per point
 
             public float getAttackSpeedPercent() {
                 return attackSpeedPercent;
@@ -631,6 +644,22 @@ public class RPGConfig {
 
             public void setCastSpeed(float castSpeed) {
                 this.castSpeed = castSpeed;
+            }
+
+            public float getComboSpeedBonus() {
+                return comboSpeedBonus;
+            }
+
+            public void setComboSpeedBonus(float comboSpeedBonus) {
+                this.comboSpeedBonus = comboSpeedBonus;
+            }
+
+            public float getCastSpeedPercent() {
+                return castSpeedPercent;
+            }
+
+            public void setCastSpeedPercent(float castSpeedPercent) {
+                this.castSpeedPercent = castSpeedPercent;
             }
         }
 
@@ -700,6 +729,7 @@ public class RPGConfig {
             private float projectileDamagePercent = 0.5f; // +0.5% projectile damage
             private float jumpForcePercent = 0.15f;      // +0.15% jump height
             private float projectileSpeedPercent = 0.3f; // +0.3% projectile speed
+            private float projectileAttackSpeedPercent = 0.3f; // +0.3% ranged attack speed
 
             public float getEvasion() {
                 return evasion;
@@ -739,6 +769,14 @@ public class RPGConfig {
 
             public void setProjectileSpeedPercent(float projectileSpeedPercent) {
                 this.projectileSpeedPercent = projectileSpeedPercent;
+            }
+
+            public float getProjectileAttackSpeedPercent() {
+                return projectileAttackSpeedPercent;
+            }
+
+            public void setProjectileAttackSpeedPercent(float projectileAttackSpeedPercent) {
+                this.projectileAttackSpeedPercent = projectileAttackSpeedPercent;
             }
         }
 
@@ -856,9 +894,16 @@ public class RPGConfig {
         /**
          * Minimum damage threshold (as % of max HP) to trigger the red screen flash
          * and health alert. Hits below this threshold won't send the DamageInfo packet.
-         * Default: 3.0 (3% of max HP)
+         * Default: 15.0 (15% of max HP)
          */
-        private float healthAlertMinThreshold = 3.0f;
+        private float healthAlertMinThreshold = 15.0f;
+
+        /**
+         * Minimum interval (ms) between red screen flash packets for the same player.
+         * Rate-limits the directional damage vignette when fighting multiple mobs.
+         * Default: 750 (max ~1.3 flashes per second)
+         */
+        private long healthAlertCooldownMs = 750;
 
 
         public float getCritMultiplier() {
@@ -923,6 +968,14 @@ public class RPGConfig {
 
         public void setHealthAlertMinThreshold(float healthAlertMinThreshold) {
             this.healthAlertMinThreshold = healthAlertMinThreshold;
+        }
+
+        public long getHealthAlertCooldownMs() {
+            return healthAlertCooldownMs;
+        }
+
+        public void setHealthAlertCooldownMs(long healthAlertCooldownMs) {
+            this.healthAlertCooldownMs = healthAlertCooldownMs;
         }
 
 

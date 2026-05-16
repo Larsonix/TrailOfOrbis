@@ -103,7 +103,13 @@ public record PlayerLevelData(
      */
     @Nonnull
     public PlayerLevelData withXpDelta(long amount) {
-        return withXp(xp + amount);
+        long newXp;
+        if (amount > 0 && xp > Long.MAX_VALUE - amount) {
+            newXp = Long.MAX_VALUE; // overflow-safe cap
+        } else {
+            newXp = xp + amount;
+        }
+        return withXp(newXp);
     }
 
     /**
