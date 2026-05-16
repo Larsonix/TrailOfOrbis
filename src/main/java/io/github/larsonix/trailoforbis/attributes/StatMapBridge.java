@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.larsonix.trailoforbis.config.ConfigManager;
+import io.github.larsonix.trailoforbis.gear.model.WeaponType;
 import io.github.larsonix.trailoforbis.systems.VanillaStatReader;
 
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
@@ -269,12 +270,14 @@ public final class StatMapBridge {
             @Nonnull Inventory inventory,
             @Nullable ItemStack weaponStack) {
 
-        // Only process utility if weapon allows it (compatible = one-handed)
+        // Only process utility if weapon allows it (per WeaponType rules, not vanilla flag)
         if (!ItemStack.isEmpty(weaponStack)) {
             Item weaponItem = weaponStack.getItem();
-            if (weaponItem != null && weaponItem.getUtility() != null
-                    && !weaponItem.getUtility().isCompatible()) {
-                return; // Two-handed weapon — utility slot is disabled
+            if (weaponItem != null) {
+                WeaponType weaponType = WeaponType.fromItemIdOrUnknown(weaponItem.getId());
+                if (!weaponType.allowsOffhand()) {
+                    return; // Weapon blocks offhand stats
+                }
             }
         }
 

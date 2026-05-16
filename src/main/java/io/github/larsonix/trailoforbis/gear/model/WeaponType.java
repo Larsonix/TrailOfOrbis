@@ -161,6 +161,26 @@ public enum WeaponType {
     }
 
     /**
+     * Whether this weapon allows utility (offhand) items to provide stats.
+     *
+     * <p>This is the RPG system's own decision — independent of Hytale's
+     * vanilla {@code Utility.Compatible} flag which doesn't match our design
+     * (e.g., vanilla marks staves as 2H-incompatible, but we allow staff+spellbook).
+     */
+    public boolean allowsOffhand() {
+        return switch (this) {
+            case SWORD, AXE, CLAWS, CLUB -> true;
+            case DAGGER -> false;
+            case LONGSWORD, BATTLEAXE, SPEAR, MACE -> false;
+            case SHORTBOW, BLOWGUN -> false;
+            case CROSSBOW -> true;
+            case BOMB, DART, KUNAI -> true;
+            case WAND, STAFF, SPELLBOOK -> true;
+            case SHIELD, UNKNOWN -> true;
+        };
+    }
+
+    /**
      * Whether this weapon is a thrown consumable (BOMB, DART, KUNAI).
      */
     public boolean isThrown() {

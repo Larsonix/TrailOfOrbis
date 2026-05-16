@@ -12,7 +12,7 @@ import io.github.larsonix.trailoforbis.gear.model.WeaponImplicit;
 import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -386,23 +386,16 @@ public final class GearStatCalculator {
     }
 
     /**
-     * Checks if an RPG weapon allows offhand (utility) item pairing.
+     * Checks if an RPG weapon allows offhand (utility) item stat pairing.
      *
      * <p><b>Only called for RPG weapons</b> ({@code isHoldingRpgGear == true}).
      * Non-RPG items (torches, food, blocks, vanilla weapons) bypass this check
      * entirely — their offhand stats always apply.
      *
-     * <p>Uses Hytale's native {@code Utility.Compatible} flag from the weapon's
-     * {@link Item} asset. This flag is resolved through Hytale's JSON template
-     * inheritance at runtime — individual weapons inherit from their type template.
-     *
-     * <p>Weapons with {@code Compatible=true}: sword, axe, club, claws, wand, crossbow.
-     * Weapons with {@code Compatible=false} (or absent): daggers (dual-wield),
-     * mace, longsword, battleaxe, spear, shortbow, staff.
-     *
-     * <p>Fallback when the Item asset can't be resolved (custom rpg_gear_*
-     * with failed base resolution, unknown mod items): returns {@code true} (allow offhand).
-     * This is the safe default — silently suppressing stats is worse than granting them.
+     * <p>Uses our own {@link WeaponType#allowsOffhand()} instead of Hytale's
+     * native {@code Utility.Compatible} flag. The vanilla flag doesn't match our RPG
+     * design (e.g., staves are vanilla 2H but we allow staff+spellbook as the
+     * caster archetype).
      *
      * @param weaponItemId The vanilla item ID of the equipped RPG weapon (may be null)
      * @return true if offhand stats should be applied
@@ -411,16 +404,7 @@ public final class GearStatCalculator {
         if (weaponItemId == null) {
             return true;  // Bare fists — offhand allowed
         }
-
-        Item item = Item.getAssetMap().getAsset(weaponItemId);
-        if (item == null) {
-            // Custom or modded item not in asset map — allow offhand as safe fallback.
-            // This covers rpg_gear_* items where resolveVanillaItemId() failed.
-            LOGGER.atFine().log("Weapon %s not in asset map — defaulting to offhand-compatible", weaponItemId);
-            return true;
-        }
-
-        return item.getUtility().isCompatible();
+        return WeaponType.fromItemIdOrUnknown(weaponItemId).allowsOffhand();
     }
 
     // =========================================================================
