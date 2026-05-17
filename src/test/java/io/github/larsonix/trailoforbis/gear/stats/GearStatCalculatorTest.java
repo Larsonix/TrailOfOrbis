@@ -487,15 +487,18 @@ class GearStatCalculatorTest {
     }
 
     @Test
-    @DisplayName("RPG Staff (Compatible=false) skips offhand stats")
-    void calculateBonuses_RpgStaff_SkipsUtility() {
+    @DisplayName("RPG Staff allows offhand stats (staff + spellbook caster archetype)")
+    void calculateBonuses_RpgStaff_AllowsUtility() {
+        // Staves allow offhand pairing (WeaponType.STAFF.allowsOffhand() = true)
+        // despite having vanilla Compatible=false. This is intentional — the staff+spellbook
+        // combo is the caster archetype in our RPG design.
         ItemStack weapon = createRpgWeaponMock("Weapon_Staff_Iron", false);
         stubEmptyArmor();
         when(inventory.getActiveHotbarItem()).thenReturn(weapon);
 
         calculator.calculateBonuses(playerId, inventory);
 
-        verify(inventory, never()).getUtilityItem();
+        verify(inventory, atLeastOnce()).getUtilityItem();
     }
 
     @Test

@@ -1012,14 +1012,14 @@ public final class ItemRegistryService {
                 return;
             }
 
-            // MERGE our reskin types with the item's existing ResourceTypes.
-            // Mod items may define ResourceTypes for custom crafting/salvage recipes —
-            // replacing them would destroy mod functionality. Our reskin workbench only
-            // checks for the presence of our specific reskin type IDs.
-            ItemResourceType[] existingTypes = (ItemResourceType[]) ITEM_RESOURCE_TYPES_FIELD.get(customItem);
+            // MERGE our reskin types with the BASE ITEM's original ResourceTypes.
+            // Always read from baseItem (never customItem) to avoid accumulating reskin
+            // types across multiple calls (createCustomItem, batchRegister, reinject).
+            // Mod resource types are preserved; our reskin types are fresh each call.
+            ItemResourceType[] baseTypes = (ItemResourceType[]) ITEM_RESOURCE_TYPES_FIELD.get(baseItem);
             List<ItemResourceType> merged = new ArrayList<>();
-            if (existingTypes != null) {
-                Collections.addAll(merged, existingTypes);
+            if (baseTypes != null) {
+                Collections.addAll(merged, baseTypes);
             }
             merged.addAll(reskinTypes);
 
