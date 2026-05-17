@@ -1,12 +1,15 @@
 package io.github.larsonix.trailoforbis.gear.vanilla;
 
+import com.hypixel.hytale.logger.HytaleLogger;
 import io.github.larsonix.trailoforbis.gear.config.GearBalanceConfig.FamilyAttackProfile;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 /**
  * Complete attack profile for a vanilla weapon.
@@ -28,23 +31,85 @@ import java.util.Map;
  * <p>This guarantees that two daggers (e.g., Iron vs Crude) with different vanilla
  * damage spreads produce identical multipliers for the same attack type.
  *
- * @param itemId The Hytale item ID (e.g., "Weapon_Daggers_Iron")
- * @param weaponFamily The weapon family from Tags (e.g., "Daggers")
- * @param attacks All enumerated attacks for this weapon
- * @param minDamage The lowest damage value across all attacks
- * @param maxDamage The highest damage value across all attacks
- * @param referenceDamage The geometric mean √(min × max) used by fallback path
- * @param damageToEffectiveness Map of vanilla damage values to effectiveness multipliers
+ * <h2>Lookup Strategy</h2>
+ *
+ * <p>At runtime, vanilla damage values from Hytale's combat events may differ slightly
+ * from the values enumerated at startup (due to float precision, stat modifier
+ * interactions, or DamageCalculator computation differences). To handle this,
+ * {@link #getAttackTypeMultiplier} uses a <b>nearest-match</b> lookup with tolerance
+ * instead of exact {@code Float} equality in a HashMap (which was the previous,
+ * fragile approach). Sorted parallel arrays enable O(log n) binary search.
  */
-public record VanillaWeaponProfile(
-        String itemId,
-        String weaponFamily,
-        List<VanillaAttackInfo> attacks,
-        float minDamage,
-        float maxDamage,
-        float referenceDamage,
-        Map<Float, Float> damageToEffectiveness
-) {
+public final class VanillaWeaponProfile {
+
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /**
+     * Maximum allowed difference between a runtime damage value and an enumerated
+     * damage value for a match. 0.5 is generous enough to absorb float precision
+     * and stat modifier drift while being small enough to avoid cross-attack
+     * confusion (weapon attacks are typically ≥2.0 apart).
+     */
+    private static final float MATCH_TOLERANCE = 0.5f;
+
+    private final String itemId;
+    private final String weaponFamily;
+    private final List<VanillaAttackInfo> attacks;
+    private final float minDamage;
+    private final float maxDamage;
+    private final float referenceDamage;
+    private final Map<Float, Float> damageToEffectiveness;
+
+    // Sorted parallel arrays for nearest-match lookup (built from damageToEffectiveness)
+    private final float[] sortedDamageKeys;
+    private final float[] sortedMultiplierValues;
+
+    public VanillaWeaponProfile(
+            String itemId,
+            String weaponFamily,
+            List<VanillaAttackInfo> attacks,
+            float minDamage,
+            float maxDamage,
+            float referenceDamage,
+            Map<Float, Float> damageToEffectiveness
+    ) {
+        this.itemId = itemId;
+        this.weaponFamily = weaponFamily;
+        this.attacks = attacks;
+        this.minDamage = minDamage;
+        this.maxDamage = maxDamage;
+        this.referenceDamage = referenceDamage;
+        this.damageToEffectiveness = damageToEffectiveness;
+
+        // Build sorted parallel arrays for nearest-match binary search
+        if (damageToEffectiveness.isEmpty()) {
+            this.sortedDamageKeys = new float[0];
+            this.sortedMultiplierValues = new float[0];
+        } else {
+            float[] keys = new float[damageToEffectiveness.size()];
+            int i = 0;
+            for (float key : damageToEffectiveness.keySet()) {
+                keys[i++] = key;
+            }
+            Arrays.sort(keys);
+
+            float[] values = new float[keys.length];
+            for (int j = 0; j < keys.length; j++) {
+                values[j] = damageToEffectiveness.get(keys[j]);
+            }
+            this.sortedDamageKeys = keys;
+            this.sortedMultiplierValues = values;
+        }
+    }
+
+    // Accessors (replaces record component accessors)
+    public String itemId() { return itemId; }
+    public String weaponFamily() { return weaponFamily; }
+    public List<VanillaAttackInfo> attacks() { return attacks; }
+    public float minDamage() { return minDamage; }
+    public float maxDamage() { return maxDamage; }
+    public float referenceDamage() { return referenceDamage; }
+    public Map<Float, Float> damageToEffectiveness() { return damageToEffectiveness; }
     /**
      * Creates a profile from a list of attacks and a family attack profile.
      *
@@ -173,23 +238,69 @@ public record VanillaWeaponProfile(
     /**
      * Gets the attack type multiplier for a vanilla damage value.
      *
-     * <p>First checks for an exact match in the pre-computed map.
-     * Falls back to calculating damage / referenceDamage for unknown values.
+     * <p>Uses a nearest-match lookup against sorted damage breakpoints with
+     * {@link #MATCH_TOLERANCE} tolerance. This is robust against float precision
+     * drift between the DamageCalculator.baseDamageRaw values read at startup and
+     * the actual damage.getAmount() values received at runtime.
+     *
+     * <p>Falls back to {@code vanillaDamage / referenceDamage} only for truly
+     * unknown damage values (e.g., new attack types not present during discovery).
      *
      * @param vanillaDamage The vanilla damage amount from the attack
      * @return The attack type multiplier
      */
     public float getAttackTypeMultiplier(float vanillaDamage) {
-        Float exact = damageToEffectiveness.get(vanillaDamage);
-        if (exact != null) {
-            return exact;
+        if (sortedDamageKeys.length == 0) {
+            return referenceDamage > 0 ? vanillaDamage / referenceDamage : 1.0f;
         }
 
-        // Fall back to calculation for unknown damage values
+        // Binary search for insertion point in sorted damage keys
+        int pos = Arrays.binarySearch(sortedDamageKeys, vanillaDamage);
+        if (pos >= 0) {
+            // Exact match
+            return sortedMultiplierValues[pos];
+        }
+
+        // No exact match — find the nearest value within tolerance.
+        // binarySearch returns -(insertionPoint) - 1 on miss
+        int insertIdx = -pos - 1;
+
+        float bestDist = Float.MAX_VALUE;
+        int bestIdx = -1;
+
+        // Check the entry at insertIdx (first value >= vanillaDamage)
+        if (insertIdx < sortedDamageKeys.length) {
+            float dist = Math.abs(sortedDamageKeys[insertIdx] - vanillaDamage);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = insertIdx;
+            }
+        }
+        // Check the entry at insertIdx - 1 (last value < vanillaDamage)
+        if (insertIdx > 0) {
+            float dist = Math.abs(sortedDamageKeys[insertIdx - 1] - vanillaDamage);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = insertIdx - 1;
+            }
+        }
+
+        if (bestIdx >= 0 && bestDist <= MATCH_TOLERANCE) {
+            return sortedMultiplierValues[bestIdx];
+        }
+
+        // Truly unknown damage value — fall back to raw ratio
         if (referenceDamage <= 0) {
             return 1.0f;
         }
-        return vanillaDamage / referenceDamage;
+        float fallback = vanillaDamage / referenceDamage;
+        LOGGER.at(Level.FINE).log(
+                "[WeaponProfile] No match for %s: vanillaDmg=%.2f (nearest=%.2f, dist=%.2f > tol=%.1f) → fallback=%.2fx. Enumerated: %s",
+                itemId, vanillaDamage,
+                bestIdx >= 0 ? sortedDamageKeys[bestIdx] : -1f,
+                bestDist, MATCH_TOLERANCE, fallback,
+                Arrays.toString(sortedDamageKeys));
+        return fallback;
     }
 
     /**

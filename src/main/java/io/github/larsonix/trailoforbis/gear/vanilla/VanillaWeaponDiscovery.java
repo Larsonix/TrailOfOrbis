@@ -221,6 +221,26 @@ public class VanillaWeaponDiscovery {
             }
             LOGGER.at(Level.INFO).log(sb.toString());
         }
+
+        // Self-test: verify the nearest-match lookup resolves every enumerated damage value
+        int selfTestMisses = 0;
+        for (VanillaWeaponProfile profile : profiles.values()) {
+            for (VanillaAttackInfo attack : profile.attacks()) {
+                float mult = profile.getAttackTypeMultiplier(attack.damage());
+                Float expected = profile.damageToEffectiveness().get(attack.damage());
+                if (expected != null && Math.abs(mult - expected) > 0.001f) {
+                    selfTestMisses++;
+                    LOGGER.at(Level.WARNING).log(
+                            "Profile self-test FAIL: %s attack '%s' dmg=%.2f → got %.2fx, expected %.2fx",
+                            profile.itemId(), attack.attackName(), attack.damage(), mult, expected);
+                }
+            }
+        }
+        if (selfTestMisses == 0) {
+            LOGGER.at(Level.INFO).log("Profile self-test: all %d profiles pass nearest-match verification", profileCount);
+        } else {
+            LOGGER.at(Level.WARNING).log("Profile self-test: %d lookup mismatches detected!", selfTestMisses);
+        }
     }
 
     /**

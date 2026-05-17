@@ -411,6 +411,99 @@ class VanillaWeaponProfileTest {
     }
 
     // =========================================================================
+    // NEAREST-MATCH TOLERANCE TESTS (REGRESSION: damage halving bug)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Nearest-Match Tolerance Lookup")
+    class NearestMatchTests {
+
+        @Test
+        @DisplayName("CORE REGRESSION: Slight float drift still returns correct profile multiplier")
+        void floatDrift_StillMatchesProfile() {
+            List<VanillaAttackInfo> attacks = List.of(
+                VanillaAttackInfo.normal("Basic", 6.0f),
+                VanillaAttackInfo.normal("Medium", 20.0f),
+                VanillaAttackInfo.normal("Heavy", 60.0f)
+            );
+
+            FamilyAttackProfile swordProfile = new FamilyAttackProfile(
+                List.of(0.5, 1.0, 2.0), 3.0);
+
+            VanillaWeaponProfile profile = VanillaWeaponProfile.create(
+                "Weapon_Sword_Mithril", "Sword", attacks, swordProfile);
+
+            // Exact matches (baseline)
+            assertEquals(0.5f, profile.getAttackTypeMultiplier(6.0f), 0.001f);
+            assertEquals(1.0f, profile.getAttackTypeMultiplier(20.0f), 0.001f);
+            assertEquals(2.0f, profile.getAttackTypeMultiplier(60.0f), 0.001f);
+
+            // Slight drift (within tolerance ±0.5) — MUST still return profile multiplier
+            assertEquals(0.5f, profile.getAttackTypeMultiplier(6.01f), 0.001f,
+                "Tiny positive drift should still match Basic attack");
+            assertEquals(0.5f, profile.getAttackTypeMultiplier(5.99f), 0.001f,
+                "Tiny negative drift should still match Basic attack");
+            assertEquals(1.0f, profile.getAttackTypeMultiplier(20.3f), 0.001f,
+                "Moderate drift should still match Medium attack");
+            assertEquals(2.0f, profile.getAttackTypeMultiplier(59.7f), 0.001f,
+                "Moderate negative drift should still match Heavy attack");
+        }
+
+        @Test
+        @DisplayName("Drift beyond tolerance falls back to raw ratio")
+        void beyondTolerance_FallsBackToRatio() {
+            List<VanillaAttackInfo> attacks = List.of(
+                VanillaAttackInfo.normal("Basic", 6.0f),
+                VanillaAttackInfo.normal("Heavy", 60.0f)
+            );
+
+            FamilyAttackProfile swordProfile = new FamilyAttackProfile(
+                List.of(0.5, 2.0), 3.0);
+
+            VanillaWeaponProfile profile = VanillaWeaponProfile.create(
+                "Weapon_Test", "Test", attacks, swordProfile);
+
+            // Value 30f is far from both 6f and 60f → should use fallback
+            float result = profile.getAttackTypeMultiplier(30f);
+            float expected = 30f / profile.referenceDamage();
+            assertEquals(expected, result, 0.001f,
+                "Value far from all enumerated damages should use ratio fallback");
+        }
+
+        @Test
+        @DisplayName("Sword basic swing NEVER returns min_multiplier floor (0.3x)")
+        void swordBasicSwing_NeverReturnsClamFloor() {
+            // Simulates the exact bug: Sword has normalMultipliers starting at 0.5
+            // but a float mismatch was causing fallback to vanillaDmg/ref < 0.3 → clamped to 0.3
+            List<VanillaAttackInfo> attacks = List.of(
+                VanillaAttackInfo.normal("Swing_Left", 6.0f),
+                VanillaAttackInfo.normal("Swing_Right", 8.0f),
+                VanillaAttackInfo.normal("Stab", 15.0f),
+                VanillaAttackInfo.normal("Heavy_Swing", 30.0f),
+                VanillaAttackInfo.normal("Pounce_Sweep", 60.0f),
+                VanillaAttackInfo.normal("Signature", 120.0f),
+                VanillaAttackInfo.backstab("Backstab", 200.0f, 180f, 60f)
+            );
+
+            FamilyAttackProfile swordProfile = new FamilyAttackProfile(
+                List.of(0.5, 0.6, 0.8, 1.0, 1.5, 2.0), 3.0);
+
+            VanillaWeaponProfile profile = VanillaWeaponProfile.create(
+                "Weapon_Sword_Mithril", "Sword", attacks, swordProfile);
+
+            // The weakest normal attack (6.0f with drift) should ALWAYS return ≥0.5
+            float weakestMult = profile.getAttackTypeMultiplier(6.01f);
+            assertTrue(weakestMult >= 0.49f,
+                "Weakest sword swing with float drift must return profile minimum (0.5), got: " + weakestMult);
+
+            // Should never return below Sword's lowest config multiplier
+            float weakestExact = profile.getAttackTypeMultiplier(6.0f);
+            assertTrue(weakestExact >= 0.49f,
+                "Weakest sword swing exact match must return 0.5, got: " + weakestExact);
+        }
+    }
+
+    // =========================================================================
     // EDGE CASES
     // =========================================================================
 
