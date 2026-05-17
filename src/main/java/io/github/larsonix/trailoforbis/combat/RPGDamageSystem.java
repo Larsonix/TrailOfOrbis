@@ -28,6 +28,7 @@ import io.github.larsonix.trailoforbis.attributes.ComputedStats;
 import io.github.larsonix.trailoforbis.elemental.ElementType;
 import io.github.larsonix.trailoforbis.elemental.ElementalStats;
 import io.github.larsonix.trailoforbis.gear.model.WeaponType;
+import io.github.larsonix.trailoforbis.gear.util.GearUtils;
 import io.github.larsonix.trailoforbis.gear.vanilla.VanillaAttackInfo;
 import io.github.larsonix.trailoforbis.gear.vanilla.VanillaWeaponProfile;
 import com.hypixel.hytale.component.dependency.Dependency;
@@ -394,6 +395,28 @@ public class RPGDamageSystem extends DamageEventSystem {
         return DamageTypeClassifier.isRpgDotCause(cause.getId());
     }
 
+    /**
+     * Fast check: is this damage from a player wielding RPG gear?
+     *
+     * <p>Used to bypass the vanillaDamage<=0 guard for modded weapons with 0 base damage
+     * (e.g., knockback-only weapons converted to RPG gear). Without this, the Damage event
+     * fires with amount=0 and our pipeline skips it — meaning RPG weapons deal no damage.
+     *
+     * <p>Only returns true for PLAYER-wielded RPG gear. Mob knockback-only attacks,
+     * environmental damage, and non-RPG items still skip correctly.
+     */
+    private boolean isPlayerRpgWeaponSource(@Nonnull Store<EntityStore> store, @Nonnull Damage damage) {
+        if (!(damage.getSource() instanceof Damage.EntitySource entitySource)) return false;
+        Ref<EntityStore> ref = entitySource.getRef();
+        if (ref == null || !ref.isValid()) return false;
+        PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+        if (playerRef == null) return false;
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null || player.getInventory() == null) return false;
+        ItemStack weapon = player.getInventory().getActiveHotbarItem();
+        return GearUtils.isRpgGear(weapon);
+    }
+
     /** Inner handle method — contains the actual damage pipeline logic. */
     private void handleInner(
         int index,
@@ -453,8 +476,17 @@ public class RPGDamageSystem extends DamageEventSystem {
         // Check vanilla damage amount to skip already-processed or invalid events
         // Note: We don't use this value for calculations - RPG base damage is computed later
         float vanillaDamage = damage.getAmount();
-        if (vanillaDamage <= 0 || damage.isCancelled()) {
+        if (damage.isCancelled()) {
             return;
+        }
+        if (vanillaDamage <= 0) {
+            // RPG weapons with 0 vanilla base damage still need processing — we're sole stat authority.
+            // Example: modded knockback-only weapons (Physical:0) that become RPG gear.
+            // Only bypass for PLAYER-wielded RPG gear; mob 0-damage attacks skip correctly.
+            if (!isPlayerRpgWeaponSource(store, damage)) {
+                return;
+            }
+            // Proceeding with 0 vanilla damage — RPG formula calculates fresh from weapon level/modifiers
         }
 
         // Guide popup damage suppression: if target is a player with a guide popup open,
@@ -999,6 +1031,11 @@ public class RPGDamageSystem extends DamageEventSystem {
 
                 if (!useVanillaProfiles) {
                     // Profiles disabled - no attack type differentiation, use RPG damage directly
+                    ctx.attackTypeMultiplier = 1.0f;
+                } else if (ctx.vanillaDamage <= 0) {
+                    // 0-damage modded weapon (RPG bypass path) — can't derive attack type from
+                    // vanilla ratios, default to neutral multiplier. RPG formula uses weapon
+                    // level/modifiers for actual damage, not vanilla base.
                     ctx.attackTypeMultiplier = 1.0f;
                 } else if (ctx.attackType == AttackType.PROJECTILE) {
                     // Projectiles have no per-attack differentiation (no light/heavy/backstab).

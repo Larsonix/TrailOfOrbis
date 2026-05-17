@@ -5,6 +5,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -14,6 +15,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.logging.Level;
 
 /**
  * Auto-patches weapons that ship without InteractionVars (damage definitions).
@@ -238,8 +240,216 @@ public final class WeaponInteractionPatcher {
         return totalPatched;
     }
 
+    /**
+     * Patches DamageCalculators with null/empty baseDamageRaw to ensure damage events fire.
+     *
+     * <p>Some modded weapons define interactions with no damage (knockback-only weapons)
+     * or omit the DamageCalculator entirely. When baseDamageRaw is null or empty,
+     * {@code DamageCalculator.calculateDamage()} returns null, causing the engine to
+     * skip firing the Damage ECS event entirely. Our RPGDamageSystem never gets called.
+     *
+     * <p>This method injects Physical:0.01 into empty DamageCalculators so the event fires.
+     * The 0.01 value is imperceptible (rounds to 0 in display) but guarantees the ECS event
+     * dispatches, allowing RPGDamageSystem to intercept and apply real RPG damage.
+     *
+     * <p>Call once during plugin startup (Phase 3.5), after {@link #patchAll()}.
+     *
+     * @return The number of DamageCalculators patched
+     */
+    public int patchZeroDamageCalculators() {
+        if (!enabled) {
+            return 0;
+        }
+
+        DefaultAssetMap<String, Item> assetMap = Item.getAssetMap();
+        var rootInteractionMap = RootInteraction.getAssetMap();
+        int patched = 0;
+
+        for (Item item : assetMap.getAssetMap().values()) {
+            if (!isWeapon(item)) continue;
+            if (item.getId().startsWith("Template_")) continue;
+            if (item.getId().startsWith("rpg_")) continue;
+
+            Map<String, String> vars = getInteractionVars(item);
+            if (vars == null || vars.isEmpty()) continue;
+
+            for (String rootId : vars.values()) {
+                RootInteraction root = rootInteractionMap.getAsset(rootId);
+                if (root == null) continue;
+
+                String[] interactionIds = root.getInteractionIds();
+                if (interactionIds == null) continue;
+
+                for (String interactionId : interactionIds) {
+                    if (patchDamageCalculatorIfEmpty(interactionId, item.getId())) {
+                        patched++;
+                    }
+                }
+            }
+        }
+
+        if (patched > 0) {
+            LOGGER.atInfo().log("Zero-damage patcher: injected Physical:0.01 into %d empty DamageCalculator(s)", patched);
+        }
+        return patched;
+    }
+
+    /**
+     * Attempts to patch a single Interaction's DamageCalculator if baseDamageRaw is empty.
+     *
+     * <p>Uses reflection to navigate: Interaction asset → DamageEntityInteraction →
+     * damageCalculator field → baseDamageRaw field. Only patches if the map is null or empty.
+     *
+     * @param interactionId The Interaction asset ID to check
+     * @param ownerItemId The weapon item ID (for logging)
+     * @return true if a patch was applied
+     */
+    private boolean patchDamageCalculatorIfEmpty(@Nonnull String interactionId, @Nonnull String ownerItemId) {
+        try {
+            // Resolve the Interaction asset
+            Object interaction = resolveInteractionAsset(interactionId);
+            if (interaction == null) return false;
+
+            // Check if it's a DamageEntityInteraction (or subclass)
+            Class<?> deiClass = findDamageEntityInteractionClass(interaction);
+            if (deiClass == null) return false;
+
+            // Access damageCalculator field
+            Field dcField = deiClass.getDeclaredField("damageCalculator");
+            dcField.setAccessible(true);
+            Object calculator = dcField.get(interaction);
+            if (calculator == null) return false;
+
+            // Access baseDamageRaw field on DamageCalculator
+            Field rawField = calculator.getClass().getDeclaredField("baseDamageRaw");
+            rawField.setAccessible(true);
+            Object rawMap = rawField.get(calculator);
+
+            // Check if empty (null, empty map, or all values sum to 0)
+            if (rawMap == null || isEmptyOrAllZero(rawMap)) {
+                // Inject Physical:0.01 using the compiled baseDamage field
+                // baseDamageRaw is Object2FloatMap<String> — inject "Physical" → 0.01f
+                injectMinimalDamage(calculator, rawField);
+                LOGGER.atFine().log("Injected Physical:0.01 into DamageCalculator for %s (interaction: %s)",
+                    ownerItemId, interactionId);
+                return true;
+            }
+        } catch (NoSuchFieldException e) {
+            // DamageCalculator structure doesn't match — skip silently (different Hytale version?)
+            LOGGER.at(Level.FINE).log("DamageCalculator field not found for interaction %s: %s",
+                interactionId, e.getMessage());
+        } catch (Exception e) {
+            LOGGER.at(Level.FINE).log("Could not patch DamageCalculator for %s (interaction %s): %s",
+                ownerItemId, interactionId, e.getMessage());
+        }
+        return false;
+    }
+
+    @Nullable
+    private Object resolveInteractionAsset(@Nonnull String id) {
+        try {
+            // Interaction.getAssetMap() — we need to find this class
+            Class<?> interactionClass = Class.forName(
+                "com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction");
+            java.lang.reflect.Method getAssetMap = interactionClass.getMethod("getAssetMap");
+            Object assetMap = getAssetMap.invoke(null);
+            java.lang.reflect.Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
+            return getAsset.invoke(assetMap, id);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Class<?> findDamageEntityInteractionClass(@Nonnull Object interaction) {
+        try {
+            Class<?> targetClass = Class.forName(
+                "com.hypixel.hytale.server.core.modules.interaction.interaction.config.server.DamageEntityInteraction");
+            if (targetClass.isInstance(interaction)) {
+                return targetClass;
+            }
+        } catch (ClassNotFoundException e) {
+            // Class not found — skip
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean isEmptyOrAllZero(@Nonnull Object rawMap) {
+        if (rawMap instanceof Map<?, ?> map) {
+            if (map.isEmpty()) return true;
+            // Check if all values sum to 0
+            double sum = 0;
+            for (Object val : map.values()) {
+                if (val instanceof Number num) {
+                    sum += Math.abs(num.doubleValue());
+                }
+            }
+            return sum < 0.001;
+        }
+        // fastutil Object2FloatMap — try size() method
+        try {
+            java.lang.reflect.Method sizeMethod = rawMap.getClass().getMethod("size");
+            int size = (int) sizeMethod.invoke(rawMap);
+            if (size == 0) return true;
+            // Check values via iterator
+            java.lang.reflect.Method valuesMethod = rawMap.getClass().getMethod("values");
+            Object values = valuesMethod.invoke(rawMap);
+            double sum = 0;
+            if (values instanceof Iterable<?> iterable) {
+                for (Object val : iterable) {
+                    if (val instanceof Number num) {
+                        sum += Math.abs(num.doubleValue());
+                    }
+                }
+            }
+            return sum < 0.001;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void injectMinimalDamage(@Nonnull Object calculator, @Nonnull Field rawField) throws Exception {
+        // Create a new Object2FloatOpenHashMap<String> with Physical:0.01
+        Object2FloatOpenHashMap<String> newMap = new Object2FloatOpenHashMap<>();
+        newMap.put("Physical", 0.01f);
+        rawField.set(calculator, newMap);
+
+        // Also need to recompile the baseDamage (Int2FloatMap) which is the runtime version.
+        // baseDamageRaw uses String keys; baseDamage uses int indices compiled from DamageCause assets.
+        // Trigger recompilation by calling afterDecode if available, or set baseDamage directly.
+        try {
+            Field baseDamageField = calculator.getClass().getDeclaredField("baseDamage");
+            baseDamageField.setAccessible(true);
+            // We need the DamageCause index for "Physical". Use DamageCause.getAssetMap()
+            int physicalIndex = getPhysicalDamageCauseIndex();
+            if (physicalIndex >= 0) {
+                it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap compiled = new it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap();
+                compiled.put(physicalIndex, 0.01f);
+                baseDamageField.set(calculator, compiled);
+            }
+        } catch (NoSuchFieldException e) {
+            // baseDamage field doesn't exist — raw map alone might be sufficient
+            // if the calculator re-compiles on next use
+        }
+    }
+
+    private int getPhysicalDamageCauseIndex() {
+        try {
+            var damageCauseMap = com.hypixel.hytale.server.core.modules.entity.damage.DamageCause.getAssetMap();
+            var physical = damageCauseMap.getAsset("Physical");
+            if (physical != null) {
+                return damageCauseMap.getIndex("Physical");
+            }
+        } catch (Exception e) {
+            LOGGER.at(Level.FINE).log("Could not resolve Physical DamageCause index: %s", e.getMessage());
+        }
+        return -1;
+    }
+
     // =========================================================================
-    // PATCHING
+    // PATCHING (InteractionVars)
     // =========================================================================
 
     /**

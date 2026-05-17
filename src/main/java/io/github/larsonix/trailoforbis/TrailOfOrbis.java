@@ -1321,6 +1321,7 @@ public class TrailOfOrbis extends JavaPlugin {
             var weaponPatcher = new io.github.larsonix.trailoforbis.gear.vanilla.WeaponInteractionPatcher(
                     dataFolder.resolve("config"), getClass().getClassLoader());
             weaponPatcher.patchAll();
+            weaponPatcher.patchZeroDamageCalculators();
         } catch (Exception e) {
             getLogger().atWarning().withCause(e).log(
                     "Weapon interaction patcher failed — some weapon skins may deal zero damage");

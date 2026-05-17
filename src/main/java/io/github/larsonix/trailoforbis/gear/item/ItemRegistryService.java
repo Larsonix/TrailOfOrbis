@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +94,7 @@ public final class ItemRegistryService {
 
     // Item fields
     private static final Field ITEM_ID_FIELD;
+    private static final Field ITEM_MAX_STACK_FIELD;
     private static final Field ITEM_TRANSLATION_PROPS_FIELD;
     private static final Field ITEM_CACHED_PACKET_FIELD;
     private static final Field ITEM_DURABILITY_LOSS_ON_DEATH_FIELD;
@@ -120,6 +122,9 @@ public final class ItemRegistryService {
             // Item fields
             ITEM_ID_FIELD = Item.class.getDeclaredField("id");
             ITEM_ID_FIELD.setAccessible(true);
+
+            ITEM_MAX_STACK_FIELD = Item.class.getDeclaredField("maxStack");
+            ITEM_MAX_STACK_FIELD.setAccessible(true);
 
             ITEM_TRANSLATION_PROPS_FIELD = Item.class.getDeclaredField("translationProperties");
             ITEM_TRANSLATION_PROPS_FIELD.setAccessible(true);
@@ -557,11 +562,25 @@ public final class ItemRegistryService {
         // Use Item's copy constructor to clone all properties
         Item customItem = new Item(baseItem);
 
+        // Force MaxStack=1 on all RPG gear. Stackable weapon-bases (pillows MaxStack=100,
+        // spears MaxStack=30) would otherwise create stackable RPG items, breaking the
+        // instanceId system which requires each RPG item to be unique and unstackable.
+        if (baseItem.getMaxStack() > 1) {
+            try {
+                ITEM_MAX_STACK_FIELD.setInt(customItem, 1);
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log("Failed to force maxStack=1 for %s", customId);
+            }
+        }
+
         // Neutralize durability on death for RPG gear — RPG items are permanent
         neutralizeDurabilityOnDeath(customItem);
 
-        // Neutralize ALL vanilla stat vectors — RPG system is the sole stat authority
-        neutralizeVanillaStats(customItem);
+        // De-couple weapon/armor/utility from shared base references.
+        // The copy constructor shallow-copies these — they share the same object as the
+        // base item. We create independent copies so our mutations don't corrupt the base.
+        // ALL fields are preserved (full field copy) — we do NOT zero anything.
+        decoupleComponents(customItem);
 
         // Copy playerAnimationsId from base item so the client doesn't log
         // "Missing playerAnimationsId" for every registered custom item during
@@ -712,92 +731,85 @@ public final class ItemRegistryService {
     }
 
     /**
-     * Neutralizes ALL vanilla stat vectors on a custom RPG item.
+     * De-couples weapon/armor/utility components from the shared base item references.
      *
      * <p>The {@code Item} copy constructor shallow-copies {@code armor}, {@code weapon},
      * and {@code utility} — they share the same object as the base item. We CANNOT mutate
      * those shared objects (that would corrupt the base item). Instead, we create fresh
-     * instances that preserve structural fields (armorSlot, cosmeticsToHide, renderDualWielded,
-     * usable, compatible) but zero out every stat-bearing field.
+     * instances with ALL fields preserved via full field-by-field reflection copy.
      *
-     * <h2>Stat Vectors Neutralized</h2>
-     * <table>
-     * <tr><th>Component</th><th>Fields Cleared</th></tr>
-     * <tr><td>ItemArmor</td><td>statModifiers, baseDamageResistance, damageResistanceValues,
-     *     damageEnhancementValues, damageClassEnhancement, knockbackResistances,
-     *     knockbackEnhancements, regeneratingValues, interactionModifiers</td></tr>
-     * <tr><td>ItemWeapon</td><td>statModifiers, entityStatsToClear</td></tr>
-     * <tr><td>ItemUtility</td><td>statModifiers, entityStatsToClear</td></tr>
-     * </table>
+     * <p>This is a de-coupling operation, NOT a stat-zeroing operation. Every field from
+     * the original mod item is preserved exactly — knockback resistances, damage resistances,
+     * stat modifiers, regenerating values, all of it. Our runtime systems handle stat
+     * authority separately (VanillaEquipmentStatSuppressor + RPGDamageSystem).
      *
-     * @param item The custom item to neutralize (must be a fresh copy, not the base item)
+     * @param item The custom item to de-couple (must be a fresh copy, not the base item)
      */
-    private void neutralizeVanillaStats(@Nonnull Item item) {
-        neutralizeArmorStats(item);
-        neutralizeWeaponStats(item);
-        neutralizeUtilityStats(item);
+    private void decoupleComponents(@Nonnull Item item) {
+        decoupleArmor(item);
+        decoupleWeapon(item);
+        decoupleUtility(item);
     }
 
     /**
-     * Replaces the item's {@code ItemArmor} with a stat-free copy.
+     * De-couples the item's {@code ItemArmor} from the shared base reference.
      *
-     * <p>Uses the 4-arg constructor which only sets armorSlot, baseDamageResistance (0),
-     * statModifiers (null), and cosmeticsToHide. All other fields default to null.
+     * <p>Creates an independent copy with ALL fields preserved via full field-by-field copy,
+     * then zeroes only {@code baseDamageResistance}. This preserves mod-specific armor
+     * properties (knockback resistances, damage resistances, regenerating values, cosmetics,
+     * custom stat modifiers) while preventing vanilla armor reduction from double-dipping.
+     *
+     * <p><b>Why baseDamageResistance must be zeroed:</b> Hytale's {@code FilterDamageGroup}
+     * runs AFTER our {@code RPGDamageSystem} and applies vanilla armor reduction from this
+     * field. Since our system already applies RPG-calculated armor, leaving the vanilla value
+     * would cause double defense. All other fields are safe — stat modifiers are handled by
+     * {@code VanillaEquipmentStatSuppressor}, and mod-specific resistances/knockback are
+     * separate systems that don't conflict.
      */
-    private void neutralizeArmorStats(@Nonnull Item item) {
+    private void decoupleArmor(@Nonnull Item item) {
         com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor armor = item.getArmor();
         if (armor == null) {
             return;
         }
 
         try {
-            // Create a clean ItemArmor with zero stats, preserving only structural fields
-            com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor clean =
+            // Full field-by-field copy — preserves ALL mod-specific armor properties.
+            Class<?> armorClass = armor.getClass();
+            com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor decoupled =
                 new com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor(
-                    armor.getArmorSlot(),   // preserve slot (Head/Chest/Legs/Hands)
-                    0.0,                    // zero baseDamageResistance
-                    null,                   // null statModifiers
-                    armor.toPacket().cosmeticsToHide  // preserve cosmetics
-                );
-            // All other fields (damageResistanceValues, damageEnhancementValues,
-            // damageClassEnhancement, knockbackResistances, knockbackEnhancements,
-            // regeneratingValues, interactionModifiers) default to null/empty.
+                    armor.getArmorSlot(), 0.0, null, null);
 
-            ITEM_ARMOR_FIELD.set(item, clean);
+            for (Field field : armorClass.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                field.set(decoupled, field.get(armor));
+            }
 
-            LOGGER.atFine().log("Neutralized armor stats for RPG item");
-        } catch (IllegalAccessException e) {
+            // Zero baseDamageResistance to prevent FilterDamageGroup double-dip.
+            // This is the ONLY field we intentionally clear — everything else stays.
+            Field bdrField = armorClass.getDeclaredField("baseDamageResistance");
+            bdrField.setAccessible(true);
+            bdrField.setDouble(decoupled, 0.0);
+
+            ITEM_ARMOR_FIELD.set(item, decoupled);
+
+            LOGGER.atFine().log("De-coupled armor for RPG item (all fields preserved, baseDamageResistance zeroed)");
+        } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
-                "Failed to neutralize armor stats - vanilla armor stats may leak");
+                "Failed to de-couple armor — shared reference remains");
         }
     }
 
     /**
-     * Replaces the item's {@code ItemWeapon} with a clean copy that preserves
-     * weapon-mechanic fields while preventing vanilla combat stat leakage.
+     * De-couples the item's {@code ItemWeapon} from the shared base reference.
      *
-     * <p>Preserves via reflection:
-     * <ul>
-     *   <li>{@code renderDualWielded} — dual-wield rendering flag</li>
-     *   <li>{@code entityStatsToClear} — resets SignatureEnergy/Ammo on weapon swap</li>
-     *   <li>{@code statModifiers} — ALL weapon stat modifiers (see below)</li>
-     * </ul>
-     *
-     * <h3>Why statModifiers are preserved entirely</h3>
-     * <p>Vanilla weapon.statModifiers contain ONLY weapon-mechanic stats, never combat stats:
-     * <table>
-     * <tr><th>Stat</th><th>Weapons</th><th>Purpose</th></tr>
-     * <tr><td>SignatureEnergy</td><td>Sword(20), Battleaxe(9), Mace(8), Daggers(27), Shortbow(6), Crossbow(5)</td><td>Signature ability charge pool</td></tr>
-     * <tr><td>SignatureCharges</td><td>Shortbow(1), Crossbow(1)</td><td>Signature charge counter</td></tr>
-     * <tr><td>Ammo</td><td>Crossbow(6)</td><td>Bolt capacity — reload loop exit condition</td></tr>
-     * </table>
-     *
-     * <p>Combat stats (Health, Stamina, Mana) are never in weapon.statModifiers — they only
-     * appear in armor.statModifiers. Our {@link VanillaEquipmentStatSuppressor} handles those.
-     * Stripping weapon.statModifiers was breaking: crossbow reload (Ammo=0), signature attacks
-     * (SignatureEnergy=0), and charged shots (SignatureCharges=0) on ALL RPG weapons.
+     * <p>Creates an independent copy with ALL fields preserved via full field-by-field
+     * reflection copy. This includes statModifiers (SignatureEnergy, Ammo, SignatureCharges),
+     * entityStatsToClear, renderDualWielded, and any mod-specific weapon fields.
      */
-    private void neutralizeWeaponStats(@Nonnull Item item) {
+    private void decoupleWeapon(@Nonnull Item item) {
         com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon weapon = item.getWeapon();
         if (weapon == null) {
             return;
@@ -826,7 +838,7 @@ public final class ItemRegistryService {
             @SuppressWarnings("unchecked")
             Int2ObjectMap<StaticModifier[]> statModifiers =
                 (Int2ObjectMap<StaticModifier[]>) WEAPON_STAT_MODIFIERS_FIELD.get(clean);
-            LOGGER.atFine().log("Neutralized weapon for RPG item (preserved entityStatsToClear + %d stat modifier(s))",
+            LOGGER.atFine().log("De-coupled weapon for RPG item (preserved all %d stat modifier(s))",
                 statModifiers != null ? statModifiers.size() : 0);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
@@ -835,21 +847,20 @@ public final class ItemRegistryService {
     }
 
     /**
-     * Replaces the item's {@code ItemUtility} with a clean copy that preserves
-     * structural flags and mechanic stat modifiers.
+     * De-couples the item's {@code ItemUtility} from the shared base reference.
      *
-     * <p>Preserves: {@code usable}, {@code compatible}, {@code entityStatsToClear},
-     * and {@code statModifiers}. Same rationale as weapon stat preservation — utility
-     * stat modifiers (if any) are weapon-mechanic stats, not combat stats.
+     * <p>Creates an independent copy with ALL fields preserved via full field-by-field
+     * reflection copy. This includes usable, compatible, entityStatsToClear, statModifiers,
+     * and any mod-specific utility fields.
      */
-    private void neutralizeUtilityStats(@Nonnull Item item) {
+    private void decoupleUtility(@Nonnull Item item) {
         com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility utility = item.getUtility();
         if (utility == null) {
             return;
         }
 
         try {
-            // Copy ALL instance fields — same pattern as neutralizeWeaponStats().
+            // Copy ALL instance fields — same pattern as decoupleWeapon().
             Class<?> utilityClass = utility.getClass();
             com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility clean =
                 new com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility();
@@ -867,7 +878,7 @@ public final class ItemRegistryService {
             @SuppressWarnings("unchecked")
             Int2ObjectMap<StaticModifier[]> statModifiers =
                 (Int2ObjectMap<StaticModifier[]>) UTILITY_STAT_MODIFIERS_FIELD.get(clean);
-            LOGGER.atFine().log("Neutralized utility for RPG item (preserved entityStatsToClear + %d stat modifier(s))",
+            LOGGER.atFine().log("De-coupled utility for RPG item (preserved all %d stat modifier(s))",
                 statModifiers != null ? statModifiers.size() : 0);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
@@ -1001,10 +1012,18 @@ public final class ItemRegistryService {
                 return;
             }
 
-            // REPLACE all ResourceTypes with our reskin type(s).
-            ItemResourceType[] newTypes = reskinTypes.toArray(new ItemResourceType[0]);
+            // MERGE our reskin types with the item's existing ResourceTypes.
+            // Mod items may define ResourceTypes for custom crafting/salvage recipes —
+            // replacing them would destroy mod functionality. Our reskin workbench only
+            // checks for the presence of our specific reskin type IDs.
+            ItemResourceType[] existingTypes = (ItemResourceType[]) ITEM_RESOURCE_TYPES_FIELD.get(customItem);
+            List<ItemResourceType> merged = new ArrayList<>();
+            if (existingTypes != null) {
+                Collections.addAll(merged, existingTypes);
+            }
+            merged.addAll(reskinTypes);
 
-            ITEM_RESOURCE_TYPES_FIELD.set(customItem, newTypes);
+            ITEM_RESOURCE_TYPES_FIELD.set(customItem, merged.toArray(new ItemResourceType[0]));
 
             // Clear the cached toPacket() result so the client gets the updated ResourceTypes.
             try {
