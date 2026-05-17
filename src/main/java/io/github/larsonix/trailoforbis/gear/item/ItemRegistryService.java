@@ -805,6 +805,7 @@ public final class ItemRegistryService {
                 "statModifiers",              // HP/Stamina/Mana bonuses → VanillaEquipmentStatSuppressor backup
                 "rawStatModifiers",           // raw version of above (compiled on decode)
                 "damageResistanceValues",     // per-element defense → our ElementalCalculator
+                "damageResistanceValuesRaw",  // raw version of above (compiled on decode)
                 "damageEnhancementValues",    // per-element offense → our damage pipeline
                 "damageEnhancementValuesRaw", // raw version of above
                 "damageClassEnhancement",     // per-class (Light/Charged/Sig) → our attack type system
