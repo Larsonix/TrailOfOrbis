@@ -754,17 +754,27 @@ public final class ItemRegistryService {
     /**
      * De-couples the item's {@code ItemArmor} from the shared base reference.
      *
-     * <p>Creates an independent copy with ALL fields preserved via full field-by-field copy,
-     * then zeroes only {@code baseDamageResistance}. This preserves mod-specific armor
-     * properties (knockback resistances, damage resistances, regenerating values, cosmetics,
-     * custom stat modifiers) while preventing vanilla armor reduction from double-dipping.
+     * <p>Creates an independent copy via full field-by-field copy, then zeroes ALL combat
+     * stat fields. Our RPG system is the sole authority for all offensive and defensive
+     * numbers — no vanilla or modded combat stats should leak through.
      *
-     * <p><b>Why baseDamageResistance must be zeroed:</b> Hytale's {@code FilterDamageGroup}
-     * runs AFTER our {@code RPGDamageSystem} and applies vanilla armor reduction from this
-     * field. Since our system already applies RPG-calculated armor, leaving the vanilla value
-     * would cause double defense. All other fields are safe — stat modifiers are handled by
-     * {@code VanillaEquipmentStatSuppressor}, and mod-specific resistances/knockback are
-     * separate systems that don't conflict.
+     * <h3>Preserved (base gameplay feel)</h3>
+     * <ul>
+     *   <li>{@code armorSlot} — structural (Head/Chest/Legs/Hands)</li>
+     *   <li>{@code cosmeticsToHide} — visual only</li>
+     *   <li>{@code knockbackResistances/knockbackEnhancements} — gameplay feel, not damage numbers</li>
+     * </ul>
+     *
+     * <h3>Zeroed (RPG system is sole authority)</h3>
+     * <ul>
+     *   <li>{@code baseDamageResistance} — prevents FilterDamageGroup double-dip</li>
+     *   <li>{@code statModifiers/rawStatModifiers} — prevents vanilla HP/Stamina/Mana bonuses</li>
+     *   <li>{@code damageResistanceValues} — per-element defense (our ElementalCalculator handles this)</li>
+     *   <li>{@code damageEnhancementValues/damageEnhancementValuesRaw} — per-element offense</li>
+     *   <li>{@code damageClassEnhancement} — per-class (Light/Charged/Signature) scaling</li>
+     *   <li>{@code regeneratingValues/regenerating} — resource regen (our stat pipeline handles this)</li>
+     *   <li>{@code interactionModifiers/interactionModifiersRaw} — per-interaction combat stat changes</li>
+     * </ul>
      */
     private void decoupleArmor(@Nonnull Item item) {
         com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor armor = item.getArmor();
@@ -773,7 +783,8 @@ public final class ItemRegistryService {
         }
 
         try {
-            // Full field-by-field copy — preserves ALL mod-specific armor properties.
+            // Full field-by-field copy first — gets knockback, cosmetics, slot, and any
+            // future non-combat fields we don't know about yet.
             Class<?> armorClass = armor.getClass();
             com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor decoupled =
                 new com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor(
@@ -787,15 +798,44 @@ public final class ItemRegistryService {
                 field.set(decoupled, field.get(armor));
             }
 
-            // Zero baseDamageResistance to prevent FilterDamageGroup double-dip.
-            // This is the ONLY field we intentionally clear — everything else stays.
-            Field bdrField = armorClass.getDeclaredField("baseDamageResistance");
-            bdrField.setAccessible(true);
-            bdrField.setDouble(decoupled, 0.0);
+            // Zero ALL combat stat fields — RPG system is sole authority for damage numbers.
+            // Knockback resistances/enhancements and cosmetics are intentionally preserved.
+            String[] combatFields = {
+                "baseDamageResistance",       // flat armor → FilterDamageGroup double-dip
+                "statModifiers",              // HP/Stamina/Mana bonuses → VanillaEquipmentStatSuppressor backup
+                "rawStatModifiers",           // raw version of above (compiled on decode)
+                "damageResistanceValues",     // per-element defense → our ElementalCalculator
+                "damageEnhancementValues",    // per-element offense → our damage pipeline
+                "damageEnhancementValuesRaw", // raw version of above
+                "damageClassEnhancement",     // per-class (Light/Charged/Sig) → our attack type system
+                "regeneratingValues",         // resource regen → our stat pipeline
+                "regenerating",               // raw regen config
+                "interactionModifiers",       // per-interaction combat stats
+                "interactionModifiersRaw",    // raw version of above
+            };
+
+            for (String fieldName : combatFields) {
+                try {
+                    Field f = armorClass.getDeclaredField(fieldName);
+                    f.setAccessible(true);
+                    Class<?> fieldType = f.getType();
+                    if (fieldType == double.class) {
+                        f.setDouble(decoupled, 0.0);
+                    } else if (fieldType == float.class) {
+                        f.setFloat(decoupled, 0.0f);
+                    } else if (fieldType == int.class) {
+                        f.setInt(decoupled, 0);
+                    } else {
+                        f.set(decoupled, null);
+                    }
+                } catch (NoSuchFieldException ignored) {
+                    // Field doesn't exist in this Hytale version — skip safely
+                }
+            }
 
             ITEM_ARMOR_FIELD.set(item, decoupled);
 
-            LOGGER.atFine().log("De-coupled armor for RPG item (all fields preserved, baseDamageResistance zeroed)");
+            LOGGER.atFine().log("De-coupled armor for RPG item (combat stats zeroed, knockback/cosmetics preserved)");
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
                 "Failed to de-couple armor — shared reference remains");
