@@ -348,12 +348,18 @@ public final class WeaponInteractionPatcher {
     @Nullable
     private Object resolveInteractionAsset(@Nonnull String id) {
         try {
-            // Interaction.getAssetMap() — we need to find this class
             Class<?> interactionClass = Class.forName(
                 "com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction");
             java.lang.reflect.Method getAssetMap = interactionClass.getMethod("getAssetMap");
             Object assetMap = getAssetMap.invoke(null);
-            java.lang.reflect.Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
+            // getAsset takes the key type (String for Interaction assets)
+            java.lang.reflect.Method getAsset;
+            try {
+                getAsset = assetMap.getClass().getMethod("getAsset", String.class);
+            } catch (NoSuchMethodException e) {
+                // Fallback: try Object parameter (some asset maps use Object key)
+                getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
+            }
             return getAsset.invoke(assetMap, id);
         } catch (Exception e) {
             return null;
